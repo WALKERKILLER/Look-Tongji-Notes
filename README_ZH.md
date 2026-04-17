@@ -111,7 +111,7 @@ python "<SKILL_DIR>/scripts/look_tongji.py" note --lecture-url "<课程链接>"
   
 - Agent 找不到相应课程时：
   
-  先用 `list --all --query "<关键词>"` 在全量课程清单里搜索；或者直接在平台打开对应节次并复制课程链接再执行 `note --lecture-url "<课程链接>"`。
+  先用 `list --all --query "<关键词>"` 在全量课程清单里搜索；或者直接在平台打开对应节次并复制课程链接。
   
   ![example_link](images/example_link.png)
   
