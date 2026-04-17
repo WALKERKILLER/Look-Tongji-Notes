@@ -26,7 +26,7 @@ Copy the repo link to your agent and say: `help me install this skill`.
 
 Copy the whole `look-tongji-notes/` folder into your skills directory:
 - Codex: `~/.codex/skills/look-tongji-notes`
-- Claude Code: `~/.codex/skills/look-tongji-notes`
+- Claude Code: `~/.claude/skills/look-tongji-notes`
 
 ### Method 3 (Codex)
 
