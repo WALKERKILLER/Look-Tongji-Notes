@@ -26,7 +26,7 @@
 
 下载并解压仓库，把整个 `look-tongji-notes/` 文件夹复制到你的 skills 目录：
 - Codex：`~/.codex/skills/look-tongji-notes`
-- Claude Code：`~/.codex/skills/look-tongji-notes`
+- Claude Code：`~/.claude/skills/look-tongji-notes`
 
 ### 方法 3（Codex）
 
