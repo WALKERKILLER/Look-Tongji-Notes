@@ -113,9 +113,9 @@ If the user provides a course name, prefer `list --all --query ...` to avoid mis
 
   Use `list --all --query "<keyword>"` to search the full course list, or open the platform and copy the lecture URL.
 
-  ![example_link](F:/Tongji-look-Subscriber/skill/look-tongji-notes/images/example_link.png)
+  ![example_link](images/example_link.png)
 
-  then say: ``/look-tongji-notes here is the link， generate note``
+  then say: ``/look-tongji-notes here is the link，generate note``
 
 ## Contributing
 
