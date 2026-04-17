@@ -1,0 +1,15 @@
+{
+    "name": "look-tongji-notes",
+    "displayName": "Look-tongji-notes",
+    "version": "0.0.1",
+    "description": "Transcribing Lessons from Tongji Look Platform to Notes with Agent Skill.",
+    "author": {
+        "name": "WALKERKILLER",
+        "email": "walker_killer@163.com",
+        "url": "https://github.com/WALKERKILLER"
+    },
+    "homepage": "https://github.com/WALKERKILLER/look-tongji-notes",
+    "repository": "https://github.com/WALKERKILLER/look-tongji-notes",
+    "license": "MIT",
+    "keywords": ["notes", "tongji", "study", "review", "education"]
+}
