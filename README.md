@@ -86,7 +86,7 @@ If the user provides a course name, prefer `list --all --query ...` to avoid mis
 > It is strongly recommended to set your Tongji account/password via the CLI (`setup`) before asking the agent to generate notes. Do not paste passwords into chat.
 
 > [!NOTE]
-> - Inspiration and parts of the code are from: https://github.com/LeafCreeper/Fudan_iCourse_Subscriber
+> - Inspiration and parts of the code are from: [Fudan_iCourse_Subscriber](https://github.com/LeafCreeper/Fudan_iCourse_Subscriber)
 > - This project is intended for **personal learning and review** only, and for technical communication. It does not save full video files by default.
 > - Users must comply with the relevant platform rules and school policies. Any misuse (including re-distribution of copyrighted course videos/audios) is the user's responsibility.
 > - When logging in outside the campus network (or without Tongji VPN), enhanced authentication may be triggered. Keep this in mind if you run the agent remotely.
