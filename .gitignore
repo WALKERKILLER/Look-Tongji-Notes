@@ -1,0 +1,6 @@
+.env
+state/
+.trash/
+tongji-output/
+__pycache__/
+*.pyc
