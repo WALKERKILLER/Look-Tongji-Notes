@@ -1,7 +1,6 @@
 <p align="center">
   <a href="README.md"><strong>English</strong></a> | <strong>中文</strong>
 </p>
-# Tongji Look Notes
 
 <p align="center">
   <a href="LOGO"><img src="images/logo.svg"></a>
