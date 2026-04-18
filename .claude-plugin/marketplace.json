@@ -12,7 +12,7 @@
       "name": "look-tongji-notes",
       "source": "./",
       "description": "Transcribing Lessons from Tongji Look Platform to Notes with Agent Skill.",
-      "version": "0.0.1"
+      "version": "0.0.2"
     }
   ]
 }
