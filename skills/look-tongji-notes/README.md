@@ -14,7 +14,8 @@ This is an agent skill + CLI for Tongji Look (`look.tongji.edu.cn`):
 - login via Tongji IAM SSO (Playwright),
 - list courses (recent list or full search),
 - transcribe a lecture to `SRT` + `TXT`,
-- then let the current agent write a Markdown study note from the transcript.
+- download lecture slide snapshots (filename includes snapshot time),
+- then let the current agent write a Markdown study note from transcript + slide images.
 
 ## Install
 
@@ -26,7 +27,7 @@ Copy the repo link to your agent and say: `help me install this skill`.
 
 Copy the whole `look-tongji-notes/` folder into your skills directory:
 - Codex: `~/.codex/skills/look-tongji-notes`
-- Claude Code: `~/.codex/skills/look-tongji-notes`
+- Claude Code: `~/.claude/skills/look-tongji-notes`
 
 ### Method 3 (Codex)
 
@@ -67,10 +68,28 @@ Search courses by name (recommended for accuracy, calls `get_all_courses` intern
 python "<SKILL_DIR>/scripts/look_tongji.py" list --all --query "<COURSE_NAME_KEYWORD>"
 ```
 
-Transcribe a lecture:
+Transcript only (`transcribe`, aliases `transcript` / `trans`):
+
+```bash
+python "<SKILL_DIR>/scripts/look_tongji.py" transcribe --lecture-url "<LECTURE_URL>"
+```
+
+Combined mode (`note`, runs transcript + slide in parallel by default):
 
 ```bash
 python "<SKILL_DIR>/scripts/look_tongji.py" note --lecture-url "<LECTURE_URL>"
+```
+
+Download slide snapshots for a lecture:
+
+```bash
+python "<SKILL_DIR>/scripts/look_tongji.py" slide --lecture-url "<LECTURE_URL>"
+```
+
+If throttling is suspected, reduce concurrency:
+
+```bash
+python "<SKILL_DIR>/scripts/look_tongji.py" slide --course-id "<COURSE_ID>" --sub-id "<SUB_ID>" --concurrency 2 --retries 5
 ```
 
 Artifacts are written to `./tongji-output/` under your current working directory.
@@ -78,6 +97,8 @@ Artifacts are written to `./tongji-output/` under your current working directory
 ## Agent Note
 
 When a user says `look-tongji:setup` / `look-tongji:list` / `look-tongji:note`, follow `SKILL.md` and run the matching CLI commands in `scripts/look_tongji.py`.
+For `look-tongji:note`, default to running transcript + slide download in parallel; only skip slide download when the user explicitly asks not to download slides/PPT.
+When writing notes, use both transcript output and slide images by default.
 If the user provides a course name, prefer `list --all --query ...` to avoid missing courses that are not in the recent list.
 
 ## Notice / Compliance

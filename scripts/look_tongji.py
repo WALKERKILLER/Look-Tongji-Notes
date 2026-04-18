@@ -10,6 +10,7 @@ This script is designed to be used by a Codex skill:
 from __future__ import annotations
 
 import argparse
+import concurrent.futures
 import getpass
 import json
 import re
@@ -56,6 +57,28 @@ def _now_iso() -> str:
 
 def _print_err(msg: str) -> None:
     print(f"[ERROR] {msg}", file=sys.stderr)
+
+
+def _format_hms(total_seconds: int) -> str:
+    sec = max(0, int(total_seconds))
+    h = sec // 3600
+    m = (sec % 3600) // 60
+    s = sec % 60
+    return f"{h:02d}-{m:02d}-{s:02d}"
+
+
+def _safe_filename_part(value: str) -> str:
+    cleaned = re.sub(r"[^A-Za-z0-9._-]+", "_", value.strip())
+    return cleaned.strip("._-") or "item"
+
+
+def _guess_ext_from_url(url: str) -> str:
+    path = urlparse(url).path or ""
+    suffix = Path(path).suffix.lower()
+    if suffix in {".jpg", ".jpeg", ".png", ".webp", ".bmp"}:
+        return suffix
+    return ".jpg"
+
 
 def _trash_dir() -> Path:
     return _skill_root() / ".trash"
@@ -381,7 +404,7 @@ def _choose_lecture_from_course(client: TongjiClient, course_id: str, limit: int
 
     candidates = sorted(candidates, key=_sort_key, reverse=True)[:limit]
 
-    print("[Note] Lectures (latest first):")
+    print("[Select] Lectures (latest first):")
     for idx, lec in enumerate(candidates, 1):
         sub_id = str(lec.get("sub_id") or "")
         title = str(lec.get("sub_title") or "").strip()
@@ -401,41 +424,54 @@ def _choose_lecture_from_course(client: TongjiClient, course_id: str, limit: int
     return str(selected.get("sub_id") or ""), selected
 
 
-def cmd_note(args: argparse.Namespace) -> int:
-    try:
-        client, username = _ensure_authenticated_client(force_login=args.force_login)
-    except Exception as e:
-        _print_err(str(e))
-        return 1
+def _resolve_course_sub(
+    client: TongjiClient,
+    *,
+    lecture_url: str,
+    course_id: str,
+    sub_id: str,
+    lecture_limit: int,
+    tag: str,
+) -> tuple[str, str] | None:
+    course_id = (course_id or "").strip()
+    sub_id = (sub_id or "").strip()
 
-    course_id = (args.course_id or "").strip()
-    sub_id = (args.sub_id or "").strip()
-
-    if args.lecture_url:
-        parsed_course_id, parsed_sub_id = _extract_ids_from_url(args.lecture_url)
+    if lecture_url:
+        parsed_course_id, parsed_sub_id = _extract_ids_from_url(lecture_url)
         course_id = course_id or (parsed_course_id or "")
         sub_id = sub_id or (parsed_sub_id or "")
 
     if not course_id:
         last = _load_last_course_id()
         if last:
-            print(f"[Note] Using last selected course_id from state: {last}")
+            print(f"[{tag}] Using last selected course_id from state: {last}")
             course_id = last
 
     if not course_id:
         _print_err("Missing course_id. Provide --course-id or --lecture-url that contains it.")
-        return 2
+        return None
 
     if not sub_id:
         try:
-            sub_id, _ = _choose_lecture_from_course(client, course_id, limit=args.lecture_limit)
+            sub_id, _ = _choose_lecture_from_course(client, course_id, limit=lecture_limit)
         except Exception as e:
             _print_err(str(e))
-            return 2
+            return None
+    return course_id, sub_id
 
-    print(f"[Note] Logged in as: {username or '(unknown)'}")
-    print(f"[Note] course_id={course_id} sub_id={sub_id}")
 
+def _run_transcript_job(
+    *,
+    client: TongjiClient,
+    username: str,
+    course_id: str,
+    sub_id: str,
+    lecture_url: str,
+    output_dir: str,
+    tag: str = "Transcript",
+) -> int:
+    print(f"[{tag}] Logged in as: {username or '(unknown)'}")
+    print(f"[{tag}] course_id={course_id} sub_id={sub_id}")
     video_url = client.get_video_url(course_id, sub_id)
     if not video_url:
         _print_err("Failed to resolve video URL. The lecture may not have playback enabled.")
@@ -458,7 +494,7 @@ def cmd_note(args: argparse.Namespace) -> int:
         _print_err(f"Unexpected error: {type(e).__name__}: {e}")
         return 1
 
-    out_dir = _output_dir(args.output_dir)
+    out_dir = _output_dir(output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
     base = f"{course_id}_{sub_id}"
@@ -474,7 +510,7 @@ def cmd_note(args: argparse.Namespace) -> int:
             {
                 "course_id": course_id,
                 "sub_id": sub_id,
-                "lecture_url": args.lecture_url or "",
+                "lecture_url": lecture_url or "",
                 "video_url": video_url,
                 "generated_at": _now_iso(),
                 "user": username or "",
@@ -491,11 +527,291 @@ def cmd_note(args: argparse.Namespace) -> int:
         encoding="utf-8",
     )
 
-    print("[Note] Done. Files written:")
+    print(f"[{tag}] Done. Files written:")
     print(f"  - {txt_path}")
     if srt_content:
         print(f"  - {srt_path}")
     print(f"  - {meta_path}")
+    return 0
+
+
+def _download_one_slide(
+    client: TongjiClient,
+    item: dict[str, Any],
+    out_dir: Path,
+    index: int,
+    timeout: int,
+    retries: int,
+) -> tuple[dict[str, Any], str | None]:
+    created_sec = int(item.get("created_sec") or 0)
+    image_url = str(item.get("image_url") or "").strip()
+    if not image_url:
+        return item, "missing image_url"
+
+    stamp = _format_hms(created_sec)
+    ext = _guess_ext_from_url(image_url)
+    filename = f"{index:04d}_t{stamp}_s{created_sec:06d}{ext}"
+    path = out_dir / _safe_filename_part(filename)
+
+    last_err = ""
+    for attempt in range(1, max(1, retries) + 1):
+        try:
+            resp = client.session.get(image_url, timeout=timeout)
+            if resp.status_code == 200 and resp.content:
+                path.write_bytes(resp.content)
+                item["filename"] = path.name
+                item["filepath"] = str(path)
+                item["downloaded_at"] = _now_iso()
+                item["bytes"] = len(resp.content)
+                return item, None
+
+            last_err = f"http {resp.status_code}"
+            if resp.status_code in (429, 500, 502, 503, 504):
+                time.sleep(0.5 * attempt)
+        except Exception as e:
+            last_err = f"{type(e).__name__}: {e}"
+            time.sleep(0.5 * attempt)
+
+    return item, last_err or "download failed"
+
+
+def _run_slide_job(
+    *,
+    client: TongjiClient,
+    username: str,
+    course_id: str,
+    sub_id: str,
+    lecture_url: str,
+    output_dir: str,
+    per_page: int,
+    max_pages: int,
+    max_items: int,
+    concurrency: int,
+    retries: int,
+    timeout: int,
+    tag: str = "Slide",
+) -> int:
+    print(f"[{tag}] Logged in as: {username or '(unknown)'}")
+    print(f"[{tag}] course_id={course_id} sub_id={sub_id}")
+    try:
+        snapshots = client.get_ppt_snapshots(
+            course_id,
+            sub_id,
+            per_page=max(1, int(per_page)),
+            max_pages=max(1, int(max_pages)),
+        )
+    except Exception as e:
+        _print_err(f"Failed to list slide snapshots: {e}")
+        return 1
+
+    if not snapshots:
+        _print_err("No slide snapshots found for this lecture.")
+        return 1
+
+    if max_items and max_items > 0:
+        snapshots = snapshots[: max_items]
+
+    out_dir = (
+        Path(output_dir).expanduser().resolve()
+        if output_dir
+        else (Path.cwd() / "tongji-output" / f"slide_{course_id}_{sub_id}").resolve()
+    )
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    concurrency = max(1, min(int(concurrency), 16))
+    retries = max(1, min(int(retries), 8))
+    timeout = max(5, int(timeout))
+
+    print(
+        f"[{tag}] Found {len(snapshots)} snapshots. Downloading with "
+        f"concurrency={concurrency}, retries={retries}, timeout={timeout}s ..."
+    )
+
+    results: list[dict[str, Any]] = []
+    failures: list[dict[str, Any]] = []
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=concurrency) as executor:
+        fut_map = {
+            executor.submit(
+                _download_one_slide,
+                client,
+                item,
+                out_dir,
+                idx,
+                timeout,
+                retries,
+            ): item
+            for idx, item in enumerate(snapshots, 1)
+        }
+
+        done_count = 0
+        total = len(fut_map)
+        for fut in concurrent.futures.as_completed(fut_map):
+            item, err = fut.result()
+            done_count += 1
+            if err:
+                failures.append({"item": item, "error": err})
+            else:
+                results.append(item)
+            if done_count % 10 == 0 or done_count == total:
+                print(f"[{tag}] Progress: {done_count}/{total}")
+
+    results.sort(key=lambda x: int(x.get("created_sec") or 0))
+
+    meta_path = out_dir / "index.json"
+    meta = {
+        "course_id": course_id,
+        "sub_id": sub_id,
+        "lecture_url": lecture_url or "",
+        "generated_at": _now_iso(),
+        "user": username or "",
+        "download": {
+            "requested": len(snapshots),
+            "succeeded": len(results),
+            "failed": len(failures),
+            "concurrency": concurrency,
+            "retries": retries,
+            "timeout_seconds": timeout,
+        },
+        "items": results,
+        "failures": failures,
+    }
+    meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+    print(f"[{tag}] Done.")
+    print(f"  - output_dir: {out_dir}")
+    print(f"  - success: {len(results)}")
+    print(f"  - failed: {len(failures)}")
+    print(f"  - index: {meta_path}")
+    if failures:
+        print(f"[{tag}] Some downloads failed. You can re-run with lower --concurrency (e.g. 2) or higher --retries.")
+    return 0 if not failures else 3
+
+
+def cmd_transcript(args: argparse.Namespace) -> int:
+    try:
+        client, username = _ensure_authenticated_client(force_login=args.force_login)
+    except Exception as e:
+        _print_err(str(e))
+        return 1
+    resolved = _resolve_course_sub(
+        client,
+        lecture_url=args.lecture_url,
+        course_id=args.course_id,
+        sub_id=args.sub_id,
+        lecture_limit=args.lecture_limit,
+        tag="Transcript",
+    )
+    if not resolved:
+        return 2
+    course_id, sub_id = resolved
+    return _run_transcript_job(
+        client=client,
+        username=username,
+        course_id=course_id,
+        sub_id=sub_id,
+        lecture_url=args.lecture_url,
+        output_dir=args.output_dir,
+        tag="Transcript",
+    )
+
+
+def cmd_slide(args: argparse.Namespace) -> int:
+    try:
+        client, username = _ensure_authenticated_client(force_login=args.force_login)
+    except Exception as e:
+        _print_err(str(e))
+        return 1
+    resolved = _resolve_course_sub(
+        client,
+        lecture_url=args.lecture_url,
+        course_id=args.course_id,
+        sub_id=args.sub_id,
+        lecture_limit=args.lecture_limit,
+        tag="Slide",
+    )
+    if not resolved:
+        return 2
+    course_id, sub_id = resolved
+    return _run_slide_job(
+        client=client,
+        username=username,
+        course_id=course_id,
+        sub_id=sub_id,
+        lecture_url=args.lecture_url,
+        output_dir=args.output_dir,
+        per_page=args.per_page,
+        max_pages=args.max_pages,
+        max_items=args.max_items,
+        concurrency=args.concurrency,
+        retries=args.retries,
+        timeout=args.timeout,
+        tag="Slide",
+    )
+
+
+def cmd_note(args: argparse.Namespace) -> int:
+    try:
+        client, username = _ensure_authenticated_client(force_login=args.force_login)
+    except Exception as e:
+        _print_err(str(e))
+        return 1
+    resolved = _resolve_course_sub(
+        client,
+        lecture_url=args.lecture_url,
+        course_id=args.course_id,
+        sub_id=args.sub_id,
+        lecture_limit=args.lecture_limit,
+        tag="Note",
+    )
+    if not resolved:
+        return 2
+    course_id, sub_id = resolved
+
+    jwt_token = client.auth.get_jwt_token() or ""
+    t_client = _build_client_from_jwt(jwt_token) if jwt_token else client
+    s_client = _build_client_from_jwt(jwt_token) if jwt_token else client
+    t_client = t_client or client
+    s_client = s_client or client
+
+    print("[Note] Running transcript and slide jobs in parallel...")
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+        fut_transcript = executor.submit(
+            _run_transcript_job,
+            client=t_client,
+            username=username,
+            course_id=course_id,
+            sub_id=sub_id,
+            lecture_url=args.lecture_url,
+            output_dir=args.output_dir,
+            tag="Transcript",
+        )
+        fut_slide = None
+        if not args.no_slide:
+            fut_slide = executor.submit(
+                _run_slide_job,
+                client=s_client,
+                username=username,
+                course_id=course_id,
+                sub_id=sub_id,
+                lecture_url=args.lecture_url,
+                output_dir=args.slide_output_dir,
+                per_page=args.per_page,
+                max_pages=args.max_pages,
+                max_items=args.max_items,
+                concurrency=args.concurrency,
+                retries=args.retries,
+                timeout=args.timeout,
+                tag="Slide",
+            )
+
+        transcript_code = int(fut_transcript.result())
+        slide_code = int(fut_slide.result()) if fut_slide is not None else 0
+
+    if transcript_code != 0:
+        return transcript_code
+    if slide_code != 0:
+        return slide_code
     return 0
 
 
@@ -526,12 +842,52 @@ def build_parser() -> argparse.ArgumentParser:
     p_list.add_argument("--force-login", action="store_true", help="Ignore cached JWT and login again")
     p_list.set_defaults(func=cmd_list)
 
-    p_note = sub.add_parser("note", help="Transcribe one lecture to SRT/TXT")
+    p_transcript = sub.add_parser("transcribe", aliases=["transcript", "trans"], help="Transcribe one lecture to SRT/TXT")
+    p_transcript.add_argument("--lecture-url", default="", help="Tongji lecture page URL (best-effort parsing)")
+    p_transcript.add_argument("--course-id", default="", help="Course ID")
+    p_transcript.add_argument("--sub-id", default="", help="Lecture sub_id")
+    p_transcript.add_argument("--lecture-limit", type=int, default=20, help="Max lectures shown for interactive choice")
+    p_transcript.add_argument("--output-dir", default="", help="Output directory (default: ./tongji-output)")
+    p_transcript.add_argument("--force-login", action="store_true", help="Ignore cached JWT and login again")
+    p_transcript.set_defaults(func=cmd_transcript)
+
+    p_slide = sub.add_parser("slide", help="Download lecture slide snapshots for one lecture")
+    p_slide.add_argument("--lecture-url", default="", help="Tongji lecture page URL (best-effort parsing)")
+    p_slide.add_argument("--course-id", default="", help="Course ID")
+    p_slide.add_argument("--sub-id", default="", help="Lecture sub_id")
+    p_slide.add_argument("--lecture-limit", type=int, default=20, help="Max lectures shown for interactive choice")
+    p_slide.add_argument(
+        "--output-dir",
+        default="",
+        help="Output directory (default: ./tongji-output/slide_<course_id>_<sub_id>)",
+    )
+    p_slide.add_argument("--per-page", type=int, default=100, help="search-ppt per_page parameter")
+    p_slide.add_argument("--max-pages", type=int, default=20, help="Max pages to request from search-ppt")
+    p_slide.add_argument("--max-items", type=int, default=0, help="Download at most N snapshots (0 means all)")
+    p_slide.add_argument("--concurrency", type=int, default=4, help="Concurrent download workers (1-16)")
+    p_slide.add_argument("--retries", type=int, default=3, help="Retry attempts per image")
+    p_slide.add_argument("--timeout", type=int, default=30, help="HTTP timeout seconds per image request")
+    p_slide.add_argument("--force-login", action="store_true", help="Ignore cached JWT and login again")
+    p_slide.set_defaults(func=cmd_slide)
+
+    p_note = sub.add_parser("note", help="Run transcript + slide in parallel for one lecture")
     p_note.add_argument("--lecture-url", default="", help="Tongji lecture page URL (best-effort parsing)")
     p_note.add_argument("--course-id", default="", help="Course ID")
     p_note.add_argument("--sub-id", default="", help="Lecture sub_id")
     p_note.add_argument("--lecture-limit", type=int, default=20, help="Max lectures shown for interactive choice")
-    p_note.add_argument("--output-dir", default="", help="Output directory (default: ./tongji-output)")
+    p_note.add_argument("--output-dir", default="", help="Transcript output directory (default: ./tongji-output)")
+    p_note.add_argument(
+        "--slide-output-dir",
+        default="",
+        help="Slide output directory (default: ./tongji-output/slide_<course_id>_<sub_id>)",
+    )
+    p_note.add_argument("--no-slide", action="store_true", help="Skip slide download and run transcript only")
+    p_note.add_argument("--per-page", type=int, default=100, help="search-ppt per_page parameter")
+    p_note.add_argument("--max-pages", type=int, default=20, help="Max pages to request from search-ppt")
+    p_note.add_argument("--max-items", type=int, default=0, help="Download at most N slide snapshots (0 means all)")
+    p_note.add_argument("--concurrency", type=int, default=4, help="Concurrent slide download workers (1-16)")
+    p_note.add_argument("--retries", type=int, default=3, help="Retry attempts per slide image")
+    p_note.add_argument("--timeout", type=int, default=30, help="HTTP timeout seconds per slide image request")
     p_note.add_argument("--force-login", action="store_true", help="Ignore cached JWT and login again")
     p_note.set_defaults(func=cmd_note)
 
