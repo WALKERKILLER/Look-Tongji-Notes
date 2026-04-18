@@ -14,7 +14,8 @@
 - 使用 Playwright 完成同济统一认证登录
 - 列出课程（最近课程 / 全量搜索）
 - 转写指定课程节次，输出字幕 `SRT` 与纯文本 `TXT`
-- 再由当前 Agent 基于转写文本生成 Markdown 笔记
+- 下载指定课程节次的 slide 截图（文件名包含截图时间）
+- 再由当前 Agent 基于转写文本 + slide 图片生成 Markdown 笔记
 
 ## 安装
 
@@ -26,7 +27,7 @@
 
 下载并解压仓库，把整个 `look-tongji-notes/` 文件夹复制到你的 skills 目录：
 - Codex：`~/.codex/skills/look-tongji-notes`
-- Claude Code：`~/.codex/skills/look-tongji-notes`
+- Claude Code：`~/.claude/skills/look-tongji-notes`
 
 ### 方法 3（Codex）
 
@@ -67,10 +68,28 @@ python "<SKILL_DIR>/scripts/look_tongji.py" list
 python "<SKILL_DIR>/scripts/look_tongji.py" list --all --query "<课程名关键词>"
 ```
 
-转写指定节次：
+仅转写指定节次（`transcribe`，别名 `transcript` / `trans`）：
+
+```bash
+python "<SKILL_DIR>/scripts/look_tongji.py" transcribe --lecture-url "<课程链接>"
+```
+
+组合模式（`note`，默认并行执行转写 + slide 拉取）：
 
 ```bash
 python "<SKILL_DIR>/scripts/look_tongji.py" note --lecture-url "<课程链接>"
+```
+
+下载该节课的 slide 截图：
+
+```bash
+python "<SKILL_DIR>/scripts/look_tongji.py" slide --lecture-url "<课程链接>"
+```
+
+若怀疑触发限流，可降低并发：
+
+```bash
+python "<SKILL_DIR>/scripts/look_tongji.py" slide --course-id "<COURSE_ID>" --sub-id "<SUB_ID>" --concurrency 2 --retries 5
 ```
 
 字幕/转写会输出到你当前工作目录的 `./tongji-output/`。
@@ -78,6 +97,8 @@ python "<SKILL_DIR>/scripts/look_tongji.py" note --lecture-url "<课程链接>"
 ## Agent Note
 
 当用户说 `look-tongji:setup` / `look-tongji:list` / `look-tongji:note` 时，按 `SKILL.md` 的流程执行，并运行 `scripts/look_tongji.py` 的对应命令。
+`look-tongji:note` 默认并行执行转录和 slide 拉取；仅在用户显式提出不下载 slide/PPT 时才只做转录。
+整理笔记时默认同时参考转录结果和 slide 图片。
 如果用户给的是“课程名称”，优先用 `list --all --query ...`，避免最近课程列表遗漏导致选错课程。
 
 ## 声明 / 合规
@@ -111,7 +132,7 @@ python "<SKILL_DIR>/scripts/look_tongji.py" note --lecture-url "<课程链接>"
   
 - Agent 找不到相应课程时：
   
-  先用 `list --all --query "<关键词>"` 在全量课程清单里搜索；或者直接在平台打开对应节次并复制课程链接再执行 `note --lecture-url "<课程链接>"`。
+  先用 `list --all --query "<关键词>"` 在全量课程清单里搜索；或者直接在平台打开对应节次并复制课程链接。
   
   ![example_link](images/example_link.png)
   
