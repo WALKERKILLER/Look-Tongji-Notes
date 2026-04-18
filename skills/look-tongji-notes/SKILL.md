@@ -145,10 +145,28 @@ The CLI writes to `./tongji-output/` (relative to the current working directory)
 - `<course_id>_<sub_id>.json` (metadata)
 - `slide_<course_id>_<sub_id>/` (slide images + `index.json`)
 
+Important transcript-reading rule:
+- For note writing, **do not use** `<course_id>_<sub_id>.json` as the main transcript source (JSON ASR payloads are noisy).
+- Always prioritize:
+  1) `<course_id>_<sub_id>.txt` (preferred when timestamps are not required),
+  2) `<course_id>_<sub_id>.srt` (use when timeline/timestamp context is needed).
+
+Important slide-reading rule:
+- For note writing, **do not use** `slide_<course_id>_<sub_id>/index.json` as the main slide timeline source (often noisy).
+- Read slide image files directly and parse ordering/time from filenames.
+- Filename format example: `0102_t01-32-45_s005565.jpg`
+  - `0102`: slide sequence number
+  - `t01-32-45`: timestamp `hh-mm-ss`
+  - `s005565`: total seconds from lecture start (`1*3600 + 32*60 + 45 = 5565`)
+
 ### Write the Markdown note (by the current agent)
 
 After the CLI finishes, read transcript `TXT` plus slide metadata/images and write:
 - `<course_id>_<sub_id>_notes.md` in the same `tongji-output/` folder.
+
+Important responsibility boundary:
+- The CLI only fetches/transcribes/downloads artifacts; it does **not** generate study-note Markdown content.
+- The current AI agent must organize transcript + slides and write the final Markdown notes.
 
 Use the following note prompt and output **only Markdown** (notes content should be in Simplified Chinese):
 
