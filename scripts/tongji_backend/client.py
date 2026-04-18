@@ -230,6 +230,103 @@ class TongjiClient:
         print("    All API endpoints failed")
         return {"title": "Unknown", "teacher": "Unknown", "lectures": []}
 
+    @staticmethod
+    def _safe_int(value, default: int = 0) -> int:
+        try:
+            return int(value)
+        except Exception:
+            return default
+
+    def _parse_ppt_item(self, item: dict) -> dict | None:
+        content = item.get("content")
+        if isinstance(content, str):
+            try:
+                content = json.loads(content)
+            except Exception:
+                content = {}
+        if not isinstance(content, dict):
+            content = {}
+
+        image_url = str(content.get("pptimgurl") or content.get("pptthumb") or "").strip()
+        if not image_url:
+            return None
+
+        created_sec = self._safe_int(
+            item.get("created_sec", content.get("created", 0)),
+            default=0,
+        )
+
+        return {
+            "course_id": str(item.get("course_id") or "").strip(),
+            "sub_id": str(item.get("sub_id") or "").strip(),
+            "created_sec": created_sec,
+            "image_url": image_url,
+            "thumb_url": str(content.get("pptthumb") or "").strip(),
+            "detecttype": str(content.get("detecttype") or "").strip(),
+            "is_key": bool(content.get("is_key")),
+            "raw": item,
+        }
+
+    def get_ppt_snapshots(
+        self,
+        course_id: str,
+        sub_id: str,
+        *,
+        per_page: int = 100,
+        max_pages: int = 20,
+    ) -> list[dict]:
+        """List PPT snapshot metadata for one lecture."""
+        api_url = f"{self.base_url}/pptnote/v1/schedule/search-ppt"
+        per_page = max(1, int(per_page))
+        max_pages = max(1, int(max_pages))
+
+        snapshots: list[dict] = []
+        seen: set[tuple[int, str]] = set()
+        total_hint = 0
+
+        for page in range(1, max_pages + 1):
+            params = {
+                "course_id": course_id,
+                "sub_id": sub_id,
+                "page": page,
+                "per_page": per_page,
+            }
+            resp = self.session.get(api_url, params=params, timeout=30)
+            if resp.status_code != 200:
+                raise RuntimeError(f"search-ppt failed (HTTP {resp.status_code})")
+
+            data = resp.json()
+            code = data.get("code")
+            if code not in (0, 200, "0", "200"):
+                raise RuntimeError(f"search-ppt failed (code={code}, msg={data.get('msg', '')})")
+
+            items = data.get("list") or []
+            total_hint = max(total_hint, self._safe_int(data.get("total"), default=0))
+            added = 0
+
+            for item in items:
+                if not isinstance(item, dict):
+                    continue
+                parsed = self._parse_ppt_item(item)
+                if not parsed:
+                    continue
+                key = (parsed["created_sec"], parsed["image_url"])
+                if key in seen:
+                    continue
+                seen.add(key)
+                snapshots.append(parsed)
+                added += 1
+
+            if added == 0:
+                break
+            if total_hint and len(snapshots) >= total_hint:
+                break
+            if len(items) < per_page:
+                break
+
+        snapshots.sort(key=lambda x: (x.get("created_sec", 0), x.get("image_url", "")))
+        return snapshots
+
     def _parse_course_detail(self, data: dict) -> dict:
         """Parse course detail from API response."""
         course_data = data.get("data", {})
