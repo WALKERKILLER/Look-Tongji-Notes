@@ -1,7 +1,7 @@
 {
     "name": "look-tongji-notes",
     "displayName": "Look-tongji-notes",
-    "version": "0.0.2",
+    "version": "0.0.3",
     "description": "Transcribing Lessons from Tongji Look Platform to Notes with Agent Skill.",
     "author": {
         "name": "WALKERKILLER",

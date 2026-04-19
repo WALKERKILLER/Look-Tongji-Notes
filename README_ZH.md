@@ -14,6 +14,7 @@
 - 使用 Playwright 完成同济统一认证登录
 - 列出课程（最近课程 / 全量搜索）
 - 转写指定课程节次，输出字幕 `SRT` 与纯文本 `TXT`
+- 根据字幕 `SRT` 由当前 Agent 生成“时间轴大纲”（`*_timeline.txt`，中文）
 - 下载指定课程节次的 slide 截图（文件名包含截图时间）
 - 再由当前 Agent 基于转写文本 + slide 图片生成 Markdown 笔记
 
@@ -91,6 +92,11 @@ python "<SKILL_DIR>/scripts/look_tongji.py" slide --lecture-url "<课程链接>"
 ```bash
 python "<SKILL_DIR>/scripts/look_tongji.py" slide --course-id "<COURSE_ID>" --sub-id "<SUB_ID>" --concurrency 2 --retries 5
 ```
+在 `look-tongji:note` 的工作流中，Agent 会在 `SRT` 生成后，额外输出一份用于视频总览的时间轴大纲：
+- 文件：`./tongji-output/<course_id>_<sub_id>_timeline.txt`
+- 格式（每行一个时间段，中文）：`起始时间-结束时间：课程阶段内容`
+  - 示例：`00:00-05:30：课程定位与考核说明`
+- 仅当用户明确提出 `不要大纲` / `不要时间线` / `no outline` / `no timeline` 时才跳过生成。
 
 字幕/转写会输出到你当前工作目录的 `./tongji-output/`。
 

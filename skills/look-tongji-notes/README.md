@@ -14,6 +14,7 @@ This is an agent skill + CLI for Tongji Look (`look.tongji.edu.cn`):
 - login via Tongji IAM SSO (Playwright),
 - list courses (recent list or full search),
 - transcribe a lecture to `SRT` + `TXT`,
+- generate a lecture timeline outline (`*_timeline.txt`) from `SRT` (agent-generated, Simplified Chinese),
 - download lecture slide snapshots (filename includes snapshot time),
 - then let the current agent write a Markdown study note from transcript + slide images.
 
@@ -93,6 +94,12 @@ python "<SKILL_DIR>/scripts/look_tongji.py" slide --course-id "<COURSE_ID>" --su
 ```
 
 Artifacts are written to `./tongji-output/` under your current working directory.
+
+In the `look-tongji:note` workflow, the agent generates a timeline outline after the `SRT` subtitle file is produced:
+- File: `./tongji-output/<course_id>_<sub_id>_timeline.txt`
+- One line per segment (Simplified Chinese), format: `Start-Over：Stage Main Content`
+  - Example: `00:00-05:30：Course Orientation and Assessment Description`
+- Skip only if the user explicitly says: `no outline` / `no timeline`.
 
 ## Agent Note
 
