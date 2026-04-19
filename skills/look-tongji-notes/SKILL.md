@@ -1,6 +1,6 @@
 ---
 name: look-tongji-notes
-description: "CLI workflow for Tongji Look (look.tongji.edu.cn): store IAM credentials locally, list recent courses, transcribe a lecture video to SRT/TXT, download lecture slide snapshots, and generate a Markdown study note from transcript + slides."
+description: "CLI workflow for Tongji Look (look.tongji.edu.cn): store IAM credentials locally, list recent courses, transcribe a lecture video to SRT/TXT, download lecture slide snapshots, and let the agent generate a timeline outline + Markdown study note from transcript + slides."
 ---
 
 # Look Tongji Notes
@@ -120,8 +120,10 @@ python "<SKILL_DIR>/scripts/look_tongji.py" transcribe --course-id "<COURSE_ID>"
 
 Unless the user explicitly says "不要下载PPT/slide" (or equivalent):
 1) Run `note` command for the same `course_id` + `sub_id` (internally does transcript + slide in parallel).
-2) After both finish, write notes using both transcript and slide images.
-3) If slide download fails but transcript succeeds, still produce notes and mention slide failure briefly.
+2) Unless the user explicitly says "不要大纲/不要时间线/no outline/no timeline" (or equivalent), generate a **timeline outline** from the `SRT` subtitles and write:
+   - `<course_id>_<sub_id>_timeline.txt` in the same `tongji-output/` folder.
+3) After both finish, write notes using both transcript and slide images.
+4) If slide download fails but transcript succeeds, still produce notes and mention slide failure briefly.
 
 Default combined command:
 
@@ -144,6 +146,56 @@ The CLI writes to `./tongji-output/` (relative to the current working directory)
 - `<course_id>_<sub_id>.txt`
 - `<course_id>_<sub_id>.json` (metadata)
 - `slide_<course_id>_<sub_id>/` (slide images + `index.json`)
+
+### Additional artifact written by the agent (timeline outline)
+
+By default (unless the user asks not to generate an outline), after the CLI writes `SRT`,
+generate a timeline outline file for quick video overview:
+- `<course_id>_<sub_id>_timeline.txt`
+
+Stabilize timeline input before generation:
+- If the SRT is too long to fit in context, run `python "<SKILL_DIR>/scripts/timeline_tools.py" srt-sample --srt "<SRT_PATH>" --out "<SAMPLED_SRT_PATH>" --max-chars 15000` and only use the sampled output as the timeline context.
+
+Format requirement (strict): each line must be:
+- `起始时间-结束时间：课程阶段内容`
+
+Use the following timeline prompt (output must be in Simplified Chinese; output **only** the timeline lines):
+
+```text
+You are a course TA. Your job is to turn the provided SRT subtitles into a concise video timeline outline for quick overview.
+
+CRITICAL OUTPUT RULES:
+1) Output ONLY the timeline lines. No title, no explanations, no Markdown, no numbering, no blank lines.
+2) One line per segment, STRICTLY in this format (use the full-width Chinese colon '：'):
+   MM:SS-MM:SS：<课程阶段内容（简体中文）>
+3) Time format is MM:SS (minutes may exceed 59; seconds are always 2 digits; minutes are at least 2 digits and can be 3+ digits when needed). Examples:
+   00:00-05:30：课程定位与考核说明
+   05:30-12:00：电路理论学科体系介绍
+   92:45-98:10：案例推导与易错点总结
+4) The timeline MUST start at 00:00. Segments must be strictly increasing AND contiguous:
+   - Previous end time == next start time
+   - No overlaps, no gaps
+5) Cover the whole lecture. Let the last segment end at (or very close to) the last subtitle end time.
+
+CONTENT RULES:
+6) Segment summaries must be in Simplified Chinese short phrases, using course terminology.
+7) Fix obvious ASR typos/homophones when the meaning is clear, but DO NOT fabricate content not present in subtitles.
+8) If a segment includes important admin items (assignment / exam / attendance / grouping / bonus points / deadlines), explicitly mention it in that segment.
+
+GRANULARITY:
+9) Prefer 10–20 segments for a typical 60–120 minute lecture; each segment usually 3–10 minutes.
+10) Make segments shorter only when there is a clear topic shift or a key announcement.
+
+Now generate the timeline outline from the SRT below:
+```
+
+SRT handling note (when context is limited):
+- If the SRT is too long to fit in context, sample subtitle blocks uniformly across the whole file (do not only take the beginning), then generate the outline.
+
+Post-processing / strict validation:
+- After the agent produces timeline text, validate and normalize it using:
+  - `python "<SKILL_DIR>/scripts/timeline_tools.py" timeline-normalize --input "<TIMELINE_TXT>" --srt "<SRT_PATH>" --tolerance 1`
+- This enforces: starts at `00:00`, segments are contiguous (no overlaps/gaps), and the last segment end is close to the last subtitle end time.
 
 Important transcript-reading rule:
 - For note writing, **do not use** `<course_id>_<sub_id>.json` as the main transcript source (JSON ASR payloads are noisy).

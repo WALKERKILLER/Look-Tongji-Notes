@@ -1,4 +1,4 @@
 interface:
   display_name: "Tongji Look Notes"
   short_description: "Transcribe Tongji Look lectures and generate notes"
-  default_prompt: "Log in to look.tongji.edu.cn, list recent courses, transcribe a lecture to SRT/TXT, then write a Markdown study note from the transcript."
+  default_prompt: "Log in to look.tongji.edu.cn, list recent courses, transcribe a lecture to SRT/TXT, generate a timeline outline from SRT, then write a Markdown study note from transcript (+ slides if available)."
