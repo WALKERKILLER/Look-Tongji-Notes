@@ -15,6 +15,7 @@ This is an agent skill + CLI for Tongji Look (`look.tongji.edu.cn`):
 - list courses (recent list or full search),
 - transcribe a lecture to `SRT` + `TXT`,
 - download lecture slide snapshots (filename includes snapshot time),
+- optionally pack slides into one PDF (with optional scan enhancement),
 - then let the current agent write a Markdown study note from transcript + slide images.
 
 ## Install
@@ -86,10 +87,34 @@ Download slide snapshots for a lecture:
 python "<SKILL_DIR>/scripts/look_tongji.py" slide --lecture-url "<LECTURE_URL>"
 ```
 
+Download slides and export to one PDF:
+
+```bash
+python "<SKILL_DIR>/scripts/look_tongji.py" slide --lecture-url "<LECTURE_URL>" --to-pdf
+```
+
+Export PDF with document-scan style enhancement (CamScanner-like):
+
+```bash
+python "<SKILL_DIR>/scripts/look_tongji.py" slide --lecture-url "<LECTURE_URL>" --to-pdf --scan-mode doc
+```
+
+Strong black-white scan effect:
+
+```bash
+python "<SKILL_DIR>/scripts/look_tongji.py" slide --lecture-url "<LECTURE_URL>" --to-pdf --scan-mode bw
+```
+
 If throttling is suspected, reduce concurrency:
 
 ```bash
 python "<SKILL_DIR>/scripts/look_tongji.py" slide --course-id "<COURSE_ID>" --sub-id "<SUB_ID>" --concurrency 2 --retries 5
+```
+
+In `note` mode, you can also enable PDF export for slide assets:
+
+```bash
+python "<SKILL_DIR>/scripts/look_tongji.py" note --lecture-url "<LECTURE_URL>" --to-pdf --scan-mode doc
 ```
 
 Artifacts are written to `./tongji-output/` under your current working directory.
