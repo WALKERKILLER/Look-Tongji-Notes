@@ -1,3 +1,7 @@
 requests
 playwright
 python-dotenv
+Pillow
+numpy
+opencv-python-headless
+mineru-open-sdk
