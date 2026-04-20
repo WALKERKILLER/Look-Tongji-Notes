@@ -24,8 +24,6 @@ from urllib.parse import parse_qs, urlparse
 
 from tongji_backend.auth import TongjiAuth
 from tongji_backend.client import TongjiClient
-from tongji_backend.mineru_parser import resolve_mineru_options, run_mineru_parse
-from tongji_backend.slide_pdf import build_slide_pdf, resolve_pdf_options
 from tongji_backend.transcriber import NoAudioStreamError, Transcriber, TranscriptionError
 
 
@@ -51,10 +49,6 @@ def _last_course_file() -> Path:
 
 def _output_dir(output_dir: str | None) -> Path:
     return (Path(output_dir).expanduser().resolve() if output_dir else (Path.cwd() / "tongji-output"))
-
-
-def _slide_pdf_dir() -> Path:
-    return (Path.cwd() / "tongji-output" / "slide-pdf").resolve()
 
 
 def _now_iso() -> str:
@@ -595,14 +589,6 @@ def _run_slide_job(
     concurrency: int,
     retries: int,
     timeout: int,
-    to_pdf: bool,
-    scan_mode: str,
-    mineru_enabled: bool,
-    mineru_pages: str,
-    mineru_source: str,
-    mineru_lang: str,
-    mineru_backend: str,
-    mineru_method: str,
     tag: str = "Slide",
 ) -> int:
     print(f"[{tag}] Logged in as: {username or '(unknown)'}")
@@ -672,89 +658,6 @@ def _run_slide_job(
 
     results.sort(key=lambda x: int(x.get("created_sec") or 0))
 
-    exported_pdf = ""
-    pdf_pages = 0
-    pdf_error = ""
-    pdf_out_dir = _slide_pdf_dir()
-    mineru_result: dict[str, Any] = {
-        "enabled": bool(mineru_enabled),
-        "ok": False,
-        "pages": (mineru_pages or "").strip(),
-        "source": (mineru_source or "").strip().lower(),
-        "lang": (mineru_lang or "").strip().lower(),
-        "backend": (mineru_backend or "").strip().lower(),
-        "method": (mineru_method or "").strip().lower(),
-        "output_dir": "",
-        "md": "",
-        "content_list_json": "",
-        "content_list_v2_json": "",
-        "layout_pdf": "",
-        "span_pdf": "",
-        "images_dir": "",
-        "error": "",
-    }
-
-    if mineru_enabled and not to_pdf:
-        mineru_result["error"] = "MinerU requires PDF input. Re-run with --to-pdf."
-        _print_err(str(mineru_result["error"]))
-
-    if to_pdf:
-        image_paths: list[Path] = []
-        for item in results:
-            raw = str(item.get("filepath") or "").strip()
-            if raw:
-                image_paths.append(Path(raw))
-        pdf_out_dir.mkdir(parents=True, exist_ok=True)
-        pdf_path = pdf_out_dir / f"slide_{course_id}_{sub_id}.pdf"
-        try:
-            pdf_pages, exported = build_slide_pdf(
-                image_paths=image_paths,
-                pdf_path=pdf_path,
-                scan_mode=scan_mode,
-            )
-            exported_pdf = str(exported)
-        except Exception as e:
-            pdf_error = f"{type(e).__name__}: {e}"
-            _print_err(f"Failed to export PDF: {pdf_error}")
-
-    if mineru_enabled and to_pdf and exported_pdf and not pdf_error:
-        try:
-            options = resolve_mineru_options(
-                enabled=True,
-                pages=mineru_pages,
-                source=mineru_source,
-                lang=mineru_lang,
-                backend=mineru_backend,
-                method=mineru_method,
-            )
-            mineru_out = pdf_out_dir / f"mineru_{course_id}_{sub_id}"
-            mineru_result = run_mineru_parse(
-                pdf_path=Path(exported_pdf),
-                output_dir=mineru_out,
-                options=options,
-            )
-            if not mineru_result.get("ok"):
-                _print_err(f"MinerU parse failed: {mineru_result.get('error')}")
-        except Exception as e:
-            mineru_result = {
-                "enabled": True,
-                "ok": False,
-                "pages": (mineru_pages or "").strip(),
-                "source": (mineru_source or "").strip().lower(),
-                "lang": (mineru_lang or "").strip().lower(),
-                "backend": (mineru_backend or "").strip().lower(),
-                "method": (mineru_method or "").strip().lower(),
-                "output_dir": "",
-                "md": "",
-                "content_list_json": "",
-                "content_list_v2_json": "",
-                "layout_pdf": "",
-                "span_pdf": "",
-                "images_dir": "",
-                "error": f"{type(e).__name__}: {e}",
-            }
-            _print_err(f"MinerU parse failed: {mineru_result['error']}")
-
     meta_path = out_dir / "index.json"
     meta = {
         "course_id": course_id,
@@ -770,20 +673,9 @@ def _run_slide_job(
             "retries": retries,
             "timeout_seconds": timeout,
         },
-        "artifacts": {
-            "index_json": str(meta_path),
-            "pdf": exported_pdf,
-            "pdf_pages": pdf_pages,
-            "pdf_dir": str(pdf_out_dir) if to_pdf else "",
-            "scan_mode": scan_mode if to_pdf else "none",
-            "mineru": mineru_result,
-        },
         "items": results,
         "failures": failures,
     }
-    if pdf_error:
-        meta["artifacts"]["pdf_error"] = pdf_error
-
     meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
     print(f"[{tag}] Done.")
@@ -791,23 +683,9 @@ def _run_slide_job(
     print(f"  - success: {len(results)}")
     print(f"  - failed: {len(failures)}")
     print(f"  - index: {meta_path}")
-    if exported_pdf:
-        print(f"  - pdf: {exported_pdf} ({pdf_pages} pages, scan_mode={scan_mode})")
-    if mineru_enabled:
-        print(f"  - mineru_ok: {bool(mineru_result.get('ok'))}")
-        if mineru_result.get("output_dir"):
-            print(f"  - mineru_output: {mineru_result.get('output_dir')}")
-        if mineru_result.get("error"):
-            print(f"  - mineru_error: {mineru_result.get('error')}")
     if failures:
         print(f"[{tag}] Some downloads failed. You can re-run with lower --concurrency (e.g. 2) or higher --retries.")
-    if to_pdf and pdf_error:
-        return 4
-    if mineru_enabled and not bool(mineru_result.get("ok")):
-        return 5
-    if failures:
-        return 3
-    return 0
+    return 0 if not failures else 3
 
 
 def cmd_transcript(args: argparse.Namespace) -> int:
@@ -855,11 +733,6 @@ def cmd_slide(args: argparse.Namespace) -> int:
     if not resolved:
         return 2
     course_id, sub_id = resolved
-    to_pdf, scan_mode = resolve_pdf_options(
-        to_pdf=args.to_pdf,
-        scan_mode=args.scan_mode,
-        tag="Slide",
-    )
     return _run_slide_job(
         client=client,
         username=username,
@@ -873,14 +746,6 @@ def cmd_slide(args: argparse.Namespace) -> int:
         concurrency=args.concurrency,
         retries=args.retries,
         timeout=args.timeout,
-        to_pdf=to_pdf,
-        scan_mode=scan_mode,
-        mineru_enabled=bool(args.mineru),
-        mineru_pages=args.mineru_pages,
-        mineru_source=args.mineru_source,
-        mineru_lang=args.mineru_lang,
-        mineru_backend=args.mineru_backend,
-        mineru_method=args.mineru_method,
         tag="Slide",
     )
 
@@ -902,11 +767,6 @@ def cmd_note(args: argparse.Namespace) -> int:
     if not resolved:
         return 2
     course_id, sub_id = resolved
-    to_pdf, scan_mode = resolve_pdf_options(
-        to_pdf=args.to_pdf,
-        scan_mode=args.scan_mode,
-        tag="Note",
-    )
 
     jwt_token = client.auth.get_jwt_token() or ""
     t_client = _build_client_from_jwt(jwt_token) if jwt_token else client
@@ -942,14 +802,6 @@ def cmd_note(args: argparse.Namespace) -> int:
                 concurrency=args.concurrency,
                 retries=args.retries,
                 timeout=args.timeout,
-                to_pdf=to_pdf,
-                scan_mode=scan_mode,
-                mineru_enabled=bool(args.mineru),
-                mineru_pages=args.mineru_pages,
-                mineru_source=args.mineru_source,
-                mineru_lang=args.mineru_lang,
-                mineru_backend=args.mineru_backend,
-                mineru_method=args.mineru_method,
                 tag="Slide",
             )
 
@@ -1015,28 +867,6 @@ def build_parser() -> argparse.ArgumentParser:
     p_slide.add_argument("--concurrency", type=int, default=4, help="Concurrent download workers (1-16)")
     p_slide.add_argument("--retries", type=int, default=3, help="Retry attempts per image")
     p_slide.add_argument("--timeout", type=int, default=30, help="HTTP timeout seconds per image request")
-    p_slide.add_argument("--to-pdf", action="store_true", help="Pack downloaded slide images into one PDF")
-    p_slide.add_argument(
-        "--scan-mode",
-        choices=["none", "doc", "bw"],
-        default="none",
-        help="Document scan effect used when --to-pdf is enabled",
-    )
-    p_slide.add_argument("--mineru", action="store_true", help="Run MinerU parse for the exported PDF")
-    p_slide.add_argument(
-        "--mineru-pages",
-        default="",
-        help="MinerU page range in natural 1-based format N-M (example: 17-24). Empty means full PDF.",
-    )
-    p_slide.add_argument(
-        "--mineru-source",
-        choices=["modelscope", "hf"],
-        default="modelscope",
-        help="Model source for MinerU",
-    )
-    p_slide.add_argument("--mineru-lang", default="ch", help="Language for MinerU OCR")
-    p_slide.add_argument("--mineru-backend", default="pipeline", help="MinerU backend")
-    p_slide.add_argument("--mineru-method", default="ocr", help="MinerU parse method")
     p_slide.add_argument("--force-login", action="store_true", help="Ignore cached JWT and login again")
     p_slide.set_defaults(func=cmd_slide)
 
@@ -1058,28 +888,6 @@ def build_parser() -> argparse.ArgumentParser:
     p_note.add_argument("--concurrency", type=int, default=4, help="Concurrent slide download workers (1-16)")
     p_note.add_argument("--retries", type=int, default=3, help="Retry attempts per slide image")
     p_note.add_argument("--timeout", type=int, default=30, help="HTTP timeout seconds per slide image request")
-    p_note.add_argument("--to-pdf", action="store_true", help="Pack downloaded slide images into one PDF")
-    p_note.add_argument(
-        "--scan-mode",
-        choices=["none", "doc", "bw"],
-        default="none",
-        help="Document scan effect used when --to-pdf is enabled",
-    )
-    p_note.add_argument("--mineru", action="store_true", help="Run MinerU parse for the exported PDF")
-    p_note.add_argument(
-        "--mineru-pages",
-        default="",
-        help="MinerU page range in natural 1-based format N-M (example: 17-24). Empty means full PDF.",
-    )
-    p_note.add_argument(
-        "--mineru-source",
-        choices=["modelscope", "hf"],
-        default="modelscope",
-        help="Model source for MinerU",
-    )
-    p_note.add_argument("--mineru-lang", default="ch", help="Language for MinerU OCR")
-    p_note.add_argument("--mineru-backend", default="pipeline", help="MinerU backend")
-    p_note.add_argument("--mineru-method", default="ocr", help="MinerU parse method")
     p_note.add_argument("--force-login", action="store_true", help="Ignore cached JWT and login again")
     p_note.set_defaults(func=cmd_note)
 
