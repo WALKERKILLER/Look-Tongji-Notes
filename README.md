@@ -16,6 +16,7 @@ This is an agent skill + CLI for Tongji Look (`look.tongji.edu.cn`):
 - transcribe a lecture to `SRT` + `TXT`,
 - generate a lecture timeline outline (`*_timeline.txt`) from `SRT` (agent-generated, Simplified Chinese),
 - download lecture slide snapshots (filename includes snapshot time),
+- optionally pack slides into one PDF (with optional scan enhancement),
 - then let the current agent write a Markdown study note from transcript + slide images.
 
 ## Install
@@ -87,6 +88,24 @@ Download slide snapshots for a lecture:
 python "<SKILL_DIR>/scripts/look_tongji.py" slide --lecture-url "<LECTURE_URL>"
 ```
 
+Download slides and export to one PDF:
+
+```bash
+python "<SKILL_DIR>/scripts/look_tongji.py" slide --lecture-url "<LECTURE_URL>" --to-pdf
+```
+
+Export PDF with document-scan style enhancement (CamScanner-like):
+
+```bash
+python "<SKILL_DIR>/scripts/look_tongji.py" slide --lecture-url "<LECTURE_URL>" --to-pdf --scan-mode doc
+```
+
+Strong black-white scan effect:
+
+```bash
+python "<SKILL_DIR>/scripts/look_tongji.py" slide --lecture-url "<LECTURE_URL>" --to-pdf --scan-mode bw
+```
+
 If throttling is suspected, reduce concurrency:
 
 ```bash
@@ -97,6 +116,12 @@ In the `look-tongji:note` workflow, the agent generates a timeline outline after
 - One line per segment (Simplified Chinese), format: `Start-Over：Stage Main Content`
   - Example: `00:00-05:30：Course Orientation and Assessment Description`
 - Skip only if the user explicitly says: `no outline` / `no timeline`.
+
+In `note` mode, you can also enable PDF export for slide assets:
+
+```bash
+python "<SKILL_DIR>/scripts/look_tongji.py" note --lecture-url "<LECTURE_URL>" --to-pdf --scan-mode doc
+```
 
 Artifacts are written to `./tongji-output/` under your current working directory.
 
