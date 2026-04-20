@@ -16,6 +16,7 @@ This is an agent skill + CLI for Tongji Look (`look.tongji.edu.cn`):
 - transcribe a lecture to `SRT` + `TXT`,
 - generate a lecture timeline outline (`*_timeline.txt`) from `SRT` (agent-generated, Simplified Chinese),
 - download lecture slide snapshots (filename includes snapshot time),
+- optionally pack slides into one PDF (with optional scan enhancement),
 - then let the current agent write a Markdown study note from transcript + slide images.
 
 ## Install
@@ -87,10 +88,44 @@ Download slide snapshots for a lecture:
 python "<SKILL_DIR>/scripts/look_tongji.py" slide --lecture-url "<LECTURE_URL>"
 ```
 
+Download slides and export to one PDF:
+
+```bash
+python "<SKILL_DIR>/scripts/look_tongji.py" slide --lecture-url "<LECTURE_URL>" --to-pdf
+```
+
+Export PDF with document-scan style enhancement (CamScanner-like):
+
+```bash
+python "<SKILL_DIR>/scripts/look_tongji.py" slide --lecture-url "<LECTURE_URL>" --to-pdf --scan-mode doc
+```
+
+Strong black-white scan effect:
+
+```bash
+python "<SKILL_DIR>/scripts/look_tongji.py" slide --lecture-url "<LECTURE_URL>" --to-pdf --scan-mode bw
+```
+
+Parse selected PDF pages with MinerU OpenAPI and save Markdown:
+
+```bash
+python "<SKILL_DIR>/scripts/look_tongji.py" slide --lecture-url "<LECTURE_URL>" --to-pdf --mineru --mineru-pages "17-24"
+```
+
+`--mineru` currently uses MinerU OpenAPI flash extraction through `mineru-open-sdk`.
+It saves Markdown only under `./tongji-output/slide-pdf/mineru_<course_id>_<sub_id>/`.
+No local MinerU model download is required.
+
 If throttling is suspected, reduce concurrency:
 
 ```bash
 python "<SKILL_DIR>/scripts/look_tongji.py" slide --course-id "<COURSE_ID>" --sub-id "<SUB_ID>" --concurrency 2 --retries 5
+```
+
+In `note` mode, you can also enable PDF export and MinerU Markdown extraction for slide assets:
+
+```bash
+python "<SKILL_DIR>/scripts/look_tongji.py" note --lecture-url "<LECTURE_URL>" --to-pdf --scan-mode doc --mineru --mineru-pages "17-24"
 ```
 
 Artifacts are written to `./tongji-output/` under your current working directory.

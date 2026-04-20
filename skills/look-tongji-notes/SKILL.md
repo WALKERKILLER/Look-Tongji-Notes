@@ -62,6 +62,13 @@ python "<SKILL_DIR>/scripts/look_tongji.py" setup --username "<YOUR_ID>" --passw
 ```
 
 If dependencies are missing, install them from `<SKILL_DIR>/requirements.txt`.
+Also install the Playwright Chromium browser once:
+
+```bash
+python -m playwright install chromium
+```
+
+`ffmpeg` must be available on `PATH` for transcription.
 
 ## Command: `look-tongji:list`
 
@@ -250,6 +257,16 @@ Run with IDs:
 ```bash
 python "<SKILL_DIR>/scripts/look_tongji.py" slide --course-id "<COURSE_ID>" --sub-id "<SUB_ID>"
 ```
+
+Download slides, export a PDF, and parse selected pages with MinerU OpenAPI
+(Markdown output only):
+
+```bash
+python "<SKILL_DIR>/scripts/look_tongji.py" slide --course-id "<COURSE_ID>" --sub-id "<SUB_ID>" --to-pdf --mineru --mineru-pages "17-24"
+```
+
+`--mineru-pages` uses natural 1-based page numbers. The output Markdown is
+written under `./tongji-output/slide-pdf/mineru_<course_id>_<sub_id>/`.
 
 If throttling is suspected, reduce concurrency:
 

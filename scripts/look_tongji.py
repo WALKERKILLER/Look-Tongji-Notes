@@ -215,7 +215,7 @@ def _check_deps() -> list[str]:
     missing: list[str] = []
     if shutil.which("ffmpeg") is None:
         missing.append("ffmpeg")
-    for module in ("requests", "dotenv", "playwright.sync_api"):
+    for module in ("requests", "dotenv", "playwright.sync_api", "PIL", "cv2", "numpy", "mineru"):
         try:
             __import__(module)
         except Exception:
