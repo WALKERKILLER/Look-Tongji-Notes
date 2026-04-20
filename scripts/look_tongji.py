@@ -1022,7 +1022,7 @@ def build_parser() -> argparse.ArgumentParser:
         default="none",
         help="Document scan effect used when --to-pdf is enabled",
     )
-    p_slide.add_argument("--mineru", action="store_true", help="Run MinerU parse for the exported PDF")
+    p_slide.add_argument("--mineru", action="store_true", help="Run MinerU OpenAPI parse for the exported PDF")
     p_slide.add_argument(
         "--mineru-pages",
         default="",
@@ -1030,13 +1030,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_slide.add_argument(
         "--mineru-source",
-        choices=["modelscope", "hf"],
-        default="modelscope",
-        help="Model source for MinerU",
+        choices=["openapi"],
+        default="openapi",
+        help="MinerU provider (currently OpenAPI flash)",
     )
     p_slide.add_argument("--mineru-lang", default="ch", help="Language for MinerU OCR")
-    p_slide.add_argument("--mineru-backend", default="pipeline", help="MinerU backend")
-    p_slide.add_argument("--mineru-method", default="ocr", help="MinerU parse method")
+    p_slide.add_argument("--mineru-backend", default="openapi", help="MinerU backend")
+    p_slide.add_argument("--mineru-method", default="flash", help="MinerU OpenAPI method")
     p_slide.add_argument("--force-login", action="store_true", help="Ignore cached JWT and login again")
     p_slide.set_defaults(func=cmd_slide)
 
@@ -1065,7 +1065,7 @@ def build_parser() -> argparse.ArgumentParser:
         default="none",
         help="Document scan effect used when --to-pdf is enabled",
     )
-    p_note.add_argument("--mineru", action="store_true", help="Run MinerU parse for the exported PDF")
+    p_note.add_argument("--mineru", action="store_true", help="Run MinerU OpenAPI parse for the exported PDF")
     p_note.add_argument(
         "--mineru-pages",
         default="",
@@ -1073,13 +1073,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_note.add_argument(
         "--mineru-source",
-        choices=["modelscope", "hf"],
-        default="modelscope",
-        help="Model source for MinerU",
+        choices=["openapi"],
+        default="openapi",
+        help="MinerU provider (currently OpenAPI flash)",
     )
     p_note.add_argument("--mineru-lang", default="ch", help="Language for MinerU OCR")
-    p_note.add_argument("--mineru-backend", default="pipeline", help="MinerU backend")
-    p_note.add_argument("--mineru-method", default="ocr", help="MinerU parse method")
+    p_note.add_argument("--mineru-backend", default="openapi", help="MinerU backend")
+    p_note.add_argument("--mineru-method", default="flash", help="MinerU OpenAPI method")
     p_note.add_argument("--force-login", action="store_true", help="Ignore cached JWT and login again")
     p_note.set_defaults(func=cmd_note)
 

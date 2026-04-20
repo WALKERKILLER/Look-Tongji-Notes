@@ -106,6 +106,16 @@ Strong black-white scan effect:
 python "<SKILL_DIR>/scripts/look_tongji.py" slide --lecture-url "<LECTURE_URL>" --to-pdf --scan-mode bw
 ```
 
+Parse selected PDF pages with MinerU OpenAPI and save Markdown:
+
+```bash
+python "<SKILL_DIR>/scripts/look_tongji.py" slide --lecture-url "<LECTURE_URL>" --to-pdf --mineru --mineru-pages "17-24"
+```
+
+`--mineru` currently uses MinerU OpenAPI flash extraction through `mineru-open-sdk`.
+It saves Markdown only under `./tongji-output/slide-pdf/mineru_<course_id>_<sub_id>/`.
+No local MinerU model download is required.
+
 If throttling is suspected, reduce concurrency:
 
 ```bash
@@ -117,10 +127,10 @@ In the `look-tongji:note` workflow, the agent generates a timeline outline after
   - Example: `00:00-05:30：Course Orientation and Assessment Description`
 - Skip only if the user explicitly says: `no outline` / `no timeline`.
 
-In `note` mode, you can also enable PDF export for slide assets:
+In `note` mode, you can also enable PDF export and MinerU Markdown extraction for slide assets:
 
 ```bash
-python "<SKILL_DIR>/scripts/look_tongji.py" note --lecture-url "<LECTURE_URL>" --to-pdf --scan-mode doc
+python "<SKILL_DIR>/scripts/look_tongji.py" note --lecture-url "<LECTURE_URL>" --to-pdf --scan-mode doc --mineru --mineru-pages "17-24"
 ```
 
 Artifacts are written to `./tongji-output/` under your current working directory.
