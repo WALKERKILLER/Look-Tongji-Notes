@@ -324,7 +324,8 @@ def cmd_list(args: argparse.Namespace) -> int:
         header += f" (query: {args.query})"
     print(f"[List] {header}:")
 
-    shown = courses[: max(1, int(args.limit))]
+    limit = int(args.limit)
+    shown = courses if limit <= 0 else courses[:limit]
     for idx, c in enumerate(shown, 1):
         title = _course_title(c)
         teacher = _course_teacher(c)
@@ -826,7 +827,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_setup.set_defaults(func=cmd_setup)
 
     p_list = sub.add_parser("list", help="Login and list recent courses")
-    p_list.add_argument("--limit", type=int, default=8, help="Number of courses to show")
+    p_list.add_argument("--limit", type=int, default=0, help="Number of courses to show (0 = all)")
     p_list.add_argument(
         "--all",
         dest="all_courses",
