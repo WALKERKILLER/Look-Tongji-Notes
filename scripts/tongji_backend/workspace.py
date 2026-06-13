@@ -936,14 +936,8 @@ def _render_llmwiki_source(manifest_path: Path, manifest: dict[str, Any], *, sit
     materials_bullets, material_sections = _collect_material_sections(raw_root / "materials")
     slide_files = sorted(slides_dir.glob("*")) if slides_dir.exists() else []
     slide_preview = "\n".join(f"- {path.name}" for path in slide_files[:12])
-    summary = _summary_from_text(notes_text or transcript_text or session_title or course_title, limit=180) or session_title
-
     body_parts = [
         f"# {session_title}",
-        "",
-        "## Summary",
-        "",
-        summary,
         "",
         "## Course Info",
         "",
