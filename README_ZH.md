@@ -8,7 +8,7 @@
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge" alt="MIT License"></a>
-  <a href="SKILL.md"><img src="https://img.shields.io/badge/Version-1.1.0-7C3AED.svg?style=for-the-badge" alt="Version 1.1.0"></a>
+  <a href="SKILL.md"><img src="https://img.shields.io/badge/Version-1.1.1-7C3AED.svg?style=for-the-badge" alt="Version 1.1.1"></a>
 </p>
 
 这是一个 agent skill 套件（9 个原子化 `/command` 技能）+ CLI，用来处理同济录课平台 `look.tongji.edu.cn`：
