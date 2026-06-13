@@ -5,13 +5,17 @@ on:
     branches: ["main", "master", "wiki"]
     paths:
       - "SKILL.md"
-      - "skills-catalog/**"
       - ".claude-plugin/**"
       - ".codex-plugin/**"
       - ".cursor-plugin/**"
+      - ".gemini-plugin/**"
+      - ".hermes-agent-plugin/**"
+      - ".openclaw-plugin/**"
+      - ".opencode-plugin/**"
       - ".agents/**"
       - "agents/**"
       - "skills/setup/**"
+      - "skills/list/**"
       - "skills/trans/**"
       - "skills/note/**"
       - "skills/add/**"
@@ -23,13 +27,17 @@ on:
   pull_request:
     paths:
       - "SKILL.md"
-      - "skills-catalog/**"
       - ".claude-plugin/**"
       - ".codex-plugin/**"
       - ".cursor-plugin/**"
+      - ".gemini-plugin/**"
+      - ".hermes-agent-plugin/**"
+      - ".openclaw-plugin/**"
+      - ".opencode-plugin/**"
       - ".agents/**"
       - "agents/**"
       - "skills/setup/**"
+      - "skills/list/**"
       - "skills/trans/**"
       - "skills/note/**"
       - "skills/add/**"
@@ -55,19 +63,17 @@ jobs:
           python -m json.tool .claude-plugin/marketplace.json >/dev/null
           python -m json.tool .codex-plugin/plugin.json >/dev/null
           python -m json.tool .cursor-plugin/plugin.json >/dev/null
+          python -m json.tool .cursor-plugin/marketplace.json >/dev/null
+          python -m json.tool .gemini-plugin/plugin.json >/dev/null
+          python -m json.tool .hermes-agent-plugin/plugin.json >/dev/null
+          python -m json.tool .openclaw-plugin/plugin.json >/dev/null
+          python -m json.tool .opencode-plugin/plugin.json >/dev/null
           python -m json.tool .agents/plugins/marketplace.json >/dev/null
 
-      - name: Validate skill catalog (new flat structure)
+      - name: Validate skills/ flat structure (9 skills)
         run: |
-          # Root skills-catalog/core/ — all 8 skills
-          test -f skills-catalog/README.md
-          for skill in setup transcribe note add ralphtrans wiki page cheatsheet; do
-            test -f "skills-catalog/core/look-tongji-${skill}/SKILL.md"
-            test -f "skills-catalog/core/look-tongji-${skill}/manifest.yaml"
-            grep -q "name: look-tongji-${skill}" "skills-catalog/core/look-tongji-${skill}/SKILL.md"
-          done
-          # Flat skills/ install directory — all 8 skills
-          for skill in setup trans note add ralphtrans wiki page cheatsheet; do
+          for skill in setup list trans note add ralphtrans wiki page cheatsheet; do
             test -f "skills/${skill}/SKILL.md"
+            test -f "skills/${skill}/manifest.yaml"
             grep -q "name: ${skill}" "skills/${skill}/SKILL.md"
           done
