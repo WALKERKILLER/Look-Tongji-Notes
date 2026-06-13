@@ -8,7 +8,7 @@
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge" alt="MIT License"></a>
-  <a href="skills-catalog/README.md"><img src="https://img.shields.io/badge/Version-0.2.0-7C3AED.svg?style=for-the-badge" alt="Version 0.2.0"></a>
+  <a href="SKILL.md"><img src="https://img.shields.io/badge/Version-1.0.0-7C3AED.svg?style=for-the-badge" alt="Version 1.0.0"></a>
 </p>
 
 This is an agent skill suite (8 atomic `/command` skills) + CLI for Tongji Look (`look.tongji.edu.cn`):
@@ -23,14 +23,14 @@ This is an agent skill suite (8 atomic `/command` skills) + CLI for Tongji Look 
 
 | Command | Description |
 |---------|-------------|
-| `/setup` | Account, workspace & dependency check (vision-support, Node.js, TeX) |
-| `/trans` | Transcribe a single lecture + optional slide download |
-| `/note` | Full note workflow: transcript + slides + materials + timeline + note |
-| `/add` | Import supplementary reference materials only |
-| `/wiki` | Build and preview the course knowledge-base site |
-| `/page` | GitHub Pages deployment guide (agent-driven) |
-| `/cheatsheet` | Generate an exam A4 cheatsheet (LaTeX / HTML) |
-| `/ralphtrans` | Batch transcribe an entire course (resume-supported) |
+| `/setup` | Configure credentials, check dependencies (Python, Node.js, ffmpeg, vision-support, TeX), set workspace |
+| `/list` | List courses, search by keyword, interactive selection |
+| `/trans` | Transcribe one lecture to SRT + TXT; optionally download slides in parallel |
+| `/note` | Generate study notes + timeline outline from transcript + slides |
+| `/add` | Import supplementary materials (PDF, PPTX, DOCX) into a lecture session |
+| `/wiki` | Build and locally serve the static course knowledge base |
+| `/cheatsheet` | Generate A4 cheat sheet (LaTeX or HTML) from course notes |
+| `/ralphtrans` | Batch transcribe all lectures in a course with checkpoint/resume |
 
 ## Install
 
@@ -40,9 +40,10 @@ Copy the repo link to your agent and say: `help me install this skill`.
 
 ### Method 2
 
-Copy the whole `look-tongji-notes/` folder into your skills directory:
+Copy the whole repository into your skills directory (or point your agent at the repo):
 - Codex: `~/.codex/skills/look-tongji-notes`
 - Claude Code: `~/.claude/skills/look-tongji-notes`
+- Gemini CLI, OpenClaw, OpenCode, Hermes Agent: use platform plugin install
 
 ### Method 3 (Codex)
 
@@ -68,37 +69,37 @@ Open Claude Code and run:
 Setup credentials (recommended):
 
 ```bash
-python "<SKILL_DIR>/scripts/look_tongji.py" setup
+python "<SKILL_DIR>/../../scripts/look_tongji.py" setup
 ```
 
 List recent courses:
 
 ```bash
-python "<SKILL_DIR>/scripts/look_tongji.py" list
+python "<SKILL_DIR>/../../scripts/look_tongji.py" list
 ```
 
 Search courses by name (recommended for accuracy, calls `get_all_courses` internally):
 
 ```bash
-python "<SKILL_DIR>/scripts/look_tongji.py" list --all --query "<COURSE_NAME_KEYWORD>"
+python "<SKILL_DIR>/../../scripts/look_tongji.py" list --all --query "<COURSE_NAME_KEYWORD>"
 ```
 
 Transcript only (`transcribe`, aliases `transcript` / `trans`):
 
 ```bash
-python "<SKILL_DIR>/scripts/look_tongji.py" transcribe --lecture-url "<LECTURE_URL>"
+python "<SKILL_DIR>/../../scripts/look_tongji.py" transcribe --lecture-url "<LECTURE_URL>"
 ```
 
 Combined mode (`note`, runs transcript + slide in parallel by default):
 
 ```bash
-python "<SKILL_DIR>/scripts/look_tongji.py" note --lecture-url "<LECTURE_URL>"
+python "<SKILL_DIR>/../../scripts/look_tongji.py" note --lecture-url "<LECTURE_URL>"
 ```
 
 Note style (affects how the generated note is formatted):
 
 ```bash
-python "<SKILL_DIR>/scripts/look_tongji.py" note --lecture-url "<LECTURE_URL>" --note-style dialogue
+python "<SKILL_DIR>/../../scripts/look_tongji.py" note --lecture-url "<LECTURE_URL>" --note-style dialogue
 ```
 Supports `standard` (lecture notes, default) and `dialogue` (Q&A format).
 
@@ -108,13 +109,13 @@ Supports `standard` (lecture notes, default) and `dialogue` (Q&A format).
 Download slide snapshots for a lecture:
 
 ```bash
-python "<SKILL_DIR>/scripts/look_tongji.py" slide --lecture-url "<LECTURE_URL>"
+python "<SKILL_DIR>/../../scripts/look_tongji.py" slide --lecture-url "<LECTURE_URL>"
 ```
 
 If throttling is suspected, reduce concurrency:
 
 ```bash
-python "<SKILL_DIR>/scripts/look_tongji.py" slide --course-id "<COURSE_ID>" --sub-id "<SUB_ID>" --concurrency 2 --retries 5
+python "<SKILL_DIR>/../../scripts/look_tongji.py" slide --course-id "<COURSE_ID>" --sub-id "<SUB_ID>" --concurrency 2 --retries 5
 ```
 In the `/note` workflow, the agent generates a timeline outline after the `SRT` subtitle file is produced:
 - File: `./tongji-output/<course_id>_<sub_id>_timeline.txt`
@@ -126,7 +127,7 @@ Artifacts are written to the configured course-wiki workspace by default.
 
 ## Agent Note
 
-When a user says `/setup` / `/trans` / `/note` / `/wiki` / `/add` / `/page` / `/cheatsheet` / `/ralphtrans`, follow the corresponding `skills/<name>/SKILL.md` and run the matching CLI commands in `scripts/look_tongji.py`.
+When a user says `/setup` / `/list` / `/trans` / `/note` / `/wiki` / `/add` / `/cheatsheet` / `/ralphtrans`, follow the corresponding `skills/<name>/SKILL.md` and run the matching CLI commands in `scripts/look_tongji.py`.
 For `/note`, default to running transcript + slide download in parallel; only skip slide download when the user explicitly asks not to download slides/PPT.
 When writing notes, use both transcript output and slide images by default.
 If the user provides a course name, prefer `list --all --query ...` to avoid missing courses that are not in the recent list.
@@ -134,9 +135,9 @@ If the user provides a course name, prefer `list --all --query ...` to avoid mis
 After notes are generated or updated, rebuild and preview the site with:
 
 ```bash
-python "<SKILL_DIR>/scripts/look_tongji.py" index
-python "<SKILL_DIR>/scripts/look_tongji.py" build
-python "<SKILL_DIR>/scripts/look_tongji.py" serve --port 8765
+python "<SKILL_DIR>/../../scripts/look_tongji.py" index
+python "<SKILL_DIR>/../../scripts/look_tongji.py" build
+python "<SKILL_DIR>/../../scripts/look_tongji.py" serve --port 8765
 ```
 
 The generated workspace can also become the user's own GitHub Pages repository. It includes:

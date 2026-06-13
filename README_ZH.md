@@ -16,7 +16,7 @@
 [![Works with Copilot](https://img.shields.io/badge/GitHub%20Copilot-✓-7C3AED.svg?style=for-the-badge)](https://github.com/features/copilot)
 [![Works with Gemini CLI](https://img.shields.io/badge/Gemini%20CLI-✓-7C3AED.svg?style=for-the-badge)](https://ai.google.dev/gemini-api)
 [![Works with Obsidian](https://img.shields.io/badge/Obsidian-✓-7C3AED.svg?style=for-the-badge)](https://obsidian.md)
-[![Version](https://img.shields.io/badge/Version-0.2.0-7C3AED.svg?style=for-the-badge)](skills-catalog/README.md)
+[![Version](https://img.shields.io/badge/Version-1.0.0-7C3AED.svg?style=for-the-badge)](SKILL.md)
 
 
 
@@ -42,7 +42,6 @@
 下载并解压仓库。仓库提供两种结构：
 
 - 兼容入口：根目录 `SKILL.md`
-- 源码 catalog：`skills-catalog/core/`
 - 扁平技能目录：`skills/<name>/SKILL.md`（8 个原子化命令）
 
 如果你的 Agent 支持插件或 marketplace，直接使用仓库根目录作为插件根即可。
@@ -80,26 +79,29 @@ $skill-installer install https://github.com/walkerkiller/look-tongji-notes
 - `.codex-plugin/`：Codex 插件元数据
 - `.cursor-plugin/`：Cursor 插件元数据
 - `.agents/plugins/`：通用 agents marketplace 元数据
+- `.gemini-plugin/`：Gemini CLI 插件元数据
+- `.openclaw-plugin/`：OpenClaw 插件元数据
+- `.opencode-plugin/`：OpenCode 插件元数据
+- `.hermes-agent-plugin/`：Hermes Agent 插件元数据
 - `skills/`：8 个原子化命令技能（`skills/<name>/SKILL.md`）
-- `skills-catalog/core/`：源码 catalog，含 `manifest.yaml`
 
 平台对齐说明：
 
 - `Claude Code`：标准扫描目录是 `skills/<skill-name>/SKILL.md`
 - `Codex`：`plugin.json` 指向 `./skills/`
 - `Cursor`：`plugin.json` 指向 `./skills/`
-- `skills-catalog/`：保留作源码 catalog 和 `manifest.yaml` 组织
+- `Gemini CLI`、`OpenClaw`、`OpenCode`、`Hermes Agent`：各平台 plugin.json 均指向 `./skills/`
 
 8 个命令：
 
-- `/setup` — 账号、工作区、依赖检测（含 vision-support、Node.js、TeX）
-- `/trans` — 单节转写 + 可选 slide 并行下载
-- `/note` — 转写 + slide + 补充资料 + 时间轴 + 笔记
-- `/add` — 纯导入补充资料（不触发转录）
-- `/wiki` — 课程知识库站点构建和本地预览
-- `/page` — GitHub Pages 部署指引（Agent 驱动）
-- `/cheatsheet` — 考前 A4 速查表（LaTeX / HTML 双路径）
-- `/ralphtrans` — 整门课程批量转写（断点续传）
+- `/setup` — 配置凭据，检查依赖（Python、Node.js、ffmpeg、vision-support、TeX），设置工作区
+- `/list` — 列出课程，关键词搜索，交互式选择
+- `/trans` — 单节转写为 SRT + TXT；可选并行下载 slide
+- `/note` — 从转写文本 + slide 生成学习笔记 + 时间轴大纲
+- `/add` — 导入补充资料（PDF、PPTX、DOCX）到课程节次
+- `/wiki` — 构建并本地 serve 静态课程知识库
+- `/cheatsheet` — 从课程笔记生成 A4 速查表（LaTeX 或 HTML）
+- `/ralphtrans` — 批量转写整门课程全部节次，支持断点续传
 
 ## 单独使用（CLI）
 
@@ -108,7 +110,7 @@ $skill-installer install https://github.com/walkerkiller/look-tongji-notes
 配置账号密码（强烈建议先做这一步）：
 
 ```bash
-python "<SKILL_DIR>/scripts/look_tongji.py" setup
+python "<SKILL_DIR>/../../scripts/look_tongji.py" setup
 ```
 
 第一次运行会询问课程知识库保存路径。这个路径不会放在 skill 目录里，
@@ -117,7 +119,7 @@ python "<SKILL_DIR>/scripts/look_tongji.py" setup
 也可以直接指定：
 
 ```bash
-python "<SKILL_DIR>/scripts/look_tongji.py" setup \
+python "<SKILL_DIR>/../../scripts/look_tongji.py" setup \
   --workspace-root "~/Documents/tongji-course-wiki" \
   --owner-name "WALKERKILLER"
 ```
@@ -125,31 +127,31 @@ python "<SKILL_DIR>/scripts/look_tongji.py" setup \
 列出最近课程：
 
 ```bash
-python "<SKILL_DIR>/scripts/look_tongji.py" list
+python "<SKILL_DIR>/../../scripts/look_tongji.py" list
 ```
 
 按课程名搜索课程（更准确；内部会调用 `get_all_courses` 获取全量课程清单）：
 
 ```bash
-python "<SKILL_DIR>/scripts/look_tongji.py" list --all --query "<课程名关键词>"
+python "<SKILL_DIR>/../../scripts/look_tongji.py" list --all --query "<课程名关键词>"
 ```
 
 仅转写指定节次（`transcribe`，别名 `transcript` / `trans`）：
 
 ```bash
-python "<SKILL_DIR>/scripts/look_tongji.py" transcribe --lecture-url "<课程链接>"
+python "<SKILL_DIR>/../../scripts/look_tongji.py" transcribe --lecture-url "<课程链接>"
 ```
 
 组合模式（`note`，默认并行执行转写 + slide 拉取）：
 
 ```bash
-python "<SKILL_DIR>/scripts/look_tongji.py" note --lecture-url "<课程链接>"
+python "<SKILL_DIR>/../../scripts/look_tongji.py" note --lecture-url "<课程链接>"
 ```
 
 笔记风格（影响笔记格式）：
 
 ```bash
-python "<SKILL_DIR>/scripts/look_tongji.py" note --lecture-url "<课程链接>" --note-style dialogue
+python "<SKILL_DIR>/../../scripts/look_tongji.py" note --lecture-url "<课程链接>" --note-style dialogue
 ```
 支持 `standard`（课堂笔记，默认）和 `dialogue`（问答格式）。
 
@@ -159,7 +161,7 @@ python "<SKILL_DIR>/scripts/look_tongji.py" note --lecture-url "<课程链接>" 
 如果这节课还有老师发的资料、PDF、PPT、Word 或其他文件，可以一并导入：
 
 ```bash
-python "<SKILL_DIR>/scripts/look_tongji.py" note \
+python "<SKILL_DIR>/../../scripts/look_tongji.py" note \
   --lecture-url "<课程链接>" \
   --material "课件=/path/to/slides.pdf" \
   --material "阅读材料=/path/to/reading.docx"
@@ -168,13 +170,13 @@ python "<SKILL_DIR>/scripts/look_tongji.py" note \
 下载该节课的 slide 截图：
 
 ```bash
-python "<SKILL_DIR>/scripts/look_tongji.py" slide --lecture-url "<课程链接>"
+python "<SKILL_DIR>/../../scripts/look_tongji.py" slide --lecture-url "<课程链接>"
 ```
 
 若怀疑触发限流，可降低并发：
 
 ```bash
-python "<SKILL_DIR>/scripts/look_tongji.py" slide --course-id "<COURSE_ID>" --sub-id "<SUB_ID>" --concurrency 2 --retries 5
+python "<SKILL_DIR>/../../scripts/look_tongji.py" slide --course-id "<COURSE_ID>" --sub-id "<SUB_ID>" --concurrency 2 --retries 5
 ```
 在 `/note` 的工作流中，Agent 会在 `SRT` 生成后，额外输出一份用于视频总览的时间轴大纲：
 - 文件：`./tongji-output/<course_id>_<sub_id>_timeline.txt`
@@ -204,7 +206,7 @@ python "<SKILL_DIR>/scripts/look_tongji.py" slide --course-id "<COURSE_ID>" --su
 
 ## Agent Note
 
-当用户说 `/setup` / `/trans` / `/note` / `/wiki` / `/add` / `/page` / `/cheatsheet` / `/ralphtrans` 时，按对应 `skills/<name>/SKILL.md` 的流程执行，并运行 `scripts/look_tongji.py` 的对应命令。
+当用户说 `/setup` / `/list` / `/trans` / `/note` / `/wiki` / `/add` / `/cheatsheet` / `/ralphtrans` 时，按对应 `skills/<name>/SKILL.md` 的流程执行，并运行 `scripts/look_tongji.py` 的对应命令。
 `/note` 默认并行执行转录和 slide 拉取；仅在用户显式提出不下载 slide/PPT 时才只做转录。
 整理笔记时默认同时参考转录结果、slide 图片和 `materials/*/converted.md`。
 如果用户给的是“课程名称”，优先用 `list --all --query ...`，避免最近课程列表遗漏导致选错课程。
@@ -212,9 +214,9 @@ python "<SKILL_DIR>/scripts/look_tongji.py" slide --course-id "<COURSE_ID>" --su
 生成或更新笔记后，执行：
 
 ```bash
-python "<SKILL_DIR>/scripts/look_tongji.py" index
-python "<SKILL_DIR>/scripts/look_tongji.py" build
-python "<SKILL_DIR>/scripts/look_tongji.py" serve --port 8765
+python "<SKILL_DIR>/../../scripts/look_tongji.py" index
+python "<SKILL_DIR>/../../scripts/look_tongji.py" build
+python "<SKILL_DIR>/../../scripts/look_tongji.py" serve --port 8765
 ```
 
 它会在工作区的 `site/` 下生成课程知识库页面，并用本地 HTTP server 预览。

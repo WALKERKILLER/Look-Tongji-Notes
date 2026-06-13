@@ -8,7 +8,7 @@
     {
       "name": "look-tongji-notes",
       "version": "1.0.0",
-      "description": "9 short commands (/setup, /list, /trans, /note, /wiki, /add, /page, /cheatsheet, /ralphtrans) for Tongji Look lecture transcription, supplementary material ingestion, and course wiki generation.",
+      "description": "8 short commands (/setup, /list, /trans, /note, /wiki, /add, /cheatsheet, /ralphtrans) for Tongji Look lecture transcription, supplementary material ingestion, and course wiki generation.",
       "author": {
         "name": "WALKERKILLER",
         "email": "walker_killer@163.com"
@@ -17,7 +17,6 @@
         "tongji",
         "lecture-notes",
         "course-wiki",
-        "github-pages",
         "markitdown",
         "/setup",
         "/list",
@@ -25,7 +24,6 @@
         "/note",
         "/wiki",
         "/add",
-        "/page",
         "/cheatsheet",
         "/ralphtrans"
       ],

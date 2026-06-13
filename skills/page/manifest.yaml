@@ -1,6 +1,0 @@
-name: page
-description: "Deploy the static course knowledge base to GitHub Pages using gh CLI, agent-driven."
-license: MIT
-metadata:
-  author: WALKERKILLER
-  version: "1.0"
