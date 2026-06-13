@@ -28,7 +28,7 @@ python "<SKILL_DIR>/../../scripts/look_tongji.py" cheatsheet --format html
 3. Two output paths:
 
 ### Path A — LaTeX (XeLaTeX available)
-Uses `<SKILL_DIR>/../../.mock-wiki/CheatingSheetTemplate/CheatingSheet.tex`.
+Uses `<SKILL_DIR>/../../CheatingSheetTemplate/CheatingSheet.tex`.
 - 4 columns, 5pt body, A4 paper
 - Compile: `xelatex -interaction=nonstopmode cheatsheet.tex`
 
@@ -39,7 +39,7 @@ Self-contained HTML with CSS print layout.
 
 ## Prompt Template
 
-Read `<SKILL_DIR>/../../.mock-wiki/CheatingSheetTemplate/README.md` for the generation prompt and typographic specification.
+Read `<SKILL_DIR>/../../CheatingSheetTemplate/README.md` for the generation prompt and typographic specification.
 
 ## Where \`<SKILL_DIR>\` Points
 

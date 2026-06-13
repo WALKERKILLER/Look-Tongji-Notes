@@ -1,7 +1,7 @@
 {
   "name": "look-tongji-notes",
-  "description": "8 short commands (/setup, /list, /trans, /note, /wiki, /add, /cheatsheet, /ralphtrans) for Tongji Look lecture transcription, supplementary materials, and course wiki generation for Hermes Agent.",
-  "version": "1.0.0",
+  "description": "9 short commands (/setup, /list, /trans, /note, /wiki, /add, /page, /cheatsheet, /ralphtrans) for Tongji Look lecture transcription, supplementary materials, course wiki generation, and GitHub Pages deployment for Hermes Agent.",
+  "version": "1.1.0",
   "author": {
     "name": "WALKERKILLER",
     "email": "walker_killer@163.com"

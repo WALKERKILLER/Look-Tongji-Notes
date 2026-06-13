@@ -1,6 +1,6 @@
 ---
 name: look-tongji-notes
-description: "8-command agent skill suite for Tongji Look (look.tongji.edu.cn): setup, list, transcribe, take notes, manage materials, build course wiki, create cheat sheets, and batch-process entire courses."
+description: "9-command agent skill suite for Tongji Look (look.tongji.edu.cn): setup, list, transcribe, take notes, manage materials, build course wiki, create cheat sheets, batch-process entire courses, and deploy course wiki to GitHub Pages."
 ---
 
 # Look Tongji Notes
@@ -16,6 +16,7 @@ description: "8-command agent skill suite for Tongji Look (look.tongji.edu.cn): 
 | `/add` | Import supplementary materials (PDF, PPTX, DOCX) into a lecture session | `skills/add/SKILL.md` |
 | `/wiki` | Build and locally serve the static course knowledge base | `skills/wiki/SKILL.md` |
 | `/cheatsheet` | Generate A4 cheat sheet (LaTeX or HTML) from course notes | `skills/cheatsheet/SKILL.md` |
+| `/page` | Deploy the built course wiki to GitHub Pages via gh CLI | `skills/page/SKILL.md` |
 | `/ralphtrans` | Batch transcribe all lectures in a course with checkpoint/resume | `skills/ralphtrans/SKILL.md` |
 
 Each command has its own `skills/<name>/SKILL.md` with detailed workflow instructions.
@@ -40,4 +41,5 @@ Each command has its own `skills/<name>/SKILL.md` with detailed workflow instruc
 /trans --course-id X     # transcribe one lecture
 /note --course-id X      # generate notes for one lecture
 /wiki                    # serve local course wiki
+/page                    # deploy course wiki to GitHub Pages
 ```

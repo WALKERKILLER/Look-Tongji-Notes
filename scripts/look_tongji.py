@@ -1433,7 +1433,7 @@ def cmd_add(args: argparse.Namespace) -> int:
 
 
 def cmd_cheatsheet(args: argparse.Namespace) -> int:
-    template_dir = _skill_root() / ".mock-wiki" / "CheatingSheetTemplate"
+    template_dir = _skill_root() / "CheatingSheetTemplate"
     tex_path = template_dir / "CheatingSheet.tex"
     readme_path = template_dir / "README.md"
 

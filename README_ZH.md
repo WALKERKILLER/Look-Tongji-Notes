@@ -16,11 +16,11 @@
 [![Works with Copilot](https://img.shields.io/badge/GitHub%20Copilot-✓-7C3AED.svg?style=for-the-badge)](https://github.com/features/copilot)
 [![Works with Gemini CLI](https://img.shields.io/badge/Gemini%20CLI-✓-7C3AED.svg?style=for-the-badge)](https://ai.google.dev/gemini-api)
 [![Works with Obsidian](https://img.shields.io/badge/Obsidian-✓-7C3AED.svg?style=for-the-badge)](https://obsidian.md)
-[![Version](https://img.shields.io/badge/Version-1.0.0-7C3AED.svg?style=for-the-badge)](SKILL.md)
+[![Version](https://img.shields.io/badge/Version-1.1.0-7C3AED.svg?style=for-the-badge)](SKILL.md)
 
 
 
-这是一个 agent skill 套件（8 个原子化 `/command` 技能）+ CLI，用来处理同济录课平台 `look.tongji.edu.cn`：
+这是一个 agent skill 套件（9 个原子化 `/command` 技能）+ CLI，用来处理同济录课平台 `look.tongji.edu.cn`：
 - 使用 Playwright 完成同济统一认证登录
 - 列出课程（最近课程 / 全量搜索）
 - 首次配置一个持久化的课程知识库工作区
@@ -83,7 +83,7 @@ $skill-installer install https://github.com/walkerkiller/look-tongji-notes
 - `.openclaw-plugin/`：OpenClaw 插件元数据
 - `.opencode-plugin/`：OpenCode 插件元数据
 - `.hermes-agent-plugin/`：Hermes Agent 插件元数据
-- `skills/`：8 个原子化命令技能（`skills/<name>/SKILL.md`）
+- `skills/`：9 个原子化命令技能（`skills/<name>/SKILL.md`）
 
 平台对齐说明：
 
@@ -100,6 +100,7 @@ $skill-installer install https://github.com/walkerkiller/look-tongji-notes
 - `/note` — 从转写文本 + slide 生成学习笔记 + 时间轴大纲
 - `/add` — 导入补充资料（PDF、PPTX、DOCX）到课程节次
 - `/wiki` — 构建并本地 serve 静态课程知识库
+- `/page` — 将构建的课程 wiki 部署到 GitHub Pages
 - `/cheatsheet` — 从课程笔记生成 A4 速查表（LaTeX 或 HTML）
 - `/ralphtrans` — 批量转写整门课程全部节次，支持断点续传
 
@@ -206,7 +207,7 @@ python "<SKILL_DIR>/../../scripts/look_tongji.py" slide --course-id "<COURSE_ID>
 
 ## Agent Note
 
-当用户说 `/setup` / `/list` / `/trans` / `/note` / `/wiki` / `/add` / `/cheatsheet` / `/ralphtrans` 时，按对应 `skills/<name>/SKILL.md` 的流程执行，并运行 `scripts/look_tongji.py` 的对应命令。
+当用户说 `/setup` / `/list` / `/trans` / `/note` / `/wiki` / `/add` / `/page` / `/cheatsheet` / `/ralphtrans` 时，按对应 `skills/<name>/SKILL.md` 的流程执行，并运行 `scripts/look_tongji.py` 的对应命令。
 `/note` 默认并行执行转录和 slide 拉取；仅在用户显式提出不下载 slide/PPT 时才只做转录。
 整理笔记时默认同时参考转录结果、slide 图片和 `materials/*/converted.md`。
 如果用户给的是“课程名称”，优先用 `list --all --query ...`，避免最近课程列表遗漏导致选错课程。

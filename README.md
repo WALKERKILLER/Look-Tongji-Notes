@@ -8,10 +8,10 @@
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge" alt="MIT License"></a>
-  <a href="SKILL.md"><img src="https://img.shields.io/badge/Version-1.0.0-7C3AED.svg?style=for-the-badge" alt="Version 1.0.0"></a>
+  <a href="SKILL.md"><img src="https://img.shields.io/badge/Version-1.1.0-7C3AED.svg?style=for-the-badge" alt="Version 1.1.0"></a>
 </p>
 
-This is an agent skill suite (8 atomic `/command` skills) + CLI for Tongji Look (`look.tongji.edu.cn`):
+This is an agent skill suite (9 atomic `/command` skills) + CLI for Tongji Look (`look.tongji.edu.cn`):
 - login via Tongji IAM SSO (Playwright),
 - list courses (recent list or full search),
 - transcribe a lecture to `SRT` + `TXT`,
@@ -29,6 +29,7 @@ This is an agent skill suite (8 atomic `/command` skills) + CLI for Tongji Look 
 | `/note` | Generate study notes + timeline outline from transcript + slides |
 | `/add` | Import supplementary materials (PDF, PPTX, DOCX) into a lecture session |
 | `/wiki` | Build and locally serve the static course knowledge base |
+| `/page` | Deploy the built course wiki to GitHub Pages via gh CLI |
 | `/cheatsheet` | Generate A4 cheat sheet (LaTeX or HTML) from course notes |
 | `/ralphtrans` | Batch transcribe all lectures in a course with checkpoint/resume |
 
@@ -127,7 +128,7 @@ Artifacts are written to the configured course-wiki workspace by default.
 
 ## Agent Note
 
-When a user says `/setup` / `/list` / `/trans` / `/note` / `/wiki` / `/add` / `/cheatsheet` / `/ralphtrans`, follow the corresponding `skills/<name>/SKILL.md` and run the matching CLI commands in `scripts/look_tongji.py`.
+When a user says `/setup` / `/list` / `/trans` / `/note` / `/wiki` / `/add` / `/page` / `/cheatsheet` / `/ralphtrans`, follow the corresponding `skills/<name>/SKILL.md` and run the matching CLI commands in `scripts/look_tongji.py`.
 For `/note`, default to running transcript + slide download in parallel; only skip slide download when the user explicitly asks not to download slides/PPT.
 When writing notes, use both transcript output and slide images by default.
 If the user provides a course name, prefer `list --all --query ...` to avoid missing courses that are not in the recent list.
