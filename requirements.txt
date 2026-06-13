@@ -1,3 +1,5 @@
 requests
 playwright
 python-dotenv
+markdown
+markitdown[all]

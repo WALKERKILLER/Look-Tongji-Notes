@@ -1,0 +1,1137 @@
+"""Inline CSS for the static site (v1.1 · #217).
+
+Extracted from ``llmwiki/build.py`` in the #217 refactor. Byte-identical
+to the pre-refactor constant — verified by ``llmwiki build`` hash.
+
+The full style sheet ships as a Python string so the builder can inline
+it into every page without needing a separate request. Theme toggle
+variables, highlight.js overrides, heatmap colors, tool-chart tokens,
+and mobile/print media queries all live here.
+"""
+
+from __future__ import annotations
+
+CSS = """/* llmwiki — god-level docs style */
+:root {
+  --bg: #ffffff;
+  --bg-alt: #f8fafc;
+  --bg-card: #ffffff;
+  --bg-code: #edf0f5;                      /* v1.0 #119: slightly darker for better contrast */
+  --text: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #6b7280;                   /* WCAG AA: 4.84:1 on white, 4.63:1 on --bg-alt */
+  --border: #d1d5db;                       /* v1.0 #119: stronger card borders (was #e2e8f0) */
+  --border-subtle: #e2e8f0;                /* for less prominent separators */
+  --accent: #7C3AED;
+  --accent-light: #a78bfa;
+  --accent-bg: #f5f3ff;
+  --radius: 8px;
+  --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+  --font-zh-hant-ui: 'Noto Sans TC', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-zh-hant-content: 'LXGW WenKai TC', 'Noto Sans TC', serif;
+  --shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.1), 0 8px 10px -6px rgba(15, 23, 42, 0.04);
+  --shadow-card: 0 1px 3px rgba(15, 23, 42, 0.08), 0 1px 2px rgba(15, 23, 42, 0.04);  /* v1.0 #119: card shadow */
+  --shadow-card-hover: 0 4px 12px rgba(15, 23, 42, 0.12), 0 2px 4px rgba(15, 23, 42, 0.06);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0c0a1d;
+    --bg-alt: #110f26;
+    --bg-card: #16142d;
+    --bg-code: #1a1836;
+    --text: #e2e8f0;
+    --text-secondary: #94a3b8;
+    --text-muted: #8b9bb5;  /* WCAG AA: 6.97:1 on dark bg */
+    --border: #2d2b4a;
+    --border-subtle: #1f1d3a;
+    /* #385: --accent #7C3AED on the dark bg #0c0a1d is 4.63:1 — axe
+       flags it as borderline. The lighter shade #a78bfa is 8.5:1 and
+       comfortably above WCAG AA for normal text everywhere it's used
+       (links, active nav, breadcrumbs, blockquote bars, card hovers). */
+    --accent: #a78bfa;
+    --accent-light: #c4b5fd;
+    --accent-bg: #1e1a3a;
+    --shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
+    --shadow-card: 0 2px 6px rgba(0, 0, 0, 0.35);
+    --shadow-card-hover: 0 6px 16px rgba(0, 0, 0, 0.45);
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0c0a1d;
+  --bg-alt: #110f26;
+  --bg-card: #16142d;
+  --bg-code: #1a1836;
+  --text: #e2e8f0;
+  --text-secondary: #94a3b8;
+  --text-muted: #8b9bb5;
+  --border: #2d2b4a;
+  --border-subtle: #1f1d3a;
+  --accent: #a78bfa;        /* #385: bump for AA contrast on dark bg */
+  --accent-light: #c4b5fd;  /* one step lighter for hover states */
+  --accent-bg: #1e1a3a;
+  --shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
+  --shadow-card: 0 2px 6px rgba(0, 0, 0, 0.35);
+  --shadow-card-hover: 0 6px 16px rgba(0, 0, 0, 0.45);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; } }
+body { font-family: var(--font); background: var(--bg); color: var(--text); line-height: 1.7; -webkit-font-smoothing: antialiased; overflow-wrap: break-word; word-wrap: break-word; }
+html[data-ui-lang="zh-Hant"] body { font-family: var(--font-zh-hant-ui); }
+html[data-ui-lang="zh-Hant"] .content,
+html[data-ui-lang="zh-Hant"] article.content,
+html[data-ui-lang="zh-Hant"] .content h1,
+html[data-ui-lang="zh-Hant"] .content h2,
+html[data-ui-lang="zh-Hant"] .content h3,
+html[data-ui-lang="zh-Hant"] .content h4,
+html[data-ui-lang="zh-Hant"] .content h5,
+html[data-ui-lang="zh-Hant"] .content h6,
+html[data-ui-lang="zh-Hant"] .content p,
+html[data-ui-lang="zh-Hant"] .content li,
+html[data-ui-lang="zh-Hant"] .content blockquote,
+html[data-ui-lang="zh-Hant"] .content table,
+html[data-ui-lang="zh-Hant"] .content summary,
+html[data-ui-lang="zh-Hant"] .content .katex-display,
+html[data-ui-lang="zh-Hant"] .content .katex { font-family: var(--font-zh-hant-content); }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+/* Skip-to-content link — visible only on keyboard focus */
+.skip-link { position: absolute; left: -9999px; top: auto; width: 1px; height: 1px; overflow: hidden; z-index: 999; padding: 8px 16px; background: var(--accent); color: #fff; font-weight: 600; font-size: 0.9rem; border-radius: 0 0 6px 0; text-decoration: none; }
+/* #ui-h1 (#565): explicit focus styles. Reset overflow + width on focus
+   so the link's content actually paints, and add a visible outline so
+   the keyboard-focus ring isn't ambiguous against the accent bg. */
+.skip-link:focus,
+.skip-link:focus-visible { position: fixed; top: 0; left: 0; width: auto; height: auto; overflow: visible; outline: 3px solid #fff; outline-offset: 0; box-shadow: 0 0 0 6px var(--accent); }
+.container { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+.muted { color: var(--text-muted); }
+kbd { display: inline-block; padding: 2px 6px; font-family: var(--mono); font-size: 0.72rem; color: var(--text-secondary); background: var(--bg-code); border: 1px solid var(--border); border-radius: 4px; line-height: 1; }
+
+/* Reading progress bar */
+.progress-bar { position: fixed; top: 0; left: 0; height: 3px; width: 0%; background: var(--accent); z-index: 200; transition: width 0.1s; }
+
+/* Nav */
+/* v1.0 #119: add a subtle shadow + stronger blur so the nav stays grounded on light backgrounds */
+.nav { position: sticky; top: 0; z-index: 100; background: var(--bg); border-bottom: 1px solid var(--border); box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
+.nav-inner { max-width: 1080px; margin: 0 auto; padding: 0 24px; height: 56px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.nav-brand { display: flex; align-items: center; gap: 8px; color: var(--text); text-decoration: none; flex-shrink: 0; }
+.nav-brand:hover { text-decoration: none; }
+.nav-brand-logo { display: inline-flex; align-items: center; justify-content: center; height: 32px; }
+.nav-brand-logo svg { display: block; height: 100%; width: auto; max-width: 230px; }
+.nav-brand-fallback { display: inline-flex; align-items: center; justify-content: center; min-width: 42px; height: 32px; padding: 0 10px; border-radius: 10px; background: var(--accent-bg); color: var(--accent); font-weight: 700; font-size: 0.86rem; letter-spacing: 0.08em; }
+.nav-links { display: flex; align-items: center; gap: 16px; }
+.nav-links a { color: var(--text-secondary); font-size: 0.86rem; font-weight: 500; text-decoration: none; }
+.nav-links a:hover { color: var(--text); text-decoration: none; }
+/* #385 S3: --accent is already bumped to #a78bfa in dark mode so the active
+   nav has 8.5:1 contrast there. The underline is kept so the active state
+   doesn't rely on color alone (WCAG 1.4.1 "Use of Color"). */
+.nav-links a.active { color: var(--accent); text-decoration: underline; text-underline-offset: 4px; text-decoration-thickness: 2px; }
+
+.nav-search-btn { display: flex; align-items: center; gap: 8px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; font-family: var(--font); color: var(--text-secondary); cursor: pointer; font-size: 0.82rem; transition: all 0.15s; }
+.nav-search-btn:hover { border-color: var(--accent); color: var(--accent); }
+.nav-search-btn svg { flex-shrink: 0; }
+@media (max-width: 767px) { .nav-search-btn span, .nav-search-btn kbd { display: none; } }
+/* Tablet + mobile: the six text anchors (Home/Projects/Sessions/Models/Compare/Changelog)
+   overflow a 768px viewport at 0.9rem/gap-20, so collapse them below the
+   1024 desktop breakpoint. Users still have Search + Theme in the top nav,
+   the command palette via Cmd+K, and the mobile bottom nav below 767. */
+@media (max-width: 1023px) { .nav-links > a { display: none; } }
+@media (max-width: 720px) {
+  .hero-shell { flex-direction: column; align-items: flex-start; gap: 20px; }
+  .hero-home .hero-figure { width: min(180px, 52vw); height: auto; aspect-ratio: 410 / 431; flex-basis: auto; align-self: center; }
+}
+
+/* #ui-m3 (#573): bump touch target from 36×36 to 44×44 (Apple HIG +
+   WCAG 2.5.5 minimum). Visual icon stays the same; padding grows. */
+.theme-toggle { background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--text-secondary); transition: all 0.2s; padding: 0; flex-shrink: 0; }
+.theme-toggle:hover { border-color: var(--accent); color: var(--accent); }
+.theme-toggle svg { width: 18px; height: 18px; }
+.nav-icon-link { background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; color: var(--text-secondary); transition: all 0.2s; flex-shrink: 0; text-decoration: none; }
+.nav-icon-link:hover { border-color: var(--accent); color: var(--accent); text-decoration: none; }
+.nav-icon-link .fa-github { font-size: 1.1rem; line-height: 1; }
+.lang-switcher { position: relative; flex-shrink: 0; }
+.lang-toggle { background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--text-secondary); transition: all 0.2s; padding: 0; flex-shrink: 0; }
+.lang-toggle:hover { border-color: var(--accent); color: var(--accent); }
+.lang-toggle svg { width: 20px; height: 20px; }
+.lang-menu { position: absolute; top: calc(100% + 10px); right: -12px; min-width: 148px; padding: 8px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg-card); box-shadow: 0 12px 30px rgba(15, 23, 42, 0.14); display: grid; gap: 6px; z-index: 40; transform-origin: top right; }
+.lang-menu-item { border: 1px solid transparent; border-radius: 8px; background: transparent; color: var(--text); padding: 8px 10px; text-align: left; font: inherit; cursor: pointer; }
+.lang-menu-item:hover { background: var(--bg-alt); border-color: var(--border); }
+.lang-menu-item.active { color: var(--accent); border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--bg-card)); }
+.lang-menu[hidden] { display: none; }
+.theme-toggle .icon-sun { display: none; }
+.theme-toggle .icon-moon { display: block; }
+:root[data-theme="dark"] .theme-toggle .icon-sun { display: block; }
+:root[data-theme="dark"] .theme-toggle .icon-moon { display: none; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .theme-toggle .icon-sun { display: block; }
+  :root:not([data-theme="light"]) .theme-toggle .icon-moon { display: none; }
+}
+
+/* Hero */
+.hero { padding: 56px 0 40px; margin-bottom: 20px; background: var(--bg-alt); border-bottom: 1px solid var(--border); }
+.hero-sm { padding: 32px 0 24px; margin-bottom: 12px; }
+.hero-shell { display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+.hero-copy { min-width: 0; flex: 1 1 0; }
+.hero h1 { font-size: 2rem; font-weight: 700; letter-spacing: -0.02em; color: var(--text); margin-bottom: 8px; overflow-wrap: break-word; }
+.hero .hero-sub { color: var(--text-secondary); font-size: 0.9rem; line-height: 1.6; overflow-wrap: break-word; }
+.hero .hero-sub code { font-family: var(--mono); background: var(--bg-card); padding: 1px 6px; border-radius: 4px; font-size: 0.82rem; border: 1px solid var(--border); }
+.hero .hero-sub a { color: var(--accent); font-weight: 500; }
+.hero-home .hero-site-title { position: relative; display: inline-flex; align-items: baseline; flex-wrap: wrap; gap: 0.12em; }
+.hero-home .hero-site-owner { position: relative; display: inline-block; z-index: 1; color: #f28c28; isolation: isolate; }
+.hero-home .hero-site-suffix { position: relative; z-index: 1; }
+.hero-home .hero-site-glow { position: absolute; left: -0.08em; right: -0.08em; top: 50%; height: 0.9em; transform: translateY(-38%); border-radius: 999px; background: linear-gradient(90deg, rgba(59, 130, 246, 0.72) 0%, rgba(236, 72, 153, 0.78) 100%); filter: blur(14px); opacity: 0.82; pointer-events: none; z-index: -1; }
+.hero-home .hero-figure { flex: 0 0 clamp(170px, 18vw, 240px); width: clamp(170px, 18vw, 240px); height: clamp(105px, 12vw, 150px); display: flex; align-items: center; justify-content: center; color: var(--text); opacity: 0.96; transform-origin: 50% 72%; transition: transform 180ms ease, opacity 180ms ease; }
+.hero-home .hero-figure:hover { transform: rotate(-4deg); opacity: 1; }
+.hero-home .hero-figure svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.hero-home .hero-figure path { fill: currentColor; }
+
+/* Breadcrumbs */
+.breadcrumbs { font-size: 0.82rem; color: var(--text-muted); margin-bottom: 16px; }
+.breadcrumbs a { color: var(--text-secondary); text-decoration: underline; text-decoration-style: dotted; text-underline-offset: 2px; text-decoration-color: var(--border); }
+.breadcrumbs a:hover { color: var(--accent); text-decoration: underline; }
+.breadcrumbs .crumb-sep { margin: 0 6px; color: var(--text-muted); }
+.breadcrumbs [aria-current="page"] { color: var(--text); font-weight: 500; }
+
+/* Section */
+.section { padding: 28px 0 32px; }
+.section h2 { font-size: 1.5rem; font-weight: 700; margin: 24px 0 16px; color: var(--text); }
+.section h3 { font-size: 1.15rem; font-weight: 600; margin: 20px 0 10px; color: var(--text); }
+
+.meta-tools { font-size: 0.82rem; margin-bottom: 12px; overflow-wrap: break-word; }
+
+/* Actions strip */
+.session-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid var(--border); }
+.tongji-media-shell { margin-bottom: 24px; }
+.tongji-media-details { border: 1px solid var(--border); border-radius: 10px; background: var(--bg-card); overflow: hidden; }
+.tongji-media-details > summary { list-style: none; cursor: pointer; padding: 14px 18px; font-weight: 600; border-bottom: 1px solid var(--border-subtle); display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.tongji-media-details > summary::-webkit-details-marker { display: none; }
+.tongji-media-details[open] > summary { background: var(--bg-alt); }
+.tongji-summary-label { display: inline-flex; align-items: center; min-width: 0; }
+.tongji-summary-caret { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; color: var(--text-secondary); flex-shrink: 0; }
+.tongji-summary-caret svg { width: 18px; height: 18px; display: block; }
+.tongji-summary-caret .tongji-caret-up { display: none; }
+.tongji-media-details[open] .tongji-summary-caret .tongji-caret-down { display: none; }
+.tongji-media-details[open] .tongji-summary-caret .tongji-caret-up { display: block; }
+.tongji-media-grid { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 16px; padding: 16px; }
+.tongji-player-wrap { min-width: 0; }
+.tongji-player { width: 100%; aspect-ratio: 16 / 9; background: #000; border-radius: 10px; overflow: hidden; }
+.art-control-look-tongji-screenshot { min-width: 38px; height: 30px; display: inline-flex !important; align-items: center; justify-content: center; padding: 0 8px; border-radius: 999px; background: rgba(15, 23, 42, 0.58); color: #f8fafc; border: 1px solid rgba(255, 255, 255, 0.18); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.15s ease; }
+.art-control-look-tongji-screenshot:hover,
+.art-control-look-tongji-screenshot:focus-visible { background: rgba(124, 58, 237, 0.72); border-color: rgba(255, 255, 255, 0.36); color: #ffffff; transform: translateY(-1px); }
+.art-control-look-tongji-screenshot svg { width: 18px; height: 18px; display: block; stroke: currentColor; }
+.tongji-player-empty { display: flex; align-items: center; justify-content: center; }
+.tongji-timeline-panel { border-left: 1px solid var(--border-subtle); padding-left: 16px; }
+.tongji-timeline-panel h2 { font-size: 1rem; margin: 0 0 12px; border: 0; padding: 0; }
+.tongji-timeline-list { height: 100%; max-height: 100%; overflow: auto; display: flex; flex-direction: column; gap: 8px; }
+.tongji-timeline-item { border: 1px solid var(--border); background: var(--bg-alt); border-radius: 8px; padding: 10px 12px; text-align: left; cursor: pointer; color: var(--text); }
+.tongji-timeline-item:hover { border-color: var(--accent); color: var(--accent); }
+.tongji-time { display: block; font-family: var(--mono); font-size: 0.82rem; margin-bottom: 4px; }
+.tongji-text { display: block; line-height: 1.5; }
+.btn { display: inline-flex; align-items: center; padding: 6px 14px; font-size: 0.82rem; font-weight: 500; background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; color: var(--text-secondary); cursor: pointer; text-decoration: none; transition: all 0.15s; font-family: var(--font); }
+.btn:hover { border-color: var(--accent); color: var(--accent); text-decoration: none; }
+.btn-primary { background: var(--accent); color: #ffffff; border-color: var(--accent); }
+.btn-primary:hover { background: var(--accent-light); border-color: var(--accent-light); color: #ffffff; }
+.btn.copied { background: var(--accent-bg); color: var(--accent); border-color: var(--accent); }
+
+/* Code copy button */
+.code-wrap { position: relative; }
+/* #ui-m4 (#574) + axe color-contrast follow-up: copy-code-btn was
+   opacity: 0 by default; touch + keyboard users couldn't see it. The
+   first fix used opacity: 0.6 by default but axe flagged the resulting
+   blend (text color × 0.6 over page bg) as 4.5:1 borderline-failing.
+   Switched to full opacity always-visible — no hover/focus state to
+   reveal — and de-emphasised the button via lower-contrast neutral
+   border + muted text instead of opacity. WCAG-clean. #ui-m3 (#573):
+   padding bumped so the hit area lands at the 44×44 minimum. */
+.copy-code-btn { position: absolute; top: 8px; right: 8px; padding: 8px 12px; min-width: 44px; min-height: 44px; font-size: 0.72rem; font-weight: 500; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; color: var(--text); cursor: pointer; font-family: var(--font); transition: border-color 0.15s, color 0.15s; z-index: 2; }
+.copy-code-btn:hover, .copy-code-btn:focus-visible { border-color: var(--accent); color: var(--accent); }
+.copy-code-btn.copied { background: var(--accent-bg); color: var(--accent); border-color: var(--accent); }
+
+/* Content */
+.content { color: var(--text); font-size: 0.95rem; max-width: 100%; overflow-wrap: break-word; word-wrap: break-word; min-width: 0; }
+.content h1, .content h2, .content h3, .content h4 { margin: 28px 0 12px; font-weight: 600; color: var(--text); scroll-margin-top: 72px; overflow-wrap: break-word; }
+.content h1 { font-size: 1.6rem; }
+.content h2 { font-size: 1.3rem; border-bottom: 1px solid var(--border); padding-bottom: 6px; margin-top: 36px; }
+.content h3 { font-size: 1.08rem; color: var(--accent); }
+.content h4 { font-size: 0.98rem; color: var(--text-secondary); }
+.content p { margin: 12px 0; color: var(--text); overflow-wrap: break-word; }
+.content ul, .content ol { margin: 12px 0 12px 24px; }
+.content li { margin: 4px 0; overflow-wrap: break-word; word-wrap: break-word; }
+.content li code { word-break: break-all; }
+.content code { font-family: var(--mono); background: var(--bg-code); padding: 2px 6px; border-radius: 4px; font-size: 0.82em; word-break: break-word; overflow-wrap: anywhere; }
+.content pre { background: var(--bg-code); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; overflow-x: auto; overflow-y: hidden; margin: 16px 0; font-size: 0.82rem; line-height: 1.5; max-width: 100%; white-space: pre; }
+.content pre code { background: none; padding: 0; font-size: inherit; word-break: normal; white-space: pre; overflow-wrap: normal; }
+.content blockquote { border-left: 3px solid var(--accent); padding: 8px 16px; color: var(--text-secondary); background: var(--accent-bg); margin: 16px 0; border-radius: 0 var(--radius) var(--radius) 0; }
+.content table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 0.88rem; display: block; overflow-x: auto; }
+.content th, .content td { border: 1px solid var(--border); padding: 8px 12px; text-align: left; overflow-wrap: break-word; }
+.content th { background: var(--bg-alt); font-weight: 600; }
+.content tr:nth-child(even) { background: var(--bg-alt); }
+.content strong { font-weight: 600; }
+.content hr { border: none; border-top: 1px solid var(--border); margin: 32px 0; }
+.content .headerlink { opacity: 0; margin-left: 8px; color: var(--text-muted); font-weight: 400; text-decoration: none; }
+.content h1:hover .headerlink, .content h2:hover .headerlink, .content h3:hover .headerlink, .content h4:hover .headerlink { opacity: 1; }
+
+/* v0.5: highlight.js owns token colours (see hljs-light / hljs-dark <link>
+   tags in page_head). We only style the code block container so it matches
+   the rest of the wiki's visual language. */
+.article pre,
+.article pre code.hljs {
+  background: var(--bg-code);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin: 16px 0;
+  overflow-x: auto;
+}
+.article pre code.hljs { padding: 14px 16px; display: block; }
+.article pre { padding: 0; }
+.article :not(pre) > code.hljs { background: transparent; padding: 0; }
+/* a11y (#385 S2): the GitHub hljs theme uses several token colors that fail
+   WCAG AA 4.5:1 contrast against our --bg-code background:
+     hljs-keyword     #d73a49 → 4.17:1 (light) → #c23a40 (4.82:1)
+     hljs-built_in    #005cc5 → 4.34:1 (light) → #0050a8 (4.78:1)
+     hljs-number      #005cc5 → 4.34:1 (light) → #0050a8 (4.78:1)
+     hljs-literal     #005cc5 → 4.34:1 (light) → #0050a8 (4.78:1)
+     hljs-title       #6f42c1 → 4.40:1 (light) → #5c34a3 (4.65:1)
+     hljs-attr        #005cc5 → 4.34:1 (light) → #0050a8 (4.78:1)
+     hljs-symbol      #e36209 → 4.05:1 (light) → #c8530a (4.51:1)
+   Dark-theme tokens stay on the hljs-dark stylesheet which already passes. */
+:root:not([data-theme="dark"]) .hljs-keyword,
+:root:not([data-theme="dark"]) .hljs-type { color: #c23a40; }
+:root:not([data-theme="dark"]) .hljs-built_in,
+:root:not([data-theme="dark"]) .hljs-number,
+:root:not([data-theme="dark"]) .hljs-literal,
+:root:not([data-theme="dark"]) .hljs-attr { color: #0050a8; }
+:root:not([data-theme="dark"]) .hljs-title,
+:root:not([data-theme="dark"]) .hljs-title.function_,
+:root:not([data-theme="dark"]) .hljs-class .hljs-title { color: #5c34a3; }
+:root:not([data-theme="dark"]) .hljs-symbol,
+:root:not([data-theme="dark"]) .hljs-bullet { color: #c8530a; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .hljs-keyword,
+  :root:not([data-theme="light"]) .hljs-type,
+  :root:not([data-theme="light"]) .hljs-built_in,
+  :root:not([data-theme="light"]) .hljs-number,
+  :root:not([data-theme="light"]) .hljs-literal,
+  :root:not([data-theme="light"]) .hljs-attr,
+  :root:not([data-theme="light"]) .hljs-title,
+  :root:not([data-theme="light"]) .hljs-symbol,
+  :root:not([data-theme="light"]) .hljs-bullet { color: unset; }
+}
+
+/* Cards */
+.card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; margin: 16px 0; }
+.card { display: block; padding: 16px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); text-decoration: none; color: var(--text); transition: all 0.15s; box-shadow: var(--shadow-card); }
+.card:hover { border-color: var(--accent); text-decoration: none; transform: translateY(-1px); box-shadow: var(--shadow-card-hover); }
+.card-title { font-weight: 600; font-size: 0.95rem; margin-bottom: 4px; color: var(--text); }
+.card-meta { font-size: 0.82rem; color: var(--text-secondary); }
+/* #455: small muted activity date range under the meta line. */
+.card-date-range { font-size: 0.72rem; color: var(--text-muted); margin-top: 2px; font-variant-numeric: tabular-nums; }
+/* #471: human-readable session description rendered as a subtitle on
+   session detail pages and as a small line beneath the slug in the
+   sessions index table. */
+.session-description { font-size: 0.95rem; color: var(--text-secondary); margin: -8px 0 16px; line-height: 1.5; }
+.session-cell-desc { font-size: 0.78rem; color: var(--text-muted); margin-top: 2px; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* #476: richer tool-result collapsible card. Renders as
+   `[badge] preview · N lines · X chars` so the user knows what's
+   inside without expanding. The badge tints by outcome. */
+.collapsible-result { margin: 12px 0; border: 1px solid var(--border); border-radius: 6px; padding: 0; background: var(--bg-card); }
+.collapsible-result > summary { padding: 8px 12px; cursor: pointer; list-style: none; font-size: 0.85rem; line-height: 1.5; }
+.collapsible-result > summary::-webkit-details-marker { display: none; }
+.collapsible-result > summary:hover { background: var(--bg-alt); }
+.collapsible-result[open] > summary { border-bottom: 1px solid var(--border); }
+.collapsible-result > *:not(summary) { padding: 8px 12px; }
+.tool-result-badge { display: inline-block; font-size: 0.7rem; font-weight: 600; padding: 1px 6px; border-radius: 3px; text-transform: uppercase; letter-spacing: 0.04em; }
+.tool-result-ok    { background: rgba(5,150,105,0.12); color: #047857; }
+.tool-result-error { background: rgba(220,38,38,0.12); color: #991B1B; }
+:root[data-theme="dark"] .tool-result-ok    { background: rgba(52,211,153,0.18); color: #34D399; }
+:root[data-theme="dark"] .tool-result-error { background: rgba(248,113,113,0.18); color: #F87171; }
+.tool-result-preview { color: var(--text); font-family: var(--mono); font-size: 0.82rem; }
+.tool-result-meta    { font-size: 0.78rem; }
+.collapsible-result.outcome-error { border-color: rgba(220,38,38,0.4); }
+.card-stats { font-size: 0.78rem; margin-top: 6px; }
+.card-badge { margin-top: 8px; }
+
+/* Content-freshness badge (#57) */
+.freshness {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 2px 10px; border-radius: 999px;
+  font-size: 0.72rem; font-weight: 600; white-space: nowrap;
+  border: 1px solid;
+}
+.freshness::before {
+  content: ""; width: 6px; height: 6px; border-radius: 50%;
+  background: currentColor;
+}
+.fresh-green   { color: #15803d; background: #dcfce7; border-color: #86efac; }
+.fresh-yellow  { color: #92400e; background: #fef3c7; border-color: #fcd34d; }
+.fresh-red     { color: #b91c1c; background: #fee2e2; border-color: #fca5a5; }
+.fresh-unknown { color: #6b7280; background: #f3f4f6; border-color: #d1d5db; }
+:root[data-theme="dark"] .fresh-green   { color: #86efac; background: #052e16; border-color: #065f46; }
+:root[data-theme="dark"] .fresh-yellow  { color: #fcd34d; background: #3a2a06; border-color: #78350f; }
+:root[data-theme="dark"] .fresh-red     { color: #fca5a5; background: #3a0a0a; border-color: #7f1d1d; }
+:root[data-theme="dark"] .fresh-unknown { color: #9ca3af; background: #1f2937; border-color: #374151; }
+@media print {
+  .freshness { background: #fff !important; color: #000 !important; border-color: #ccc !important; }
+  .freshness::before { background: #000 !important; }
+}
+
+/* Collapsible section */
+.sub-section { margin-top: 32px; }
+.sub-section summary { font-size: 1.15rem; font-weight: 600; cursor: pointer; padding: 8px 0; color: var(--text-secondary); }
+.sub-section summary:hover { color: var(--accent); }
+
+/* Sessions table */
+/* #ui-h10 (#569): isolation: isolate creates a stacking context so
+   the sticky thead doesn't lose z-order against the page nav blur on
+   iOS Safari. */
+.table-wrap { max-width: 100%; overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-card); isolation: isolate; }
+/* #452: table-layout: fixed pins column widths from <colgroup> so sticky <thead>
+   columns stay aligned with <tbody> as the user scrolls. min-width keeps the
+   table horizontally scrollable on narrow viewports rather than crushing cols. */
+.sessions-table { width: 100%; min-width: 880px; border-collapse: collapse; font-size: 0.88rem; table-layout: fixed; }
+.sessions-table td { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sessions-table td a { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; }
+.sessions-table th, .sessions-table td { padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--border); }
+.sessions-table th { background: var(--bg-alt); font-weight: 600; color: var(--text-secondary); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.05em; }
+.sessions-table.sticky-head th {
+  position: -webkit-sticky;
+  position: sticky;
+  top: 56px;
+  z-index: 2;
+  transform: translateZ(0);
+}
+.sessions-table tr:last-child td { border-bottom: none; }
+.sessions-table tr:hover { background: var(--bg-alt); }
+.sessions-table tr.selected { background: var(--accent-bg); }
+.sessions-table td.num { text-align: right; font-variant-numeric: tabular-nums; color: var(--text-secondary); }
+.sessions-table code { font-family: var(--mono); font-size: 0.82em; color: var(--text-secondary); }
+.sessions-table tr[hidden] { display: none; }
+
+/* Filter bar */
+.filter-bar { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin-bottom: 16px; padding: 12px 16px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); }
+.filter-bar label { display: flex; flex-direction: column; gap: 4px; font-size: 0.72rem; color: var(--text-muted); font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em; }
+.filter-bar select, .filter-bar input { padding: 6px 10px; font-size: 0.85rem; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; color: var(--text); font-family: var(--font); min-width: 140px; }
+.filter-bar input[type="text"] { min-width: 180px; }
+.filter-bar .btn { align-self: end; }
+.filter-count { font-size: 0.78rem; margin-left: auto; align-self: end; }
+
+/* Synthesis block */
+.synthesis { background: var(--accent-bg); border: 1px solid var(--accent-light); border-radius: var(--radius); padding: 20px 24px; margin-bottom: 24px; }
+.synthesis h2, .synthesis h3 { color: var(--accent); margin-top: 0; }
+.synthesis p { margin: 10px 0; }
+
+/* Command palette */
+/* #478: was gated by `[aria-hidden="false"]`. axe-core flags that as
+   `aria-hidden-focus` because focusable children inside an aria-hidden
+   element are unreachable to AT users. Now toggled via `.open` class
+   that JS sets when the dialog is active; aria-hidden is removed
+   entirely while open and `inert` is applied to sibling chrome to
+   keep AT focus inside the dialog (#479). */
+.palette { position: fixed; inset: 0; z-index: 300; display: none; }
+.palette.open { display: block; }
+.palette-backdrop { position: absolute; inset: 0; background: rgba(15, 23, 42, 0.5); backdrop-filter: blur(4px); }
+.palette-modal { position: relative; max-width: 600px; margin: 10vh auto 0; background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow); overflow: hidden; }
+.palette-header { display: flex; align-items: center; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--border); }
+.palette-header svg { color: var(--text-muted); flex-shrink: 0; }
+.palette-header input { flex: 1; background: transparent; border: none; outline: none; font-family: var(--font); font-size: 0.95rem; color: var(--text); }
+.palette-header input::placeholder { color: var(--text-muted); }
+.palette-results { list-style: none; max-height: 50vh; overflow-y: auto; padding: 6px 0; }
+.palette-results li { padding: 10px 16px; cursor: pointer; border-left: 3px solid transparent; }
+.palette-results li.active { background: var(--accent-bg); border-left-color: var(--accent); }
+.palette-results li:hover { background: var(--bg-alt); }
+.palette-results .result-title { font-weight: 500; font-size: 0.9rem; color: var(--text); }
+.palette-results .result-meta { font-size: 0.75rem; color: var(--text-muted); margin-top: 2px; }
+.palette-results .result-type { display: inline-block; padding: 1px 6px; background: var(--bg-code); border-radius: 3px; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.04em; margin-right: 6px; color: var(--accent); }
+.palette-footer { display: flex; gap: 16px; padding: 10px 16px; border-top: 1px solid var(--border); font-size: 0.75rem; background: var(--bg-alt); }
+
+/* Help dialog */
+/* #478: same .open class swap as the palette — aria-hidden gating
+   was an axe-core violation for any focusable child. */
+/* #ui-l8 (#581): hint + example paragraphs in the help dialog moved
+   from inline style="" to these classes so the dialog stays
+   strict-CSP-friendly. */
+.help-dialog-hint { font-size: 0.82rem; margin: 4px 0 8px; }
+.help-dialog-example { font-size: 0.82rem; margin-top: 6px; }
+/* 404 page link list — was inline style="list-style:disc;...". */
+.not-found-links { list-style: disc; padding-left: 24px; margin: 12px 0; }
+.help-dialog { position: fixed; inset: 0; z-index: 250; display: none; }
+.help-dialog.open { display: block; }
+.help-modal { position: relative; max-width: 420px; margin: 15vh auto 0; background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 24px; box-shadow: var(--shadow); }
+.help-modal h2 { font-size: 1.1rem; margin-bottom: 16px; }
+.help-modal table { width: 100%; font-size: 0.88rem; margin-bottom: 16px; }
+.help-modal td { padding: 6px 0; }
+.help-modal td:first-child { width: 130px; }
+
+/* Footer */
+.footer { padding: 32px 0; border-top: 1px solid var(--border); margin-top: 48px; background: var(--bg-alt); }
+.footer p { font-size: 0.85rem; color: var(--text-muted); text-align: center; }
+.footer a { text-decoration: underline; text-underline-offset: 2px; }
+
+/* Changelog page — narrow reading column + keep-a-changelog typography */
+.container.narrow { max-width: 860px; }
+.changelog-body { padding: 40px 0 64px; }
+.changelog-body .article h2 { margin-top: 48px; padding-bottom: 8px; border-bottom: 1px solid var(--border); font-size: 1.5rem; }
+.changelog-body .article h2:first-child { margin-top: 0; }
+.changelog-body .article h3 { margin-top: 28px; font-size: 1.1rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.04em; }
+.changelog-body .article h4 { margin-top: 20px; font-size: 0.98rem; }
+.changelog-body .article ul { margin: 12px 0 20px; padding-left: 22px; }
+.changelog-body .article li { margin: 6px 0; line-height: 1.6; }
+.changelog-body .article li > code,
+.changelog-body .article p > code { font-size: 0.86rem; padding: 1px 6px; background: var(--bg-code); border-radius: 4px; }
+.changelog-body .article p { line-height: 1.7; }
+.changelog-body .article a { color: var(--accent); }
+.changelog-body .article hr { margin: 36px 0; border: 0; border-top: 1px solid var(--border); }
+.changelog-body .article blockquote { margin: 16px 0; padding: 8px 16px; border-left: 3px solid var(--accent); color: var(--text-secondary); background: var(--bg-alt); border-radius: 0 4px 4px 0; }
+
+/* v0.4: Related pages panel */
+.related-pages { margin-top: 48px; padding-top: 24px; border-top: 1px solid var(--border); }
+.related-pages h3 { font-size: 1.05rem; color: var(--text-secondary); margin-bottom: 12px; }
+.related-pages ul { list-style: none; margin: 0; padding: 0; }
+.related-pages li { padding: 6px 0; font-size: 0.9rem; border-bottom: 1px solid var(--border); }
+.related-pages li:last-child { border-bottom: none; }
+
+/* v0.8 (#64, #72): GitHub-style 365-day activity heatmap. Rendered as a
+   build-time SVG in build.py (see llmwiki/viz_heatmap.py). The CSS custom
+   properties below get picked up by the inlined SVG via its own <style>
+   block so the colors swap with the page theme. The pre-v0.8 JS-based
+   tiny-strip heatmap is gone. */
+:root {
+  --heatmap-0: #dde1e6;        /* v1.0 #119: darker level-0 for visibility on white */
+  --heatmap-1: #9be9a8;
+  --heatmap-2: #40c463;
+  --heatmap-3: #30a14e;
+  --heatmap-4: #216e39;
+}
+:root[data-theme="dark"] {
+  --heatmap-0: #161b22;
+  --heatmap-1: #0e4429;
+  --heatmap-2: #006d32;
+  --heatmap-3: #26a641;
+  --heatmap-4: #39d353;
+}
+.heatmap-section { padding-top: 16px; padding-bottom: 16px; }
+.activity-heatmap { margin-bottom: 24px; padding: 14px 16px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); overflow-x: auto; }
+.heatmap-label { font-size: 0.78rem; margin-bottom: 8px; }
+.heatmap-svg { display: block; max-width: 100%; }
+.heatmap-svg rect { transition: stroke 0.1s; }
+.heatmap-svg rect:hover { stroke: var(--accent); stroke-width: 1; }
+
+/* v0.8 (#65): Tool-call bar chart — rendered as pure SVG by
+   llmwiki/viz_tools.py. CSS custom properties drive the category
+   colors so the page theme can override them; dark-mode variants
+   use saturated fills that read against the dark card background. */
+:root {
+  /* v1.0 #119: slightly less saturated in light mode — bars read cleaner on white card background */
+  --tool-cat-io: #2563eb;
+  --tool-cat-search: #9333ea;
+  --tool-cat-exec: #ea580c;
+  --tool-cat-network: #059669;
+  --tool-cat-plan: #475569;
+  --tool-cat-other: #6b7280;
+}
+:root[data-theme="dark"] {
+  --tool-cat-io: #60a5fa;
+  --tool-cat-search: #c084fc;
+  --tool-cat-exec: #fb923c;
+  --tool-cat-network: #34d399;
+  --tool-cat-plan: #94a3b8;
+  --tool-cat-other: #9ca3af;
+}
+.tool-chart-section { padding-top: 8px; padding-bottom: 16px; }
+.tool-chart-card { margin: 16px 0 24px; padding: 14px 16px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); overflow-x: auto; }
+.tool-chart-label { font-size: 0.78rem; margin-bottom: 8px; }
+.tool-chart-svg { display: block; max-width: 100%; }
+.tool-chart-svg rect { transition: opacity 0.1s; stroke: rgba(15, 23, 42, 0.08); stroke-width: 1; }  /* v1.0 #119: thin stroke for bar definition */
+:root[data-theme="dark"] .tool-chart-svg rect { stroke: rgba(255, 255, 255, 0.05); }
+.tool-chart-svg rect:hover { opacity: 0.85; }
+
+/* v0.8 (#66): Token usage card — stacked bars for four token categories
+   plus a cache hit ratio badge. Rendered as plain HTML by
+   llmwiki/viz_tokens.py. Colors follow the same category convention as
+   the tool chart (blue = input, amber = cache_creation, green = cache_read,
+   purple = output). */
+:root {
+  --token-input: #3b82f6;
+  --token-cache-creation: #f59e0b;
+  --token-cache-read: #10b981;
+  --token-output: #a855f7;
+  --token-area-fill: rgba(59, 130, 246, 0.22);
+  --token-area-stroke: #3b82f6;
+}
+:root[data-theme="dark"] {
+  --token-input: #60a5fa;
+  --token-cache-creation: #fbbf24;
+  --token-cache-read: #34d399;
+  --token-output: #c084fc;
+  --token-area-fill: rgba(96, 165, 250, 0.22);
+  --token-area-stroke: #60a5fa;
+}
+.token-card { margin: 16px 0 24px; padding: 14px 16px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); }
+.token-card-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
+.token-card-title { font-weight: 600; font-size: 0.9rem; }
+.token-card-total { font-size: 0.78rem; }
+.token-row { display: grid; grid-template-columns: 120px 1fr 64px; gap: 10px; align-items: center; margin: 4px 0; font-size: 0.82rem; }
+.token-label { color: var(--text-secondary); }
+.token-bar-wrap { height: 10px; background: var(--bg-alt); border-radius: 3px; overflow: hidden; }
+.token-bar { display: block; height: 100%; border-radius: 3px; }
+.token-bar-input { background: var(--token-input); }
+.token-bar-cache_creation { background: var(--token-cache-creation); }
+.token-bar-cache_read { background: var(--token-cache-read); }
+.token-bar-output { background: var(--token-output); }
+.token-value { text-align: right; font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; color: var(--text-secondary); }
+.token-ratio { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border); font-size: 0.8rem; display: flex; gap: 8px; align-items: baseline; }
+.token-ratio-label { color: var(--text-secondary); }
+.token-ratio-value { font-weight: 600; font-size: 0.95rem; }
+.token-ratio-value.tier-green   { color: #15803d; }
+.token-ratio-value.tier-yellow  { color: #92400e; }
+.token-ratio-value.tier-red     { color: #b91c1c; }
+.token-ratio-value.tier-unknown { color: var(--text-secondary); }
+:root[data-theme="dark"] .token-ratio-value.tier-green  { color: #86efac; }
+:root[data-theme="dark"] .token-ratio-value.tier-yellow { color: #fcd34d; }
+:root[data-theme="dark"] .token-ratio-value.tier-red    { color: #fca5a5; }
+.token-ratio.tier-green   { background: rgba(34, 197, 94, 0.08); }
+.token-ratio.tier-yellow  { background: rgba(234, 179, 8, 0.08); }
+.token-ratio.tier-red     { background: rgba(239, 68, 68, 0.08); }
+.token-ratio { padding: 8px 10px; border-radius: 4px; }
+.token-timeline-svg { display: block; max-width: 100%; }
+
+/* Site-wide token stats on the home page */
+.token-stats-section { padding-top: 8px; padding-bottom: 16px; }
+.token-stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin: 8px 0 24px; }
+.token-stat { padding: 14px 16px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); text-decoration: none; color: var(--text); display: block; }
+a.token-stat:hover { border-color: var(--accent); }
+.token-stat-label { font-size: 0.76rem; margin-bottom: 4px; }
+.token-stat-value { font-size: 1.4rem; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+.token-stat-sub { font-size: 0.75rem; margin-top: 4px; }
+
+/* v0.7 (#55): Model entity info card + /models/ sortable table. The
+   `.model-card` is rendered by llmwiki/models_page.py.render_model_info_card;
+   the `.models-table` is inside render_models_index. Both reuse existing
+   theme vars — no new custom properties. */
+.model-card { margin: 20px 0; padding: 18px 22px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); }
+.model-card-header { display: flex; gap: 10px; align-items: baseline; margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+.model-card-title { font-size: 1.25rem; font-weight: 700; }
+.model-card-provider { font-size: 0.95rem; }
+.model-card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px 18px; margin-bottom: 14px; }
+.model-card-kv { display: flex; flex-direction: column; gap: 2px; font-size: 0.88rem; }
+.model-card-kv .muted { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; }
+.model-card-row { display: flex; gap: 12px; align-items: baseline; font-size: 0.88rem; margin: 8px 0; }
+.model-card-row-label { min-width: 80px; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; }
+.model-price-cell { margin-right: 14px; font-family: 'JetBrains Mono', monospace; }
+.model-card-section-title { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; margin-top: 14px; margin-bottom: 8px; }
+.model-card-benches { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); }
+.model-bench-row { display: grid; grid-template-columns: 140px 1fr 52px; gap: 10px; align-items: center; margin: 4px 0; font-size: 0.85rem; }
+.model-bench-label { color: var(--text-secondary); }
+.model-bench-bar { height: 10px; background: var(--bg-alt); border-radius: 3px; overflow: hidden; }
+.model-bench-fill { display: block; height: 100%; background: var(--accent); border-radius: 3px; }
+.model-bench-value { text-align: right; font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; color: var(--text-secondary); }
+.model-warnings { margin: 12px 0; padding: 10px 14px; background: rgba(234, 179, 8, 0.08); border: 1px solid #f59e0b; border-radius: 4px; font-size: 0.85rem; }
+.model-warnings summary { cursor: pointer; font-weight: 600; color: #b45309; }
+:root[data-theme="dark"] .model-warnings { background: rgba(234, 179, 8, 0.12); }
+:root[data-theme="dark"] .model-warnings summary { color: #fcd34d; }
+.models-table-wrap { overflow-x: auto; margin: 20px 0; }
+.models-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+.models-table th, .models-table td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border); }
+.models-table th { font-weight: 600; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary); background: var(--bg-alt); }
+.models-table td { font-family: 'JetBrains Mono', monospace; }
+.models-table td:first-child { font-family: inherit; }
+.models-table tr:hover td { background: var(--bg-alt); }
+.models-table a { color: var(--accent); text-decoration: none; font-weight: 500; }
+.models-table a:hover { text-decoration: underline; }
+
+/* v0.7 (#56): Changelog timeline + inline pricing sparkline + home
+   "Recently updated" card. All rendered by llmwiki/changelog_timeline.py.
+   Timeline is a vertical list with a connecting line on the left,
+   newest entry first, numeric deltas colored by direction. */
+.timeline-card { margin: 20px 0; padding: 18px 22px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); }
+.timeline-card-title { font-size: 0.88rem; font-weight: 600; margin-bottom: 12px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; }
+.timeline-sparkline { display: flex; align-items: center; gap: 12px; padding: 6px 0 12px; font-size: 0.78rem; }
+.timeline-sparkline .price-sparkline { flex: 0 0 auto; }
+.changelog-timeline { list-style: none; margin: 0; padding: 0 0 0 18px; position: relative; border-left: 2px solid var(--border); }
+.timeline-item { position: relative; padding: 8px 0 8px 16px; font-size: 0.88rem; }
+.timeline-date { display: block; font-size: 0.76rem; color: var(--text-secondary); font-family: 'JetBrains Mono', monospace; margin-bottom: 2px; }
+.timeline-dot { position: absolute; left: -23px; top: 14px; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); border: 2px solid var(--bg-card); }
+.timeline-body { display: block; }
+.timeline-event { font-weight: 500; }
+.timeline-detail { font-size: 0.82rem; color: var(--text-secondary); margin-top: 4px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.timeline-field { font-size: 0.78rem; padding: 1px 6px; background: var(--bg-alt); border-radius: 3px; }
+.timeline-delta { display: inline-flex; gap: 6px; align-items: baseline; font-family: 'JetBrains Mono', monospace; }
+.timeline-from { color: var(--text-secondary); text-decoration: line-through; text-decoration-thickness: 1px; }
+.timeline-to { font-weight: 600; color: var(--text); }
+.timeline-arrow { color: var(--text-secondary); }
+.timeline-arrow-down { color: #15803d; }
+.timeline-arrow-up { color: #b91c1c; }
+:root[data-theme="dark"] .timeline-arrow-down { color: #86efac; }
+:root[data-theme="dark"] .timeline-arrow-up { color: #fca5a5; }
+
+.recently-updated-section { padding-top: 8px; padding-bottom: 16px; }
+.recently-updated-card { margin: 8px 0 24px; padding: 14px 16px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); }
+.recently-updated-title { font-size: 0.78rem; margin-bottom: 10px; }
+.recently-updated-list { list-style: none; margin: 0; padding: 0; }
+.recently-updated-item { display: grid; grid-template-columns: 180px 100px 1fr; gap: 10px; align-items: baseline; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 0.88rem; min-width: 0; }
+.recently-updated-item:last-child { border-bottom: none; }
+.recently-updated-item > * { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.recently-updated-item a { color: var(--accent); text-decoration: none; font-weight: 500; }
+.recently-updated-item a:hover { text-decoration: underline; }
+.recently-updated-date { font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; }
+/* Below 640px the 180+100+1fr grid is too wide — collapse to a single
+   column so each item stacks vertically instead of overflowing. */
+@media (max-width: 639px) {
+  .recently-updated-item { grid-template-columns: 1fr; gap: 2px; padding: 8px 0; }
+  .recently-updated-item > * { white-space: normal; }
+}
+
+/* Project topics — GitHub-style tag chips on project cards, project
+   detail pages, and the home-page grid. Rendered by
+   llmwiki/project_topics.py. Tag colors are theme-neutral so the
+   same style reads on both project cards (light background) and
+   the project hero strip. */
+.project-topics { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.topic-chip {
+  display: inline-block;
+  padding: 3px 10px;
+  background: var(--bg-alt);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 500;
+  line-height: 1.4;
+  text-decoration: none;
+  transition: all 0.1s;
+}
+a.topic-chip:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--bg-card);
+}
+.topic-chip-more { opacity: 0.7; }
+.card-topics { margin-top: 8px; }
+.card-topics .topic-chip { font-size: 0.68rem; padding: 2px 8px; }
+.project-topics-section { padding-top: 12px; padding-bottom: 8px; }
+.project-topics-section .container { padding-top: 16px; padding-bottom: 4px; }
+.project-description { margin: 0 0 10px; font-size: 0.92rem; line-height: 1.5; max-width: 680px; }
+.project-hero-topics { margin-bottom: 6px; }
+.project-homepage { display: inline-block; margin-top: 6px; font-size: 0.82rem; color: var(--accent); text-decoration: none; }
+.project-homepage:hover { text-decoration: underline; }
+
+/* v0.7 (#58): Auto-generated vs-comparison pages. Side-by-side table
+   with difference highlighting, benchmark bar chart, price delta, and
+   a stub summary section the user fills in. */
+.vs-section { margin: 24px 0; }
+.vs-section h2 { font-size: 1.2rem; font-weight: 600; margin: 0 0 14px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+.vs-table { width: 100%; border-collapse: collapse; margin: 12px 0 24px; font-size: 0.92rem; }
+.vs-table th, .vs-table td { padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border); }
+.vs-table th:first-child { width: 180px; color: var(--text-secondary); font-weight: 500; font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.03em; }
+.vs-table .vs-colhead { font-size: 1rem; background: var(--bg-alt); }
+.vs-table .vs-colhead a { color: var(--accent); text-decoration: none; }
+.vs-table .vs-colhead a:hover { text-decoration: underline; }
+.vs-table td { font-family: 'JetBrains Mono', monospace; }
+.vs-table .cell-diff { background: rgba(124, 58, 237, 0.08); font-weight: 600; }
+:root[data-theme="dark"] .vs-table .cell-diff { background: rgba(167, 139, 250, 0.12); }
+.vs-bench-chart { display: block; max-width: 100%; margin: 8px 0; }
+.vs-summary-stub p { padding: 14px 18px; background: var(--bg-alt); border-left: 3px solid var(--accent); border-radius: 0 4px 4px 0; font-style: italic; }
+.vs-index-table { width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 0.92rem; }
+.vs-index-table th, .vs-index-table td { padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border); }
+.vs-index-table th { font-weight: 600; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary); background: var(--bg-alt); }
+.vs-index-table a { color: var(--accent); text-decoration: none; font-weight: 500; }
+.vs-index-table a:hover { text-decoration: underline; }
+.vs-index-table tr:hover td { background: var(--bg-alt); }
+
+
+/* Agent badge icons */
+.agent-badge-stack {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+  min-height: 32px;
+  position: relative;
+}
+.agent-badge {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid rgba(160, 128, 96, 0.34);
+  background: rgba(230, 214, 193, 0.98);
+  box-shadow: 0 3px 10px rgba(75, 56, 38, 0.12);
+  overflow: hidden;
+  color: #64748b;
+}
+.agent-badge + .agent-badge { margin-left: -8px; }
+.agent-badge img,
+.agent-badge svg {
+  width: 22px;
+  height: 22px;
+  display: block;
+}
+.agent-codex img {
+  width: 25px;
+  height: 25px;
+}
+.agent-claude img,
+.agent-copilot img,
+.agent-gemini img,
+.agent-openclaw img,
+.agent-opencode img,
+.agent-hermes img {
+  width: 24px;
+  height: 24px;
+}
+.agent-cursor img {
+  width: 24px;
+  height: 24px;
+}
+.agent-cursor svg,
+.agent-obsidian svg,
+.agent-unknown svg {
+  width: 22px;
+  height: 22px;
+}
+.agent-claude   { color: #7c3aed; }
+.agent-codex    { color: #111827; }
+.agent-copilot  { color: #2563eb; }
+.agent-cursor   { color: #92400e; }
+.agent-gemini   { color: #db4437; }
+.agent-openclaw { color: #0f766e; }
+.agent-opencode { color: #7c2d12; }
+.agent-hermes   { color: #7c3aed; }
+.agent-obsidian { color: #6d28d9; }
+.agent-unknown  { color: #374151; }
+:root[data-theme="dark"] .agent-badge {
+  background: rgba(214, 194, 168, 0.98);
+  border-color: rgba(173, 139, 102, 0.4);
+  box-shadow: 0 6px 18px rgba(28, 22, 16, 0.28);
+}
+.sessions-table .agent-badge-stack {
+  min-height: 28px;
+  padding-right: 12px;
+}
+.sessions-table .agent-badge {
+  width: 26px;
+  height: 26px;
+}
+.sessions-table .agent-badge + .agent-badge {
+  margin-left: -11px;
+}
+.sessions-table .agent-codex img {
+  width: 23px;
+  height: 23px;
+}
+.sessions-table .agent-claude img,
+.sessions-table .agent-copilot img,
+.sessions-table .agent-gemini img,
+.sessions-table .agent-openclaw img,
+.sessions-table .agent-opencode img,
+.sessions-table .agent-hermes img,
+.sessions-table .agent-cursor img {
+  width: 22px;
+  height: 22px;
+}
+.agent-badge-overflow {
+  position: absolute;
+  top: -4px;
+  right: -1px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #6b21a8;
+  color: #ffffff;
+  font-size: 0.58rem;
+  font-weight: 700;
+  line-height: 1;
+  border: 1px solid rgba(255,255,255,0.85);
+  box-shadow: 0 2px 6px rgba(17, 24, 39, 0.18);
+}
+:root[data-theme="dark"] .agent-badge-overflow {
+  background: #7c3aed;
+  border-color: rgba(226, 232, 240, 0.9);
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* v0.4: Deep-link icon next to headings */
+.content h2 .deep-link, .content h3 .deep-link, .content h4 .deep-link { margin-left: 8px; font-size: 0.8em; opacity: 0; text-decoration: none; transition: opacity 0.15s; }
+.content h2:hover .deep-link, .content h3:hover .deep-link, .content h4:hover .deep-link { opacity: 0.7; }
+.content h2 .deep-link:hover, .content h3 .deep-link:hover { opacity: 1; text-decoration: none; }
+
+/* v0.4: Mark highlighting in search results */
+mark { background: var(--accent-bg); color: var(--accent); padding: 0 2px; border-radius: 3px; font-weight: 500; }
+
+/* Hover-to-preview wikilinks */
+.wikilink-preview { position: fixed; max-width: 360px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; box-shadow: var(--shadow); padding: 12px 14px; z-index: 250; pointer-events: auto; font-size: 0.85rem; animation: fadeIn 0.1s ease-out; }
+.wikilink-preview .wl-title { font-weight: 600; color: var(--text); margin-bottom: 6px; }
+.wikilink-preview .wl-body { color: var(--text-secondary); font-size: 0.8rem; line-height: 1.5; max-height: 140px; overflow: hidden; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+
+/* Timeline block on sessions index */
+.timeline-block { margin-bottom: 16px; padding: 12px 16px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); }
+.timeline-label { font-size: 0.78rem; margin-bottom: 6px; }
+.timeline-block svg rect { transition: opacity 0.15s; }
+.timeline-block svg rect:hover { opacity: 1 !important; }
+
+/* TOC sidebar (session pages, desktop only, injected by JS) */
+.toc-sidebar { position: fixed; top: 88px; left: max(16px, calc((100vw - 1080px) / 2 - 240px)); width: 220px; max-height: calc(100vh - 120px); overflow-y: auto; padding: 12px 14px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); font-size: 0.82rem; z-index: 50; display: none; }
+.toc-sidebar .toc-title { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); font-weight: 600; margin-bottom: 8px; }
+.toc-sidebar ul { list-style: none; padding: 0; margin: 0; }
+.toc-sidebar li { margin: 0; }
+.toc-sidebar li.toc-h3 { padding-left: 12px; }
+.toc-sidebar li.toc-h4 { padding-left: 24px; }
+.toc-sidebar .toc-link { display: block; padding: 4px 8px; color: var(--text-secondary); border-left: 2px solid transparent; line-height: 1.4; text-decoration: none; border-radius: 0 4px 4px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.toc-sidebar .toc-link:hover { color: var(--text); background: var(--bg-alt); text-decoration: none; }
+.toc-sidebar .toc-link.active { color: var(--accent); border-left-color: var(--accent); background: var(--bg-alt); font-weight: 500; }
+@media (min-width: 1340px) { .toc-sidebar { display: block; } }
+
+/* #460: Hamburger button + slide-down drawer for tablet/mobile.
+   Desktop nav-links row hides at <1024 (existing rule), so without
+   this drawer Graph / Docs / Changelog were unreachable on mobile. */
+.nav-hamburger {
+  display: none;  /* shown only when nav-links row is hidden */
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: 6px; width: 44px; height: 44px;
+  align-items: center; justify-content: center;
+  cursor: pointer; color: var(--text-secondary);
+  padding: 0; margin-left: auto;
+  transition: all 0.15s;
+}
+.nav-hamburger:hover { border-color: var(--accent); color: var(--accent); }
+@media (max-width: 1023px) { .nav-hamburger { display: inline-flex; } }
+/* #v1378-review: forced-colors (Windows High Contrast) mode overrides
+   our custom palette with the system one. Without this, the hamburger
+   button's border (var(--border)) is ignored and the button visually
+   disappears against the nav background. Use system-named colors so
+   it stays visible. */
+@media (forced-colors: active) {
+  .nav-hamburger { border: 2px solid ButtonText; }
+  .nav-hamburger:focus-visible { outline: 3px solid Highlight; outline-offset: 2px; }
+}
+.nav-drawer {
+  display: none;
+  position: absolute; left: 0; right: 0; top: 100%;
+  background: var(--bg); border-bottom: 1px solid var(--border);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+  flex-direction: column; padding: 8px 16px 12px;
+  z-index: 99;
+}
+.nav-drawer:not([hidden]) { display: flex; }
+.nav-drawer-link {
+  display: block; padding: 12px 12px;
+  color: var(--text); font-size: 0.95rem; font-weight: 500;
+  text-decoration: none; border-radius: 6px;
+}
+.nav-drawer-link:hover, .nav-drawer-link:focus-visible { background: var(--bg-alt); text-decoration: none; }
+.nav-drawer-link.active { color: var(--accent); }
+
+/* Mobile bottom navigation */
+.mobile-bottom-nav { display: none; }
+/* Mobile bottom nav breakpoint at 767 matches the common 768 tablet cutoff
+   (Bootstrap/Tailwind). At 767 and below we show the bottom nav; at 768+
+   we assume the user has enough horizontal room for the top-nav controls. */
+@media (max-width: 767px) {
+  .mobile-bottom-nav {
+    display: flex; position: fixed; bottom: 0; left: 0; right: 0;
+    background: var(--bg-card); border-top: 1px solid var(--border);
+    padding: 6px 0 calc(6px + env(safe-area-inset-bottom, 0px));
+    justify-content: space-around; align-items: center;
+    z-index: 150; backdrop-filter: saturate(1.5) blur(8px);
+    -webkit-backdrop-filter: saturate(1.5) blur(8px);
+  }
+  .mbn-link {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    background: none; border: none; color: var(--text-secondary);
+    padding: 4px 10px; font-size: 0.66rem; font-weight: 500;
+    text-decoration: none; cursor: pointer; font-family: inherit;
+    min-width: 52px; transition: color 0.15s;
+  }
+  .mbn-link svg { width: 20px; height: 20px; stroke-width: 2; }
+  .mbn-link:hover, .mbn-link:active { color: var(--accent); text-decoration: none; }
+  .mbn-link.active { color: var(--accent); }
+  body { padding-bottom: 76px; }
+  .nav-links .nav-search-btn, .nav-links .theme-toggle, .nav-links .lang-switcher, .nav-links .nav-icon-link { display: none; }
+  .tongji-media-grid { grid-template-columns: 1fr; }
+  .tongji-timeline-panel { border-left: 0; border-top: 1px solid var(--border-subtle); padding-left: 0; padding-top: 16px; }
+}
+
+/* Print */
+@media print {
+  :root {
+    --bg: #fff; --bg-alt: #fff; --bg-card: #fff; --bg-code: #f5f5f5;
+    --text: #000; --text-secondary: #333; --text-muted: #555;
+    --border: #ccc; --accent: #000;
+  }
+  /* #ui-l1 (#578): keep breadcrumbs in print so a printed page
+     retains its location context. #ui-l3 (#579): keep activity
+     heatmap + token charts + related-pages too — useful when an
+     offline reader needs to follow a hardcopy. Removed from the
+     hide-list. */
+  .nav, .footer, .palette, .help-dialog, .session-actions, .filter-bar,
+  .progress-bar, .nav-search-btn, .theme-toggle, .lang-switcher, .nav-icon-link, .copy-code-btn,
+  .wikilink-preview, .timeline-block, .toc-sidebar, .mobile-bottom-nav,
+  .deep-link,
+  .meta-tools { display: none !important; }
+  /* Breadcrumbs + heatmap + charts kept on print, but rendered
+     monochrome to save ink. */
+  .breadcrumbs { color: #333; }
+  .activity-heatmap { filter: grayscale(100%); }
+  .related-pages { border-top: 1px solid #ccc; padding-top: 8pt; margin-top: 12pt; page-break-inside: avoid; }
+  body { background: #fff; color: #000; font-size: 11pt; padding-bottom: 0; }
+  .hero { padding: 12px 0 8px; background: #fff; border: none; }
+  .hero h1 { font-size: 18pt; color: #000; }
+  .hero .hero-sub { color: #333; font-size: 10pt; }
+  .container { max-width: 100%; padding: 0 12pt; }
+  .content { font-size: 11pt; }
+  .content h1, .content h2, .content h3, .content h4 { page-break-after: avoid; break-after: avoid; color: #000; }
+  .content pre, .content blockquote, .content table, .content img, .content figure { page-break-inside: avoid; break-inside: avoid; }
+  .content pre { border: 1px solid #ccc; background: #f8f8f8; font-size: 9pt; }
+  .content code { font-size: 9pt; }
+  .content a { color: #000; text-decoration: underline; }
+  .content a[href^="http"]:after { content: " (" attr(href) ")"; font-size: 8pt; color: #555; word-break: break-all; }
+  .content img, .content svg { max-width: 100%; height: auto; }
+  article { max-width: 100% !important; }
+  .section { padding: 0 !important; }
+}
+"""
+
+# v1.2 (#112): reader-first article shell CSS (inlined from removed reader_shell module).
+_READER_SHELL_CSS = """\
+/* --- Reader shell (v1.2.0 · #112) --- */
+.reader-shell {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr) 280px;
+  gap: 32px;
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 32px 24px;
+  align-items: start;
+}
+.reader-shell__drawer,
+.reader-shell__rail {
+  position: sticky;
+  top: 24px;
+  align-self: start;
+  background: var(--bg-alt);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 16px;
+  font-size: 0.85rem;
+}
+.reader-shell__drawer h2,
+.reader-shell__rail h2 {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  margin: 0 0 10px 0;
+}
+.reader-shell__drawer ul,
+.reader-shell__rail ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.reader-shell__drawer li,
+.reader-shell__rail li { padding: 4px 0; }
+
+.reader-shell__drawer-empty {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  margin: 0;
+}
+
+.reader-shell__header {
+  border-bottom: 1px solid var(--border-subtle);
+  padding-bottom: 16px;
+  margin-bottom: 24px;
+}
+.reader-shell__crumbs {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+.reader-shell__crumbs .sep { margin: 0 6px; }
+.reader-shell__subtitle {
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+.reader-shell__utility {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+  flex-wrap: wrap;
+}
+.reader-shell__util-btn {
+  padding: 4px 10px;
+  font-size: 0.78rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  text-decoration: none;
+  transition: border-color 0.15s;
+}
+.reader-shell__util-btn:hover { border-color: var(--accent); }
+
+.reader-shell__body { line-height: 1.7; }
+
+.reader-shell__infobox dl {
+  margin: 0;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 10px;
+  font-size: 0.82rem;
+}
+.reader-shell__infobox-row { display: contents; }
+.reader-shell__infobox dt { color: var(--text-muted); }
+.reader-shell__infobox dd { margin: 0; }
+
+.reader-shell__revisions,
+.reader-shell__see-also,
+.reader-shell__references {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+@media (max-width: 1100px) {
+  .reader-shell {
+    grid-template-columns: minmax(0, 1fr) 280px;
+  }
+  .reader-shell__drawer { display: none; }
+}
+@media (max-width: 760px) {
+  .reader-shell {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 24px;
+  }
+  .reader-shell__rail {
+    position: static;
+    margin-top: 24px;
+  }
+}
+"""
+CSS = CSS + "\n" + _READER_SHELL_CSS
+
+# v1.2 (#265): docs-shell CSS for the production documentation pages.
+# Only pages with ``docs_shell: true`` frontmatter (the tutorials + the
+# hub index) pick up these styles — selectors are all namespaced under
+# ``.docs-shell`` so no existing page changes render.
+from llmwiki.render.docs_css import DOCS_SHELL_CSS as _DOCS_SHELL_CSS  # noqa: E402
+CSS = CSS + "\n" + _DOCS_SHELL_CSS

@@ -2,5 +2,9 @@
 state/
 .trash/
 tongji-output/
+look-tongji-workspace/
 __pycache__/
 *.pyc
+.venv/
+.omc/
+.mock-wiki/

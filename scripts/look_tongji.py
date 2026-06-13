@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """CLI for Tongji Look (look.tongji.edu.cn): setup, list, transcribe.
 
-This script is designed to be used by a Codex skill:
+This script is designed to be used by an agent skill:
 - Credentials are stored in the skill root `.env` (ignored by `.gitignore`).
 - Auth cache is stored in `<skill>/state/`.
-- Artifacts are written to `./tongji-output/` under the current working directory.
+- Lecture artifacts are written to the configured course-wiki workspace by default.
 """
 
 from __future__ import annotations
@@ -13,6 +13,7 @@ import argparse
 import concurrent.futures
 import getpass
 import json
+import os
 import re
 import shutil
 import sys
@@ -22,9 +23,21 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 
-from tongji_backend.auth import TongjiAuth
-from tongji_backend.client import TongjiClient
-from tongji_backend.transcriber import NoAudioStreamError, Transcriber, TranscriptionError
+from tongji_backend.workspace import (
+    MaterialInput,
+    WorkspaceConfig,
+    index_workspace_wiki,
+    build_workspace_wiki,
+    ensure_workspace_config,
+    import_materials,
+    prepare_lecture_workspace,
+    sanitize_path_component,
+    serve_workspace_wiki,
+    write_manifest,
+)
+
+if False:  # pragma: no cover - typing only without import-time dependency
+    from tongji_backend.client import TongjiClient
 
 
 def _skill_root() -> Path:
@@ -53,6 +66,89 @@ def _output_dir(output_dir: str | None) -> Path:
 
 def _now_iso() -> str:
     return time.strftime("%Y-%m-%dT%H:%M:%S%z")
+
+
+def _normalize_agent_name(value: str) -> str:
+    raw = re.sub(r"[\s_-]+", "", str(value or "").strip().lower())
+    if not raw:
+        return ""
+    mapping = {
+        "codex": "codex",
+        "codexcli": "codex",
+        "claude": "claude",
+        "claudecode": "claude",
+        "claudecodecli": "claude",
+        "copilot": "copilot",
+        "githubcopilot": "copilot",
+        "copilotchat": "copilot",
+        "copilotcli": "copilot",
+        "gemini": "gemini-cli",
+        "geminicli": "gemini-cli",
+        "openclaw": "openclaw",
+        "opencode": "opencode",
+        "hermes": "hermes-agent",
+        "hermesagent": "hermes-agent",
+    }
+    return mapping.get(raw, raw)
+
+
+def _detect_current_agent() -> str:
+    explicit = _normalize_agent_name(os.environ.get("LOOK_TONGJI_AGENT", ""))
+    if explicit:
+        return explicit
+    env_map = (
+        ("CLAUDE_CODE", "claude"),
+        ("CLAUDECODE", "claude"),
+        ("CODEX_CLI", "codex"),
+        ("CURSOR_AGENT", "cursor"),
+        ("COPILOT_HOME", "copilot"),
+        ("GEMINI_CLI", "gemini-cli"),
+        ("OPENCLAW", "openclaw"),
+        ("OPENCODE", "opencode"),
+        ("HERMES_AGENT", "hermes-agent"),
+    )
+    for env_var, agent in env_map:
+        if os.environ.get(env_var):
+            return agent
+    if os.environ.get("CODEX_THREAD_ID") or os.environ.get("CODEX_MANAGED_BY_NPM"):
+        return "codex"
+    return "codex"
+
+
+def _merge_agent_sequence(existing: Any, current_agent: str) -> list[str]:
+    raw_items: list[str] = []
+    if isinstance(existing, list):
+        raw_items.extend(str(item or "") for item in existing)
+    elif isinstance(existing, str) and existing.strip():
+        raw_items.extend(part.strip() for part in existing.split(","))
+    if current_agent:
+        raw_items.append(current_agent)
+    seen: set[str] = set()
+    merged: list[str] = []
+    for item in raw_items:
+        agent = _normalize_agent_name(item)
+        if agent and agent not in seen:
+            seen.add(agent)
+            merged.append(agent)
+    return merged
+
+
+def _merge_material_entries(
+    existing: Any,
+    incoming: list[dict[str, Any]] | None,
+) -> list[dict[str, Any]]:
+    merged: list[dict[str, Any]] = []
+    seen_names: set[str] = set()
+    for source in (existing if isinstance(existing, list) else [], incoming or []):
+        if not isinstance(source, dict):
+            continue
+        name = sanitize_path_component(str(source.get("name") or ""), fallback="")
+        dedupe_key = name or str(source.get("copied_path") or source.get("source_path") or "")
+        if not dedupe_key or dedupe_key in seen_names:
+            continue
+        seen_names.add(dedupe_key)
+        merged.append(source)
+    return merged
 
 
 def _print_err(msg: str) -> None:
@@ -165,6 +261,9 @@ def _clear_auth_session() -> None:
 
 
 def _build_client_from_jwt(jwt_token: str) -> TongjiClient | None:
+    from tongji_backend.auth import TongjiAuth
+    from tongji_backend.client import TongjiClient
+
     auth = TongjiAuth()
     auth.jwt_token = jwt_token
     auth._setup_bearer_auth()
@@ -175,6 +274,9 @@ def _build_client_from_jwt(jwt_token: str) -> TongjiClient | None:
 
 
 def _ensure_authenticated_client(force_login: bool = False) -> tuple[TongjiClient, str]:
+    from tongji_backend.auth import TongjiAuth
+    from tongji_backend.client import TongjiClient
+
     # 1) Try cached JWT first
     if not force_login:
         cached = _load_auth_session()
@@ -229,6 +331,35 @@ def cmd_setup(args: argparse.Namespace) -> int:
         print("  python -m playwright install chromium")
         print()
 
+    # Node.js detection (needed for vision-support)
+    node_path = shutil.which("node")
+    if node_path:
+        print(f"[Setup] Node.js: detected ({node_path})")
+    else:
+        print("[Setup] Node.js: NOT found. vision-support requires Node.js. Install from https://nodejs.org/")
+
+    # vision-support config detection
+    vs_paths = [
+        Path.home() / ".claude" / "skills" / "vision-support" / "config.json",
+        Path.home() / ".agents" / "skills" / "vision-support" / "config.json",
+    ]
+    vs_configured = any(p.exists() for p in vs_paths)
+    if vs_configured:
+        print("[Setup] vision-support: 已配置")
+    else:
+        print("[Setup] vision-support: 未配置。运行以下命令初始化：")
+        print("  claude /oh-my-claudecode:mcp-setup")
+
+    # TeX detection (optional, for cheatsheet compilation)
+    if shutil.which("xelatex"):
+        print("[Setup] xelatex: detected")
+    else:
+        print("[Setup] xelatex: NOT found (optional). Install TeX Live for cheatsheet compilation:")
+        print("  - Ubuntu/Debian: sudo apt install texlive-xetex")
+        print("  - macOS: brew install mactex")
+        print("  - Windows: Install MiKTeX from https://miktex.org/")
+    print()
+
     env_file = _env_path()
     if env_file.exists() and not args.overwrite:
         _print_err(f".env already exists at {env_file}. Re-run with --overwrite to replace it.")
@@ -257,6 +388,20 @@ def cmd_setup(args: argparse.Namespace) -> int:
     existing["TONGJI_PASSWORD"] = password
     _write_env_file(env_file, existing)
     _clear_auth_session()
+    try:
+        workspace_config = ensure_workspace_config(
+            workspace_root=args.workspace_root or None,
+            owner_name=args.owner_name or None,
+            site_name=args.site_name or None,
+            interactive=True,
+        )
+        workspace_config.workspace_root.mkdir(parents=True, exist_ok=True)
+        print(f"[Setup] Saved workspace config to: {workspace_config.config_path}")
+        print(f"[Setup] Workspace root: {workspace_config.workspace_root}")
+        print(f"[Setup] Site name: {workspace_config.site_name}")
+    except Exception as e:
+        _print_err(f"Workspace setup failed: {e}")
+        return 1
     print(f"[Setup] Saved credentials to: {env_file}")
     print("[Setup] Done.")
     return 0
@@ -425,6 +570,133 @@ def _choose_lecture_from_course(client: TongjiClient, course_id: str, limit: int
     return str(selected.get("sub_id") or ""), selected
 
 
+def _find_lecture_info(detail: dict[str, Any], sub_id: str) -> dict[str, Any]:
+    lectures = detail.get("lectures") or []
+    for item in lectures:
+        if str(item.get("sub_id") or "") == str(sub_id):
+            return dict(item)
+    return {"sub_id": sub_id, "sub_title": f"节次-{sub_id}", "date": ""}
+
+
+def _prepare_workspace_for_lecture(
+    client: TongjiClient,
+    args: argparse.Namespace,
+    *,
+    course_id: str,
+    sub_id: str,
+) -> tuple[WorkspaceConfig, Any]:
+    config = ensure_workspace_config(
+        workspace_root=getattr(args, "workspace_root", "") or None,
+        owner_name=getattr(args, "owner_name", "") or None,
+        site_name=getattr(args, "site_name", "") or None,
+        interactive=not getattr(args, "no_workspace_prompt", False),
+    )
+    detail = client.get_course_detail(course_id)
+    lecture = _find_lecture_info(detail, sub_id)
+    return config, prepare_lecture_workspace(config, course_detail=detail, lecture=lecture)
+
+
+def _parse_material_arg(raw: str) -> MaterialInput | None:
+    text = (raw or "").strip()
+    if not text:
+        return None
+    if "=" in text:
+        name, path = text.split("=", 1)
+        return MaterialInput(name=sanitize_path_component(name, fallback=Path(path).stem), path=Path(path))
+    path = Path(text)
+    return MaterialInput(name=sanitize_path_component(path.stem, fallback="资料"), path=path)
+
+
+def _collect_materials(args: argparse.Namespace) -> list[MaterialInput]:
+    materials: list[MaterialInput] = []
+    for raw in getattr(args, "material", []) or []:
+        parsed = _parse_material_arg(raw)
+        if parsed:
+            materials.append(parsed)
+
+    if getattr(args, "no_material_prompt", False) or not sys.stdin.isatty():
+        return materials
+
+    if materials:
+        return materials
+
+    raw = input("[Materials] 是否有补充资料需要加入来源索引？(y/N): ").strip().lower()
+    if raw not in {"y", "yes", "1", "true", "是", "确认"}:
+        return materials
+
+    print("[Materials] 逐行输入：资料名=文件路径。直接回车结束。")
+    while True:
+        line = input("material> ").strip()
+        if not line:
+            break
+        parsed = _parse_material_arg(line)
+        if parsed:
+            materials.append(parsed)
+    return materials
+
+
+def _write_lecture_manifest_from_outputs(
+    *,
+    workspace: Any,
+    course_id: str,
+    sub_id: str,
+    lecture_url: str,
+    transcript_output_dir: Path,
+    slide_output_dir: Path,
+    imported_materials: list[dict[str, Any]] | None = None,
+    note_style: str = "standard",
+) -> None:
+    base = f"{course_id}_{sub_id}"
+    current_agent = _detect_current_agent()
+    existing_manifest: dict[str, Any] = {}
+    if getattr(workspace, "manifest_path", None) and workspace.manifest_path.exists():
+        try:
+            data = json.loads(workspace.manifest_path.read_text(encoding="utf-8"))
+            if isinstance(data, dict):
+                existing_manifest = data
+        except Exception:
+            existing_manifest = {}
+    meta_path = transcript_output_dir / f"{base}.json"
+    meta = {}
+    if meta_path.exists():
+        try:
+            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        except Exception:
+            meta = {}
+
+    artifacts = {
+        "transcript_txt": str(transcript_output_dir / f"{base}.txt"),
+        "subtitle_srt": str(transcript_output_dir / f"{base}.srt"),
+        "transcript_meta": str(meta_path),
+        "slides_dir": str(slide_output_dir),
+        "slide_index": str(slide_output_dir / "index.json"),
+        "timeline_txt": str(transcript_output_dir / f"{base}_timeline.txt"),
+    }
+    merged_agents = _merge_agent_sequence(existing_manifest.get("agents") or existing_manifest.get("agent"), current_agent)
+    merged_materials = _merge_material_entries(existing_manifest.get("materials"), imported_materials)
+    manifest = {
+        "course_id": course_id,
+        "sub_id": sub_id,
+        "course_title": workspace.course_title,
+        "session_title": workspace.session_title,
+        "agent": current_agent,
+        "agents": merged_agents or [current_agent],
+        "lecture_url": lecture_url or "",
+        "video_url": meta.get("video_url", ""),
+        "base_name": base,
+        "generated_at": _now_iso(),
+        "duration_seconds": int(meta.get("duration_seconds") or 0),
+        "subtitle_word_count": int(meta.get("word_count") or meta.get("subtitle_word_count") or 0),
+        "note_style": note_style,
+        "artifacts": artifacts,
+        "materials": merged_materials,
+    }
+    dur = int(meta.get("duration_seconds") or 0)
+    if 0 < dur < 3600:
+        manifest["duration_warning"] = True
+    write_manifest(workspace, manifest)
+
+
 def _resolve_course_sub(
     client: TongjiClient,
     *,
@@ -471,6 +743,8 @@ def _run_transcript_job(
     output_dir: str,
     tag: str = "Transcript",
 ) -> int:
+    from tongji_backend.transcriber import NoAudioStreamError, Transcriber, TranscriptionError
+
     print(f"[{tag}] Logged in as: {username or '(unknown)'}")
     print(f"[{tag}] course_id={course_id} sub_id={sub_id}")
     video_url = client.get_video_url(course_id, sub_id)
@@ -503,6 +777,12 @@ def _run_transcript_job(
     srt_path = out_dir / f"{base}.srt"
     meta_path = out_dir / f"{base}.json"
 
+    # Compute duration_seconds from utterance end_time (milliseconds)
+    duration_seconds = 0
+    if utterances:
+        max_end = max(u.get("end_time", 0) for u in utterances)
+        duration_seconds = max_end // 1000
+
     txt_path.write_text(transcript.strip() + "\n", encoding="utf-8")
     if srt_content:
         srt_path.write_text(srt_content.strip() + "\n", encoding="utf-8")
@@ -515,6 +795,7 @@ def _run_transcript_job(
                 "video_url": video_url,
                 "generated_at": _now_iso(),
                 "user": username or "",
+                "duration_seconds": duration_seconds,
                 "artifacts": {
                     "transcript_txt": str(txt_path),
                     "subtitle_srt": str(srt_path) if srt_content else "",
@@ -689,6 +970,188 @@ def _run_slide_job(
     return 0 if not failures else 3
 
 
+def _atomic_write_json(path: Path, data: Any) -> None:
+    """Write JSON atomically: write to tmp file then rename."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".tmp.json")
+    tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    tmp.replace(path)
+
+
+def _create_batch_state(course_id: str, lectures: list[dict[str, Any]]) -> dict[str, Any]:
+    now = _now_iso()
+    return {
+        "course_id": course_id,
+        "started_at": now,
+        "updated_at": now,
+        "lectures": [
+            {
+                "sub_id": str(l.get("sub_id", "")),
+                "sub_title": str(l.get("sub_title", "")),
+                "status": "pending",
+                "attempts": 0,
+                "error": None,
+            }
+            for l in lectures
+        ],
+    }
+
+
+def cmd_batch_transcribe(args: argparse.Namespace) -> int:
+    try:
+        client, username = _ensure_authenticated_client(force_login=args.force_login)
+    except Exception as e:
+        _print_err(str(e))
+        return 1
+
+    course_id = (args.course_id or "").strip()
+    if not course_id:
+        _print_err("Missing --course-id")
+        return 2
+
+    print(f"[Batch] Fetching course detail for course_id={course_id} ...")
+    try:
+        detail = client.get_course_detail(course_id)
+    except Exception as e:
+        _print_err(f"Failed to get course detail: {e}")
+        return 1
+
+    lectures_raw = detail.get("lectures") or []
+    lectures = [l for l in lectures_raw if l.get("has_playback") is True]
+    if not lectures:
+        _print_err("No playable lectures found for this course.")
+        return 1
+
+    print(f"[Batch] Found {len(lectures)} lecture(s) with playback enabled.")
+
+    try:
+        config = ensure_workspace_config(
+            workspace_root=args.workspace_root or None,
+            owner_name=args.owner_name or None,
+            site_name=args.site_name or None,
+            interactive=not args.no_workspace_prompt,
+        )
+    except Exception as e:
+        _print_err(f"Workspace config failed: {e}")
+        return 1
+
+    batch_state_path = config.workspace_root / "batch_state.json"
+    max_retries = max(1, int(args.max_retries))
+
+    # Load or create batch state (interrupt-safe resume)
+    if batch_state_path.exists():
+        try:
+            state = json.loads(batch_state_path.read_text(encoding="utf-8"))
+            if state.get("course_id") != course_id:
+                print(f"[Batch] Existing state is for course '{state.get('course_id')}', starting fresh.")
+                state = _create_batch_state(course_id, lectures)
+            else:
+                # Reset any in_progress items back to pending
+                for item in state.get("lectures", []):
+                    if item.get("status") == "in_progress":
+                        item["status"] = "pending"
+                done = sum(1 for l in state.get("lectures", []) if l.get("status") == "done")
+                print(f"[Batch] Resuming from existing batch_state.json ({done}/{len(lectures)} done)")
+        except Exception:
+            print("[Batch] Could not read batch_state.json, starting fresh.")
+            state = _create_batch_state(course_id, lectures)
+    else:
+        state = _create_batch_state(course_id, lectures)
+        _atomic_write_json(batch_state_path, state)
+        print(f"[Batch] Created batch_state.json at {batch_state_path}")
+
+    # Ensure the lectures list in state covers all current lectures
+    state_sub_ids = {l["sub_id"] for l in state.get("lectures", [])}
+    for lec in lectures:
+        sid = str(lec.get("sub_id", ""))
+        if sid not in state_sub_ids:
+            state.setdefault("lectures", []).append({
+                "sub_id": sid,
+                "sub_title": str(lec.get("sub_title", "")),
+                "status": "pending",
+                "attempts": 0,
+                "error": None,
+            })
+
+    def _save_state():
+        state["updated_at"] = _now_iso()
+        _atomic_write_json(batch_state_path, state)
+
+    try:
+        while True:
+            pending = [l for l in state.get("lectures", []) if l["status"] in ("pending", "failed")]
+            if not pending:
+                break
+
+            item = pending[0]
+            sub_id = item["sub_id"]
+            sub_title = item["sub_title"] or sub_id
+            done = sum(1 for l in state["lectures"] if l["status"] == "done")
+            total = len(state["lectures"])
+
+            print(f"[Batch] [{done + 1}/{total}] Processing: {sub_title} ({sub_id})")
+
+            item["status"] = "in_progress"
+            item["attempts"] = int(item.get("attempts", 0)) + 1
+            _save_state()
+
+            output_dir_str = args.output_dir
+            if not output_dir_str:
+                try:
+                    _config, workspace = _prepare_workspace_for_lecture(
+                        client, args, course_id=course_id, sub_id=sub_id,
+                    )
+                    output_dir_str = str(workspace.raw_root)
+                except Exception as e:
+                    item["status"] = "failed"
+                    item["error"] = f"Workspace setup failed: {e}"
+                    _save_state()
+                    continue
+
+            result = _run_transcript_job(
+                client=client,
+                username=username,
+                course_id=course_id,
+                sub_id=sub_id,
+                lecture_url="",
+                output_dir=output_dir_str,
+                tag="Batch",
+            )
+
+            if result == 0:
+                item["status"] = "done"
+                item["error"] = None
+            else:
+                if item["attempts"] >= max_retries:
+                    item["status"] = "failed"
+                    item["error"] = f"Failed after {item['attempts']} attempt(s), last code={result}"
+                else:
+                    item["status"] = "pending"
+                    item["error"] = f"Attempt {item['attempts']}/{max_retries} failed"
+
+            _save_state()
+
+    except KeyboardInterrupt:
+        print("\n[Batch] Interrupted by user. Saving current state...")
+        for item in state.get("lectures", []):
+            if item["status"] == "in_progress":
+                item["status"] = "pending"
+        _save_state()
+        print(f"[Batch] State saved to {batch_state_path}. Re-run to continue.")
+        return 130
+
+    # Summary
+    done_count = sum(1 for l in state["lectures"] if l["status"] == "done")
+    failed_count = sum(1 for l in state["lectures"] if l["status"] == "failed")
+    print(f"[Batch] Summary: {done_count} done, {failed_count} failed")
+    if failed_count > 0:
+        print("[Batch] Failed lectures:")
+        for l in state["lectures"]:
+            if l["status"] == "failed":
+                print(f"  - {l['sub_title']} ({l['sub_id']}): {l.get('error', 'unknown')}")
+    return 0 if failed_count == 0 else 3
+
+
 def cmd_transcript(args: argparse.Namespace) -> int:
     try:
         client, username = _ensure_authenticated_client(force_login=args.force_login)
@@ -706,6 +1169,61 @@ def cmd_transcript(args: argparse.Namespace) -> int:
     if not resolved:
         return 2
     course_id, sub_id = resolved
+    workspace = None
+    if not args.output_dir or args.slide:
+        try:
+            _config, workspace = _prepare_workspace_for_lecture(client, args, course_id=course_id, sub_id=sub_id)
+            if not args.output_dir:
+                args.output_dir = str(workspace.raw_root)
+        except Exception as e:
+            _print_err(f"Workspace setup failed: {e}")
+            return 1
+
+    if args.slide:
+        slide_output_dir = workspace.raw_slides_dir
+        jwt_token = client.auth.get_jwt_token() or ""
+        t_client = _build_client_from_jwt(jwt_token) if jwt_token else client
+        s_client = _build_client_from_jwt(jwt_token) if jwt_token else client
+        t_client = t_client or client
+        s_client = s_client or client
+
+        print("[Transcript] Running transcript and slide jobs in parallel...")
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+            fut_transcript = executor.submit(
+                _run_transcript_job,
+                client=t_client,
+                username=username,
+                course_id=course_id,
+                sub_id=sub_id,
+                lecture_url=args.lecture_url,
+                output_dir=args.output_dir,
+                tag="Transcript",
+            )
+            fut_slide = executor.submit(
+                _run_slide_job,
+                client=s_client,
+                username=username,
+                course_id=course_id,
+                sub_id=sub_id,
+                lecture_url=args.lecture_url,
+                output_dir=str(slide_output_dir),
+                per_page=getattr(args, "per_page", 100),
+                max_pages=getattr(args, "max_pages", 20),
+                max_items=getattr(args, "max_items", 0),
+                concurrency=getattr(args, "concurrency", 4),
+                retries=getattr(args, "retries", 3),
+                timeout=getattr(args, "timeout", 30),
+                tag="Slide",
+            )
+            transcript_code = int(fut_transcript.result())
+            slide_code = int(fut_slide.result())
+
+        if transcript_code != 0:
+            return transcript_code
+        if slide_code != 0:
+            print("[Transcript] Slide download failed or incomplete; transcript artifacts are still kept.")
+        return 0
+
     return _run_transcript_job(
         client=client,
         username=username,
@@ -734,6 +1252,13 @@ def cmd_slide(args: argparse.Namespace) -> int:
     if not resolved:
         return 2
     course_id, sub_id = resolved
+    if not args.output_dir:
+        try:
+            _config, workspace = _prepare_workspace_for_lecture(client, args, course_id=course_id, sub_id=sub_id)
+            args.output_dir = str(workspace.raw_slides_dir)
+        except Exception as e:
+            _print_err(f"Workspace setup failed: {e}")
+            return 1
     return _run_slide_job(
         client=client,
         username=username,
@@ -768,6 +1293,27 @@ def cmd_note(args: argparse.Namespace) -> int:
     if not resolved:
         return 2
     course_id, sub_id = resolved
+
+    try:
+        config, workspace = _prepare_workspace_for_lecture(client, args, course_id=course_id, sub_id=sub_id)
+    except Exception as e:
+        _print_err(f"Workspace setup failed: {e}")
+        return 1
+
+    transcript_output_dir = Path(args.output_dir).expanduser().resolve() if args.output_dir else workspace.raw_root
+    slide_output_dir = (
+        Path(args.slide_output_dir).expanduser().resolve()
+        if args.slide_output_dir
+        else workspace.raw_slides_dir
+    )
+    args.output_dir = str(transcript_output_dir)
+    args.slide_output_dir = str(slide_output_dir)
+
+    imported_materials: list[dict[str, Any]] = []
+    materials = _collect_materials(args)
+    if materials:
+        imported_materials = import_materials(workspace, materials)
+        print(f"[Materials] Imported {len(imported_materials)} material(s) into: {workspace.raw_materials_dir}")
 
     jwt_token = client.auth.get_jwt_token() or ""
     t_client = _build_client_from_jwt(jwt_token) if jwt_token else client
@@ -812,8 +1358,176 @@ def cmd_note(args: argparse.Namespace) -> int:
     if transcript_code != 0:
         return transcript_code
     if slide_code != 0:
-        return slide_code
+        print("[Note] Slide download failed or was incomplete; transcript artifacts are still kept.")
+    _write_lecture_manifest_from_outputs(
+        workspace=workspace,
+        course_id=course_id,
+        sub_id=sub_id,
+        lecture_url=args.lecture_url,
+        transcript_output_dir=transcript_output_dir,
+        slide_output_dir=slide_output_dir,
+        imported_materials=imported_materials,
+        note_style=args.note_style,
+    )
+
+    # Duration check: warn if < 1 hour (non-blocking)
+    meta_path = transcript_output_dir / f"{course_id}_{sub_id}.json"
+    try:
+        meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        duration_seconds = int(meta.get("duration_seconds") or 0)
+        if 0 < duration_seconds < 3600:
+            print(f"[Warning] 课时不足1小时({duration_seconds}秒)，转录可能不完整，建议重试")
+    except Exception:
+        pass
+
+    try:
+        site_dir = build_workspace_wiki(config)
+        print(f"[Wiki] Built course site: {site_dir}")
+    except Exception as e:
+        _print_err(f"Course site build failed: {e}")
+        return 1
     return 0
+
+
+def cmd_add(args: argparse.Namespace) -> int:
+    try:
+        client, username = _ensure_authenticated_client(force_login=args.force_login)
+    except Exception as e:
+        _print_err(str(e))
+        return 1
+    resolved = _resolve_course_sub(
+        client,
+        lecture_url=args.lecture_url,
+        course_id=args.course_id,
+        sub_id=args.sub_id,
+        lecture_limit=args.lecture_limit,
+        tag="Add",
+    )
+    if not resolved:
+        return 2
+    course_id, sub_id = resolved
+
+    try:
+        config, workspace = _prepare_workspace_for_lecture(client, args, course_id=course_id, sub_id=sub_id)
+    except Exception as e:
+        _print_err(f"Workspace setup failed: {e}")
+        return 1
+
+    materials = _collect_materials(args)
+    imported_materials: list[dict[str, Any]] = []
+    if materials:
+        imported_materials = import_materials(workspace, materials)
+        print(f"[Add] Imported {len(imported_materials)} material(s) into: {workspace.raw_materials_dir}")
+    else:
+        print("[Add] No materials to import.")
+
+    try:
+        synced = index_workspace_wiki(config)
+        print(f"[Add] Indexed {len(synced)} lesson manifest(s) into llm-wiki sources.")
+    except Exception as e:
+        _print_err(f"Index failed: {e}")
+        return 1
+
+    print("[Add] Done.")
+    return 0
+
+
+def cmd_cheatsheet(args: argparse.Namespace) -> int:
+    template_dir = _skill_root() / ".mock-wiki" / "CheatingSheetTemplate"
+    tex_path = template_dir / "CheatingSheet.tex"
+    readme_path = template_dir / "README.md"
+
+    if not tex_path.exists():
+        _print_err(".mock-wiki/CheatingSheetTemplate/CheatingSheet.tex not found.")
+        _print_err(f"Expected at: {tex_path}")
+        return 1
+
+    output_format = (args.format or "html").strip().lower()
+    if output_format not in ("tex", "html"):
+        _print_err(f"Unsupported format: {output_format}. Use 'tex' or 'html'.")
+        return 2
+
+    xelatex_path = shutil.which("xelatex")
+    if output_format == "tex":
+        if xelatex_path is None:
+            _print_err("xelatex not found. Install TeX Live to compile .tex files:")
+            _print_err("  - Ubuntu/Debian: sudo apt install texlive-xetex")
+            _print_err("  - macOS: brew install mactex")
+            _print_err("  - Windows: Install MiKTeX from https://miktex.org/")
+            return 1
+        print(f"[Cheatsheet] xelatex found: {xelatex_path}")
+
+    output_path = args.output or str(Path.cwd() / f"cheatsheet.{output_format}")
+    print(f"[Cheatsheet] Format: {output_format}")
+    print(f"[Cheatsheet] Output: {output_path}")
+    print(f"[Cheatsheet] Template: {tex_path}")
+    print(f"[Cheatsheet] Template directory: {template_dir}")
+    if readme_path.exists():
+        print(f"[Cheatsheet] Reference README: {readme_path}")
+    print()
+    print("[Cheatsheet] Note: CLI only checks the environment. Content generation is handled by the Agent.")
+    if output_format == "html":
+        print("[Cheatsheet] HTML output path ready. Pass this to the Agent for content generation.")
+    return 0
+
+
+def cmd_wiki(args: argparse.Namespace) -> int:
+    return cmd_build(args)
+
+
+def cmd_index(args: argparse.Namespace) -> int:
+    try:
+        config = ensure_workspace_config(
+            workspace_root=args.workspace_root or None,
+            owner_name=args.owner_name or None,
+            site_name=args.site_name or None,
+            interactive=not args.no_workspace_prompt,
+        )
+        synced = index_workspace_wiki(config)
+    except Exception as e:
+        _print_err(str(e))
+        return 1
+    if synced:
+        print(f"[Index] Indexed {len(synced)} lesson manifest(s) into llm-wiki sources.")
+    else:
+        print("[Index] No lesson manifest found yet. Seeded an empty llm-wiki source page.")
+    return 0
+
+
+def cmd_build(args: argparse.Namespace) -> int:
+    try:
+        config = ensure_workspace_config(
+            workspace_root=args.workspace_root or None,
+            owner_name=args.owner_name or None,
+            site_name=args.site_name or None,
+            interactive=not args.no_workspace_prompt,
+        )
+        site_dir = build_workspace_wiki(config)
+    except Exception as e:
+        _print_err(str(e))
+        return 1
+    print(f"[Build] Built course site: {site_dir}")
+    print(f"[Build] Open: {site_dir / 'index.html'}")
+    return 0
+
+
+def cmd_serve(args: argparse.Namespace) -> int:
+    try:
+        config = ensure_workspace_config(
+            workspace_root=args.workspace_root or None,
+            owner_name=args.owner_name or None,
+            site_name=args.site_name or None,
+            interactive=not args.no_workspace_prompt,
+        )
+    except Exception as e:
+        _print_err(str(e))
+        return 1
+    return serve_workspace_wiki(
+        config,
+        port=args.port,
+        host=args.host,
+        open_browser=args.open,
+    )
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -823,6 +1537,9 @@ def build_parser() -> argparse.ArgumentParser:
     p_setup = sub.add_parser("setup", help="Check deps and write <skill>/.env")
     p_setup.add_argument("--username", default="", help="Tongji username (optional)")
     p_setup.add_argument("--password", default="", help="Tongji password (optional; avoid CLI if possible)")
+    p_setup.add_argument("--workspace-root", default="", help="Persistent course wiki workspace root")
+    p_setup.add_argument("--owner-name", default="", help="Owner name shown in the course wiki")
+    p_setup.add_argument("--site-name", default="", help="Course wiki site name")
     p_setup.add_argument("--overwrite", action="store_true", help="Overwrite existing .env")
     p_setup.set_defaults(func=cmd_setup)
 
@@ -849,8 +1566,30 @@ def build_parser() -> argparse.ArgumentParser:
     p_transcript.add_argument("--sub-id", default="", help="Lecture sub_id")
     p_transcript.add_argument("--lecture-limit", type=int, default=20, help="Max lectures shown for interactive choice")
     p_transcript.add_argument("--output-dir", default="", help="Output directory (default: ./tongji-output)")
+    p_transcript.add_argument("--workspace-root", default="", help="Persistent course wiki workspace root")
+    p_transcript.add_argument("--owner-name", default="", help="Owner name shown in the course wiki")
+    p_transcript.add_argument("--site-name", default="", help="Course wiki site name")
+    p_transcript.add_argument("--no-workspace-prompt", action="store_true", help="Do not prompt for workspace config")
     p_transcript.add_argument("--force-login", action="store_true", help="Ignore cached JWT and login again")
+    p_transcript.add_argument("--slide", action="store_true", help="Also download slides in parallel with transcription")
+    p_transcript.add_argument("--per-page", type=int, default=100, help="search-ppt per_page parameter (slide download)")
+    p_transcript.add_argument("--max-pages", type=int, default=20, help="Max pages to request from search-ppt (slide download)")
+    p_transcript.add_argument("--max-items", type=int, default=0, help="Download at most N slide snapshots (0 means all)")
+    p_transcript.add_argument("--concurrency", type=int, default=4, help="Concurrent slide download workers (1-16)")
+    p_transcript.add_argument("--retries", type=int, default=3, help="Retry attempts per slide image")
+    p_transcript.add_argument("--timeout", type=int, default=30, help="HTTP timeout seconds per slide image request")
     p_transcript.set_defaults(func=cmd_transcript)
+
+    p_batch = sub.add_parser("batch-transcribe", help="Batch transcribe all playable lectures for a course")
+    p_batch.add_argument("--course-id", required=True, help="Course ID")
+    p_batch.add_argument("--workspace-root", default="", help="Persistent course wiki workspace root")
+    p_batch.add_argument("--owner-name", default="", help="Owner name shown in the course wiki")
+    p_batch.add_argument("--site-name", default="", help="Course wiki site name")
+    p_batch.add_argument("--no-workspace-prompt", action="store_true", help="Do not prompt for workspace config")
+    p_batch.add_argument("--output-dir", default="", help="Output directory for all lectures (default: per-lecture workspace)")
+    p_batch.add_argument("--max-retries", type=int, default=3, help="Max retries per failed lecture")
+    p_batch.add_argument("--force-login", action="store_true", help="Ignore cached JWT and login again")
+    p_batch.set_defaults(func=cmd_batch_transcribe)
 
     p_slide = sub.add_parser("slide", help="Download lecture slide snapshots for one lecture")
     p_slide.add_argument("--lecture-url", default="", help="Tongji lecture page URL (best-effort parsing)")
@@ -862,6 +1601,10 @@ def build_parser() -> argparse.ArgumentParser:
         default="",
         help="Output directory (default: ./tongji-output/slide_<course_id>_<sub_id>)",
     )
+    p_slide.add_argument("--workspace-root", default="", help="Persistent course wiki workspace root")
+    p_slide.add_argument("--owner-name", default="", help="Owner name shown in the course wiki")
+    p_slide.add_argument("--site-name", default="", help="Course wiki site name")
+    p_slide.add_argument("--no-workspace-prompt", action="store_true", help="Do not prompt for workspace config")
     p_slide.add_argument("--per-page", type=int, default=100, help="search-ppt per_page parameter")
     p_slide.add_argument("--max-pages", type=int, default=20, help="Max pages to request from search-ppt")
     p_slide.add_argument("--max-items", type=int, default=0, help="Download at most N snapshots (0 means all)")
@@ -882,6 +1625,12 @@ def build_parser() -> argparse.ArgumentParser:
         default="",
         help="Slide output directory (default: ./tongji-output/slide_<course_id>_<sub_id>)",
     )
+    p_note.add_argument("--workspace-root", default="", help="Persistent course wiki workspace root")
+    p_note.add_argument("--owner-name", default="", help="Owner name shown in the course wiki")
+    p_note.add_argument("--site-name", default="", help="Course wiki site name")
+    p_note.add_argument("--material", action="append", default=[], help="Supplementary material as name=path or path")
+    p_note.add_argument("--no-material-prompt", action="store_true", help="Do not ask for supplementary materials")
+    p_note.add_argument("--no-workspace-prompt", action="store_true", help="Do not prompt for workspace config")
     p_note.add_argument("--no-slide", action="store_true", help="Skip slide download and run transcript only")
     p_note.add_argument("--per-page", type=int, default=100, help="search-ppt per_page parameter")
     p_note.add_argument("--max-pages", type=int, default=20, help="Max pages to request from search-ppt")
@@ -889,8 +1638,65 @@ def build_parser() -> argparse.ArgumentParser:
     p_note.add_argument("--concurrency", type=int, default=4, help="Concurrent slide download workers (1-16)")
     p_note.add_argument("--retries", type=int, default=3, help="Retry attempts per slide image")
     p_note.add_argument("--timeout", type=int, default=30, help="HTTP timeout seconds per slide image request")
+    p_note.add_argument(
+        "--note-style",
+        default="standard",
+        choices=["standard", "dialogue"],
+        help="Note writing style: standard (lecture notes) or dialogue (Q&A format)",
+    )
     p_note.add_argument("--force-login", action="store_true", help="Ignore cached JWT and login again")
     p_note.set_defaults(func=cmd_note)
+
+    p_add = sub.add_parser("add", help="Import materials into a lecture workspace without transcription")
+    p_add.add_argument("--lecture-url", default="", help="Tongji lecture page URL (best-effort parsing)")
+    p_add.add_argument("--course-id", default="", help="Course ID")
+    p_add.add_argument("--sub-id", default="", help="Lecture sub_id")
+    p_add.add_argument("--lecture-limit", type=int, default=20, help="Max lectures shown for interactive choice")
+    p_add.add_argument("--material", action="append", default=[], help="Supplementary material as name=path or path")
+    p_add.add_argument("--no-material-prompt", action="store_true", help="Do not ask for supplementary materials")
+    p_add.add_argument("--workspace-root", default="", help="Persistent course wiki workspace root")
+    p_add.add_argument("--owner-name", default="", help="Owner name shown in the course wiki")
+    p_add.add_argument("--site-name", default="", help="Course wiki site name")
+    p_add.add_argument("--no-workspace-prompt", action="store_true", help="Do not prompt for workspace config")
+    p_add.add_argument("--force-login", action="store_true", help="Ignore cached JWT and login again")
+    p_add.set_defaults(func=cmd_add)
+
+    p_cheatsheet = sub.add_parser("cheatsheet", help="Check environment for cheatsheet generation")
+    p_cheatsheet.add_argument("--course-id", default="", help="Course ID (for context, not used for generation)")
+    p_cheatsheet.add_argument("--format", default="html", choices=["tex", "html"], help="Output format")
+    p_cheatsheet.add_argument("--output", default="", help="Output file path")
+    p_cheatsheet.set_defaults(func=cmd_cheatsheet)
+
+    p_index = sub.add_parser("index", help="Index lesson manifests into the llm-wiki workspace")
+    p_index.add_argument("--workspace-root", default="", help="Persistent course wiki workspace root")
+    p_index.add_argument("--owner-name", default="", help="Owner name shown in the course wiki")
+    p_index.add_argument("--site-name", default="", help="Course wiki site name")
+    p_index.add_argument("--no-workspace-prompt", action="store_true", help="Do not prompt for workspace config")
+    p_index.set_defaults(func=cmd_index)
+
+    p_build = sub.add_parser("build", help="Build the static course wiki from the configured workspace")
+    p_build.add_argument("--workspace-root", default="", help="Persistent course wiki workspace root")
+    p_build.add_argument("--owner-name", default="", help="Owner name shown in the course wiki")
+    p_build.add_argument("--site-name", default="", help="Course wiki site name")
+    p_build.add_argument("--no-workspace-prompt", action="store_true", help="Do not prompt for workspace config")
+    p_build.set_defaults(func=cmd_build)
+
+    p_wiki = sub.add_parser("wiki", help="Compatibility alias of build for rebuilding the static course wiki")
+    p_wiki.add_argument("--workspace-root", default="", help="Persistent course wiki workspace root")
+    p_wiki.add_argument("--owner-name", default="", help="Owner name shown in the course wiki")
+    p_wiki.add_argument("--site-name", default="", help="Course wiki site name")
+    p_wiki.add_argument("--no-workspace-prompt", action="store_true", help="Do not prompt for workspace config")
+    p_wiki.set_defaults(func=cmd_wiki)
+
+    p_serve = sub.add_parser("serve", help="Start local HTTP server for the generated course wiki")
+    p_serve.add_argument("--workspace-root", default="", help="Persistent course wiki workspace root")
+    p_serve.add_argument("--owner-name", default="", help="Owner name shown in the course wiki")
+    p_serve.add_argument("--site-name", default="", help="Course wiki site name")
+    p_serve.add_argument("--no-workspace-prompt", action="store_true", help="Do not prompt for workspace config")
+    p_serve.add_argument("--port", type=int, default=8765)
+    p_serve.add_argument("--host", default="127.0.0.1")
+    p_serve.add_argument("--open", action="store_true", help="Open browser after starting")
+    p_serve.set_defaults(func=cmd_serve)
 
     return parser
 

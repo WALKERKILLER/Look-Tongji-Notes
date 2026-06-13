@@ -1,0 +1,1646 @@
+"""Convert agent session transcripts (.jsonl) to Karpathy-style markdown.
+
+Called by `llmwiki sync`. Reads from the adapters in `llmwiki.adapters` and
+writes clean, frontmatter-tagged markdown under `raw/sessions/`.
+
+The conversion is idempotent: state is tracked in `.llmwiki-state.json` by
+mtime, so re-running on unchanged files is a fast no-op.
+"""
+
+from __future__ import annotations
+
+import fnmatch as _fnmatch  # #py-m11 (#597): module-level alias
+import json
+import re
+import sys
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from typing import Any, Iterable, Optional
+
+from llmwiki import REPO_ROOT
+from llmwiki.adapters import REGISTRY, discover_adapters
+from llmwiki.quarantine import add_entry as _quarantine_add
+
+DEFAULT_STATE_FILE = REPO_ROOT / ".llmwiki-state.json"
+DEFAULT_CONFIG_FILE = REPO_ROOT / "examples" / "sessions_config.json"
+DEFAULT_OUT_DIR = REPO_ROOT / "raw" / "sessions"
+DEFAULT_IGNORE_FILE = REPO_ROOT / ".llmwikiignore"
+
+DEFAULT_CONFIG: dict[str, Any] = {
+    "filters": {
+        "live_session_minutes": 60,
+        "include_projects": [],
+        "exclude_projects": [],
+        "drop_record_types": ["queue-operation", "file-history-snapshot", "progress"],
+    },
+    "redaction": {
+        "real_username": "",
+        "replacement_username": "USER",
+        "extra_patterns": [
+            r"(?i)(api[_-]?key|secret|token|bearer|password)[\"'\s:=]+[\w\-\.]{8,}",
+            r"sk-[A-Za-z0-9]{20,}",
+            r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+",
+        ],
+    },
+    "truncation": {
+        "tool_result_chars": 500,
+        "bash_stdout_lines": 5,
+        "write_content_preview_lines": 5,
+        "user_prompt_chars": 4000,
+        "assistant_text_chars": 8000,
+    },
+    "drop_thinking_blocks": True,
+}
+
+
+# ─── config + state ────────────────────────────────────────────────────────
+
+def load_config(path: Path) -> dict[str, Any]:
+    # #arch-l6 (#628): the json.loads(json.dumps(...)) idiom was a
+    # round-trip deep-copy from the era before copy.deepcopy was a
+    # builtin import. copy.deepcopy is ~5× faster and avoids the
+    # implicit "JSON-serializable types only" constraint.
+    import copy
+    cfg: dict[str, Any] = copy.deepcopy(DEFAULT_CONFIG)
+    if path.exists():
+        try:
+            user = json.loads(path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as e:
+            print(f"  warning: bad config {path}: {e}", file=sys.stderr)
+            return cfg
+        for section, value in user.items():
+            if isinstance(value, dict) and isinstance(cfg.get(section), dict):
+                cfg[section].update(value)
+            else:
+                cfg[section] = value
+    # Auto-detect username if not set. #489: be careful here.
+    #
+    # The previous logic was `os.environ["USER"] or Path.home().name`.
+    # Two failure modes that bit users in the wild:
+    #
+    # 1. **Windows.** Windows uses ``USERNAME``, not ``USER``. The env
+    #    var lookup returns empty, the fallback returns
+    #    ``Path.home().name`` — which is the user's actual name, fine
+    #    on a real desktop but the redactor then matches the *short*
+    #    string in path components anywhere in transcripts. On a
+    #    Windows machine where the user's name is short (e.g. "AB")
+    #    this flagged unrelated path tokens.
+    # 2. **Stripped Docker images / CI.** ``USER`` is unset and
+    #    ``Path.home()`` returns ``/`` or ``/root``; ``Path("/").name``
+    #    is empty, but ``Path("/root").name`` is ``"root"`` — every
+    #    ``/Users/root/`` and ``/home/root/`` path got rewritten as
+    #    ``/Users/USER/`` even when the actual transcript author had
+    #    a totally different username.
+    #
+    # Fix: prefer ``USER`` (Unix) → ``USERNAME`` (Windows) →
+    # ``Path.home().name`` *only if it's at least 3 chars long*.
+    # Anything shorter is too risky as a substring rewrite target;
+    # leave the field empty and let the user opt in via config.
+    if not cfg["redaction"].get("real_username"):
+        try:
+            import os
+            candidate = (
+                os.environ.get("USER")
+                or os.environ.get("USERNAME")
+                or ""
+            ).strip()
+            if not candidate:
+                home_name = Path.home().name.strip()
+                # Only trust the home-dir name when it's not a generic
+                # container default and is long enough to be specific.
+                if len(home_name) >= 3 and home_name.lower() not in (
+                    "root", "user", "users", "home", "ubuntu",
+                ):
+                    candidate = home_name
+            cfg["redaction"]["real_username"] = candidate
+        except Exception:
+            pass
+    return cfg
+
+
+def _raw_write_guard(
+    out_path: Path,
+    *,
+    force: bool,
+    source: str,
+    adapter_name: str,
+) -> None:
+    """Hard-guard raw/ immutability (#326).
+
+    CLAUDE.md says "raw/ is immutable" but today the invariant is
+    enforced only by the mtime state file.  This helper turns it into
+    a runtime check: if ``out_path`` already exists and ``force`` is
+    False, raise ``FileExistsError`` so the caller can quarantine +
+    skip instead of silently overwriting.
+
+    Bypass only via the existing ``llmwiki sync --force`` flag.
+    """
+    if not out_path.exists() or force:
+        return
+    raise FileExistsError(
+        f"refusing to overwrite existing raw file {out_path} "
+        f"(source: {source}, adapter: {adapter_name}); "
+        f"pass --force to bypass or delete the file first"
+    )
+
+
+def _portable_state_key(adapter_name: str, path: Path) -> str:
+    """Return a portable state-file key for ``path`` (G-04 · #290).
+
+    Keys used to be absolute filesystem paths, which broke when the
+    repo moved between machines and also leaked the operator's home
+    directory if the state file was ever accidentally committed.  The
+    new format is ``<adapter>::<relative-path-under-home-or-repo>``.
+
+    Examples:
+      - ``claude_code::.claude/projects/-Users-…/session.jsonl``
+      - ``obsidian::Documents/Obsidian Vault/Daily/2026-04-19.md``
+      - ``codex_cli::.codex/sessions/abc.jsonl``
+
+    When ``path`` is outside the user's home, the absolute path is
+    preserved so we don't silently lose a key.  The prefix still names
+    the adapter so two adapters can't collide on the same file.
+    """
+    try:
+        relative = Path(path).resolve().relative_to(Path.home())
+        rel = relative.as_posix()
+    except (ValueError, OSError):
+        rel = str(path)
+    return f"{adapter_name}::{rel}"
+
+
+def _migrate_legacy_state(
+    raw: dict[str, Any], adapter_names: Iterable[str]
+) -> tuple[dict[str, float], int]:
+    """One-shot migration from the old absolute-path schema.
+
+    Returns ``(migrated_state, migrated_count)`` so the caller can log
+    how many keys changed.  Entries already in the new
+    ``<adapter>::<relpath>`` shape pass through untouched.  Entries
+    whose key looks like an absolute filesystem path get mapped to the
+    new shape by matching adapter sub-strings (``"/.claude/projects/"``
+    → ``claude_code``, ``"/.codex/sessions/"`` → ``codex_cli``, etc.).
+    """
+    out: dict[str, float] = {}
+    migrated = 0
+    # Rough per-adapter path signature — good enough for a one-off fix-up.
+    hints: list[tuple[str, str]] = [
+        ("claude_code", ".claude/projects/"),
+        ("codex_cli",   ".codex/sessions/"),
+        ("copilot-chat", "workspaceStorage"),
+        ("copilot-cli",  ".copilot/"),
+        ("cursor",       "Cursor/"),
+        ("gemini_cli",   ".gemini/"),
+        ("obsidian",     "Obsidian"),
+        ("opencode",     "opencode/"),
+        ("chatgpt",      "conversations.json"),
+        # #493: jira / meeting / pdf hints removed — no concrete
+        # adapters ship for them. If they're added back later, the
+        # adapter author can add their own LEGACY_PATH_HINT. See
+        # docs/UPGRADING.md for the original removal note.
+    ]
+    known_names = set(adapter_names)
+    for k, v in raw.items():
+        if not isinstance(k, str):
+            continue
+        # G-03 (#289): preserve observability metadata (``_meta``,
+        # ``_counters``) and any future underscore-prefixed system
+        # keys through migration. These hold dicts, not mtimes.
+        if k.startswith("_"):
+            out[k] = v  # type: ignore[assignment]
+            continue
+        if not isinstance(v, (int, float)) or isinstance(v, bool):
+            continue
+        if "::" in k:
+            # Already portable — keep.
+            out[k] = float(v)
+            continue
+        # Legacy absolute-path key. Try to infer the adapter from the path.
+        inferred: Optional[str] = None
+        for name, token in hints:
+            if name in known_names and token in k:
+                inferred = name
+                break
+        if inferred is None:
+            # Preserve the raw key rather than dropping the entry — the
+            # next sync will either pass-through or re-migrate it.
+            out[k] = float(v)
+            continue
+        try:
+            rel = Path(k).relative_to(Path.home()).as_posix()
+        except (ValueError, OSError):
+            rel = k
+        out[f"{inferred}::{rel}"] = float(v)
+        migrated += 1
+    return out, migrated
+
+
+def load_state(
+    path: Path, adapter_names: Optional[Iterable[str]] = None
+) -> dict[str, Any]:
+    """Load ``.llmwiki-state.json`` and migrate legacy absolute-path keys.
+
+    Older state files used absolute paths as keys (``/Users/…/foo.jsonl``).
+    On first load under the new schema we rewrite those keys in place to
+    ``<adapter>::<relpath>`` so subsequent runs are portable across
+    machines.  Keys we can't confidently re-map are kept verbatim so no
+    session is accidentally re-processed.
+    """
+    if not path.exists():
+        return {}
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return {}
+    if not isinstance(raw, dict):
+        return {}
+    names = list(adapter_names or REGISTRY.keys())
+    migrated, count = _migrate_legacy_state(raw, names)
+    if count:
+        # Persist the migration so the next load is a pure pass-through.
+        try:
+            save_state(path, migrated)
+        except OSError:
+            pass
+    return migrated
+
+
+def save_state(path: Path, state: dict[str, Any]) -> None:
+    # #426 (post-final-review): values are heterogeneous. Per-file
+    # entries are floats (mtime), but the function also persists
+    # `_meta` (dict) and `_counters` (dict) sentinel keys. The old
+    # `dict[str, float]` annotation lied to type-checkers and to the
+    # multi-agent review that flagged it.
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(state, indent=2, sort_keys=True), encoding="utf-8")
+
+
+# ─── .llmwikiignore ───────────────────────────────────────────────────────
+
+
+class IgnoreMatcher:
+    """Gitignore-style pattern matcher for `.llmwikiignore`.
+
+    Patterns are read from one file (typically `.llmwikiignore` at the repo
+    root). Each non-empty, non-comment line is a pattern. A pattern is matched
+    against the project slug, the session filename, and the `<project>/<name>`
+    composite.
+
+    Supports:
+      - `#` for line comments
+      - `!pattern` for negation (a negated pattern re-includes a previously
+        excluded match)
+      - `*`, `?`, `[abc]` glob metacharacters via fnmatch
+      - `**` matches any number of path segments (any substring)
+      - Trailing `/` marks a pattern as directory-only (matches project slugs)
+    """
+
+    def __init__(self, patterns: list[str]):
+        # Each entry is (glob_pattern, is_negation, dir_only)
+        self._rules: list[tuple[str, bool, bool]] = []
+        for raw in patterns:
+            raw = raw.strip()
+            if not raw or raw.startswith("#"):
+                continue
+            negate = raw.startswith("!")
+            if negate:
+                raw = raw[1:]
+            dir_only = raw.endswith("/")
+            if dir_only:
+                raw = raw[:-1]
+            self._rules.append((raw, negate, dir_only))
+
+    @classmethod
+    def from_file(cls, path: Path) -> "IgnoreMatcher":
+        if not path.exists():
+            return cls([])
+        try:
+            text = path.read_text(encoding="utf-8")
+        except OSError as e:
+            # #py-l2 (#600): silent fallback to empty was hiding real
+            # permission / IO problems from operators. Print a warning
+            # to stderr so the failure is visible without breaking
+            # callers that expect a usable IgnoreMatcher.
+            import sys as _sys
+            print(
+                f"warning: could not read {path}: {e}; treating as no-ignores",
+                file=_sys.stderr,
+            )
+            return cls([])
+        return cls(text.splitlines())
+
+    @staticmethod
+    def _match_one(pattern: str, target: str) -> bool:
+        """Match a single pattern against a target string.
+
+        We emulate gitignore-ish behaviour with stdlib fnmatch, extended to
+        handle `**` by translating it to `*` and also matching the pattern
+        against any path suffix.
+
+        #py-m11 (#597): fnmatch was imported per-call. The module is in
+        the stdlib (no actual disk hit), but the resolution still costs
+        a few microseconds × thousands of calls during a sync. Hoisted
+        to a module-level alias.
+        """
+        # Use the module-level _fnmatch alias hoisted below.
+        fnmatch = _fnmatch
+
+        # Normalize path separators
+        target = target.replace("\\", "/")
+        pattern_norm = pattern.replace("\\", "/")
+        # `**` means "any number of path segments" — collapse to `*` for fnmatch
+        fn_pattern = pattern_norm.replace("**", "*")
+        if fnmatch.fnmatch(target, fn_pattern):
+            return True
+        # Also allow matching against any suffix of the target so `foo/*.md`
+        # matches `raw/sessions/foo/bar.md`.
+        parts = target.split("/")
+        for i in range(len(parts)):
+            suffix = "/".join(parts[i:])
+            if fnmatch.fnmatch(suffix, fn_pattern):
+                return True
+        # And bare basename match so `*.tmp` matches any file named *.tmp
+        base = parts[-1] if parts else target
+        if fnmatch.fnmatch(base, fn_pattern):
+            return True
+        return False
+
+    def is_ignored(self, *, project: str, filename: str) -> bool:
+        """Return True if the (project, filename) pair should be skipped.
+
+        The composite path `<project>/<filename>` is matched too so patterns
+        like `confidential-client/` or `ai-newsletter/2026-04-04-*` work.
+        """
+        composite = f"{project}/{filename}"
+        ignored = False
+        for pattern, negate, dir_only in self._rules:
+            targets: list[str] = [composite, filename, project]
+            matched = any(self._match_one(pattern, t) for t in targets)
+            if not matched:
+                continue
+            if dir_only and not self._match_one(pattern, project):
+                # Directory-only rule but the match came from the filename —
+                # skip this rule.
+                continue
+            ignored = not negate
+        return ignored
+
+    def __bool__(self) -> bool:
+        return bool(self._rules)
+
+    def __len__(self) -> int:
+        return len(self._rules)
+
+
+# ─── parsing ───────────────────────────────────────────────────────────────
+
+def parse_jsonl(path: Path) -> list[dict[str, Any]]:
+    """Parse a JSONL transcript into a list of dict records.
+
+    #487: any OSError opening or reading the file is **re-raised** so
+    the caller in ``convert_all`` can route the failure through the
+    same ``_quarantine_add`` + 'errored' bucket as every other I/O
+    failure. The previous ``except OSError: pass`` swallowed
+    permission errors silently, leaving the affected file invisible
+    to ``llmwiki sync --status`` and the quarantine — operators saw
+    a session counted as 'filtered' (zero records) rather than
+    'errored' (something went wrong, look at it).
+
+    Per-line ``json.JSONDecodeError`` is still caught and skipped:
+    JSONL allows partial writes from a still-running session, and a
+    single bad line shouldn't abandon the whole file. Only
+    file-level I/O failures bubble up.
+    """
+    # #sec-8 (#552): size guards. A maliciously-large or runaway
+    # transcript could blow up memory or stall the parser. Per-line cap
+    # rejects pathologically long lines (a 200MB single-line JSON);
+    # per-file cap caps total bytes consumed even if every line is fine.
+    # Numbers chosen well above the largest legitimate Claude session
+    # observed in the wild (≈4 MB / 800 KB per line).
+    PER_LINE_BYTE_CAP = 16 * 1024 * 1024     # 16 MB / line
+    PER_FILE_BYTE_CAP = 256 * 1024 * 1024    # 256 MB / file
+    out: list[dict[str, Any]] = []
+    consumed = 0
+    # ``errors="replace"`` lets us survive the occasional corrupt byte in a
+    # session transcript (e.g. a truncated UTF-8 sequence from a killed
+    # tool). Before the fix a single bad byte would abort the whole sync.
+    with path.open(encoding="utf-8", errors="replace") as f:
+        for line_no, line in enumerate(f, 1):
+            line_bytes = len(line.encode("utf-8", errors="replace"))
+            consumed += line_bytes
+            if line_bytes > PER_LINE_BYTE_CAP:
+                # Skip — but keep walking. A single 30 MB line is
+                # almost certainly noise; one bad line shouldn't
+                # abandon the rest of the file.
+                continue
+            if consumed > PER_FILE_BYTE_CAP:
+                # Stop here — return what we've accumulated so far so
+                # callers still get partial data instead of nothing.
+                import sys as _sys
+                print(
+                    f"warning: {path} exceeded {PER_FILE_BYTE_CAP // (1024*1024)}MB cap; "
+                    f"truncating after {line_no} lines",
+                    file=_sys.stderr,
+                )
+                break
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                rec = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            # Only keep dict-shaped records. JSONL files occasionally
+            # contain stray scalars (e.g. numbers, strings) from partial
+            # writes, which used to crash downstream filter_records.
+            if isinstance(rec, dict):
+                out.append(rec)
+    return out
+
+
+def filter_records(records: list[dict[str, Any]], drop_types: list[str]) -> list[dict[str, Any]]:
+    drop = set(drop_types)
+    return [r for r in records if r.get("type") not in drop]
+
+
+def parse_iso(ts: Optional[str]) -> Optional[datetime]:
+    if not ts:
+        return None
+    try:
+        return datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
+    except (ValueError, AttributeError):
+        return None
+
+
+def latest_record_time(records: list[dict[str, Any]]) -> Optional[datetime]:
+    latest: Optional[datetime] = None
+    for r in records:
+        t = parse_iso(r.get("timestamp"))
+        if t and (latest is None or t > latest):
+            latest = t
+    return latest
+
+
+def first_record_time(records: list[dict[str, Any]]) -> Optional[datetime]:
+    earliest: Optional[datetime] = None
+    for r in records:
+        t = parse_iso(r.get("timestamp"))
+        if t and (earliest is None or t < earliest):
+            earliest = t
+    return earliest
+
+
+def first_field(records: list[dict[str, Any]], field: str, default: str = "") -> str:
+    for r in records:
+        v = r.get(field)
+        if v:
+            return str(v)
+    return default
+
+
+def most_common_model(records: list[dict[str, Any]]) -> str:
+    counts: dict[str, int] = {}
+    for r in records:
+        if r.get("type") != "assistant":
+            continue
+        m = r.get("message", {}).get("model")
+        if m:
+            counts[m] = counts.get(m, 0) + 1
+    return max(counts, key=lambda k: counts[k]) if counts else ""
+
+
+# ─── redaction + truncation ────────────────────────────────────────────────
+
+# #416 + #484: default token shapes redacted out of every session
+# transcript regardless of user config. CLAUDE.md security model
+# promises redaction "before anything hits disk" — these patterns
+# close the gap left by relying on user-provided `extra_patterns`.
+#
+# Original (#416):
+# - GitHub PATs: `ghp_*` (classic), `gho_*` (OAuth), `ghs_*`
+#   (server-to-server), `ghu_*` (user-to-server), `github_pat_*`
+#   (fine-grained)
+# - AWS access key IDs: `AKIA*` (20 chars total)
+# - Slack tokens: `xoxb-*`, `xoxp-*`, `xoxa-*`, `xoxr-*`, `xoxs-*`
+#
+# Extended (#484) — added the patterns Pratiyush's developers most
+# commonly paste into Claude sessions ("here's my .env, why isn't
+# auth working?"). Anything below this comment is one PEM-encoded
+# / one prefix-shaped paste away from being committed to raw/ and
+# served at the public GitHub Pages URL by the pages.yml workflow:
+#
+# - Anthropic API keys: `sk-ant-api03-*` (and any future variant)
+# - OpenAI keys: classic `sk-*`, project keys `sk-proj-*`,
+#   service-account keys `sk-svcacct-*`
+# - Google API keys: `AIza[A-Za-z0-9_-]{35}`
+# - Stripe live keys: `sk_live_*`, `pk_live_*` (publishable too —
+#   leak associates the project with you even if revoked)
+# - npm tokens: `npm_[A-Za-z0-9]{36}`
+# - JWT structure: `eyJ...eyJ...sig` (loose 3-segment shape)
+# - PEM private keys: full BEGIN/END envelope
+#
+# These run AFTER user `extra_patterns` so users can override.
+_DEFAULT_TOKEN_PATTERNS = [
+    # GitHub
+    re.compile(r"\bghp_[A-Za-z0-9_]{20,}\b"),
+    re.compile(r"\bgho_[A-Za-z0-9_]{20,}\b"),
+    re.compile(r"\bghs_[A-Za-z0-9_]{20,}\b"),
+    re.compile(r"\bghu_[A-Za-z0-9_]{20,}\b"),
+    re.compile(r"\bgithub_pat_[A-Za-z0-9_]{20,}\b"),
+    # AWS
+    re.compile(r"\bAKIA[0-9A-Z]{16}\b"),
+    # Slack
+    re.compile(r"\bxox[abprs]-[A-Za-z0-9-]{10,}\b"),
+    # #484: Anthropic API keys
+    re.compile(r"\bsk-ant-api[0-9]{2}-[A-Za-z0-9_-]{20,}\b"),
+    # #484: OpenAI keys (project + service-account variants must come
+    # BEFORE the generic `sk-` rule below so they match more specifically).
+    re.compile(r"\bsk-proj-[A-Za-z0-9_-]{20,}\b"),
+    re.compile(r"\bsk-svcacct-[A-Za-z0-9_-]{20,}\b"),
+    re.compile(r"\bsk-[A-Za-z0-9_-]{20,}\b"),
+    # #484: Google API keys (39 chars total: AIza + 35)
+    re.compile(r"\bAIza[A-Za-z0-9_-]{35}\b"),
+    # #484: Stripe live + restricted keys (test keys `sk_test_*` are
+    # intentionally not redacted — they're meant to ship in code).
+    re.compile(r"\bsk_live_[0-9a-zA-Z]{24,}\b"),
+    re.compile(r"\bpk_live_[0-9a-zA-Z]{24,}\b"),
+    re.compile(r"\brk_live_[0-9a-zA-Z]{24,}\b"),
+    # #484: npm registry tokens
+    re.compile(r"\bnpm_[A-Za-z0-9]{36}\b"),
+    # #484: JWT shape — 3 base64url segments separated by `.`. Loose
+    # enough to catch most JWTs without false-positiving on every dotted
+    # token. Header MUST start `eyJ` (`{"`) which is the canonical JWT
+    # opening; payload likewise.
+    re.compile(r"\beyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b"),
+    # #484: PEM-encoded private keys. Multi-line via `re.DOTALL`.
+    re.compile(
+        r"-----BEGIN (?:RSA |EC |DSA |OPENSSH |ENCRYPTED |PGP )?PRIVATE KEY-----"
+        r".*?"
+        r"-----END (?:RSA |EC |DSA |OPENSSH |ENCRYPTED |PGP )?PRIVATE KEY-----",
+        re.DOTALL,
+    ),
+]
+
+
+class Redactor:
+    def __init__(self, config: dict[str, Any]):
+        red = config.get("redaction", {})
+        self.real_user = red.get("real_username", "")
+        self.repl_user = red.get("replacement_username", "USER")
+        # #py-l6 (#604): one bad user-supplied pattern used to abort
+        # construction of the entire Redactor — leaving sync running
+        # with NO redaction at all (worse than partial redaction).
+        # Compile each pattern individually; warn on the bad ones, keep
+        # the good ones. Default token patterns + username redaction
+        # still run regardless.
+        self.patterns = []
+        import sys as _sys
+        for p in red.get("extra_patterns", []):
+            try:
+                self.patterns.append(re.compile(p))
+            except re.error as e:
+                print(
+                    f"warning: invalid redaction pattern {p!r} skipped: {e}",
+                    file=_sys.stderr,
+                )
+
+    def __call__(self, text: str) -> str:
+        if not text:
+            return text
+        if self.real_user:
+            text = self._redact_username(text)
+        for pat in self.patterns:
+            text = pat.sub("<REDACTED>", text)
+        # #416: default token redaction runs unconditionally so users
+        # never accidentally publish credentials by forgetting to
+        # configure `extra_patterns`.
+        for pat in _DEFAULT_TOKEN_PATTERNS:
+            text = pat.sub("<REDACTED>", text)
+        return text
+
+    def _redact_username(self, text: str) -> str:
+        """Replace the real username in home-directory paths.
+
+        #416: covers macOS (`/Users/<u>`), Linux (`/home/<u>`), Windows
+        (`C:\\Users\\<u>` plus mixed-separator variants users hit when
+        copy-pasting between shells), and WSL (`/mnt/c/Users/<u>`).
+
+        #485: extended to cover Windows non-C drives (`D:\\Users\\`,
+        `E:\\Users\\`, every drive letter), Cygwin
+        (`/cygdrive/<letter>/Users/<u>`), Windows extended-length
+        prefix (`\\\\?\\C:\\Users\\<u>`), and WSL UNC
+        (`\\\\wsl.localhost\\<distro>\\home\\<u>`,
+        `\\\\wsl$\\<distro>\\home\\<u>`). All variants users hit in
+        the wild on a multi-drive Windows box or a Cygwin/WSL
+        environment.
+
+        Username can contain hyphens, underscores, and unicode.
+        """
+        # #py-h8 (#586): cache the compiled username pattern on the
+        # instance so a long sync doesn't recompile the same regex
+        # thousands of times. Key on the real_user string so a config
+        # change between calls (rare) still rebuilds the pattern.
+        cached = getattr(self, "_username_pattern_cache", None)
+        if cached and cached[0] == self.real_user:
+            return cached[1].sub(
+                lambda m: m.group("prefix") + self.repl_user, text
+            )
+        u = re.escape(self.real_user)
+        repl_user = self.repl_user
+        # Single regex with prefix alternation; word-style boundary
+        # (lookahead) prevents matching `aliceandbob` when `alice` is
+        # the real user. The username group is itself the only thing
+        # we substitute — separators and prefix are preserved.
+        prefixes = (
+            # Original (#416): macOS / Linux / Windows C: / WSL /mnt
+            r"/Users/",
+            r"/home/",
+            r"C:\\Users\\",
+            r"C:/Users/",
+            r"/mnt/[a-z]/Users/",
+            # #485: Windows non-C drives (D, E, F, ...) — both backslash
+            # and forward-slash forms (Powershell prints either depending
+            # on origin).
+            r"[A-Za-z]:\\Users\\",
+            r"[A-Za-z]:/Users/",
+            # #485: Cygwin home format
+            r"/cygdrive/[a-z]/Users/",
+            # #485: Windows extended-length path prefix `\\?\C:\Users\`
+            # (used by APIs that bypass MAX_PATH; appears in some tool
+            # output).
+            r"\\\\\?\\[A-Za-z]:\\Users\\",
+            # #485: WSL UNC prefixes — both modern (`wsl.localhost`) and
+            # legacy (`wsl$`). Distro name allows letters/digits/hyphens.
+            r"\\\\wsl\.localhost\\[A-Za-z0-9_-]+\\home\\",
+            r"\\\\wsl\$\\[A-Za-z0-9_-]+\\home\\",
+        )
+        pattern = re.compile(
+            r"(?P<prefix>" + "|".join(prefixes) + r")"
+            + r"(?P<user>" + u + r")"
+            + r"(?=$|[/\\])"
+        )
+        # Cache for next call.
+        self._username_pattern_cache = (self.real_user, pattern)
+        return pattern.sub(lambda m: m.group("prefix") + repl_user, text)
+
+
+def _close_open_fence(text: str) -> str:
+    """If ``text`` contains an unclosed code fence, append the matching
+    close so downstream markdown parsers don't swallow the rest of the
+    page as one giant code block.
+
+    #72 — truncated tool results used to eat everything below them.
+    #419 — track ``\\`\\`\\``` and ``~~~`` independently. Markdown allows
+    both fence styles; some pretty-printers and Quarto-flavoured docs
+    use ``~~~``. Counting them together lets one style mask the other's
+    open count and the wrong fence type ends up appended.
+
+    Counts only lines whose first non-whitespace characters are triple
+    backticks or triple tildes (real fences, not inline code).
+    """
+    # #py-m9 (#595): short-circuit on prose with no fences. The full
+    # splitlines + lstrip walk is O(n) on every page; pages without any
+    # fence at all (lots of them — quotes, summaries, frontmatter-only
+    # snippets) get the fast `in` check instead. Both `\`\`\`` and `~~~`
+    # must be absent for the early-out to be safe.
+    if "```" not in text and "~~~" not in text:
+        return text
+    backtick_count = 0
+    tilde_count = 0
+    for line in text.splitlines():
+        stripped = line.lstrip()
+        if stripped.startswith("```"):
+            backtick_count += 1
+        elif stripped.startswith("~~~"):
+            tilde_count += 1
+    suffix = ""
+    if backtick_count % 2 == 1:
+        suffix += "\n```"
+    if tilde_count % 2 == 1:
+        suffix += "\n~~~"
+    return text + suffix if suffix else text
+
+
+def truncate_chars(text: str, max_chars: int) -> str:
+    if not text or len(text) <= max_chars:
+        return text
+    kept = _close_open_fence(text[:max_chars])
+    return kept + f"\n…(truncated, {len(text) - max_chars} more chars)"
+
+
+def truncate_lines(text: str, max_lines: int) -> str:
+    if not text:
+        return text
+    lines = text.splitlines()
+    if len(lines) <= max_lines:
+        return text
+    kept = _close_open_fence("\n".join(lines[:max_lines]))
+    return kept + f"\n…(truncated, {len(lines) - max_lines} more lines)"
+
+
+# ─── record classification ─────────────────────────────────────────────────
+
+def is_real_user_prompt(record: dict[str, Any]) -> bool:
+    if record.get("type") != "user":
+        return False
+    return isinstance(record.get("message", {}).get("content"), str)
+
+
+def is_tool_result_delivery(record: dict[str, Any]) -> bool:
+    if record.get("type") != "user":
+        return False
+    content = record.get("message", {}).get("content")
+    if not isinstance(content, list):
+        return False
+    return any(isinstance(b, dict) and b.get("type") == "tool_result" for b in content)
+
+
+def count_user_messages(records: list[dict[str, Any]]) -> int:
+    return sum(1 for r in records if is_real_user_prompt(r))
+
+
+def count_tool_calls(records: list[dict[str, Any]]) -> int:
+    n = 0
+    for r in records:
+        if r.get("type") != "assistant":
+            continue
+        for b in r.get("message", {}).get("content", []) or []:
+            if isinstance(b, dict) and b.get("type") == "tool_use":
+                n += 1
+    return n
+
+
+def extract_tools_used(records: list[dict[str, Any]]) -> list[str]:
+    seen: dict[str, None] = {}
+    for r in records:
+        if r.get("type") != "assistant":
+            continue
+        for b in r.get("message", {}).get("content", []) or []:
+            if isinstance(b, dict) and b.get("type") == "tool_use":
+                seen.setdefault(b.get("name", "Unknown"), None)
+    return list(seen.keys())
+
+
+# ─── v0.8 session metrics (#63) ───────────────────────────────────────────
+# Structured per-session metrics emitted into frontmatter as JSON inline
+# values. The build step and the v0.8 visualization modules (#64/#65/#66)
+# consume these without having to re-parse the raw .jsonl. Keep all helpers
+# stdlib-only and tolerant of missing fields.
+
+
+def compute_tool_counts(records: list[dict[str, Any]]) -> dict[str, int]:
+    """Return a {tool_name: count} mapping across all assistant tool_use blocks."""
+    counts: dict[str, int] = {}
+    for r in records:
+        if r.get("type") != "assistant":
+            continue
+        for b in r.get("message", {}).get("content", []) or []:
+            if isinstance(b, dict) and b.get("type") == "tool_use":
+                name = b.get("name") or "Unknown"
+                counts[name] = counts.get(name, 0) + 1
+    # Return with stable ordering (by count desc then name) so the rendered
+    # frontmatter is byte-identical across runs.
+    return dict(sorted(counts.items(), key=lambda kv: (-kv[1], kv[0])))
+
+
+def compute_token_totals(records: list[dict[str, Any]]) -> dict[str, int]:
+    """Sum input / cache_creation / cache_read / output tokens across assistant
+    messages. Missing fields contribute 0.
+    """
+    totals = {"input": 0, "cache_creation": 0, "cache_read": 0, "output": 0}
+    for r in records:
+        if r.get("type") != "assistant":
+            continue
+        usage = r.get("message", {}).get("usage") or {}
+        if not isinstance(usage, dict):
+            continue
+        totals["input"] += int(usage.get("input_tokens") or 0)
+        totals["cache_creation"] += int(usage.get("cache_creation_input_tokens") or 0)
+        totals["cache_read"] += int(usage.get("cache_read_input_tokens") or 0)
+        totals["output"] += int(usage.get("output_tokens") or 0)
+    return totals
+
+
+def compute_turn_count(records: list[dict[str, Any]]) -> int:
+    """Number of user→assistant turn pairs (equivalent to real user prompts)."""
+    return count_user_messages(records)
+
+
+def compute_hour_buckets(records: list[dict[str, Any]]) -> dict[str, int]:
+    """Return {"YYYY-MM-DDTHH": count} keyed by UTC hour-of-activity.
+
+    Sparse — only hours with at least one record. Used by the v0.8 activity
+    heatmap (#64) to size per-day dots without reading the raw jsonl.
+    """
+    buckets: dict[str, int] = {}
+    for r in records:
+        ts = parse_iso(r.get("timestamp"))
+        if ts is None:
+            continue
+        ts_utc = ts.astimezone(timezone.utc) if ts.tzinfo else ts
+        key = ts_utc.strftime("%Y-%m-%dT%H")
+        buckets[key] = buckets.get(key, 0) + 1
+    # Sorted chronologically for stable frontmatter output.
+    return dict(sorted(buckets.items()))
+
+
+def compute_duration_seconds(records: list[dict[str, Any]]) -> int:
+    """Total elapsed session time in whole seconds (last_ts - first_ts)."""
+    first = first_record_time(records)
+    last = latest_record_time(records)
+    if first is None or last is None:
+        return 0
+    delta = last - first
+    return max(0, int(delta.total_seconds()))
+
+
+# ─── tool-use rendering ────────────────────────────────────────────────────
+
+
+def _coerce_int(value: Any) -> Optional[int]:
+    """Return ``value`` as an ``int`` or ``None`` for unparseable input.
+
+    G-05 (#291): sub-agent transcripts occasionally ship tool arguments
+    as strings (``{"offset": "123"}``) or floats.  The old code assumed
+    ints and crashed on concat.  This helper accepts:
+
+    - ``int`` → returned as-is (``bool`` rejected — ``True + 0`` is a
+      footgun we intentionally don't tolerate)
+    - ``float`` → cast to ``int`` (drops the fractional part)
+    - ``str`` → parsed if it's an integer literal; otherwise ``None``
+    - anything else → ``None``
+    """
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        try:
+            return int(value)
+        except (OverflowError, ValueError):
+            return None
+    if isinstance(value, str):
+        s = value.strip()
+        if not s:
+            return None
+        try:
+            return int(s, 10)
+        except ValueError:
+            try:
+                return int(float(s))
+            except (OverflowError, ValueError):
+                return None
+    return None
+
+
+def summarize_tool_use(block: dict[str, Any], redact: Redactor, config: dict[str, Any]) -> str:
+    name = block.get("name", "Tool")
+    inp = block.get("input", {}) or {}
+    trunc = config.get("truncation", {})
+
+    if name == "Bash":
+        cmd = inp.get("command", "") or ""
+        first_line = cmd.splitlines()[0] if cmd else ""
+        if len(cmd.splitlines()) > 1:
+            first_line += " …"
+        return f"`Bash`: `{redact(truncate_chars(first_line, 200))}`"
+
+    if name == "Read":
+        fp = inp.get("file_path", "")
+        # G-05 (#291): coerce to int at the boundary. Sub-agent records sometimes
+        # serialise numeric tool args as strings ("123"), and the old
+        # ``(offset or 0) + (limit or 0)`` blew up with `TypeError: can only
+        # concatenate str (not "int") to str` — silently dropping the whole
+        # session (see agent-ace0e851c84aaba7c.jsonl). ``_coerce_int`` also
+        # accepts None/bool/float and returns a default on anything else.
+        offset = _coerce_int(inp.get("offset"))
+        limit = _coerce_int(inp.get("limit"))
+        rng = ""
+        if offset is not None or limit is not None:
+            start = offset if offset is not None else 1
+            end: int | str
+            if limit is not None:
+                end = (offset or 0) + limit
+            else:
+                end = "?"
+            rng = f" ({start}–{end})"
+        return f"`Read`: `{redact(fp)}`{rng}"
+
+    if name == "Write":
+        fp = inp.get("file_path", "")
+        content = inp.get("content", "") or ""
+        preview = truncate_lines(content, trunc.get("write_content_preview_lines", 5))
+        return (
+            f"`Write`: `{redact(fp)}` ({len(content)} chars)\n\n"
+            f"```\n{redact(preview)}\n```"
+        )
+
+    if name == "Edit":
+        fp = inp.get("file_path", "")
+        old = inp.get("old_string", "") or ""
+        new = inp.get("new_string", "") or ""
+        return f"`Edit`: `{redact(fp)}` (− {len(old)} chars / + {len(new)} chars)"
+
+    if name == "Glob":
+        pat = inp.get("pattern", "")
+        path = inp.get("path", "")
+        return f"`Glob`: `{redact(pat)}`" + (f" in `{redact(path)}`" if path else "")
+
+    if name == "Grep":
+        pat = inp.get("pattern", "")
+        glob = inp.get("glob") or inp.get("path", "")
+        return f"`Grep`: `{redact(pat)}`" + (f" in `{redact(glob)}`" if glob else "")
+
+    if name == "TodoWrite":
+        todos = inp.get("todos", []) or []
+        return f"`TodoWrite`: {len(todos)} todos"
+
+    if name == "WebFetch":
+        return f"`WebFetch`: {redact(inp.get('url', ''))}"
+
+    if name == "WebSearch":
+        q = inp.get("query", "")
+        return f"`WebSearch`: {redact(truncate_chars(q, 200))}"
+
+    if name == "Task":
+        desc = inp.get("description", "") or inp.get("subagent_type", "")
+        return f"`Task`: {redact(truncate_chars(desc, 200))}"
+
+    keys = ", ".join(inp.keys())
+    return f"`{name}` (inputs: {keys})"
+
+
+def render_assistant_message(
+    record: dict[str, Any],
+    redact: Redactor,
+    config: dict[str, Any],
+) -> tuple[str, list[str]]:
+    msg = record.get("message", {})
+    content = msg.get("content", [])
+    if not isinstance(content, list):
+        return "", []
+    text_parts: list[str] = []
+    tools: list[str] = []
+    drop_thinking = config.get("drop_thinking_blocks", True)
+    max_chars = config.get("truncation", {}).get("assistant_text_chars", 8000)
+
+    for block in content:
+        if not isinstance(block, dict):
+            continue
+        btype = block.get("type")
+        if btype == "thinking":
+            if drop_thinking:
+                continue
+            text_parts.append(f"_(thinking)_ {block.get('thinking', '')}")
+        elif btype == "text":
+            text_parts.append(block.get("text", ""))
+        elif btype == "tool_use":
+            tools.append(summarize_tool_use(block, redact, config))
+
+    text = "\n\n".join(t for t in text_parts if t).strip()
+    text = truncate_chars(redact(text), max_chars)
+    return text, tools
+
+
+def render_tool_results(
+    record: dict[str, Any],
+    redact: Redactor,
+    config: dict[str, Any],
+) -> list[str]:
+    msg = record.get("message", {})
+    content = msg.get("content", [])
+    if not isinstance(content, list):
+        return []
+    out: list[str] = []
+    max_chars = config.get("truncation", {}).get("tool_result_chars", 500)
+    for block in content:
+        if not isinstance(block, dict) or block.get("type") != "tool_result":
+            continue
+        c = block.get("content", "")
+        if isinstance(c, list):
+            parts = [b.get("text", "") for b in c if isinstance(b, dict) and b.get("type") == "text"]
+            c = "\n".join(parts)
+        marker = "ERROR" if block.get("is_error") else "ok"
+        rendered = truncate_chars(redact(str(c).strip()), max_chars)
+        out.append(f"  → result ({marker}): {rendered}" if rendered else f"  → result ({marker})")
+    return out
+
+
+def render_user_prompt(record: dict[str, Any], redact: Redactor, max_chars: int) -> str:
+    content = record.get("message", {}).get("content", "")
+    if not isinstance(content, str):
+        return ""
+    return truncate_chars(redact(content.strip()), max_chars)
+
+
+# ─── full markdown renderer ────────────────────────────────────────────────
+
+_UUID_LIKE = re.compile(
+    r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}",
+    re.IGNORECASE,
+)
+
+
+def derive_session_slug(records: list[dict[str, Any]], jsonl_path: Path) -> str:
+    """Derive a slug from session records or fall back to the filename.
+
+    #424: when no ``slug`` field is in any record, the old fallback was
+    ``jsonl_path.stem[:12]``. UUID-named transcripts (Claude Code emits
+    these — ``b7f0e3c4-2189-4f8e-9e4f-...jsonl``) all collapsed onto
+    the *same* 12-char prefix per project (``b7f0e3c4-21``), so two
+    sessions in the same minute with that prefix produced the same
+    canonical filename. Correctness was coupled to the disambig pass
+    (#339); if the renderer ever moved first, this regressed silently.
+
+    Fix: detect UUID-shaped stems and fall back to the same stable
+    8-char source hash the disambig pass uses (``_source_hash8``).
+    Two distinct UUIDs always produce distinct hashes, so the canonical
+    slug is unique without leaning on disambig. Non-UUID stems keep
+    the historical 12-char prefix to preserve human-readable slugs
+    for projects that name their JSONLs deliberately.
+    """
+    for r in records:
+        slug = r.get("slug")
+        if slug:
+            return str(slug)
+    stem = jsonl_path.stem
+    # #arch-l3 (#625): the 8-char vs 12-char split is intentional, not
+    # a drift. UUID stems get the stable hash because every UUID shares
+    # the same 12-char prefix per project; deliberate human-named stems
+    # get the 12-char prefix because it preserves readability. Don't
+    # collapse them — a single rule loses one of the two properties.
+    if _UUID_LIKE.match(stem):
+        return _source_hash8(jsonl_path)
+    if not stem:
+        # Empty stem (rare — would require a literal ``.jsonl`` filename).
+        return _source_hash8(jsonl_path)
+    return stem[:12]
+
+
+def flat_output_name(
+    started: datetime,
+    project_slug: str,
+    slug: str,
+    *,
+    disambiguator: str = "",
+) -> str:
+    """Build a flat filename: ``YYYY-MM-DDTHH-MM-project-slug.md``.
+
+    The date+time+project+slug format ensures chronological sort,
+    project traceability, and uniqueness without nested directories.
+
+    Note (#arch-l2 / #624): the ``slug`` argument may already carry a
+    ``-subagent-<agent_id>`` suffix when the caller is rendering a
+    sub-agent transcript. ``flat_output_name`` does NOT add that
+    suffix itself — it's mixed in upstream (see ``render_session_*``
+    sites in this file) so this helper stays single-purpose.
+
+    ``disambiguator`` (#339): when two distinct source jsonls would
+    produce the same filename (subagents that inherit the parent's
+    start-time + slug, or top-level sessions that happen to start in
+    the same minute), the caller passes a short stable hash of the
+    source path here and we append ``--<hash>`` before ``.md``.
+    """
+    ts = started.strftime("%Y-%m-%dT%H-%M")
+    suffix = f"--{disambiguator}" if disambiguator else ""
+    return f"{ts}-{project_slug}-{slug}{suffix}.md"
+
+
+def _source_hash8(source_path: Path) -> str:
+    """Stable 8-char SHA-256 of a source path — used as a filename
+    disambiguator when two jsonls would otherwise collide (#339)."""
+    import hashlib as _hl
+    return _hl.sha256(str(source_path).encode("utf-8")).hexdigest()[:8]
+
+
+def _adapter_tag(adapter_name: str) -> str:
+    """Normalise an adapter registry name for the frontmatter ``tags``
+    field.  Matches the convention used across the codebase:
+
+    * ``claude_code`` → ``claude-code``
+    * ``codex_cli``   → ``codex-cli``
+    * ``copilot-chat`` → ``copilot-chat`` (already hyphenated)
+    * unknown / empty → ``claude-code`` (back-compat default so the
+      auto-tagger never emits an empty tag)
+    """
+    if not adapter_name:
+        return "claude-code"
+    normalised = adapter_name.strip().replace("_", "-")
+    # Whitespace-only input strips to empty — fall back to the default.
+    if not normalised:
+        return "claude-code"
+    return normalised
+
+
+def derive_description(records: list[dict[str, Any]], redact: "Redactor") -> str:
+    """#471: derive a 120-char human-readable description from the
+    first non-trivial user prompt in the session.
+
+    Walks the records looking for the first user message, strips path
+    noise, skips trivial openers ("hi", "thanks", "continue"), and
+    truncates to ~120 chars at a word boundary.
+
+    Empty / un-derivable input returns ``""``; callers can fall back
+    to the slug. Always passes the result through the same Redactor
+    the body uses so the description doesn't leak any path / token
+    that the body would have redacted.
+    """
+    TRIVIAL = {"hi", "hello", "hey", "thanks", "thank you", "ok",
+               "continue", "go on", "ya", "yes", "no", "."}
+    MAX_CHARS = 120
+    PATH_PREFIX_RE = re.compile(r"^/?(?:Users|home|mnt/[a-z]|cygdrive/[a-z])/[^/\s]+/")
+
+    for r in records:
+        if not isinstance(r, dict):
+            continue
+        if r.get("type") != "user":
+            continue
+        msg = r.get("message", {})
+        if not isinstance(msg, dict):
+            continue
+        content = msg.get("content")
+        text = ""
+        if isinstance(content, str):
+            text = content
+        elif isinstance(content, list):
+            # Take the first text-shaped block.
+            for block in content:
+                if isinstance(block, dict) and block.get("type") == "text":
+                    text = block.get("text") or ""
+                    break
+                if isinstance(block, str):
+                    text = block
+                    break
+        if not text:
+            continue
+
+        # First non-empty line (skip code-fence opens + path-noise).
+        for raw_line in text.splitlines():
+            line = raw_line.strip()
+            if not line:
+                continue
+            if line.startswith("```") or line.startswith("~~~"):
+                continue
+            # Strip leading absolute-path prefix from "two tasks in /Users/x/..." style.
+            line = PATH_PREFIX_RE.sub("", line, count=1)
+            # Skip trivial openers (case-insensitive).
+            if line.lower().rstrip(" ?!.") in TRIVIAL:
+                continue
+            # Truncate at word boundary.
+            if len(line) > MAX_CHARS:
+                cut = line.rfind(" ", 0, MAX_CHARS - 3)
+                if cut < MAX_CHARS // 2:
+                    cut = MAX_CHARS - 3
+                line = line[:cut].rstrip() + "..."
+            return redact(line)
+    return ""
+
+
+def render_session_markdown(
+    records: list[dict[str, Any]],
+    jsonl_path: Path,
+    project_slug: str,
+    redact: Redactor,
+    config: dict[str, Any],
+    is_subagent_file: bool,
+    adapter_name: str = "claude_code",
+) -> tuple[str, str, datetime]:
+    started = first_record_time(records) or datetime.now(timezone.utc)
+    ended = latest_record_time(records) or started
+    date_str = started.strftime("%Y-%m-%d")
+
+    session_id = first_field(records, "sessionId") or jsonl_path.stem
+    slug = derive_session_slug(records, jsonl_path)
+    if is_subagent_file:
+        agent_id = jsonl_path.stem.replace("agent-", "")[:8]
+        slug = f"{slug}-subagent-{agent_id}"
+
+    cwd = first_field(records, "cwd")
+    git_branch = first_field(records, "gitBranch")
+    permission_mode = first_field(records, "permissionMode")
+    model = most_common_model(records)
+    tools_used = extract_tools_used(records)
+    u_count = count_user_messages(records)
+    t_count = count_tool_calls(records)
+
+    # v0.8 (#63) structured metrics — JSON inline in frontmatter
+    tool_counts = compute_tool_counts(records)
+    token_totals = compute_token_totals(records)
+    turn_count = compute_turn_count(records)
+    hour_buckets = compute_hour_buckets(records)
+    duration_seconds = compute_duration_seconds(records)
+
+    title = f"Session: {slug} — {date_str}"
+    # #346: emit the actual adapter name instead of hardcoding
+    # ``claude-code`` — codex_cli / cursor / copilot-chat / gemini_cli
+    # sessions were mis-tagged and grouped under the wrong chip on
+    # the compiled site.
+    tag_adapter = _adapter_tag(adapter_name)
+    # #471: human-readable description from the first non-trivial user
+    # turn — replaces the opaque slug-date title in listings.
+    description = derive_description(records, redact)
+    # YAML-escape inner double quotes so the frontmatter parser doesn't
+    # truncate at the first internal `"`.
+    description_safe = description.replace("\\", "\\\\").replace('"', '\\"')
+    front = [
+        "---",
+        f'title: "{title}"',
+        "type: source",
+        f'description: "{description_safe}"',
+        f"tags: [{tag_adapter}, session-transcript]",
+        f"date: {date_str}",
+        f"source_file: raw/sessions/{started.strftime('%Y-%m-%dT%H-%M')}-{project_slug}-{slug}.md",
+        f"sessionId: {session_id}",
+        f"slug: {slug}",
+        f"project: {project_slug}",
+        f"started: {started.isoformat()}",
+        f"ended: {ended.isoformat()}",
+        f"cwd: {redact(cwd)}",
+        f"gitBranch: {git_branch}",
+        f"permissionMode: {permission_mode}",
+        f"model: {model}",
+        f"user_messages: {u_count}",
+        f"tool_calls: {t_count}",
+        f"tools_used: [{', '.join(tools_used)}]",
+        # v0.8 — structured metrics (JSON inline so the simple frontmatter
+        # parser stores them as strings; consumers json.loads() on demand).
+        f"tool_counts: {json.dumps(tool_counts, sort_keys=False)}",
+        f"token_totals: {json.dumps(token_totals, sort_keys=False)}",
+        f"turn_count: {turn_count}",
+        f"hour_buckets: {json.dumps(hour_buckets, sort_keys=False)}",
+        f"duration_seconds: {duration_seconds}",
+        f"is_subagent: {str(is_subagent_file).lower()}",
+        "---",
+        "",
+    ]
+
+    body: list[str] = [
+        f"# {title}",
+        "",
+        f"**Project:** `{project_slug}` · **Branch:** `{git_branch}` · **Mode:** `{permission_mode}` · **Model:** `{model}`",
+        "",
+        f"**Stats:** {u_count} user messages, {t_count} tool calls, tools used: {', '.join(tools_used) if tools_used else 'none'}.",
+        "",
+        "## Conversation",
+        "",
+    ]
+
+    max_user_chars = config.get("truncation", {}).get("user_prompt_chars", 4000)
+    turn_idx = 0
+    assistant_open = False
+    for r in records:
+        if is_real_user_prompt(r):
+            turn_idx += 1
+            assistant_open = False
+            body.append(f"### Turn {turn_idx} — User")
+            body.append("")
+            body.append(render_user_prompt(r, redact, max_user_chars) or "_(empty)_")
+            body.append("")
+        elif r.get("type") == "assistant":
+            text, tools = render_assistant_message(r, redact, config)
+            if not text and not tools:
+                continue
+            if not assistant_open:
+                body.append(f"### Turn {turn_idx} — Assistant")
+                body.append("")
+                assistant_open = True
+            if text:
+                body.append(text)
+                body.append("")
+            if tools:
+                body.append("**Tools used:**")
+                body.append("")
+                for t in tools:
+                    body.append(f"- {t}")
+                body.append("")
+        elif is_tool_result_delivery(r):
+            results = render_tool_results(r, redact, config)
+            if not results:
+                continue
+            if not assistant_open:
+                body.append(f"### Turn {turn_idx} — Assistant")
+                body.append("")
+                assistant_open = True
+            body.append("**Tool results:**")
+            body.append("")
+            body.extend(results)
+            body.append("")
+
+    md = "\n".join(front + body).rstrip() + "\n"
+    return md, slug, started
+
+
+# ─── orchestration ─────────────────────────────────────────────────────────
+
+def convert_all(
+    adapters: list[str] | None = None,
+    out_dir: Path = DEFAULT_OUT_DIR,
+    state_file: Path = DEFAULT_STATE_FILE,
+    config_file: Path = DEFAULT_CONFIG_FILE,
+    ignore_file: Path = DEFAULT_IGNORE_FILE,
+    since: Optional[str] = None,
+    project: Optional[str] = None,
+    include_current: bool = False,
+    force: bool = False,
+    dry_run: bool = False,
+) -> int:
+    """Main entry: convert new sessions across all enabled adapters."""
+    config = load_config(config_file)
+    state = {} if force else load_state(state_file, adapter_names=list(REGISTRY.keys()))
+    redact = Redactor(config)
+    ignore = IgnoreMatcher.from_file(ignore_file)
+    if ignore:
+        print(f"==> loaded {len(ignore)} pattern(s) from {ignore_file.name}")
+
+    drop_types = config.get("filters", {}).get("drop_record_types", [])
+    live_minutes = config.get("filters", {}).get("live_session_minutes", 60)
+    live_cutoff = datetime.now(timezone.utc) - timedelta(minutes=live_minutes)
+
+    since_dt: Optional[datetime] = None
+    if since:
+        try:
+            since_dt = datetime.strptime(since, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        except ValueError:
+            print(f"error: --since must be YYYY-MM-DD, got {since!r}", file=sys.stderr)
+            return 2
+
+    discover_adapters()
+    selected: list[type] = []
+    if adapters:
+        # #v1378-review: aliases now live in REGISTRY_ALIASES, not
+        # REGISTRY itself, so resolve through resolve_adapter_name to
+        # support both canonical names and historical kebab-case
+        # aliases (e.g. `--adapter copilot-chat`).
+        from llmwiki.adapters import resolve_adapter_name
+        for name in adapters:
+            canonical = resolve_adapter_name(name)
+            if canonical is None:
+                print(f"error: unknown adapter {name!r}. Try: {', '.join(REGISTRY)}", file=sys.stderr)
+                return 2
+            selected.append(REGISTRY[canonical])
+    else:
+        # #326: default-fire only AI-session adapters. Non-AI adapters
+        # (obsidian, jira, meeting, pdf) must be explicitly enabled via
+        # ``sessions_config.json`` with ``{<name>: {enabled: true}}`` —
+        # otherwise ``llmwiki sync`` never walks a user's personal
+        # Obsidian vault or ingests their Jira tickets silently.
+        for cls in REGISTRY.values():
+            if not cls.is_available():
+                continue
+            adapter_cfg = config.get(cls.name, {}) if isinstance(config, dict) else {}
+            explicit_enabled = (
+                isinstance(adapter_cfg, dict)
+                and adapter_cfg.get("enabled") is True
+            )
+            if getattr(cls, "is_ai_session", True) or explicit_enabled:
+                selected.append(cls)
+
+    if not selected:
+        print("No adapters available. Install Claude Code or Codex CLI first.", file=sys.stderr)
+        return 1
+
+    converted = unchanged = live = filtered = ignored_count = errors = 0
+
+    # G-03 (#289): per-adapter counters so `llmwiki sync --status` can
+    # report which adapter saw what. Written under ``_counters`` in the
+    # state file so there's no separate persistence surface to maintain.
+    counters: dict[str, dict[str, int]] = {}
+
+    def _bump(adapter_name: str, field: str) -> None:
+        c = counters.setdefault(adapter_name, {
+            "discovered": 0, "converted": 0, "unchanged": 0, "live": 0,
+            "filtered": 0, "ignored": 0, "errored": 0,
+        })
+        c[field] = c.get(field, 0) + 1
+
+    # Names claimed by this sync run. Independent of --force and of the
+    # state file — its sole purpose is to stop two source jsonls in this
+    # single run from writing to the same canonical filename. Without this
+    # set, `sync --force` silently overwrote colliding outputs because the
+    # disambiguator on disk was gated on ``not force`` (bug #339).
+    names_written_this_run: set[str] = set()
+
+    for cls in selected:
+        adapter = cls(config)
+        print(f"==> adapter: {cls.name}")
+        sessions = adapter.discover_sessions()
+        print(f"  discovered: {len(sessions)} source files")
+        counters.setdefault(cls.name, {
+            "discovered": 0, "converted": 0, "unchanged": 0, "live": 0,
+            "filtered": 0, "ignored": 0, "errored": 0,
+        })
+        counters[cls.name]["discovered"] = len(sessions)
+        for path in sessions:
+            # #arch-h9 (#612): mtime check FIRST. The previous order
+            # called `adapter.derive_project_slug(path)` before the
+            # mtime check, which on Codex CLI opens every .jsonl to
+            # read the session_meta cwd field. On a 5k-session corpus
+            # that's 5k needless file opens per no-op sync (~10x scale
+            # projection). Stat is cheap; slug derivation can be
+            # expensive — so check mtime first and skip the expensive
+            # slug + ignore + project-filter work when nothing changed.
+            try:
+                mtime = path.stat().st_mtime
+            except OSError as e:
+                errors += 1
+                _bump(cls.name, "errored")
+                _quarantine_add(cls.name, str(path), f"stat failed: {e}")
+                continue
+            key = _portable_state_key(cls.name, path)
+            if state.get(key) == mtime:
+                unchanged += 1
+                _bump(cls.name, "unchanged")
+                continue
+
+            # Now we know we have to look at the file content — derive
+            # slug + run filters. Anything that bails after this point
+            # has had to pay the slug cost, but that's true for every
+            # session that actually gets converted.
+            project_slug = adapter.derive_project_slug(path)
+            if project and project not in project_slug:
+                filtered += 1
+                _bump(cls.name, "filtered")
+                continue
+            if ignore and ignore.is_ignored(project=project_slug, filename=path.name):
+                ignored_count += 1
+                _bump(cls.name, "ignored")
+                continue
+
+            # Markdown-source adapters (e.g. Obsidian) route through a simple
+            # copy-with-redaction path rather than parse_jsonl.
+            if path.suffix == ".md":
+                try:
+                    text = path.read_text(encoding="utf-8")
+                except OSError as e:
+                    errors += 1
+                    _bump(cls.name, "errored")
+                    _quarantine_add(cls.name, str(path), f"read failed: {e}")
+                    continue
+                if len(text) < 50:
+                    filtered += 1
+                    _bump(cls.name, "filtered")
+                    continue
+                out_name = f"{project_slug}-{path.stem}.md"
+                out_path = out_dir / out_name
+                if dry_run:
+                    print(f"  [dry-run] {out_path.relative_to(REPO_ROOT) if out_path.is_relative_to(REPO_ROOT) else out_path} ({len(text)} bytes)")
+                else:
+                    out_path.parent.mkdir(parents=True, exist_ok=True)
+                    try:
+                        _raw_write_guard(out_path, force=force, source=str(path),
+                                         adapter_name=cls.name)
+                    except FileExistsError as e:
+                        errors += 1
+                        _bump(cls.name, "errored")
+                        _quarantine_add(cls.name, str(path), str(e))
+                        continue
+                    out_path.write_text(redact(text), encoding="utf-8")
+                    state[key] = mtime
+                converted += 1
+                _bump(cls.name, "converted")
+                continue
+
+            # #493: PDF dispatch removed. There was never a concrete PDF
+            # adapter — `adapter.convert_pdf` raised AttributeError on
+            # every adapter, the exception got swallowed into
+            # `_quarantine_add`, and the user saw a confusing
+            # "'XAdapter' object has no attribute 'convert_pdf'" entry.
+            # README also lied about a "PDF Production v0.5" adapter
+            # that never existed. If a real PDF adapter ships later it
+            # can re-add this branch and declare `convert_pdf` on
+            # `BaseAdapter` properly.
+
+            # #487: parse_jsonl now re-raises OSError so we can route I/O
+            # failures through the quarantine + 'errored' bucket the same
+            # way write failures do. Previously the helper swallowed them
+            # and the file silently became 'filtered' (zero records).
+            try:
+                records = parse_jsonl(path)
+            except OSError as e:
+                print(f"  error: {path.name}: {e}", file=sys.stderr)
+                errors += 1
+                _bump(cls.name, "errored")
+                _quarantine_add(cls.name, str(path), f"parse_jsonl I/O failed: {e}")
+                continue
+            # v0.5 (#109): normalize agent-specific records into the shared
+            # Claude-style format before filtering/rendering. This lets each
+            # adapter translate its native schema without touching the shared
+            # renderer. The default implementation is a no-op for Claude Code.
+            records = adapter.normalize_records(records)
+            records = filter_records(records, drop_types)
+            if not records:
+                filtered += 1
+                _bump(cls.name, "filtered")
+                continue
+            last_t = latest_record_time(records)
+            if last_t and last_t > live_cutoff and not include_current:
+                live += 1
+                _bump(cls.name, "live")
+                continue
+            if since_dt and last_t and last_t < since_dt:
+                filtered += 1
+                _bump(cls.name, "filtered")
+                continue
+            try:
+                md, slug, started = render_session_markdown(
+                    records, path, project_slug, redact, config,
+                    adapter.is_subagent(path),
+                    adapter_name=cls.name,
+                )
+            except Exception as e:
+                print(f"  error: {path.name}: {e}", file=sys.stderr)
+                errors += 1
+                _bump(cls.name, "errored")
+                _quarantine_add(cls.name, str(path), f"render failed: {e}")
+                continue
+            date_str = started.strftime("%Y-%m-%d")
+            out_name = flat_output_name(started, project_slug, slug)
+            out_path = out_dir / out_name
+            # #339: disambiguate when the canonical name would collide with
+            # a different source. Two cases, both must trigger the retry:
+            #   (a) Another source in THIS sync run already claimed the
+            #       canonical name. Independent of --force — otherwise
+            #       `sync --force` silently overwrites sibling sessions
+            #       whose project+date+slug happen to collide (~200
+            #       dropped sessions on a real claude-code corpus).
+            #   (b) Canonical exists on disk from a prior run AND the
+            #       state file does not record us as its writer. Only
+            #       consulted when --force is off; under --force the user
+            #       has explicitly asked to overwrite their own prior
+            #       outputs.
+            needs_disambig = not dry_run and (
+                out_name in names_written_this_run
+                or (not force and out_path.exists() and state.get(key) != mtime)
+            )
+            if needs_disambig:
+                out_name = flat_output_name(
+                    started, project_slug, slug,
+                    disambiguator=_source_hash8(path),
+                )
+                out_path = out_dir / out_name
+                # #404: rewrite the source_file: frontmatter line so it
+                # matches the disambiguated filename. Without this the
+                # rendered markdown still pointed at the canonical name,
+                # breaking graph viewer links and any consumer that
+                # resolved source_file → site URL.
+                md = re.sub(
+                    r"^source_file: raw/sessions/[^\n]+$",
+                    f"source_file: raw/sessions/{out_name}",
+                    md,
+                    count=1,
+                    flags=re.MULTILINE,
+                )
+            if not dry_run:
+                names_written_this_run.add(out_name)
+            if dry_run:
+                # #426 sister fix: mirror the defensive `is_relative_to` check
+                # the verbatim-text branch above already had so dry-run on
+                # out_dir paths outside REPO_ROOT (e.g. test fixtures, vault
+                # overlays) doesn't crash on `relative_to`.
+                shown = (
+                    out_path.relative_to(REPO_ROOT)
+                    if out_path.is_relative_to(REPO_ROOT) else out_path
+                )
+                print(f"  [dry-run] {shown} ({len(md)} bytes)")
+            else:
+                out_path.parent.mkdir(parents=True, exist_ok=True)
+                try:
+                    _raw_write_guard(out_path, force=force, source=str(path),
+                                     adapter_name=cls.name)
+                except FileExistsError as e:
+                    errors += 1
+                    _bump(cls.name, "errored")
+                    _quarantine_add(cls.name, str(path), str(e))
+                    continue
+                out_path.write_text(md, encoding="utf-8")
+                state[key] = mtime
+            converted += 1
+            _bump(cls.name, "converted")
+
+    if not dry_run:
+        # G-03 (#289): stamp _meta.last_sync + _counters onto the state
+        # file so `llmwiki sync --status` has a canonical place to read
+        # observability data. Keys are namespaced with `_` so they can't
+        # collide with portable adapter::path keys (which never start
+        # with `_` because adapter names are lowercase identifiers).
+        # #426: persist under --force too. `--force` is meant to ignore
+        # *prior* state (re-process files even when their mtime says
+        # they're unchanged), not to skip recording the new run. The
+        # original `not force` guard discarded every per-key state
+        # update from this run plus the observability data, so
+        # `sync --status` after a `--force` re-sync would silently show
+        # the *previous* run's `last_sync` timestamp, and the next
+        # non-force sync would re-process every file all over again.
+        state["_meta"] = {
+            "last_sync": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "version": 1,
+        }
+        state["_counters"] = counters
+        save_state(state_file, state)
+
+    print()
+    print(
+        f"summary: {converted} converted, {unchanged} unchanged, "
+        f"{live} live, {filtered} filtered, {ignored_count} ignored, {errors} errors"
+    )
+    return 0 if errors == 0 else 1

@@ -39,3 +39,15 @@ If you want to force a fresh login:
 - "ASR task timed out"
   - Meaning: the ASR service did not return results in time.
   - Fix: retry later, or retry multiple times (network / service instability happens).
+
+## Workspace issues
+
+- "Missing workspace root"
+  - Meaning: the skill has not been initialized and no workspace env var was provided.
+  - Fix: run `python "<SKILL_DIR>/scripts/look_tongji.py" setup`, or set `LOOK_TONGJI_WORKSPACE_ROOT`.
+- Imported material has no useful Markdown
+  - Meaning: MarkItDown could not extract text from that file.
+  - Fix: install optional dependencies with `pip install -r "<SKILL_DIR>/requirements.txt"`, or provide a cleaner PDF/DOCX/PPTX source.
+- Static site does not show new notes
+  - Meaning: the agent has not written `<course_id>_<sub_id>_notes.md` yet, or the site was not rebuilt.
+  - Fix: write the notes into the session raw-data folder, then run `python "<SKILL_DIR>/scripts/look_tongji.py" wiki`.

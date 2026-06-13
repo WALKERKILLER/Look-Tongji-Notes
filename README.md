@@ -8,15 +8,29 @@
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge" alt="MIT License"></a>
+  <a href="skills-catalog/README.md"><img src="https://img.shields.io/badge/Version-0.2.0-7C3AED.svg?style=for-the-badge" alt="Version 0.2.0"></a>
 </p>
 
-This is an agent skill + CLI for Tongji Look (`look.tongji.edu.cn`):
+This is an agent skill suite (8 atomic `/command` skills) + CLI for Tongji Look (`look.tongji.edu.cn`):
 - login via Tongji IAM SSO (Playwright),
 - list courses (recent list or full search),
 - transcribe a lecture to `SRT` + `TXT`,
 - generate a lecture timeline outline (`*_timeline.txt`) from `SRT` (agent-generated, Simplified Chinese),
 - download lecture slide snapshots (filename includes snapshot time),
 - then let the current agent write a Markdown study note from transcript + slide images.
+
+## Commands
+
+| Command | Description |
+|---------|-------------|
+| `/setup` | Account, workspace & dependency check (vision-support, Node.js, TeX) |
+| `/trans` | Transcribe a single lecture + optional slide download |
+| `/note` | Full note workflow: transcript + slides + materials + timeline + note |
+| `/add` | Import supplementary reference materials only |
+| `/wiki` | Build and preview the course knowledge-base site |
+| `/page` | GitHub Pages deployment guide (agent-driven) |
+| `/cheatsheet` | Generate an exam A4 cheatsheet (LaTeX / HTML) |
+| `/ralphtrans` | Batch transcribe an entire course (resume-supported) |
 
 ## Install
 
@@ -81,6 +95,16 @@ Combined mode (`note`, runs transcript + slide in parallel by default):
 python "<SKILL_DIR>/scripts/look_tongji.py" note --lecture-url "<LECTURE_URL>"
 ```
 
+Note style (affects how the generated note is formatted):
+
+```bash
+python "<SKILL_DIR>/scripts/look_tongji.py" note --lecture-url "<LECTURE_URL>" --note-style dialogue
+```
+Supports `standard` (lecture notes, default) and `dialogue` (Q&A format).
+
+> [!TIP]
+> The CLI detects lectures shorter than 1 hour and prints a non-blocking warning: `[Warning] 课时不足1小时` — suggesting a retry, as very short lectures may indicate an incomplete recording or playback error.
+
 Download slide snapshots for a lecture:
 
 ```bash
@@ -92,20 +116,37 @@ If throttling is suspected, reduce concurrency:
 ```bash
 python "<SKILL_DIR>/scripts/look_tongji.py" slide --course-id "<COURSE_ID>" --sub-id "<SUB_ID>" --concurrency 2 --retries 5
 ```
-In the `look-tongji:note` workflow, the agent generates a timeline outline after the `SRT` subtitle file is produced:
+In the `/note` workflow, the agent generates a timeline outline after the `SRT` subtitle file is produced:
 - File: `./tongji-output/<course_id>_<sub_id>_timeline.txt`
 - One line per segment (Simplified Chinese), format: `Start-Over：Stage Main Content`
   - Example: `00:00-05:30：Course Orientation and Assessment Description`
 - Skip only if the user explicitly says: `no outline` / `no timeline`.
 
-Artifacts are written to `./tongji-output/` under your current working directory.
+Artifacts are written to the configured course-wiki workspace by default.
 
 ## Agent Note
 
-When a user says `look-tongji:setup` / `look-tongji:list` / `look-tongji:note`, follow `SKILL.md` and run the matching CLI commands in `scripts/look_tongji.py`.
-For `look-tongji:note`, default to running transcript + slide download in parallel; only skip slide download when the user explicitly asks not to download slides/PPT.
+When a user says `/setup` / `/trans` / `/note` / `/wiki` / `/add` / `/page` / `/cheatsheet` / `/ralphtrans`, follow the corresponding `skills/<name>/SKILL.md` and run the matching CLI commands in `scripts/look_tongji.py`.
+For `/note`, default to running transcript + slide download in parallel; only skip slide download when the user explicitly asks not to download slides/PPT.
 When writing notes, use both transcript output and slide images by default.
 If the user provides a course name, prefer `list --all --query ...` to avoid missing courses that are not in the recent list.
+
+After notes are generated or updated, rebuild and preview the site with:
+
+```bash
+python "<SKILL_DIR>/scripts/look_tongji.py" index
+python "<SKILL_DIR>/scripts/look_tongji.py" build
+python "<SKILL_DIR>/scripts/look_tongji.py" serve --port 8765
+```
+
+The generated workspace can also become the user's own GitHub Pages repository. It includes:
+
+- `llmwiki/`
+- `index.py`
+- `build.sh`
+- `serve.sh`
+- `.github/workflows/wiki-checks.yml`
+- `.github/workflows/pages.yml`
 
 ## Notice / Compliance
 
@@ -128,13 +169,13 @@ If the user provides a course name, prefer `list --all --query ...` to avoid mis
 ## Best practices
 
 - Generate subtitles + notes for the latest lecture:
-  - `/look-tongji-notes help me generate subtitles and notes for the latest lecture`
+  - `/note help me generate subtitles and notes for the latest lecture`
   
 - Generate subtitles + notes for a named course:
-  - `/look-tongji-notes help me generate subtitles and notes for today's Advanced Mathematics lecture`
+  - `/note help me generate subtitles and notes for today's Advanced Mathematics lecture`
   
 - List recent courses and let the user choose:
-  - `/look-tongji-notes list recent courses and let me choose one to process`
+  - `/trans list recent courses and let me choose one to process`
   
 - If the agent cannot find the course:
 
@@ -142,7 +183,7 @@ If the user provides a course name, prefer `list --all --query ...` to avoid mis
 
   ![example_link](images/example_link.png)
 
-  then say: ``/look-tongji-notes here is the link，generate note``
+  then say: ``/trans here is the link，generate note``
 
 ## Contributing
 

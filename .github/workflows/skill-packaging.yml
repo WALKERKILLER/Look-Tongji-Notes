@@ -1,0 +1,73 @@
+name: Skill packaging
+
+on:
+  push:
+    branches: ["main", "master", "wiki"]
+    paths:
+      - "SKILL.md"
+      - "skills-catalog/**"
+      - ".claude-plugin/**"
+      - ".codex-plugin/**"
+      - ".cursor-plugin/**"
+      - ".agents/**"
+      - "agents/**"
+      - "skills/setup/**"
+      - "skills/trans/**"
+      - "skills/note/**"
+      - "skills/add/**"
+      - "skills/ralphtrans/**"
+      - "skills/wiki/**"
+      - "skills/page/**"
+      - "skills/cheatsheet/**"
+      - ".github/workflows/skill-packaging.yml"
+  pull_request:
+    paths:
+      - "SKILL.md"
+      - "skills-catalog/**"
+      - ".claude-plugin/**"
+      - ".codex-plugin/**"
+      - ".cursor-plugin/**"
+      - ".agents/**"
+      - "agents/**"
+      - "skills/setup/**"
+      - "skills/trans/**"
+      - "skills/note/**"
+      - "skills/add/**"
+      - "skills/ralphtrans/**"
+      - "skills/wiki/**"
+      - "skills/page/**"
+      - "skills/cheatsheet/**"
+      - ".github/workflows/skill-packaging.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-json-and-skills:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate plugin JSON files
+        run: |
+          python -m json.tool .claude-plugin/plugin.json >/dev/null
+          python -m json.tool .claude-plugin/marketplace.json >/dev/null
+          python -m json.tool .codex-plugin/plugin.json >/dev/null
+          python -m json.tool .cursor-plugin/plugin.json >/dev/null
+          python -m json.tool .agents/plugins/marketplace.json >/dev/null
+
+      - name: Validate skill catalog (new flat structure)
+        run: |
+          # Root skills-catalog/core/ — all 8 skills
+          test -f skills-catalog/README.md
+          for skill in setup transcribe note add ralphtrans wiki page cheatsheet; do
+            test -f "skills-catalog/core/look-tongji-${skill}/SKILL.md"
+            test -f "skills-catalog/core/look-tongji-${skill}/manifest.yaml"
+            grep -q "name: look-tongji-${skill}" "skills-catalog/core/look-tongji-${skill}/SKILL.md"
+          done
+          # Flat skills/ install directory — all 8 skills
+          for skill in setup trans note add ralphtrans wiki page cheatsheet; do
+            test -f "skills/${skill}/SKILL.md"
+            grep -q "name: ${skill}" "skills/${skill}/SKILL.md"
+          done

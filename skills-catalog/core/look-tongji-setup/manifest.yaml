@@ -1,0 +1,9 @@
+# manifest.yaml — Tooling metadata for look-tongji-setup
+schema_version: 1
+license: MIT
+scope: education
+version: "1.1"
+requires-tools:
+  - node >= 18 (optional — required only for vision-support)
+requires-skills: []
+toolkit: look-tongji-notes

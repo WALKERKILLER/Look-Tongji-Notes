@@ -1,18 +1,24 @@
 {
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "look-tongji-notes",
   "owner": {
     "name": "WALKERKILLER",
-    "email": "walker_kilelr@163.com"
-  },
-  "metadata": {
-    "description": "Transcribing Lessons from Tongji Look Platform to Notes with Agent Skill."
+    "email": "walker_killer@163.com"
   },
   "plugins": [
     {
       "name": "look-tongji-notes",
+      "version": "0.2.0",
+      "description": "8 short commands (/setup, /trans, /note, /wiki, /add, /page, /cheatsheet, /ralphtrans) for Tongji Look lecture transcription, supplementary material ingestion, and course wiki generation.",
+      "author": {
+        "name": "WALKERKILLER",
+        "email": "walker_killer@163.com"
+      },
+      "keywords": ["tongji", "lecture-notes", "course-wiki", "markitdown", "github-pages", "/setup", "/trans", "/note", "/wiki", "/add", "/page", "/cheatsheet", "/ralphtrans"],
       "source": "./",
-      "description": "Transcribing Lessons from Tongji Look Platform to Notes with Agent Skill.",
-      "version": "0.0.3"
+      "category": "education",
+      "strict": false,
+      "skills": "./skills/"
     }
   ]
 }

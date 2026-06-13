@@ -30,3 +30,11 @@ If parsing fails, use explicit IDs:
 You can provide only `course_id` and select the lecture interactively:
 
 - `python "<SKILL_DIR>/scripts/look_tongji.py" note --course-id "<COURSE_ID>"`
+
+## Adding supplementary materials
+
+When processing a lecture, pass extra files as repeated `--material` arguments:
+
+- `python "<SKILL_DIR>/scripts/look_tongji.py" note --course-id "<COURSE_ID>" --sub-id "<SUB_ID>" --material "课件=/path/to/slides.pdf"`
+
+The CLI copies each file into the matching course/session raw-data folder and writes a Markdown conversion beside it.

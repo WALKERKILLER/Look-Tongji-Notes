@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches: ["main", "master", "wiki"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  python-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Compile Python sources
+        run: |
+          python -m py_compile \
+            scripts/look_tongji.py \
+            scripts/timeline_tools.py \
+            scripts/tongji_backend/*.py
+
+      - name: CLI help smoke test
+        run: |
+          python scripts/look_tongji.py --help
+          python scripts/look_tongji.py setup --help
+          python scripts/look_tongji.py transcribe --help
+          python scripts/look_tongji.py batch-transcribe --help
+          python scripts/look_tongji.py note --help
+          python scripts/look_tongji.py add --help
+          python scripts/look_tongji.py cheatsheet --help
+          python scripts/look_tongji.py index --help
+          python scripts/look_tongji.py build --help
+          python scripts/look_tongji.py serve --help
+
+      - name: Build empty course wiki
+        run: |
+          export LOOK_TONGJI_CONFIG_PATH="$RUNNER_TEMP/look-tongji-config.json"
+          python scripts/look_tongji.py index \
+            --workspace-root "$RUNNER_TEMP/course-wiki" \
+            --owner-name CI \
+            --no-workspace-prompt
+          python scripts/look_tongji.py build \
+            --workspace-root "$RUNNER_TEMP/course-wiki" \
+            --owner-name CI \
+            --no-workspace-prompt
+          test -f "$RUNNER_TEMP/course-wiki/site/index.html"
+          test -f "$RUNNER_TEMP/course-wiki/llmwiki/__main__.py"
+          test -f "$RUNNER_TEMP/course-wiki/llmwiki/build.py"
+          test -f "$RUNNER_TEMP/course-wiki/llmwiki/serve.py"
+          test -f "$RUNNER_TEMP/course-wiki/.github/workflows/wiki-checks.yml"
+          test -f "$RUNNER_TEMP/course-wiki/.github/workflows/pages.yml"
+          test -f "$RUNNER_TEMP/course-wiki/index.py"
+          test -f "$RUNNER_TEMP/course-wiki/build.sh"
+          test -f "$RUNNER_TEMP/course-wiki/serve.sh"
+          cd "$RUNNER_TEMP/course-wiki"
+          python ./index.py
+          PYTHONPATH="$RUNNER_TEMP/course-wiki" python -m llmwiki build --out "$RUNNER_TEMP/course-wiki/site" || echo "(expected: no sources in empty workspace)"
+          test -f "$RUNNER_TEMP/course-wiki/site/index.html"

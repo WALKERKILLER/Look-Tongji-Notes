@@ -1,0 +1,10 @@
+# manifest.yaml — Tooling metadata for look-tongji-cheatsheet
+schema_version: 1
+license: MIT
+scope: education
+version: "1.1"
+requires-tools:
+  - xelatex (optional — required only for LaTeX compilation path)
+requires-skills:
+  - look-tongji-note
+toolkit: look-tongji-notes

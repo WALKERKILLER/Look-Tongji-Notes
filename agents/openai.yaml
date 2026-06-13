@@ -1,4 +1,6 @@
 interface:
-  display_name: "Tongji Look Notes"
-  short_description: "Transcribe Tongji Look lectures and generate notes"
-  default_prompt: "Log in to look.tongji.edu.cn, list recent courses, transcribe a lecture to SRT/TXT, generate a timeline outline from SRT, then write a Markdown study note from transcript (+ slides if available)."
+  display_name: "Look Tongji Notes"
+  short_description: "8 atomic commands (/setup, /trans, /note, /wiki, /add, /page, /cheatsheet, /ralphtrans) for Tongji Look lecture transcription, note generation, course wiki building, GitHub Pages deployment, and batch processing."
+  default_prompt: "Use the 8 short commands for Look Tongji Notes: /setup to configure credentials and workspace, /trans to transcribe a lecture, /note to generate study notes with timeline, /add to import supplementary materials, /wiki to build and serve the course knowledge base, /page to deploy to GitHub Pages via gh CLI, /cheatsheet to create exam cheat sheets, and /ralphtrans to batch transcribe an entire course with checkpoint/resume."
+skills:
+  path: "skills"

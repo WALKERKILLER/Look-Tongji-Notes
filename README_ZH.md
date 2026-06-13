@@ -5,18 +5,31 @@
 <p align="center">
   <a href="LOGO"><img src="images/logo.svg"></a>
 </p>
-
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge" alt="MIT License"></a>
 </p>
 
-这是一个 agent `skill` + CLI，用来处理同济录课平台 `look.tongji.edu.cn`：
+
+[![Works with Claude Code](https://img.shields.io/badge/Claude%20Code-✓-7C3AED.svg?style=for-the-badge)](https://claude.com/claude-code)
+[![Works with Codex CLI](https://img.shields.io/badge/Codex%20CLI-✓-7C3AED.svg?style=for-the-badge)](https://github.com/openai/codex)
+[![Works with Cursor](https://img.shields.io/badge/Cursor-✓-7C3AED.svg?style=for-the-badge)](https://cursor.com)
+[![Works with Copilot](https://img.shields.io/badge/GitHub%20Copilot-✓-7C3AED.svg?style=for-the-badge)](https://github.com/features/copilot)
+[![Works with Gemini CLI](https://img.shields.io/badge/Gemini%20CLI-✓-7C3AED.svg?style=for-the-badge)](https://ai.google.dev/gemini-api)
+[![Works with Obsidian](https://img.shields.io/badge/Obsidian-✓-7C3AED.svg?style=for-the-badge)](https://obsidian.md)
+[![Version](https://img.shields.io/badge/Version-0.2.0-7C3AED.svg?style=for-the-badge)](skills-catalog/README.md)
+
+
+
+这是一个 agent skill 套件（8 个原子化 `/command` 技能）+ CLI，用来处理同济录课平台 `look.tongji.edu.cn`：
 - 使用 Playwright 完成同济统一认证登录
 - 列出课程（最近课程 / 全量搜索）
+- 首次配置一个持久化的课程知识库工作区
 - 转写指定课程节次，输出字幕 `SRT` 与纯文本 `TXT`
-- 根据字幕 `SRT` 由当前 Agent 生成“时间轴大纲”（`*_timeline.txt`，中文）
-- 下载指定课程节次的 slide 截图（文件名包含截图时间）
-- 再由当前 Agent 基于转写文本 + slide 图片生成 Markdown 笔记
+- 根据字幕 `SRT` 由当前 Agent 生成“时间轴大纲”（`*_timeline.txt`）
+- 下载指定课程节次的 slide 截图
+- 支持导入补充资料，并用 [`markitdown`](https://github.com/microsoft/markitdown)转成可索引文本
+- 由当前 Agent 基于转写文本 + slide 图片 + 补充资料生成 Markdown 笔记
+- 生成一个基于 `llm-wiki`的课程知识库页面
 
 ## 安装
 
@@ -26,9 +39,20 @@
 
 ### 方法 2
 
-下载并解压仓库，把整个 `look-tongji-notes/` 文件夹复制到你的 skills 目录：
-- Codex：`~/.codex/skills/look-tongji-notes`
-- Claude Code：`~/.claude/skills/look-tongji-notes`
+下载并解压仓库。仓库提供两种结构：
+
+- 兼容入口：根目录 `SKILL.md`
+- 源码 catalog：`skills-catalog/core/`
+- 扁平技能目录：`skills/<name>/SKILL.md`（8 个原子化命令）
+
+如果你的 Agent 支持插件或 marketplace，直接使用仓库根目录作为插件根即可。
+`.claude-plugin/`、`.codex-plugin/`、`.cursor-plugin/`、`.agents/plugins/`
+各平台 manifests 在根目录下，`skills/` 下为 8 个命令的 `SKILL.md`。
+
+如果只能手动复制 skill：
+
+- Codex：复制到 `~/.codex/skills/look-tongji-notes`
+- Claude Code：复制到 `~/.claude/skills/look-tongji-notes`
 
 ### 方法 3（Codex）
 
@@ -47,6 +71,36 @@ $skill-installer install https://github.com/walkerkiller/look-tongji-notes
 /plugin install look-tongji-notes
 ```
 
+## 多 Agent Skill 结构
+
+本仓库按多平台插件格式组织，其中：
+
+- 根目录：源码仓库与 catalog 元数据
+- `.claude-plugin/`：Claude Code marketplace/plugin 元数据
+- `.codex-plugin/`：Codex 插件元数据
+- `.cursor-plugin/`：Cursor 插件元数据
+- `.agents/plugins/`：通用 agents marketplace 元数据
+- `skills/`：8 个原子化命令技能（`skills/<name>/SKILL.md`）
+- `skills-catalog/core/`：源码 catalog，含 `manifest.yaml`
+
+平台对齐说明：
+
+- `Claude Code`：标准扫描目录是 `skills/<skill-name>/SKILL.md`
+- `Codex`：`plugin.json` 指向 `./skills/`
+- `Cursor`：`plugin.json` 指向 `./skills/`
+- `skills-catalog/`：保留作源码 catalog 和 `manifest.yaml` 组织
+
+8 个命令：
+
+- `/setup` — 账号、工作区、依赖检测（含 vision-support、Node.js、TeX）
+- `/trans` — 单节转写 + 可选 slide 并行下载
+- `/note` — 转写 + slide + 补充资料 + 时间轴 + 笔记
+- `/add` — 纯导入补充资料（不触发转录）
+- `/wiki` — 课程知识库站点构建和本地预览
+- `/page` — GitHub Pages 部署指引（Agent 驱动）
+- `/cheatsheet` — 考前 A4 速查表（LaTeX / HTML 双路径）
+- `/ralphtrans` — 整门课程批量转写（断点续传）
+
 ## 单独使用（CLI）
 
 `<SKILL_DIR>` 指包含 `SKILL.md` 的那个目录。
@@ -55,6 +109,17 @@ $skill-installer install https://github.com/walkerkiller/look-tongji-notes
 
 ```bash
 python "<SKILL_DIR>/scripts/look_tongji.py" setup
+```
+
+第一次运行会询问课程知识库保存路径。这个路径不会放在 skill 目录里，
+所以后续更新 skill 时不会被覆盖。
+
+也可以直接指定：
+
+```bash
+python "<SKILL_DIR>/scripts/look_tongji.py" setup \
+  --workspace-root "~/Documents/tongji-course-wiki" \
+  --owner-name "WALKERKILLER"
 ```
 
 列出最近课程：
@@ -81,6 +146,25 @@ python "<SKILL_DIR>/scripts/look_tongji.py" transcribe --lecture-url "<课程链
 python "<SKILL_DIR>/scripts/look_tongji.py" note --lecture-url "<课程链接>"
 ```
 
+笔记风格（影响笔记格式）：
+
+```bash
+python "<SKILL_DIR>/scripts/look_tongji.py" note --lecture-url "<课程链接>" --note-style dialogue
+```
+支持 `standard`（课堂笔记，默认）和 `dialogue`（问答格式）。
+
+> [!TIP]
+> CLI 会自动检测课时是否不足 1 小时，若发现时长短于 1 小时会输出非阻塞警告：`[Warning] 课时不足1小时`，提示转录可能不完整，建议重试。
+
+如果这节课还有老师发的资料、PDF、PPT、Word 或其他文件，可以一并导入：
+
+```bash
+python "<SKILL_DIR>/scripts/look_tongji.py" note \
+  --lecture-url "<课程链接>" \
+  --material "课件=/path/to/slides.pdf" \
+  --material "阅读材料=/path/to/reading.docx"
+```
+
 下载该节课的 slide 截图：
 
 ```bash
@@ -92,20 +176,75 @@ python "<SKILL_DIR>/scripts/look_tongji.py" slide --lecture-url "<课程链接>"
 ```bash
 python "<SKILL_DIR>/scripts/look_tongji.py" slide --course-id "<COURSE_ID>" --sub-id "<SUB_ID>" --concurrency 2 --retries 5
 ```
-在 `look-tongji:note` 的工作流中，Agent 会在 `SRT` 生成后，额外输出一份用于视频总览的时间轴大纲：
+在 `/note` 的工作流中，Agent 会在 `SRT` 生成后，额外输出一份用于视频总览的时间轴大纲：
 - 文件：`./tongji-output/<course_id>_<sub_id>_timeline.txt`
+- 新版默认位置：`<工作区>/raw/<课程>/<节次>/原始数据/<course_id>_<sub_id>_timeline.txt`
 - 格式（每行一个时间段，中文）：`起始时间-结束时间：课程阶段内容`
   - 示例：`00:00-05:30：课程定位与考核说明`
 - 仅当用户明确提出 `不要大纲` / `不要时间线` / `no outline` / `no timeline` 时才跳过生成。
 
-字幕/转写会输出到你当前工作目录的 `./tongji-output/`。
+默认输出写入配置好的课程知识库工作区：
+
+```text
+<工作区>/
+├── raw/
+│   └── <课程名称>/
+│       └── <节次>/
+│           └── 原始数据/
+│               ├── <course_id>_<sub_id>.txt
+│               ├── <course_id>_<sub_id>.srt
+│               ├── slides/
+│               ├── materials/
+│               └── manifest.json
+├── wiki/
+└── site/
+```
+
+如果你显式传入 `--output-dir`，CLI 仍然会尊重这个路径，方便兼容旧流程。
 
 ## Agent Note
 
-当用户说 `look-tongji:setup` / `look-tongji:list` / `look-tongji:note` 时，按 `SKILL.md` 的流程执行，并运行 `scripts/look_tongji.py` 的对应命令。
-`look-tongji:note` 默认并行执行转录和 slide 拉取；仅在用户显式提出不下载 slide/PPT 时才只做转录。
-整理笔记时默认同时参考转录结果和 slide 图片。
+当用户说 `/setup` / `/trans` / `/note` / `/wiki` / `/add` / `/page` / `/cheatsheet` / `/ralphtrans` 时，按对应 `skills/<name>/SKILL.md` 的流程执行，并运行 `scripts/look_tongji.py` 的对应命令。
+`/note` 默认并行执行转录和 slide 拉取；仅在用户显式提出不下载 slide/PPT 时才只做转录。
+整理笔记时默认同时参考转录结果、slide 图片和 `materials/*/converted.md`。
 如果用户给的是“课程名称”，优先用 `list --all --query ...`，避免最近课程列表遗漏导致选错课程。
+
+生成或更新笔记后，执行：
+
+```bash
+python "<SKILL_DIR>/scripts/look_tongji.py" index
+python "<SKILL_DIR>/scripts/look_tongji.py" build
+python "<SKILL_DIR>/scripts/look_tongji.py" serve --port 8765
+```
+
+它会在工作区的 `site/` 下生成课程知识库页面，并用本地 HTTP server 预览。
+这里对齐 `llm-wiki` 的真实形态：不是 React/Vite/Next 项目，也不是单 HTML，
+而是 Python 静态站点生成器，输出多级 HTML、`style.css`、`script.js`，
+再用 `serve` 命令提供本地预览。
+中英切换只影响面板控件，不会翻译课程内容。
+
+## GitHub Pages 部署
+
+如果要把 `site/` 部署到 GitHub Pages，可以把工作区做成一个普通 Git 仓库：
+
+```bash
+cd "<工作区>"
+git init
+git add raw wiki site llmwiki .github build.sh serve.sh index.py
+git commit -m "build course wiki"
+```
+
+然后在 GitHub 仓库设置里选择从 `site/` 目录发布，或按项目习惯配置
+GitHub Actions。初始化工作区时会自动写入：
+
+- `llmwiki/`：直接复用 `llm-wiki` 的前端与构建包
+- `index.py`：将课程节次 `manifest.json` 编成 `llm-wiki` 输入层
+- `build.sh`：调用 `python -m llmwiki build --out ./site`
+- `serve.sh`：调用 `python -m llmwiki serve --dir ./site`
+- `.github/workflows/wiki-checks.yml`
+- `.github/workflows/pages.yml`
+
+不要提交 `.env`、账号密码、JWT 或未授权传播的课程视频。
 
 ## 声明 / 合规
 
@@ -120,21 +259,24 @@ python "<SKILL_DIR>/scripts/look_tongji.py" slide --course-id "<COURSE_ID>" --su
 
 ## ToDo
 
-- [ ] 制作课程面板前端（汇聚个人课程视频、时间轴大纲、字幕、笔记等资源）。
+- [x] 生成课程知识库静态站点骨架（课程、节次、视频、时间轴、i18n 控件）。
 - [ ] 适配触发加强认证时的登录流程。
-- [ ] 适配针对课程的 LLM WIKI + 笔记数据库，用于由笔记/字幕驱动的复习。
+- [x] 适配针对课程的 LLM WIKI + 笔记数据库基础目录。
 - [ ] 制作 standalone 的 TUI/GUI 工具，不打开 Agent 也能手动转写字幕/笔记/Q&A。
 
 ## 最佳实践
+> [!NOTE]
+> 建议在agent工具中使用具有**视觉**的llm模型来保证对图片资料的理解来保持最佳体验。若必须使用本身不具备视觉能力的llm，建议通过配置来自[vision-support](https://github.com/penfick/skills)仓库中的`vision-support`这一skill来外挂视觉模型理解图片资料。
+
 
 - 生成最新课程字幕与笔记：
-  - `/look-tongji-notes 帮我生成最新一节课的字幕和笔记`
+  - `/note 帮我生成最新一节课的字幕和笔记`
   
 - 生成指定课程字幕与笔记：
-  - `/look-tongji-notes 帮我生成今天的高等数学课程字幕和笔记`
+  - `/note 帮我生成今天的高等数学课程字幕和笔记`
   
 - 查看最近课程列表并选择：
-  - `/look-tongji-notes 为我列出最新几门课，让我挑选要生成笔记的`
+  - `/trans 为我列出最新几门课，让我挑选要生成笔记的`
   
 - Agent 找不到相应课程时：
   
@@ -142,7 +284,7 @@ python "<SKILL_DIR>/scripts/look_tongji.py" slide --course-id "<COURSE_ID>" --su
   
   ![example_link](images/example_link.png)
   
-  然后告诉Agent: ``/look-tongji-notes 这是课程链接，为我生成笔记``
+  然后告诉Agent: ``/trans 这是课程链接，为我生成笔记``
 
 ## 贡献指南
 
