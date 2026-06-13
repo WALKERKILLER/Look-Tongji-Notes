@@ -31,7 +31,7 @@
       ],
       "source": "./",
       "category": "education",
-      "strict": false,
+      "strict": true,
       "skills": "./skills/"
     }
   ]
