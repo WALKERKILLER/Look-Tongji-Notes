@@ -3,4 +3,4 @@ description: "Generate study notes from a lecture transcript and slides. Runs tr
 license: MIT
 metadata:
   author: WALKERKILLER
-  version: "1.1"
+  version: "1.1.1"
