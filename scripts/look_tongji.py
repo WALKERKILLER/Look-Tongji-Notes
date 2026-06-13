@@ -1533,10 +1533,8 @@ def cmd_build(args: argparse.Namespace) -> int:
     if site_index.exists():
         content = site_index.read_text(encoding="utf-8")
         if "No lectures indexed yet" in content:
-            _print_err("[Build] WARNING: No lectures indexed — site is a stub.")
-            _print_err("[Build] Transcribe a lecture with /trans first, then rebuild.")
-            _print_err(f"[Build] Stub output: {site_dir}")
-            return 1
+            _print_err("[Build] WARNING: No lectures indexed yet — site is a stub.")
+            _print_err("[Build] Run /trans or /note to transcribe a lecture first.")
     print(f"[Build] Built course site: {site_dir}")
     print(f"[Build] Open: {site_dir / 'index.html'}")
     return 0
