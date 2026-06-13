@@ -1,0 +1,45 @@
+{
+  "name": "vision-support",
+  "version": "1.0.1",
+  "description": "为非多模态大模型（deepseek、GLM、mimo 等）提供图片识别能力的 Agent Skill。支持多图识别、多模型回退、19+ 平台。",
+  "keywords": [
+    "agent-skill",
+    "vision",
+    "image-recognition",
+    "claude-code",
+    "codex",
+    "pi-agent",
+    "multimodal",
+    "fallback"
+  ],
+  "license": "MIT",
+  "author": "penfick",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/penfick/skills.git"
+  },
+  "homepage": "https://github.com/penfick/skills#readme",
+  "bugs": {
+    "url": "https://github.com/penfick/skills/issues"
+  },
+  "type": "module",
+  "bin": {
+    "vision-support": "./bin/cli.mjs"
+  },
+  "files": [
+    "bin",
+    "scripts",
+    "references",
+    "SKILL.md",
+    "config.example.json",
+    "images",
+    "install.mjs",
+    "install.sh"
+  ],
+  "scripts": {
+    "postinstall": "node bin/postinstall.mjs"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

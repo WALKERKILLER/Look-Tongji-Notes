@@ -8,3 +8,5 @@ __pycache__/
 .venv/
 .omc/
 .mock-wiki/
+vision-support/config.json
+vision-support/.env

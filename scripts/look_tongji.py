@@ -348,17 +348,21 @@ def cmd_setup(args: argparse.Namespace) -> int:
     else:
         print("[Setup] Node.js: NOT found. vision-support requires Node.js. Install from https://nodejs.org/")
 
-    # vision-support config detection
+    # vision-support config detection (embedded + external)
+    vs_embedded_config = _skill_root() / "vision-support" / "config.json"
     vs_paths = [
+        vs_embedded_config,
         Path.home() / ".claude" / "skills" / "vision-support" / "config.json",
         Path.home() / ".agents" / "skills" / "vision-support" / "config.json",
     ]
     vs_configured = any(p.exists() for p in vs_paths)
     if vs_configured:
         print("[Setup] vision-support: 已配置")
+        if vs_embedded_config.exists():
+            print("  测试: node \"<SKILL_DIR>/vision-support/scripts/vision.mjs\" \"<SKILL_DIR>/../../komari.jpg\"")
     else:
         print("[Setup] vision-support: 未配置。运行以下命令初始化：")
-        print("  claude /oh-my-claudecode:mcp-setup")
+        print(f"  cd \"{_skill_root() / 'vision-support'}\" && node scripts/vision.mjs init")
 
     # TeX detection (optional, for cheatsheet compilation)
     if shutil.which("xelatex"):

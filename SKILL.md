@@ -33,6 +33,12 @@ Each command has its own `skills/<name>/SKILL.md` with detailed workflow instruc
 - The agent generates timeline outlines, study notes, and cheat sheet content.
 - Never pass passwords in chat. Use interactive terminal input.
 
+### Vision Support
+- Embedded at `<SKILL_DIR>/vision-support/` (Node.js 18+ required).
+- `/setup` detects Node.js and configures a vision provider via `vision.mjs init`.
+- Test with: `node "<SKILL_DIR>/vision-support/scripts/vision.mjs" "<image-path>"`
+- Config saved to `<SKILL_DIR>/vision-support/config.json` (git-ignored).
+
 ## Quick Start
 
 ```
