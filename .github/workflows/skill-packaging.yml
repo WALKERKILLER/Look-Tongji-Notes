@@ -21,7 +21,6 @@ on:
       - "skills/add/**"
       - "skills/ralphtrans/**"
       - "skills/wiki/**"
-      - "skills/page/**"
       - "skills/cheatsheet/**"
       - ".github/workflows/skill-packaging.yml"
   pull_request:
@@ -43,7 +42,6 @@ on:
       - "skills/add/**"
       - "skills/ralphtrans/**"
       - "skills/wiki/**"
-      - "skills/page/**"
       - "skills/cheatsheet/**"
       - ".github/workflows/skill-packaging.yml"
   workflow_dispatch:
@@ -70,9 +68,9 @@ jobs:
           python -m json.tool .opencode-plugin/plugin.json >/dev/null
           python -m json.tool .agents/plugins/marketplace.json >/dev/null
 
-      - name: Validate skills/ flat structure (9 skills)
+      - name: Validate skills/ flat structure (8 skills)
         run: |
-          for skill in setup list trans note add ralphtrans wiki page cheatsheet; do
+          for skill in setup list trans note add ralphtrans wiki cheatsheet; do
             test -f "skills/${skill}/SKILL.md"
             test -f "skills/${skill}/manifest.yaml"
             grep -q "name: ${skill}" "skills/${skill}/SKILL.md"
