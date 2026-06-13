@@ -923,9 +923,12 @@ def _render_llmwiki_source(manifest_path: Path, manifest: dict[str, Any], *, sit
     timeline_path = Path(str(artifacts.get("timeline_txt") or raw_root / f"{manifest.get('base_name', '')}_timeline.txt"))
     srt_path = Path(str(artifacts.get("subtitle_srt") or raw_root / f"{manifest.get('base_name', '')}.srt"))
     slides_dir = Path(str(artifacts.get("slides_dir") or raw_root / "slides"))
-    rel_manifest = manifest_path.relative_to(raw_root.parents[3])
-    rel_timeline = timeline_path.relative_to(raw_root.parents[3]) if timeline_path.exists() else None
-    rel_subtitle = srt_path.relative_to(raw_root.parents[3]) if srt_path.exists() else None
+    ws_root = raw_root.parents[3]  # workspace root
+    rel_manifest = manifest_path.resolve().relative_to(ws_root.resolve())
+    timeline_path_resolved = timeline_path.resolve()
+    rel_timeline = timeline_path_resolved.relative_to(ws_root.resolve()) if timeline_path.exists() else None
+    srt_path_resolved = srt_path.resolve()
+    rel_subtitle = srt_path_resolved.relative_to(ws_root.resolve()) if srt_path.exists() else None
 
     notes_text = notes_path.read_text(encoding="utf-8", errors="replace").strip() if notes_path.exists() else ""
     transcript_text = transcript_path.read_text(encoding="utf-8", errors="replace").strip() if transcript_path.exists() else ""

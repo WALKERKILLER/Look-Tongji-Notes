@@ -34,6 +34,34 @@ python "<SKILL_DIR>/../../scripts/look_tongji.py" note \
 
 3. The CLI runs transcript + slide in parallel, then the **agent** writes notes.
 
+## Important: `note` Re-Runs Transcription
+
+**`note` always re-downloads the video and re-runs ASR**, even if the lecture was already transcribed. This is by design — `note` = transcribe + slide + note in one combined operation.
+
+**If you already ran `transcribe` separately**, do NOT run `note`. Instead:
+1. Run `slide` to download slides (if not already done)
+2. Write the note manually using the existing SRT/TXT + slides
+
+This saves ~4 minutes of re-downloading and re-transcribing per lecture.
+
+## Non-Interactive / Batch Flags
+
+When scripting or working non-interactively:
+
+| Flag | Description |
+|------|-------------|
+| `--no-slide` | Skip slide download (transcript only) |
+| `--no-material-prompt` | Skip "any supplementary materials?" prompt |
+
+For `--no-material-prompt`, use with `--material` to supply materials non-interactively:
+
+```bash
+python "<SKILL_DIR>/../../scripts/look_tongji.py" note \
+  --course-id "<ID>" --sub-id "<ID>" \
+  --no-material-prompt \
+  --material "slides=/path/to/file.pdf"
+```
+
 ## Agent Responsibilities
 
 After the CLI finishes, the agent must:

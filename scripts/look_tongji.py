@@ -1528,6 +1528,15 @@ def cmd_build(args: argparse.Namespace) -> int:
     except Exception as e:
         _print_err(str(e))
         return 1
+    # Detect stub vs real wiki build
+    site_index = site_dir / "index.html"
+    if site_index.exists():
+        content = site_index.read_text(encoding="utf-8")
+        if "No lectures indexed yet" in content:
+            _print_err("[Build] WARNING: No lectures indexed — site is a stub.")
+            _print_err("[Build] Transcribe a lecture with /trans first, then rebuild.")
+            _print_err(f"[Build] Stub output: {site_dir}")
+            return 1
     print(f"[Build] Built course site: {site_dir}")
     print(f"[Build] Open: {site_dir / 'index.html'}")
     return 0

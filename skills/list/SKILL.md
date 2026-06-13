@@ -41,11 +41,28 @@ python "<SKILL_DIR>/../../scripts/look_tongji.py" list --all
 
 | Flag | Description |
 |------|-------------|
-| `--limit LIMIT` | Number of courses to show (0 = all) |
 | `--all` | List all courses (slower but more complete) |
-| `--query QUERY` | Filter courses by keyword in title/teacher (case-insensitive) |
-| `--choose CHOOSE` | Auto-select course number (1-based) for non-interactive use |
+| `--limit LIMIT` | Number of courses to show (0 = all) |
+| `--query QUERY` | Filter by keyword in title/teacher (server-side, case-insensitive) |
+| `--choose CHOOSE` | Auto-select course # (1-based) for non-interactive use |
 | `--force-login` | Ignore cached JWT and login again |
+
+## ⚠️ Important: Chinese Query Limitation
+
+`--query` is a **server-side** keyword search and may not match Chinese course names reliably. If `--query "课程名关键词"` returns empty:
+
+**Workaround:** Use `--all` to fetch all courses, then filter locally:
+```bash
+python "<SKILL_DIR>/../../scripts/look_tongji.py" list --all 2>&1 | grep "课程名关键词"
+```
+
+## Non-Interactive Usage
+
+When `--choose` is set, the CLI auto-selects the course and saves its ID — no `input()` prompt. Combine with `--all` for scripted workflows:
+
+```bash
+python "<SKILL_DIR>/../../scripts/look_tongji.py" list --all --choose 1
+```
 
 ## Interactive Selection
 
