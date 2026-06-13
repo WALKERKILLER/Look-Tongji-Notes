@@ -932,7 +932,6 @@ def _render_llmwiki_source(manifest_path: Path, manifest: dict[str, Any], *, sit
 
     notes_text = notes_path.read_text(encoding="utf-8", errors="replace").strip() if notes_path.exists() else ""
     transcript_text = transcript_path.read_text(encoding="utf-8", errors="replace").strip() if transcript_path.exists() else ""
-    timeline_text = timeline_path.read_text(encoding="utf-8", errors="replace").strip() if timeline_path.exists() else ""
     materials_bullets, material_sections = _collect_material_sections(raw_root / "materials")
     slide_files = sorted(slides_dir.glob("*")) if slides_dir.exists() else []
     slide_preview = "\n".join(f"- {path.name}" for path in slide_files[:12])
@@ -953,8 +952,6 @@ def _render_llmwiki_source(manifest_path: Path, manifest: dict[str, Any], *, sit
     if video_url:
         body_parts.append(f"- `video_url`：{video_url}")
 
-    if timeline_text:
-        body_parts.extend(["", "## Timeline", "", timeline_text])
     if notes_text:
         body_parts.extend(["", "## Notes", "", notes_text])
     elif transcript_text:
