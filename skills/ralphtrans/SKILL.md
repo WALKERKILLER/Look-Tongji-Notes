@@ -53,3 +53,7 @@ python "<SKILL_DIR>/../../scripts/look_tongji.py" batch-transcribe --course-id "
 
 - Run `/note` for each transcribed lecture to generate study notes.
 - Run `/wiki` to rebuild and serve the course site.
+
+## Where \`<SKILL_DIR>\` Points
+
+\`<SKILL_DIR>\` is the directory containing this \`SKILL.md\`. Shared scripts (\`look_tongji.py\`, \`timeline_tools.py\`, \`tongji_backend/\`) and references live two levels up in the repository root (\`<SKILL_DIR>/../../scripts/\` and \`<SKILL_DIR>/../../references/\`).

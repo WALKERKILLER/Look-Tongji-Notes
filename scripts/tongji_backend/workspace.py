@@ -338,9 +338,9 @@ def _workspace_readme(config: "WorkspaceConfig") -> str:
 常用命令：
 
 ```bash
-python "<SKILL_DIR>/scripts/look_tongji.py" index --workspace-root "$(pwd)"
-python "<SKILL_DIR>/scripts/look_tongji.py" build --workspace-root "$(pwd)"
-python "<SKILL_DIR>/scripts/look_tongji.py" serve --workspace-root "$(pwd)" --port 8765
+python "<SKILL_DIR>/../../scripts/look_tongji.py" index --workspace-root "$(pwd)"
+python "<SKILL_DIR>/../../scripts/look_tongji.py" build --workspace-root "$(pwd)"
+python "<SKILL_DIR>/../../scripts/look_tongji.py" serve --workspace-root "$(pwd)" --port 8765
 ```
 
 GitHub Pages 已通过 `.github/workflows/pages.yml` 预置。

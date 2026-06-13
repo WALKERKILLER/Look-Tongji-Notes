@@ -2,7 +2,7 @@
   "name": "look-tongji-notes",
   "displayName": "Look Tongji Notes",
   "version": "1.0.0",
-  "description": "9 short commands (/setup, /trans, /note, /wiki, /add, /page, /cheatsheet, /ralphtrans, /list) for Tongji Look lecture transcription, supplementary material ingestion, and course wiki generation.",
+  "description": "9 short commands (/setup, /list, /trans, /note, /wiki, /add, /page, /cheatsheet, /ralphtrans) for Tongji Look lecture transcription, supplementary material ingestion, and course wiki generation.",
   "author": {
     "name": "WALKERKILLER",
     "email": "walker_killer@163.com",
@@ -11,6 +11,20 @@
   "homepage": "https://github.com/WALKERKILLER/look-tongji-notes",
   "repository": "https://github.com/WALKERKILLER/look-tongji-notes",
   "license": "MIT",
-  "keywords": ["tongji", "notes", "education", "course-wiki", "setup", "trans", "note", "wiki", "add", "page", "cheatsheet", "ralphtrans", "list"],
+  "keywords": [
+    "tongji",
+    "notes",
+    "education",
+    "course-wiki",
+    "setup",
+    "list",
+    "trans",
+    "note",
+    "wiki",
+    "add",
+    "page",
+    "cheatsheet",
+    "ralphtrans"
+  ],
   "skills": "./skills/"
 }

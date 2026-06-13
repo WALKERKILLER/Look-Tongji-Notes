@@ -40,3 +40,7 @@ python "<SKILL_DIR>/../../scripts/look_tongji.py" add \
 ## Difference from `/note --material`
 
 `/add` only imports materials + updates the index. It does NOT trigger transcription or slide download.
+
+## Where \`<SKILL_DIR>\` Points
+
+\`<SKILL_DIR>\` is the directory containing this \`SKILL.md\`. Shared scripts (\`look_tongji.py\`, \`timeline_tools.py\`, \`tongji_backend/\`) and references live two levels up in the repository root (\`<SKILL_DIR>/../../scripts/\` and \`<SKILL_DIR>/../../references/\`).
