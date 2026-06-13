@@ -1,0 +1,10 @@
+{
+  "name": "look-tongji-notes",
+  "description": "9 short commands (/setup, /trans, /note, /wiki, /add, /page, /cheatsheet, /ralphtrans, /list) for Tongji Look lecture transcription, supplementary materials, and course wiki generation.",
+  "version": "1.0.0",
+  "author": {
+    "name": "WALKERKILLER",
+    "email": "walker_killer@163.com"
+  },
+  "skills": "./skills/"
+}
