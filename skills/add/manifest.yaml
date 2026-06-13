@@ -1,0 +1,6 @@
+name: add
+description: "Import supplementary materials (PDF, PPTX, DOCX) into a lecture session for note generation context."
+license: MIT
+metadata:
+  author: WALKERKILLER
+  version: "1.0"

@@ -1,0 +1,6 @@
+name: list
+description: "Discover and select courses from Tongji Look (look.tongji.edu.cn). Lists recent or all courses, filters by keyword, and saves the chosen course for use with /trans, /note, and other commands. Prerequisite for all lecture workflows."
+license: MIT
+metadata:
+  author: WALKERKILLER
+  version: "1.0"

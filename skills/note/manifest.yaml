@@ -1,0 +1,6 @@
+name: note
+description: "Generate study notes from a lecture transcript and slides. Runs transcript + slide download in parallel, then writes a Markdown note with timeline outline."
+license: MIT
+metadata:
+  author: WALKERKILLER
+  version: "1.0"

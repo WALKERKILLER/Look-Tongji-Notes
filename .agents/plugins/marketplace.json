@@ -6,18 +6,12 @@
   "plugins": [
     {
       "name": "look-tongji-notes",
-      "description": "8 short commands (/setup, /trans, /note, /wiki, /add, /page, /cheatsheet, /ralphtrans) for Tongji Look lecture transcription, supplementary material ingestion, and course wiki generation.",
-      "version": "0.2.0",
+      "description": "9 short commands (/setup, /trans, /note, /wiki, /add, /page, /cheatsheet, /ralphtrans, /list) for Tongji Look lecture transcription, supplementary material ingestion, and course wiki generation.",
+      "version": "1.0.0",
       "skills": "./skills/",
-      "keywords": ["setup", "trans", "note", "wiki", "add", "page", "cheatsheet", "ralphtrans"],
-      "source": {
-        "source": "local",
-        "path": "../../"
-      },
-      "policy": {
-        "installation": "INSTALLED_BY_DEFAULT"
-      },
-      "category": "Education"
+      "keywords": ["tongji", "lecture-notes", "course-wiki", "markitdown", "github-pages", "/setup", "/trans", "/note", "/wiki", "/add", "/page", "/cheatsheet", "/ralphtrans", "/list"],
+      "source": "./",
+      "category": "education"
     }
   ]
 }

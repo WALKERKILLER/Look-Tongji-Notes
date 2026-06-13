@@ -1,0 +1,6 @@
+name: wiki
+description: "Build and locally serve the static course knowledge base site from lecture session data."
+license: MIT
+metadata:
+  author: WALKERKILLER
+  version: "1.0"

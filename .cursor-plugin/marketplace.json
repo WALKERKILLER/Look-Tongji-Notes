@@ -1,5 +1,4 @@
 {
-  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "look-tongji-notes",
   "owner": {
     "name": "WALKERKILLER",
@@ -17,7 +16,6 @@
       "keywords": ["tongji", "lecture-notes", "course-wiki", "markitdown", "github-pages", "/setup", "/trans", "/note", "/wiki", "/add", "/page", "/cheatsheet", "/ralphtrans", "/list"],
       "source": "./",
       "category": "education",
-      "strict": false,
       "skills": "./skills/"
     }
   ]

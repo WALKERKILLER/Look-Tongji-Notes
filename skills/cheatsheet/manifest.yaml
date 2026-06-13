@@ -1,0 +1,6 @@
+name: cheatsheet
+description: "Generate a high-density A4 cheat sheet for open-book exams. Two output paths: LaTeX (XeLaTeX) or self-contained HTML with CSS print layout."
+license: MIT
+metadata:
+  author: WALKERKILLER
+  version: "1.0"

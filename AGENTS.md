@@ -25,14 +25,13 @@ Root of the Look Tongji Notes skill repository. Provides a multi-agent skill + C
 | `llmwiki/` | Vendored `llm-wiki` Python package (v1.3.82) for building static knowledge-base sites from session data |
 | `references/` | Security, troubleshooting, and URL-format reference documentation for agent consumption |
 | `scripts/` | CLI entry point (`look_tongji.py`) and backend modules for auth, API client, transcription, slide download, and workspace management |
-| `skills/` | 8 atomic per-command skill files (`skills/<name>/SKILL.md`) for multi-agent platforms |
-| `skills-catalog/` | Source-catalog skill manifests for all 8 commands (`look-tongji-setup`, `look-tongji-transcribe`, `look-tongji-note`, `look-tongji-wiki`, `look-tongji-add`, `look-tongji-page`, `look-tongji-cheatsheet`, `look-tongji-ralphtrans`) |
+| `skills/` | 9 atomic per-command skill files (`skills/<name>/SKILL.md`) for multi-agent platforms |
 
 ## For AI Agents
 
 ### Working In This Directory
-- This is the source repository root. The 8 installable command skills live under `skills/<name>/SKILL.md` in flat layout.
-- `SKILL.md` is the primary compatibility index: it maps `/command` trigger phrases (`/setup`, `/trans`, `/note`, `/wiki`, `/add`, `/page`, `/cheatsheet`, `/ralphtrans`) to CLI commands. The old `look-tongji:xxx` prefix format is deprecated.
+- This is the source repository root. The 9 installable command skills live under `skills/<name>/SKILL.md` in flat layout.
+- `SKILL.md` is the primary compatibility index: it maps `/command` trigger phrases (`/setup`, `/list`, `/trans`, `/note`, `/wiki`, `/add`, `/page`, `/cheatsheet`, `/ralphtrans`) to CLI commands.
 - Credentials are stored in `<skill_root>/.env` (auto-ignored by `.gitignore`). Auth cache goes in `<skill_root>/state/`.
 - The workspace config (course wiki path) is stored outside the skill tree so skill updates do not destroy it.
 - Lecture artifacts follow this layout: `raw/<course_name>/<session>/原始数据/{transcript,slides,materials,manifest.json}`.

@@ -1,0 +1,6 @@
+name: ralphtrans
+description: "Batch transcribe all lectures in a course with checkpoint/resume. Supports optional slide download per session."
+license: MIT
+metadata:
+  author: WALKERKILLER
+  version: "1.0"

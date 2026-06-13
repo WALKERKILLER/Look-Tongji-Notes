@@ -1,0 +1,6 @@
+name: setup
+description: "Configure Tongji Look credentials, check system dependencies (Python, Node.js, ffmpeg, vision-support, XeLaTeX), and set up the persistent course-wiki workspace."
+license: MIT
+metadata:
+  author: WALKERKILLER
+  version: "1.0"
