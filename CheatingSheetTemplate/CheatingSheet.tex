@@ -1,0 +1,234 @@
+% !TEX program = xelatex
+% Made by Milvoid
+\RequirePackage{fix-cm}
+\documentclass[a4paper]{article}
+
+\usepackage{iftex}
+\ifXeTeX
+\else
+  \errmessage{CheatingPaper.tex must be compiled with XeLaTeX}
+\fi
+
+\usepackage[
+  a4paper,
+  left=0.05cm,
+  right=0.05cm,
+  top=0.05cm,
+  bottom=0.05cm,
+  noheadfoot
+]{geometry}
+\usepackage[no-math]{fontspec}
+\usepackage{xeCJK}
+\usepackage{xcolor}
+\usepackage{multicol}
+\usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{mathtools}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{tabularx}
+
+% Page and column specification.
+\newlength{\CheatColumnWidth}
+\newlength{\CheatColumnSep}
+\newlength{\CheatTextWidth}
+\setlength{\CheatColumnWidth}{5.07cm}
+\setlength{\CheatColumnSep}{0.2cm}
+\setlength{\CheatTextWidth}{\dimexpr 4\CheatColumnWidth + 3\CheatColumnSep\relax}
+\setlength{\textwidth}{\CheatTextWidth}
+\setlength{\columnsep}{\CheatColumnSep}
+\setlength{\columnseprule}{0pt}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0pt}
+\setlength{\topskip}{0pt}
+\setlength{\partopsep}{0pt}
+\pagestyle{empty}
+
+% Fonts:
+% Keep formulas in the classic LaTeX/AMS Computer Modern math fonts; fontspec
+% is used only for body text fonts.
+% English: SF Compact Text. The bundled files in fonts/ are static Regular,
+% Bold, Italic, and BoldItalic instances generated from macOS SF Compact with
+% opsz=19. Loading /System/Library/Fonts/SFCompact.ttf directly in XeLaTeX uses
+% that variable font's default Black instance, which makes Regular text too bold.
+\defaultfontfeatures{Ligatures=TeX}
+\newcommand{\CheatFontPath}{fonts/}
+\IfFileExists{fonts/SFCompactText-Regular.ttf}{}
+  {\renewcommand{\CheatFontPath}{CheatingSeetTemplate/fonts/}}
+\setmainfont{SFCompactText-Regular.ttf}[
+  Path=\CheatFontPath,
+  BoldFont=SFCompactText-Bold.ttf,
+  ItalicFont=SFCompactText-Italic.ttf,
+  BoldItalicFont=SFCompactText-BoldItalic.ttf
+]
+\setsansfont{SFCompactText-Regular.ttf}[
+  Path=\CheatFontPath,
+  BoldFont=SFCompactText-Bold.ttf,
+  ItalicFont=SFCompactText-Italic.ttf,
+  BoldItalicFont=SFCompactText-BoldItalic.ttf
+]
+\setmonofont{SFCompactText-Regular.ttf}[
+  Path=\CheatFontPath,
+  BoldFont=SFCompactText-Bold.ttf,
+  ItalicFont=SFCompactText-Italic.ttf,
+  BoldItalicFont=SFCompactText-BoldItalic.ttf
+]
+% Chinese: PingFang SC, i.e. 苹方-简.
+\setCJKmainfont{PingFangSC-Regular.ttf}[
+  Path=\CheatFontPath,
+  BoldFont=PingFangSC-SemiBold.ttf,
+  ItalicFont=PingFangSC-Regular.ttf
+]
+\setCJKsansfont{PingFangSC-Regular.ttf}[
+  Path=\CheatFontPath,
+  BoldFont=PingFangSC-SemiBold.ttf,
+  ItalicFont=PingFangSC-Regular.ttf
+]
+\setCJKmonofont{PingFangSC-Regular.ttf}[
+  Path=\CheatFontPath,
+  BoldFont=PingFangSC-SemiBold.ttf,
+  ItalicFont=PingFangSC-Regular.ttf
+]
+\newfontfamily\CheatLatinSemiBold{SFCompactText-SemiBold.ttf}[
+  Path=\CheatFontPath
+]
+\newfontfamily\CheatLatinSemiBlack{SFCompactText-SemiBlack.ttf}[
+  Path=\CheatFontPath
+]
+\newCJKfontfamily\CheatCJKSemiBold{PingFangSC-SemiBold.ttf}[
+  Path=\CheatFontPath
+]
+\newCJKfontfamily\CheatCJKSemiBlack{PingFangSC-SemiBlack.ttf}[
+  Path=\CheatFontPath
+]
+\xeCJKsetup{
+  CJKmath=true,
+  CheckSingle=true,
+  PunctStyle=kaiming
+}
+
+% Typography specification.
+\definecolor{CheatTitleBlue}{HTML}{004D80}
+\definecolor{CheatAccentBlue}{HTML}{0076BA}
+\definecolor{CheatDividerGray}{HTML}{808080}
+\makeatletter
+\renewcommand\normalsize{%
+  \@setfontsize\normalsize{5pt}{6pt}%
+  \abovedisplayskip 1pt plus 0.5pt minus 0.5pt%
+  \belowdisplayskip 1pt plus 0.5pt minus 0.5pt%
+  \abovedisplayshortskip 0.5pt plus 0.5pt%
+  \belowdisplayshortskip 0.5pt plus 0.5pt%
+}
+\makeatother
+\normalsize
+% Use the standard 10 pt Computer Modern math design scaled down for the
+% cheat-sheet sizes. The 5 pt optical math fonts have wider side bearings,
+% which makes adjacent formula letters look looser than ordinary LaTeX math.
+\DeclareFontFamily{OT1}{CheatMathRoman}{}
+\DeclareFontShape{OT1}{CheatMathRoman}{m}{n}{<-> cmr10}{}
+\DeclareFontFamily{OML}{CheatMathItalic}{\skewchar\font=127}
+\DeclareFontShape{OML}{CheatMathItalic}{m}{it}{<-> cmmi10}{}
+\DeclareFontFamily{OMS}{CheatMathSymbol}{\skewchar\font=48}
+\DeclareFontShape{OMS}{CheatMathSymbol}{m}{n}{<-> cmsy10}{}
+\DeclareFontFamily{OMX}{CheatMathLargeSymbol}{}
+\DeclareFontShape{OMX}{CheatMathLargeSymbol}{m}{n}{<-> cmex10}{}
+\SetSymbolFont{operators}{normal}{OT1}{CheatMathRoman}{m}{n}
+\SetSymbolFont{letters}{normal}{OML}{CheatMathItalic}{m}{it}
+\SetSymbolFont{symbols}{normal}{OMS}{CheatMathSymbol}{m}{n}
+\SetSymbolFont{largesymbols}{normal}{OMX}{CheatMathLargeSymbol}{m}{n}
+\DeclareMathSizes{5}{5}{4}{3}
+\newcommand{\CheatInlineMathSize}{5.7}
+\newcommand{\CheatInlineMathScriptSize}{4.7}
+\newcommand{\CheatInlineMathScriptScriptSize}{3.6}
+\DeclareMathSizes
+  {\CheatInlineMathSize}
+  {\CheatInlineMathSize}
+  {\CheatInlineMathScriptSize}
+  {\CheatInlineMathScriptScriptSize}
+\newcommand{\CheatInlineMathFont}{%
+  \fontsize{\CheatInlineMathSize pt}{6pt}\selectfont
+}
+% Restore standard LaTeX math glue around operators and relations.
+\thinmuskip=3mu
+\medmuskip=4mu plus 2mu minus 4mu
+\thickmuskip=5mu plus 5mu
+
+\titleformat{\section}
+  {\color{CheatTitleBlue}\fontsize{7pt}{7.5pt}\selectfont}
+  {}{0pt}{}
+\titleformat{\subsection}
+  {\color{CheatTitleBlue}\fontsize{6pt}{6.5pt}\selectfont\CheatLatinSemiBold\CheatCJKSemiBold}
+  {}{0pt}{}
+\titlespacing*{\section}{0pt}{1.2pt}{0.6pt}
+\titlespacing*{\subsection}{0pt}{0.9pt}{0.4pt}
+\setcounter{secnumdepth}{0}
+
+\setlist[itemize]{
+  leftmargin=0.85em,
+  label={-},
+  labelsep=0.25em,
+  itemsep=0pt,
+  topsep=0pt,
+  parsep=0pt,
+  partopsep=0pt
+}
+\setlist[enumerate]{
+  leftmargin=1.1em,
+  labelsep=0.25em,
+  itemsep=0pt,
+  topsep=0pt,
+  parsep=0pt,
+  partopsep=0pt
+}
+\renewcommand{\arraystretch}{0.95}
+\setlength{\tabcolsep}{1.5pt}
+\allowdisplaybreaks
+\raggedright
+\emergencystretch=0.8em
+
+\newenvironment{cheatsheet}
+  {\begin{multicols*}{4}\raggedcolumns\normalsize}
+  {\end{multicols*}}
+
+\newcommand{\term}[1]{\textbf{#1}}
+\newcommand{\accenttext}[1]{{\color{CheatAccentBlue}#1}}
+\newcommand{\pointtitle}[1]{{\color{CheatAccentBlue}\CheatLatinSemiBlack\CheatCJKSemiBlack #1}}
+\newcommand{\pt}[1]{\pointtitle{#1}}
+\newcommand{\paragraphtitle}[1]{\pointtitle{#1}}
+\newcommand{\bullettitle}[1]{\pointtitle{#1}}
+\newcommand{\m}[1]{{\CheatInlineMathFont\(#1\)}}
+\newcommand{\tightmath}[1]{\m{#1}}
+\newcommand{\diff}{\mathop{}\!\mathrm{d}}
+\newcommand{\divider}{%
+  \par\vspace{1pt}%
+  {\color{CheatDividerGray}\hrule height 0.5pt width \linewidth}%
+  \vspace{1pt}%
+}
+
+\begin{document}
+\begin{cheatsheet}
+
+\section{Section Title / 一级标题}
+\subsection{Subsection Title / 二级标题}
+正文使用 5 pt 字号、6 pt 行间距；英文字体为 SF Compact Text，中文字体为苹方-简。%
+将这一段替换为你的 Cheating Paper 内容。行内公式用 \verb|\m{...}| 或 \verb|\tightmath{...}|；
+
+还可以使用像这样的单行公式：
+$$\mathrm{Re} = \frac{\text{惯性力}}{\text{黏性力}} = \frac{\rho Vl}{\mu} = \frac{Vl}{\nu}$$
+
+多字母语义标识使用 \verb|\mathrm{...}| 或 \verb|\operatorname{...}|，如 \m{P+\mathrm{SSR}}、\m{P_t^{\mathrm{ex}}}、\m{\operatorname{Cov}(x,y)}；
+真正的变量乘积保持数学写法，如 \m{xy} 或 \m{X'P_ZX}。
+
+\divider
+
+\begin{itemize}
+  \item \pointtitle{要点标题保持正文大小并使用 SemiBlack}，颜色使用 \#0076BA。
+  \item 公式示例：\tightmath{a^2+b^2=c^2}
+\end{itemize}
+
+
+
+\end{cheatsheet}
+\end{document}

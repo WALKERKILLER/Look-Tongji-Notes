@@ -40,3 +40,7 @@ Self-contained HTML with CSS print layout.
 ## Prompt Template
 
 Read `<SKILL_DIR>/../../.mock-wiki/CheatingSheetTemplate/README.md` for the generation prompt and typographic specification.
+
+## Where \`<SKILL_DIR>\` Points
+
+\`<SKILL_DIR>\` is the directory containing this \`SKILL.md\`. Shared scripts (\`look_tongji.py\`, \`timeline_tools.py\`, \`tongji_backend/\`) and references live two levels up in the repository root (\`<SKILL_DIR>/../../scripts/\` and \`<SKILL_DIR>/../../references/\`).
