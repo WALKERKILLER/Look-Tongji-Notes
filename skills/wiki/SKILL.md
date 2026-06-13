@@ -4,7 +4,7 @@ description: "Build and serve the static course knowledge base locally. Rebuilds
 license: MIT
 metadata:
   author: WALKERKILLER
-  version: "1.0"
+  version: "1.1"
 ---
 
 # Wiki
@@ -53,6 +53,6 @@ Each session page follows this layout (top to bottom):
 - The generated site uses the vendored llm-wiki frontend.
 - UI chrome (language toggle, navigation) is handled by the frontend; content is from workspace data.
 
-## Where \`<SKILL_DIR>\` Points
+## Where `<SKILL_DIR>` Points
 
-\`<SKILL_DIR>\` is the directory containing this \`SKILL.md\`. Shared scripts (\`look_tongji.py\`, \`timeline_tools.py\`, \`tongji_backend/\`) and references live two levels up in the repository root (\`<SKILL_DIR>/../../scripts/\` and \`<SKILL_DIR>/../../references/\`).
+`<SKILL_DIR>` is the directory containing this `SKILL.md`. Shared scripts (`look_tongji.py`, `timeline_tools.py`, `tongji_backend/`) and references live two levels up in the repository root (`<SKILL_DIR>/../../scripts/` and `<SKILL_DIR>/../../references/`).

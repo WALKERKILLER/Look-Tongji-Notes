@@ -42,11 +42,11 @@
 下载并解压仓库。仓库提供两种结构：
 
 - 兼容入口：根目录 `SKILL.md`
-- 扁平技能目录：`skills/<name>/SKILL.md`（8 个原子化命令）
+- 扁平技能目录：`skills/<name>/SKILL.md`（9 个原子化命令）
 
 如果你的 Agent 支持插件或 marketplace，直接使用仓库根目录作为插件根即可。
 `.claude-plugin/`、`.codex-plugin/`、`.cursor-plugin/`、`.agents/plugins/`
-各平台 manifests 在根目录下，`skills/` 下为 8 个命令的 `SKILL.md`。
+各平台 manifests 在根目录下，`skills/` 下为 9 个命令的 `SKILL.md`。
 
 如果只能手动复制 skill：
 
@@ -92,7 +92,7 @@ $skill-installer install https://github.com/walkerkiller/look-tongji-notes
 - `Cursor`：`plugin.json` 指向 `./skills/`
 - `Gemini CLI`、`OpenClaw`、`OpenCode`、`Hermes Agent`：各平台 plugin.json 均指向 `./skills/`
 
-8 个命令：
+9 个命令：
 
 - `/setup` — 配置凭据，检查依赖（Python、Node.js、ffmpeg、vision-support、TeX），设置工作区
 - `/list` — 列出课程，关键词搜索，交互式选择

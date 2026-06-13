@@ -1,0 +1,6 @@
+name: page
+description: "Deploy the static course wiki to GitHub Pages via gh CLI."
+license: MIT
+metadata:
+  author: WALKERKILLER
+  version: "1.1"

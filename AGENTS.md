@@ -42,7 +42,7 @@ Root of the Look Tongji Notes skill repository. Provides a multi-agent skill + C
 
 ### Working In This Directory
 - This is the source repository root. The 9 installable command skills live under `skills/<name>/SKILL.md` in flat layout.
-- `SKILL.md` is the primary compatibility index: it maps `/command` trigger phrases (`/setup`, `/list`, `/trans`, `/note`, `/wiki`, `/add`, `/cheatsheet`, `/ralphtrans`) to CLI commands.
+- `SKILL.md` is the primary compatibility index: it maps `/command` trigger phrases (`/setup`, `/list`, `/trans`, `/note`, `/wiki`, `/add`, `/cheatsheet`, `/page`, `/ralphtrans`) to CLI commands.
 - Credentials are stored in `<skill_root>/.env` (auto-ignored by `.gitignore`). Auth cache goes in `<skill_root>/state/`.
 - The workspace config (course wiki path) is stored outside the skill tree so skill updates do not destroy it.
 - Lecture artifacts follow this layout: `raw/<course_name>/<session>/原始数据/{transcript,slides,materials,manifest.json}`.

@@ -4,7 +4,7 @@ description: "Configure Tongji Look credentials, check system dependencies (Pyth
 license: MIT
 metadata:
   author: WALKERKILLER
-  version: "1.0"
+  version: "1.1"
 ---
 
 # Setup

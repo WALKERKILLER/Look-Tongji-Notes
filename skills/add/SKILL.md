@@ -4,7 +4,7 @@ description: "Add supplementary materials (PDF, PPTX, DOCX, images) to a lecture
 license: MIT
 metadata:
   author: WALKERKILLER
-  version: "1.0"
+  version: "1.1"
 ---
 
 # Add Materials
@@ -41,6 +41,6 @@ python "<SKILL_DIR>/../../scripts/look_tongji.py" add \
 
 `/add` only imports materials + updates the index. It does NOT trigger transcription or slide download.
 
-## Where \`<SKILL_DIR>\` Points
+## Where `<SKILL_DIR>` Points
 
-\`<SKILL_DIR>\` is the directory containing this \`SKILL.md\`. Shared scripts (\`look_tongji.py\`, \`timeline_tools.py\`, \`tongji_backend/\`) and references live two levels up in the repository root (\`<SKILL_DIR>/../../scripts/\` and \`<SKILL_DIR>/../../references/\`).
+`<SKILL_DIR>` is the directory containing this `SKILL.md`. Shared scripts (`look_tongji.py`, `timeline_tools.py`, `tongji_backend/`) and references live two levels up in the repository root (`<SKILL_DIR>/../../scripts/` and `<SKILL_DIR>/../../references/`).

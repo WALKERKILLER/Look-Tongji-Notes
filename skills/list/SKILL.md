@@ -4,7 +4,7 @@ description: "Discover and select courses from Tongji Look (look.tongji.edu.cn).
 license: MIT
 metadata:
   author: WALKERKILLER
-  version: "1.0"
+  version: "1.1"
 ---
 
 # List

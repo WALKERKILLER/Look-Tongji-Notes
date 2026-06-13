@@ -4,7 +4,7 @@ description: "Transcribe a single Tongji Look lecture video to SRT + TXT, option
 license: MIT
 metadata:
   author: WALKERKILLER
-  version: "1.0"
+  version: "1.1"
 ---
 
 # Transcribe

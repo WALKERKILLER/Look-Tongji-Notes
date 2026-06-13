@@ -334,7 +334,17 @@ def cmd_setup(args: argparse.Namespace) -> int:
     # Node.js detection (needed for vision-support)
     node_path = shutil.which("node")
     if node_path:
-        print(f"[Setup] Node.js: detected ({node_path})")
+        try:
+            import subprocess
+            result = subprocess.run([node_path, "--version"], capture_output=True, text=True, timeout=5)
+            version_str = result.stdout.strip().lstrip("v")
+            major = int(version_str.split(".")[0]) if version_str else 0
+            print(f"[Setup] Node.js: detected ({node_path}), version {version_str}")
+            if major < 18:
+                print(f"[Setup] WARNING: Node.js version {major} is below 18. vision-support may not work correctly.")
+                print(f"  Install Node.js >= 18 from https://nodejs.org/")
+        except Exception:
+            print(f"[Setup] Node.js: detected ({node_path}), version unknown")
     else:
         print("[Setup] Node.js: NOT found. vision-support requires Node.js. Install from https://nodejs.org/")
 
@@ -358,6 +368,14 @@ def cmd_setup(args: argparse.Namespace) -> int:
         print("  - Ubuntu/Debian: sudo apt install texlive-xetex")
         print("  - macOS: brew install mactex")
         print("  - Windows: Install MiKTeX from https://miktex.org/")
+
+    # gh CLI detection (for /page deployment)
+    if shutil.which("gh"):
+        print("[Setup] gh CLI: detected")
+    else:
+        print("[Setup] gh CLI: NOT found. /page deployment requires gh CLI. Install from:")
+        print("  - https://cli.github.com/")
+        print("  - Or: sudo apt install gh / brew install gh")
     print()
 
     env_file = _env_path()
