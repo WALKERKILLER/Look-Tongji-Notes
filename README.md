@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <a href="LOGO"><img src="images/logo.svg"></a>
+  <a href="#"><img src="images/logo.svg"></a>
 </p>
 
 <p align="center">
@@ -35,33 +35,31 @@ This is an agent skill suite (9 atomic `/command` skills) + CLI for Tongji Look 
 
 ## Install
 
-### Method 1
+### Recommended: npx skills
 
-Copy the repo link to your agent and say: `help me install this skill`.
+If your agent supports the [skills](https://github.com/topics/skills) protocol:
 
-### Method 2
-
-Copy the whole repository into your skills directory (or point your agent at the repo):
-- Codex: `~/.codex/skills/look-tongji-notes`
-- Claude Code: `~/.claude/skills/look-tongji-notes`
-- Gemini CLI, OpenClaw, OpenCode, Hermes Agent: use platform plugin install
-
-### Method 3 (Codex)
-
-Open Codex and run:
-
-```text
-$skill-installer install https://github.com/walkerkiller/look-tongji-notes
+```bash
+npx skills install https://github.com/walkerkiller/look-tongji-notes
 ```
 
-### Method 4 (Claude Code)
+### Claude Code Marketplace
 
-Open Claude Code and run:
+In Claude Code:
 
 ```text
 /plugin marketplace add https://github.com/walkerkiller/look-tongji-notes
 /plugin install look-tongji-notes
 ```
+
+### Other Platforms
+
+| Platform | How |
+|----------|-----|
+| Claude Code | Marketplace (above) or point plugin root to this repo |
+| Codex CLI | `.codex-plugin/plugin.json` → `./skills/` |
+| Cursor | `.cursor-plugin/plugin.json` → `./skills/` |
+| Gemini CLI / OpenClaw / OpenCode / Hermes Agent | `plugin.json` → `./skills/` |
 
 ## Usage (CLI)
 
@@ -163,9 +161,10 @@ The generated workspace can also become the user's own GitHub Pages repository. 
 
 ## ToDo
 
-- [ ] Build a course dashboard frontend (videos, timeline, subtitles, notes).
+- [x] Generate course knowledge base static site skeleton (courses, sessions, video, timeline, i18n controls).
 - [ ] Support login flows with enhanced authentication.
-- [ ] Add course-level LLM wiki + notes database for review workflows.
+- [x] Add course-level LLM wiki + notes database foundation.
+
 - [ ] Build a standalone TUI/GUI tool for manual transcription/notes/Q&A.
 
 ## Best practices
