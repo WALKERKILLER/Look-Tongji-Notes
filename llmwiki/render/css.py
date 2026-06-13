@@ -222,9 +222,9 @@ kbd { display: inline-block; padding: 2px 6px; font-family: var(--mono); font-si
 .art-control-look-tongji-screenshot:focus-visible { background: rgba(124, 58, 237, 0.72); border-color: rgba(255, 255, 255, 0.36); color: #ffffff; transform: translateY(-1px); }
 .art-control-look-tongji-screenshot svg { width: 18px; height: 18px; display: block; stroke: currentColor; }
 .tongji-player-empty { display: flex; align-items: center; justify-content: center; }
-.tongji-timeline-panel { border-left: 1px solid var(--border-subtle); padding-left: 16px; }
+.tongji-timeline-panel { border-left: 1px solid var(--border-subtle); padding-left: 16px; overflow: hidden; }
 .tongji-timeline-panel h2 { font-size: 1rem; margin: 0 0 12px; border: 0; padding: 0; }
-.tongji-timeline-list { height: 100%; max-height: 100%; overflow: auto; display: flex; flex-direction: column; gap: 8px; }
+.tongji-timeline-list { max-height: 450px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
 .tongji-timeline-item { border: 1px solid var(--border); background: var(--bg-alt); border-radius: 8px; padding: 10px 12px; text-align: left; cursor: pointer; color: var(--text); }
 .tongji-timeline-item:hover { border-color: var(--accent); color: var(--accent); }
 .tongji-time { display: block; font-family: var(--mono); font-size: 0.82rem; margin-bottom: 4px; }
