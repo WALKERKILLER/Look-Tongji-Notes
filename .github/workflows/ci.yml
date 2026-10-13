@@ -18,6 +18,16 @@ env:
   FLUTTER_VERSION: "3.47.7"
 
 jobs:
+  governance:
+    name: governance (gates)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - run: node scripts/run-gates.mjs
+
   lookd:
     name: lookd (Go)
     runs-on: ubuntu-latest
