@@ -28,13 +28,7 @@ agent/  Node.js host for the embedded Pi Agent (@earendil-works/pi-coding-agent 
 
 ## Build
 
-```sh
-cd lookd && go build -trimpath -ldflags='-s -w' -o bin/lookd ./cmd/lookd   # GOPROXY=https://goproxy.cn,direct
-cd agent && npm ci
-cd app && flutter build linux --release
-```
-
-At runtime the app looks for `lookd` and `agent/src/host.mjs` in this order: environment variables `LOOKD_BIN` / `LOOK_AGENT` / `LOOK_NODE`, then next to the executable, then by walking up to this directory. ffmpeg is needed for transcription, and Node.js for the assistant.
+Build and run instructions for each platform are in the [README](../README.md#build-from-source). ffmpeg is needed for transcription, and Node.js for the assistant.
 
 ## Data
 

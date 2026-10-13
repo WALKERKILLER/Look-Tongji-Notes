@@ -18,8 +18,56 @@ env:
   FLUTTER_VERSION: "3.47.7"
 
 jobs:
+  # Decides which parts a change touches. Jobs for untouched parts are skipped
+  # through `if:`; GitHub reports a skipped job as successful, so the required
+  # checks on `app` still pass. Markdown-only changes skip every build job.
+  changes:
+    name: changes
+    runs-on: ubuntu-latest
+    outputs:
+      lookd: ${{ steps.filter.outputs.lookd }}
+      agent: ${{ steps.filter.outputs.agent }}
+      app: ${{ steps.filter.outputs.app }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - id: filter
+        env:
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          # Run everything when there is no usable base: manual runs, new
+          # branches, force-pushes.
+          all=false
+          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ] || [ -z "$BASE" ] || [ "$BASE" = 0000000000000000000000000000000000000000 ] \
+            || ! files="$(git diff --name-only "$BASE"...HEAD)"; then
+            all=true
+          fi
+          code="$(printf '%s\n' "${files:-}" | grep -Ev '\.md$' || true)"
+          for part in lookd agent app; do
+            if [ "$all" = true ] || printf '%s\n' "$code" | grep -Eq "^(${part}/|\.github/workflows/ci\.yml$)"; then
+              echo "$part=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "$part=false" >> "$GITHUB_OUTPUT"
+            fi
+          done
+          cat "$GITHUB_OUTPUT"
+
+  governance:
+    name: governance (gates)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - run: node scripts/run-gates.mjs
+
   lookd:
     name: lookd (Go)
+    needs: changes
+    # Fail safe: if change detection itself fails, run the job anyway.
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.lookd == 'true') }}
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -40,6 +88,9 @@ jobs:
 
   agent:
     name: agent (Node)
+    needs: changes
+    # Fail safe: if change detection itself fails, run the job anyway.
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.agent == 'true') }}
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -56,6 +107,9 @@ jobs:
 
   app:
     name: app (Flutter)
+    needs: changes
+    # Fail safe: if change detection itself fails, run the job anyway.
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.app == 'true') }}
     runs-on: ubuntu-latest
     defaults:
       run:
