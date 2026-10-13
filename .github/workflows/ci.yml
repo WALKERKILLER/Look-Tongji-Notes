@@ -77,3 +77,6 @@ jobs:
       - run: flutter build linux --release
       - uses: actions/upload-artifact@v7
         with:
+          name: look-studio-linux-bundle
+          path: app/build/linux/x64/release/bundle
+          retention-days: 7

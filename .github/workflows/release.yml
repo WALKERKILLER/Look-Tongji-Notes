@@ -69,3 +69,4 @@ jobs:
             --title "Look Studio $GITHUB_REF_NAME" \
             --prerelease \
             --verify-tag \
+            --generate-notes
