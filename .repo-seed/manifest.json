@@ -56,9 +56,10 @@
   "files": [
     {
       "path": "AGENTS.md",
-      "sha256": "367ead9456abf084864fc7a89775e15ba6f0025bebd51b98309ede4e92115101",
+      "sha256": "fc6c1b1e2bb5698112db48cede2a5c199403705b6397913634a9924f5829cb62",
       "category": "instruction",
-      "capability": "baseline"
+      "capability": "baseline",
+      "userModified": true
     },
     {
       "path": "CLAUDE.md",
@@ -153,7 +154,7 @@
     },
     {
       "path": "CONTRIBUTING.md",
-      "sha256": "3bdf848de7c89924c7c708df17b0edda02da9acf17ea52382c8b1a45b64b21b5",
+      "sha256": "4779d042b35dbc4aba9cefc1a60512c79ecfb1e292f492ee703b0e3f56fd17ae",
       "category": "meta",
       "capability": "baseline",
       "userModified": true

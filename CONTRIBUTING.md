@@ -6,7 +6,7 @@ Thank you for considering contributing to Look Studio. This repository is agent-
 
 - `app` is the integration branch for Look Studio. It is an orphan branch of Look-Tongji-Notes and never merges with `main` ([decision 0004](docs/decisions/0004-studio-on-an-orphan-app-branch.md)).
 - Work on a short-lived branch from `app`, named by type: `feat/…`, `fix/…`, `docs/…`, `ci/…`, `refactor/…`, `chore/…`. Contributors without write access work on a fork.
-- Every change reaches `app` through a pull request. The `app` ruleset blocks deletion and force-pushes, and requires the CI checks `governance (gates)`, `lookd (Go)`, `agent (Node)` and `app (Flutter)` plus an approving review from the code owner @WALKERKILLER ([CODEOWNERS](CODEOWNERS)).
+- Every change reaches `app` through a pull request. The `app` ruleset blocks deletion and force-pushes, and requires the CI checks `governance (gates)`, `lookd (Go)`, `agent (Node)` and `app (Flutter)` plus an approving review from the code owner @WALKERKILLER ([CODEOWNERS](CODEOWNERS)). CI runs a part's job only when the change touches that part (`app/`, `lookd/`, `agent/`, or the CI workflow); Markdown-only changes run just the gates, and skipped jobs count as passed.
 - Releases are tags `studio-vX.Y.Z` on `app`; [release.yml](.github/workflows/release.yml) publishes them as Linux pre-releases.
 
 ## Governance loop

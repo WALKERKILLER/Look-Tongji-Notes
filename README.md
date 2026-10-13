@@ -70,7 +70,7 @@ Needs the Android SDK (`flutter doctor --android-licenses`).
 (cd app && flutter build apk --release)   # app/build/app/outputs/flutter-apk/app-release.apk
 ```
 
-Gradle ignores `https_proxy`; behind a proxy, pass Java proxy settings, for example `JAVA_TOOL_OPTIONS="-Dhttps.proxyHost=127.0.0.1 -Dhttps.proxyPort=7890"`. The APK contains only the Flutter UI and is signed with the debug key. `lookd` and the agent are not packaged for Android, so the app reports that it cannot find `lookd`.
+The APK contains only the Flutter UI and is signed with the debug key. `lookd` and the agent are not packaged for Android, so the app reports that it cannot find `lookd`.
 
 ## Contributing
 
