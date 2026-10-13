@@ -1,0 +1,71 @@
+name: Studio release
+
+on:
+  push:
+    tags: ["studio-v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  FLUTTER_VERSION: "3.47.7"
+  PACKAGE: look-studio-linux-x64
+
+jobs:
+  linux:
+    name: Linux package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libmpv-dev
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: lookd/go.mod
+          cache-dependency-path: lookd/go.sum
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: agent/package-lock.json
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Build
+        run: |
+          (cd lookd && go build -trimpath -ldflags='-s -w' -o bin/lookd ./cmd/lookd)
+          (cd app && flutter pub get && flutter build linux --release)
+
+      # The app looks for lookd and agent/src/host.mjs next to its executable.
+      - name: Package
+        run: |
+          cp -r app/build/linux/x64/release/bundle "$PACKAGE"
+          cp lookd/bin/lookd "$PACKAGE/"
+          mkdir -p "$PACKAGE/agent"
+          cp -r agent/src agent/package.json agent/package-lock.json "$PACKAGE/agent/"
+          (cd "$PACKAGE/agent" && npm ci --omit=dev)
+          cp LICENSE "$PACKAGE/"
+          tar -czf "$PACKAGE.tar.gz" "$PACKAGE"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ${{ env.PACKAGE }}
+          path: ${{ env.PACKAGE }}.tar.gz
+          retention-days: 14
+
+      - name: Publish pre-release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" "$PACKAGE.tar.gz" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "Look Studio $GITHUB_REF_NAME" \
+            --prerelease \
+            --verify-tag \

@@ -1,0 +1,17 @@
+{
+  "name": "look-studio-agent",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Look Studio resident assistant: embeds Pi via @earendil-works/pi-coding-agent SDK",
+  "type": "module",
+  "main": "src/host.mjs",
+  "scripts": {
+    "start": "node src/host.mjs",
+    "check": "node --check src/host.mjs && node --check src/tools.mjs && node --check src/models.mjs && node --check src/catalog.mjs && node --check src/timeline.mjs && node --check src/vision.mjs"
+  },
+  "engines": { "node": ">=22" },
+  "dependencies": {
+    "@earendil-works/pi-coding-agent": "1.0.0",
+    "typebox": "1.3.27"
+  }
+}
