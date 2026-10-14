@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
 import 'package:provider/provider.dart';
 
+import '../../core/activity_tracker.dart';
 import '../../core/api.dart';
 import '../../core/app_state.dart';
 import '../../core/format.dart';
@@ -119,7 +120,7 @@ class _NotePageState extends State<NotePage> {
     final cs = Theme.of(context).colorScheme;
     return ReportScreen(
       value: {'screen': '笔记', if (n != null) 'note_id': n.id, if (n != null) 'note_title': n.title, if (n != null && n.lectureId.isNotEmpty) 'lecture_id': n.lectureId},
-      child: LayoutBuilder(builder: (context, c) {
+      child: ActivityRegion(kind: 'read', lectureId: n?.lectureId ?? '', child: LayoutBuilder(builder: (context, c) {
         final tocPane = c.maxWidth >= 1040;
         final sidePane = c.maxWidth >= 1200;
         final reading = !_loading && _error == null && !_editing && n != null;
@@ -242,7 +243,7 @@ class _NotePageState extends State<NotePage> {
                           ),
                         ]),
         );
-      }),
+      })),
     );
   }
 }
@@ -550,7 +551,7 @@ class _CoursewareReaderPageState extends State<_CoursewareReaderPage> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
-    return FutureBuilder(
+    return ActivityRegion(kind: 'read', lectureId: widget.lectureId, child: FutureBuilder(
       future: _data,
       builder: (context, snap) {
         final d = snap.data;
@@ -616,7 +617,7 @@ class _CoursewareReaderPageState extends State<_CoursewareReaderPage> {
           );
         });
       },
-    );
+    ));
   }
 }
 

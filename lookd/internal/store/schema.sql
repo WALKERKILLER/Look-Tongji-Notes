@@ -180,3 +180,15 @@ CREATE TABLE IF NOT EXISTS timeline (
   title      TEXT NOT NULL,
   PRIMARY KEY (lecture_id, idx)
 );
+
+-- Study time per local day, reported by the app (docs/specs/0001-learning-activity-heatmap.md).
+-- kind: watch | read | practice (seconds) or ask (count).
+CREATE TABLE IF NOT EXISTS activity (
+  day        TEXT NOT NULL,              -- YYYY-MM-DD, local time
+  kind       TEXT NOT NULL,
+  course_id  TEXT NOT NULL DEFAULT '',
+  lecture_id TEXT NOT NULL DEFAULT '',
+  seconds    INTEGER NOT NULL DEFAULT 0,
+  count      INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (day, kind, course_id, lecture_id)
+);
