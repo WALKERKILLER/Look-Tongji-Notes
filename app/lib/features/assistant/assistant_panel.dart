@@ -19,6 +19,7 @@ import '../courses/download_sheet.dart';
 import '../../widgets/look_markdown.dart';
 import '../library/note_reader.dart';
 import '../player/player_page.dart';
+import '../practice/quiz.dart';
 import '../schedule/schedule_widgets.dart';
 import '../settings/model_meta.dart';
 import '../settings/models_page.dart';
@@ -50,6 +51,9 @@ const _toolLabels = {
   'search_courseware': ('搜索课件', Icons.plagiarism_outlined),
   'view_slides': ('查看 PPT', Icons.slideshow_outlined),
   'view_images': ('查看插图', Icons.image_outlined),
+  'create_quiz': ('生成练习', Icons.quiz_outlined),
+  'list_quizzes': ('查看练习', Icons.quiz_outlined),
+  'read_quiz_results': ('查看作答', Icons.fact_check_outlined),
 };
 
 /// Resident assistant: docked beside the shell on wide windows, full screen on
@@ -641,6 +645,10 @@ class _AssistantTurn extends StatelessWidget {
           }
           if (b.name == 'view_slides' && d?['slides'] is List) {
             children.add(_SlideStrip(lectureId: '${d!['lecture_id'] ?? ''}', slides: [for (final x in d['slides'] as List) (x as num).toInt()], mode: '${d['mode'] ?? ''}'));
+          }
+          if (b.name == 'create_quiz' && d?['quiz'] is Map) {
+            final q = Quiz((d!['quiz'] as Map).cast<String, dynamic>());
+            children.add(QuizCard(key: ValueKey(q.id), quiz: q, live: true));
           }
           if (b.name == 'save_note' && d?['note'] is Map) {
             children.add(_NoteCard(note: (d!['note'] as Map).cast<String, dynamic>(), onAction: onAction));

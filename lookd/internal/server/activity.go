@@ -90,7 +90,7 @@ func (s *Server) activity(_ http.ResponseWriter, r *http.Request) (any, error) {
 	var minutes, active int64
 	for _, d := range days {
 		minutes += d.Minutes
-		if d.Minutes >= 1 || d.Asks > 0 || d.NotesNew > 0 || d.NotesEdited > 0 {
+		if d.Active() {
 			active++
 		}
 	}
