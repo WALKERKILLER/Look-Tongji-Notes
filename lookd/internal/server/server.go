@@ -158,6 +158,7 @@ func (s *Server) Handler() http.Handler {
 	h("GET /api/activity", s.activity)
 	h("GET /api/activity/day", s.activityDay)
 	h("POST /api/activity", s.addActivity)
+	h("POST /api/agent/event", s.agentEvent)
 	h("GET /api/quizzes", s.quizzes)
 	h("POST /api/quizzes", s.addQuiz)
 	h("GET /api/quizzes/{id}", s.quiz)

@@ -26,6 +26,7 @@ import '../settings/models_page.dart';
 import '../settings/provider_presets.dart';
 import '../usage/usage_page.dart';
 import 'assistant_controller.dart';
+import 'tasks_page.dart';
 
 const _toolLabels = {
   'app_guide': ('查阅功能说明', Icons.menu_book_outlined),
@@ -55,6 +56,18 @@ const _toolLabels = {
   'list_quizzes': ('查看练习', Icons.quiz_outlined),
   'read_quiz_results': ('查看作答', Icons.fact_check_outlined),
 };
+
+/// Shows the assistant over the current screen in a sheet, so the user keeps
+/// their place (practice, task history).
+Future<void> showAssistantSheet(BuildContext context) => showModalBottomSheet(
+      context: context,
+      useRootNavigator: true,
+      isScrollControlled: true,
+      showDragHandle: true,
+      useSafeArea: true,
+      constraints: const BoxConstraints(maxWidth: 720),
+      builder: (_) => const FractionallySizedBox(heightFactor: 0.85, child: AssistantPanel(docked: true, embedded: true)),
+    );
 
 /// Resident assistant: docked beside the shell on wide windows, full screen on
 /// phones, and as a tab inside the player.
@@ -551,6 +564,11 @@ class _ContextMeter extends StatelessWidget {
           leadingIcon: const Icon(Icons.insights_outlined, size: 18),
           onPressed: () => Navigator.of(context, rootNavigator: true).push(MaterialPageRoute(builder: (_) => const UsagePage())),
           child: const Text('查看用量'),
+        ),
+        MenuItemButton(
+          leadingIcon: const Icon(Icons.schedule_rounded, size: 18),
+          onPressed: () => Navigator.of(context, rootNavigator: true).push(MaterialPageRoute(builder: (_) => const TasksPage())),
+          child: const Text('定时任务'),
         ),
       ],
       builder: (context, m, _) => IconButton(
