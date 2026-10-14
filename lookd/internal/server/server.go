@@ -155,6 +155,9 @@ func (s *Server) Handler() http.Handler {
 		cfg, chans, events := s.Jobs.ASR.Status()
 		return map[string]any{"config": cfg, "channels": chans, "events": events}, nil
 	})
+	h("GET /api/activity", s.activity)
+	h("GET /api/activity/day", s.activityDay)
+	h("POST /api/activity", s.addActivity)
 	h("GET /api/schedule", s.schedule)
 	h("POST /api/schedule", s.addSchedule)
 	h("PATCH /api/schedule/{id}", s.patchSchedule)

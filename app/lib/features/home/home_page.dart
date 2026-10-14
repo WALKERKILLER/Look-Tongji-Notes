@@ -16,6 +16,7 @@ import '../../widgets/course_visuals.dart';
 import '../../widgets/organic_shapes.dart';
 import '../../widgets/states.dart';
 import '../../widgets/user_avatar.dart';
+import '../activity/activity_page.dart';
 import '../courses/course_card.dart';
 import '../courses/course_page.dart';
 import '../player/player_page.dart';
@@ -111,6 +112,10 @@ class _HomePageState extends State<HomePage> {
             ),
           ),
         ],
+        _header(context, '学习足迹', pad,
+            action: TextButton(
+                onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ActivityPage())), child: const Text('统计'))),
+        SliverToBoxAdapter(child: ContentWidth(child: Padding(padding: EdgeInsets.symmetric(horizontal: pad), child: const ActivityCard()))),
         if (_recent.isNotEmpty) ...[
           _header(context, '继续观看', pad),
           SliverToBoxAdapter(

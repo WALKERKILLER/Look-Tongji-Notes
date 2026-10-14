@@ -32,6 +32,7 @@ type Library struct {
 	Root  string
 	Store *store.Store
 	mu    sync.Mutex
+	actMu sync.Mutex
 	tpl   Templates
 }
 
@@ -434,7 +435,7 @@ func (l *Library) Reindex(ctx context.Context) (int, error) {
 		}
 		return nil
 	})
-	return count + l.reindexSchedule(ctx), err
+	return count + l.reindexSchedule(ctx) + l.reindexActivity(ctx), err
 }
 
 var srtTime = regexp.MustCompile(`(\d+):(\d+):(\d+)[,.](\d+)\s*-->\s*(\d+):(\d+):(\d+)[,.](\d+)`)
