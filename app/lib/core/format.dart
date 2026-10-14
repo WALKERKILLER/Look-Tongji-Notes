@@ -66,3 +66,29 @@ String fmtUntil(DateTime t) {
 const kindLabels = {'video': '视频', 'slides': 'PPT', 'courseware': '课件', 'transcript': '转写', 'audio': '音频', 'parse': '课件解析'};
 
 const weekdayNames = _weekdays;
+
+/// Compact count for statistics: 0, 980, 12.3K, 4.5M.
+String fmtCompact(num n) {
+  if (n >= 1e9) return '${(n / 1e9).toStringAsFixed(1)}B';
+  if (n >= 1e6) return '${(n / 1e6).toStringAsFixed(n >= 1e7 ? 0 : 1)}M';
+  if (n >= 1e4) return '${(n / 1e3).toStringAsFixed(0)}K';
+  if (n >= 1e3) return '${(n / 1e3).toStringAsFixed(1)}K';
+  return '${n.round()}';
+}
+
+/// Estimated USD cost; small amounts keep four decimals so they don't read as zero.
+String fmtUsd(num v) {
+  if (v == 0) return '\$0';
+  if (v < 0.01) return '\$${v.toStringAsFixed(4)}';
+  if (v < 100) return '\$${v.toStringAsFixed(2)}';
+  return '\$${v.toStringAsFixed(0)}';
+}
+
+const kWeekdays = ['一', '二', '三', '四', '五', '六', '日'];
+
+/// "10月14日 周二"
+String fmtDayLabel(DateTime d) => '${d.month}月${d.day}日 周${kWeekdays[d.weekday - 1]}';
+
+/// Local calendar day as YYYY-MM-DD.
+String fmtIsoDay(DateTime d) =>
+    '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';

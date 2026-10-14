@@ -12,6 +12,7 @@ import {
 import { DATA_DIR, ModelPipeline } from "./models.mjs";
 import { createTools, TURN_TOOL_BUDGET } from "./tools.mjs";
 import { generateTimeline } from "./timeline.mjs";
+import { entryFrom, UsageLedger } from "./usage.mjs";
 
 const TOKEN = process.env.LOOKD_TOKEN ?? "";
 const CWD = process.env.LIBRARY_ROOT ?? process.cwd();
@@ -20,6 +21,13 @@ await mkdir(SESSIONS, { recursive: true });
 
 const pipeline = new ModelPipeline();
 await pipeline.init();
+const usage = new UsageLedger(DATA_DIR);
+pipeline.usage = usage;
+try {
+	await usage.backfill(SESSIONS);
+} catch (e) {
+	console.error(`usage backfill: ${e.message}`);
+}
 
 const SYSTEM = `你是 Look Studio 的常驻助手，帮助同济大学学生使用 Look 录课平台的课程录像。
 你能做的：介绍应用功能、查看课程与节次、阅读转写稿、看 PPT 与课件、全文搜索、整理与保存笔记、生成时间轴大纲、标记日程、出复习题。
@@ -81,6 +89,9 @@ async function openConversation(id) {
 		calls: 0,
 		lastUser: "",
 		pipeline,
+		// Ledger attribution; scheduled runs set purpose "task" and taskId.
+		purpose: "chat",
+		taskId: null,
 		// find_tools: declare more tools from the next model call on.
 		load(names) {
 			const active = conv.session.getActiveToolNames();
@@ -100,6 +111,7 @@ async function openConversation(id) {
 		customTools: createTools(conv),
 	});
 	conv.session = session;
+	recordUsage(conv);
 	live.set(session.sessionId, conv);
 	if (live.size > MAX_LIVE) {
 		const idle = [...live.entries()].filter(([, c]) => !c.busy).sort((a, b) => a[1].used - b[1].used)[0];
@@ -109,6 +121,25 @@ async function openConversation(id) {
 		}
 	}
 	return conv;
+}
+
+// Every assistant message, including tool-loop round trips, is one ledger line.
+function recordUsage(conv) {
+	let started = 0;
+	let ttft = null;
+	conv.session.subscribe((ev) => {
+		if (ev.type === "message_start" && ev.message?.role === "assistant") {
+			started = Date.now();
+			ttft = null;
+		} else if (ev.type === "message_update" && ttft === null && started) {
+			ttft = Date.now() - started;
+		} else if (ev.type === "message_end" && ev.message?.role === "assistant") {
+			usage.record(
+				entryFrom(ev.message, { purpose: conv.purpose, session_id: conv.session.sessionId, task_id: conv.taskId, ttft_ms: ttft ?? undefined }),
+			);
+			started = 0;
+		}
+	});
 }
 
 // Model/prefs changes apply to idle conversations on next open.
@@ -264,6 +295,30 @@ route("POST", "/timeline", async (req, _m, res) => {
 	return { chapters: await generateTimeline(pipeline, lecture_id, ac.signal) };
 });
 
+function sessionTitle(s) {
+	return s.name || s.firstMessage.replace(/^<context>[\s\S]*?<\/context>\s*/, "").slice(0, 60) || "新对话";
+}
+
+route("GET", "/usage/summary", async (req) => {
+	const q = new URL(req.url, "http://x").searchParams;
+	const titles = new Map((await SessionManager.list(CWD, SESSIONS)).map((s) => [s.id, sessionTitle(s)]));
+	return usage.summary(q.get("from") ?? "", q.get("to") ?? "", titles);
+});
+route("GET", "/usage/calls", async (req) => {
+	const q = new URL(req.url, "http://x").searchParams;
+	const titles = new Map((await SessionManager.list(CWD, SESSIONS)).map((s) => [s.id, sessionTitle(s)]));
+	const calls = await usage.calls({
+		before: Number(q.get("before")) || Infinity,
+		limit: Math.min(Number(q.get("limit")) || 50, 200),
+		from: q.get("from") || undefined,
+		to: q.get("to") || undefined,
+		model: q.get("model") || undefined,
+		purpose: q.get("purpose") || undefined,
+		session_id: q.get("session_id") || undefined,
+	});
+	return calls.map((c) => (c.session_id ? { ...c, title: titles.get(c.session_id) ?? null } : c));
+});
+
 route("GET", "/sessions", async () => {
 	const list = await SessionManager.list(CWD, SESSIONS);
 	return list
@@ -271,7 +326,7 @@ route("GET", "/sessions", async () => {
 		.slice(0, 200)
 		.map((s) => ({
 			id: s.id,
-			title: s.name || s.firstMessage.replace(/^<context>[\s\S]*?<\/context>\s*/, "").slice(0, 60) || "新对话",
+			title: sessionTitle(s),
 			modified: s.modified,
 			messages: s.messageCount,
 			busy: live.get(s.id)?.busy ?? false,

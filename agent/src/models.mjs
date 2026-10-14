@@ -9,6 +9,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { ModelRuntime } from "@earendil-works/pi-coding-agent";
 import { Catalog } from "./catalog.mjs";
+import { entryFrom } from "./usage.mjs";
 
 export const DATA_DIR = process.env.AGENT_DATA_DIR ?? join(homedir(), ".local/share/look-studio/agent");
 const MODELS = join(DATA_DIR, "models.json");
@@ -299,6 +300,7 @@ export class ModelPipeline {
 			{ messages: [{ role: "user", content: [{ type: "text", text: "Reply with: ok" }], timestamp: Date.now() }] },
 			{ signal: AbortSignal.timeout(30_000), maxTokens: 64 },
 		);
+		this.usage?.record(entryFrom(res, { purpose: "test" }));
 		if (res.stopReason === "error") throw new Error(res.errorMessage ?? "请求失败");
 		const reply = res.content.filter((c) => c.type === "text").map((c) => c.text).join("").trim();
 		return { model: `${m.provider}/${m.id}`, latency_ms: Date.now() - t0, reply: reply.slice(0, 80) };

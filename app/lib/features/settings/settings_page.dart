@@ -19,6 +19,7 @@ import '../../widgets/states.dart';
 import '../../widgets/user_avatar.dart';
 import '../assistant/assistant_controller.dart';
 import '../profile/profile_dialog.dart';
+import '../usage/usage_page.dart';
 import 'asr_settings.dart';
 import 'mineru_settings.dart';
 import 'models_page.dart';
@@ -603,6 +604,14 @@ class _AssistantSettings extends StatelessWidget {
         onTap: () => Navigator.of(context, rootNavigator: true).push(MaterialPageRoute(builder: (_) => const ModelsPage())),
       ),
       _VisionModelTile(a: a),
+      ListTile(
+        contentPadding: EdgeInsets.zero,
+        leading: const Icon(Icons.insights_outlined),
+        title: const Text('用量与费用'),
+        subtitle: const Text('按模型、用途和对话查看 token 与估算费用'),
+        trailing: const Icon(Icons.chevron_right_rounded),
+        onTap: () => Navigator.of(context, rootNavigator: true).push(MaterialPageRoute(builder: (_) => const UsagePage())),
+      ),
       SwitchListTile(contentPadding: EdgeInsets.zero, value: p.assistantDocked, onChanged: (v) => p.update((x) => x.assistantDocked = v), title: const Text('宽屏时常驻在右侧')),
       SwitchListTile(contentPadding: EdgeInsets.zero, value: p.chatBubbles, onChanged: (v) => p.update((x) => x.chatBubbles = v), title: const Text('回复使用气泡')),
       SwitchListTile(contentPadding: EdgeInsets.zero, value: p.showThinking, onChanged: (v) => p.update((x) => x.showThinking = v), title: const Text('显示思考过程')),
