@@ -168,12 +168,67 @@ func CheckAttempt(q Quiz, a QuizAttempt) error {
 	return nil
 }
 
-func (s *Store) PutQuiz(ctx context.Context, q Quiz) error {
+// Mirror writes the file copy of a set inside its transaction and returns
+// how to undo the write if the transaction then fails to commit.
+type Mirror func(q Quiz, attempts []QuizAttempt) (undo func(), err error)
+
+// mirrored runs change in a transaction and then mirror; a mirror failure
+// rolls the change back, and a commit failure undoes the mirror, so the index
+// and the file copy agree whatever fails.
+func (s *Store) mirrored(ctx context.Context, change func(tx *sql.Tx) error, mirror func(tx *sql.Tx) (func(), error)) error {
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if err := change(tx); err != nil {
+		return err
+	}
+	undo, err := mirror(tx)
+	if err != nil {
+		return err
+	}
+	if err := commitTx(tx); err != nil {
+		undo()
+		return err
+	}
+	return nil
+}
+
+// PutQuizMirrored stores a new set and writes its file copy.
+func (s *Store) PutQuizMirrored(ctx context.Context, q Quiz, mirror Mirror) error {
+	return s.mirrored(ctx, func(tx *sql.Tx) error { return putQuiz(ctx, tx, q) },
+		func(*sql.Tx) (func(), error) { return mirror(q, []QuizAttempt{}) })
+}
+
+// PutQuizAttemptMirrored stores an attempt and rewrites the set's file copy
+// with every attempt.
+func (s *Store) PutQuizAttemptMirrored(ctx context.Context, q Quiz, a QuizAttempt, mirror Mirror) error {
+	return s.mirrored(ctx, func(tx *sql.Tx) error { return putQuizAttempt(ctx, tx, a) },
+		func(tx *sql.Tx) (func(), error) {
+			attempts, err := quizAttempts(ctx, tx, q.ID)
+			if err != nil {
+				return nil, err
+			}
+			return mirror(q, attempts)
+		})
+}
+
+// DeleteQuizMirrored deletes a set with its attempts in one transaction;
+// remove deletes the file copy and returns how to restore it.
+func (s *Store) DeleteQuizMirrored(ctx context.Context, id string, remove func() (func(), error)) error {
+	return s.mirrored(ctx, func(tx *sql.Tx) error { return deleteQuiz(ctx, tx, id) },
+		func(*sql.Tx) (func(), error) { return remove() })
+}
+
+func (s *Store) PutQuiz(ctx context.Context, q Quiz) error { return putQuiz(ctx, s.DB, q) }
+
+func putQuiz(ctx context.Context, db querier, q Quiz) error {
 	b, err := json.Marshal(q.Questions)
 	if err != nil {
 		return err
 	}
-	_, err = s.DB.ExecContext(ctx, `INSERT OR REPLACE INTO quizzes(id,title,course_id,lecture_id,difficulty,source,questions,created_at) VALUES(?,?,?,?,?,?,?,?)`,
+	_, err = db.ExecContext(ctx, `INSERT OR REPLACE INTO quizzes(id,title,course_id,lecture_id,difficulty,source,questions,created_at) VALUES(?,?,?,?,?,?,?,?)`,
 		q.ID, q.Title, q.CourseID, q.LectureID, q.Difficulty, q.Source, string(b), q.CreatedAt)
 	return err
 }
@@ -255,31 +310,45 @@ func (s *Store) Quiz(ctx context.Context, id string) (Quiz, error) {
 	return q, s.scores(ctx, &q, true)
 }
 
+// DeleteQuiz deletes a set and its attempts together.
 func (s *Store) DeleteQuiz(ctx context.Context, id string) error {
-	res, err := s.DB.ExecContext(ctx, `DELETE FROM quizzes WHERE id=?`, id)
+	return s.mirrored(ctx, func(tx *sql.Tx) error { return deleteQuiz(ctx, tx, id) },
+		func(*sql.Tx) (func(), error) { return func() {}, nil })
+}
+
+func deleteQuiz(ctx context.Context, db querier, id string) error {
+	res, err := db.ExecContext(ctx, `DELETE FROM quizzes WHERE id=?`, id)
 	if err != nil {
 		return err
 	}
 	if n, _ := res.RowsAffected(); n == 0 {
 		return sql.ErrNoRows
 	}
-	_, err = s.DB.ExecContext(ctx, `DELETE FROM quiz_attempts WHERE quiz_id=?`, id)
+	_, err = db.ExecContext(ctx, `DELETE FROM quiz_attempts WHERE quiz_id=?`, id)
 	return err
 }
 
 func (s *Store) PutQuizAttempt(ctx context.Context, a QuizAttempt) error {
+	return putQuizAttempt(ctx, s.DB, a)
+}
+
+func putQuizAttempt(ctx context.Context, db querier, a QuizAttempt) error {
 	if a.Total <= 0 {
 		return errors.New("attempt without questions")
 	}
 	b, _ := json.Marshal(a.Answers)
-	_, err := s.DB.ExecContext(ctx, `INSERT OR REPLACE INTO quiz_attempts(id,quiz_id,started_at,finished_at,answers,correct,total) VALUES(?,?,?,?,?,?,?)`,
+	_, err := db.ExecContext(ctx, `INSERT OR REPLACE INTO quiz_attempts(id,quiz_id,started_at,finished_at,answers,correct,total) VALUES(?,?,?,?,?,?,?)`,
 		a.ID, a.QuizID, a.StartedAt, a.FinishedAt, string(b), a.Correct, a.Total)
 	return err
 }
 
 // QuizAttempts returns a set's attempts, oldest first.
 func (s *Store) QuizAttempts(ctx context.Context, quizID string) ([]QuizAttempt, error) {
-	rows, err := s.DB.QueryContext(ctx, `SELECT id,quiz_id,started_at,finished_at,answers,correct,total FROM quiz_attempts WHERE quiz_id=? ORDER BY finished_at`, quizID)
+	return quizAttempts(ctx, s.DB, quizID)
+}
+
+func quizAttempts(ctx context.Context, db querier, quizID string) ([]QuizAttempt, error) {
+	rows, err := db.QueryContext(ctx, `SELECT id,quiz_id,started_at,finished_at,answers,correct,total FROM quiz_attempts WHERE quiz_id=? ORDER BY finished_at`, quizID)
 	if err != nil {
 		return nil, err
 	}
