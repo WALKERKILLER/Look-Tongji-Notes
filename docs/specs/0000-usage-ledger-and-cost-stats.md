@@ -25,7 +25,7 @@ Non-goals: provider billing reconciliation (costs are estimates from model price
 ### API (agent host, reached by the app as `/agent/usage…` through lookd)
 - `GET /usage/summary?from=YYYY-MM-DD&to=YYYY-MM-DD` →
   `{totals:{calls, input, output, cache_read, cache_write, cost, errors}, days:[{date, input, output, cache_read, cost, calls}], by_model:[…], by_purpose:[…], by_session:[{session_id, title, …}]}`; days use local time and include zero days in range.
-- `GET /usage/calls?before=<cursor>&limit=50` → newest-first page of ledger lines with the session title resolved. Calls are ordered by (time, position in the ledger), and each carries `cursor` `<ts>:<position>`. The next page passes the last call's cursor, so calls sharing a millisecond are not skipped (a bare `<ts>` still means "older than"). `from`/`to` and `summary` dates must be real calendar days (`2026-02-31` → 400).
+- `GET /usage/calls?before=<cursor>&limit=50` → newest-first page of ledger lines with the session title resolved. Calls are ordered by (time, position in the ledger), and each carries `cursor` `<ts>:<position>`. The next page passes the last call's cursor, so calls sharing a millisecond are not skipped (a bare `<ts>` still means "older than"). `limit` is an integer 1–200 (default 50; anything else → 400). `from`/`to` and `summary` dates must be real calendar days (`2026-02-31` → 400).
 - Bad dates → 400.
 
 ### UI

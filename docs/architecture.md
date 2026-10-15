@@ -33,7 +33,7 @@ The app starts lookd ([lookd_service.dart](../app/lib/core/lookd_service.dart) s
 | `lookd/internal/events` | SSE event fan-out |
 | `lookd/internal/agent` | Supervises the Node agent host and proxies `/agent/*` |
 | `agent/src/host.mjs` | Agent host: HTTP endpoints, system prompt, sessions |
-| `agent/src/http.mjs` | Request body reading with the 1 MiB limit, HTTP errors |
+| `agent/src/http.mjs` | Request body reading with the 1 MiB limit and 30 s deadline, HTTP error replies |
 | `agent/src/tools.mjs` | Tool groups, `find_tools`, note playbook, write guards |
 | `agent/src/models.mjs`, `catalog.mjs` | Providers, model preferences, models.dev metadata |
 | `agent/src/timeline.mjs`, `vision.mjs`, `lookd.mjs` | Outline generation, image bridge for text-only models, lookd client |

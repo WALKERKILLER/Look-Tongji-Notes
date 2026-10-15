@@ -222,3 +222,9 @@ CREATE TABLE IF NOT EXISTS quiz_attempts (
   total       INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS quiz_attempts_by_quiz ON quiz_attempts(quiz_id);
+
+-- Tokens of committed mirrored writes; see store/mirror.go (not mirrored).
+CREATE TABLE IF NOT EXISTS mirror_commits (
+  token TEXT PRIMARY KEY,
+  at    INTEGER NOT NULL
+);

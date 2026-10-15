@@ -2,6 +2,8 @@ package library
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -133,5 +135,83 @@ func TestQuizNotKeptWhenMirrorFails(t *testing.T) {
 	}
 	if a, _ := st.QuizAttempts(ctx, q.ID); len(a) != 0 {
 		t.Fatalf("attempt kept without its file: %+v", a)
+	}
+}
+
+func TestQuizAttemptAfterDeleteKeepsItDeleted(t *testing.T) {
+	ctx := context.Background()
+	l, st := openLib(t)
+	q, err := l.SaveQuiz(ctx, store.Quiz{Title: "自测", Questions: []store.QuizQuestion{
+		{Stem: "1+1=?", Options: []store.QuizOption{{Text: "2"}, {Text: "3"}}, Answer: 0},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	full, _ := st.Quiz(ctx, q.ID) // read before a concurrent delete commits
+	if err := l.DeleteQuiz(ctx, q.ID); err != nil {
+		t.Fatal(err)
+	}
+	m := l.beginMirror()
+	a := store.QuizAttempt{ID: NewID(), QuizID: q.ID, StartedAt: 1, FinishedAt: 2, Answers: []int{0}, Correct: 1, Total: 1}
+	err = st.PutQuizAttemptMirrored(ctx, m.token(), full, a, l.quizMirror(m))
+	m.finish(ctx, err)
+	if !errors.Is(err, sql.ErrNoRows) {
+		t.Fatalf("attempt on a deleted set: %v", err)
+	}
+	if _, err := os.Stat(l.quizPath(q.ID)); !os.IsNotExist(err) {
+		t.Fatal("deleted set's file written back")
+	}
+	var n int
+	st.DB.QueryRow(`SELECT count(*) FROM quiz_attempts`).Scan(&n)
+	if n != 0 {
+		t.Fatalf("%d orphan attempt(s)", n)
+	}
+}
+
+func TestQuizReindexReplacesAttempts(t *testing.T) {
+	ctx := context.Background()
+	l, st := openLib(t)
+	q, err := l.SaveQuiz(ctx, store.Quiz{Title: "自测", Questions: []store.QuizQuestion{
+		{Stem: "1+1=?", Options: []store.QuizOption{{Text: "2"}, {Text: "3"}}, Answer: 0},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	keep, _ := l.AddQuizAttempt(ctx, q.ID, 0, []int{0})
+	if _, err := l.AddQuizAttempt(ctx, q.ID, 0, []int{1}); err != nil {
+		t.Fatal(err)
+	}
+	// The file is edited to hold only the first attempt.
+	full, _ := st.Quiz(ctx, q.ID)
+	full.Best, full.Last, full.LectureTitle = nil, nil, ""
+	writeJSON(l.quizPath(q.ID), map[string]any{"quiz": full, "attempts": []store.QuizAttempt{keep}})
+	if _, err := l.Reindex(ctx); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := st.Quiz(ctx, q.ID)
+	if got.Attempts != 1 || got.Best.Correct != 1 {
+		t.Fatalf("after reindex: attempts %d, best %+v", got.Attempts, got.Best)
+	}
+}
+
+func TestQuizDeleteInterruptedIsRestored(t *testing.T) {
+	ctx := context.Background()
+	l, st := openLib(t)
+	q, err := l.SaveQuiz(ctx, store.Quiz{Title: "自测", Questions: []store.QuizQuestion{
+		{Stem: "1+1=?", Options: []store.QuizOption{{Text: "2"}, {Text: "3"}}, Answer: 0},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	before, _ := os.ReadFile(l.quizPath(q.ID))
+	m := l.beginMirror()
+	if _, err := m.remove(l.quizPath(q.ID)); err != nil { // crash before the delete commits
+		t.Fatal(err)
+	}
+	if _, err := Open(l.Root, st); err != nil {
+		t.Fatal(err)
+	}
+	if after, _ := os.ReadFile(l.quizPath(q.ID)); string(after) != string(before) {
+		t.Fatal("file of a set still in the index not restored")
 	}
 }

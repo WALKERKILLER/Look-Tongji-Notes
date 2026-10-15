@@ -16,7 +16,7 @@ import { bundledPluginsDir, PluginHost } from "./plugins.mjs";
 import { generateTimeline } from "./timeline.mjs";
 import { api } from "./lookd.mjs";
 import { fmtStamp, TaskScheduler } from "./tasks.mjs";
-import { httpError, readJson } from "./http.mjs";
+import { httpError, readJson, replyError } from "./http.mjs";
 import { entryFrom, UsageLedger } from "./usage.mjs";
 
 const TOKEN = process.env.LOOKD_TOKEN ?? "";
@@ -357,7 +357,7 @@ route("GET", "/usage/calls", async (req) => {
 	const titles = new Map((await SessionManager.list(CWD, SESSIONS)).map((s) => [s.id, sessionTitle(s)]));
 	const calls = await usage.calls({
 		before: q.get("before") || undefined,
-		limit: Math.min(Number(q.get("limit")) || 50, 200),
+		limit: q.has("limit") ? Number(q.get("limit")) : 50,
 		from: q.get("from") || undefined,
 		to: q.get("to") || undefined,
 		model: q.get("model") || undefined,
@@ -601,8 +601,7 @@ const server = createServer(async (req, res) => {
 			const out = await r.fn(req, m.slice(1), res);
 			if (out !== undefined && !res.headersSent) send(res, 200, out);
 		} catch (e) {
-			if (!res.headersSent) send(res, e.status ?? 500, { error: String(e?.message ?? e) });
-			else res.end();
+			replyError(req, res, e);
 		}
 		return;
 	}

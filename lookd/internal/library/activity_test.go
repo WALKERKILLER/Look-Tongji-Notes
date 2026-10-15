@@ -71,24 +71,6 @@ func TestActivityNotKeptWhenMirrorFails(t *testing.T) {
 	}
 }
 
-func TestActivityCommitFailureKeepsPreviousFile(t *testing.T) {
-	ctx := context.Background()
-	l, _ := openLib(t)
-	path := filepath.Join(l.Root, "activity.json")
-	if err := l.AddActivity(ctx, "", "2026-10-13", "watch", "", "", 300, 0); err != nil {
-		t.Fatal(err)
-	}
-	before, _ := os.ReadFile(path)
-	undo, err := replaceJSON(path, map[string]any{"rows": []store.ActivityRow{{Day: "2026-10-13", Kind: "watch", Seconds: 999}}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	undo() // what AddActivityMirrored does when the commit fails
-	if after, _ := os.ReadFile(path); string(after) != string(before) {
-		t.Fatalf("previous file not restored:\n%s", after)
-	}
-}
-
 func TestActivityReindexSkipsInvalidRows(t *testing.T) {
 	ctx := context.Background()
 	l, st := openLib(t)

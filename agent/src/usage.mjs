@@ -198,9 +198,11 @@ export class UsageLedger {
 	 * (ts, position in the ledger), and each carries `cursor` "<ts>:<position>";
 	 * pass the last one as `before` for the next page, so calls sharing a
 	 * millisecond are never skipped. A bare "<ts>" still means "older than ts".
+	 * `limit` is 1–MAX_PAGE.
 	 */
 	async calls({ before, limit = 50, from, to, model, purpose, session_id } = {}) {
 		if ((from && !isDay(from)) || (to && !isDay(to))) throw rangeError();
+		if (!Number.isInteger(limit) || limit < 1 || limit > MAX_PAGE) throw Object.assign(new Error(`limit 应为 1–${MAX_PAGE} 的整数`), { status: 400 });
 		const cursor = parseCursor(before);
 		const start = from ? dayStart(from) : -Infinity;
 		const end = to ? dayStart(shiftDay(to, 1)) : Infinity;
@@ -218,6 +220,8 @@ export class UsageLedger {
 		return out.sort((a, b) => b.ts - a.ts || pos(b) - pos(a)).slice(0, limit);
 	}
 }
+
+export const MAX_PAGE = 200;
 
 function parseCursor(before) {
 	if (before == null || before === "") return { ts: Infinity, pos: Infinity };
