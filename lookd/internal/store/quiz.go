@@ -172,16 +172,20 @@ func CheckAttempt(q Quiz, a QuizAttempt) error {
 // how to undo the write if the transaction then fails to commit.
 type Mirror func(q Quiz, attempts []QuizAttempt) (undo func(), err error)
 
-// mirrored runs change in a transaction and then mirror; a mirror failure
-// rolls the change back, and a commit failure undoes the mirror, so the index
-// and the file copy agree whatever fails.
-func (s *Store) mirrored(ctx context.Context, change func(tx *sql.Tx) error, mirror func(tx *sql.Tx) (func(), error)) error {
+// mirrored runs change in a transaction, records token (see
+// MirrorCommitted) and then mirror; a mirror failure rolls the change back,
+// and a commit failure calls the mirror's undo, so the index and the file
+// copy agree whatever fails.
+func (s *Store) mirrored(ctx context.Context, token string, change func(tx *sql.Tx) error, mirror func(tx *sql.Tx) (func(), error)) error {
 	tx, err := s.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
 	if err := change(tx); err != nil {
+		return err
+	}
+	if err := markMirrorCommit(ctx, tx, token); err != nil {
 		return err
 	}
 	undo, err := mirror(tx)
@@ -196,15 +200,15 @@ func (s *Store) mirrored(ctx context.Context, change func(tx *sql.Tx) error, mir
 }
 
 // PutQuizMirrored stores a new set and writes its file copy.
-func (s *Store) PutQuizMirrored(ctx context.Context, q Quiz, mirror Mirror) error {
-	return s.mirrored(ctx, func(tx *sql.Tx) error { return putQuiz(ctx, tx, q) },
+func (s *Store) PutQuizMirrored(ctx context.Context, token string, q Quiz, mirror Mirror) error {
+	return s.mirrored(ctx, token, func(tx *sql.Tx) error { return putQuiz(ctx, tx, q) },
 		func(*sql.Tx) (func(), error) { return mirror(q, []QuizAttempt{}) })
 }
 
 // PutQuizAttemptMirrored stores an attempt and rewrites the set's file copy
 // with every attempt.
-func (s *Store) PutQuizAttemptMirrored(ctx context.Context, q Quiz, a QuizAttempt, mirror Mirror) error {
-	return s.mirrored(ctx, func(tx *sql.Tx) error { return putQuizAttempt(ctx, tx, a) },
+func (s *Store) PutQuizAttemptMirrored(ctx context.Context, token string, q Quiz, a QuizAttempt, mirror Mirror) error {
+	return s.mirrored(ctx, token, func(tx *sql.Tx) error { return putQuizAttempt(ctx, tx, a) },
 		func(tx *sql.Tx) (func(), error) {
 			attempts, err := quizAttempts(ctx, tx, q.ID)
 			if err != nil {
@@ -216,8 +220,8 @@ func (s *Store) PutQuizAttemptMirrored(ctx context.Context, q Quiz, a QuizAttemp
 
 // DeleteQuizMirrored deletes a set with its attempts in one transaction;
 // remove deletes the file copy and returns how to restore it.
-func (s *Store) DeleteQuizMirrored(ctx context.Context, id string, remove func() (func(), error)) error {
-	return s.mirrored(ctx, func(tx *sql.Tx) error { return deleteQuiz(ctx, tx, id) },
+func (s *Store) DeleteQuizMirrored(ctx context.Context, token, id string, remove func() (func(), error)) error {
+	return s.mirrored(ctx, token, func(tx *sql.Tx) error { return deleteQuiz(ctx, tx, id) },
 		func(*sql.Tx) (func(), error) { return remove() })
 }
 
@@ -312,7 +316,7 @@ func (s *Store) Quiz(ctx context.Context, id string) (Quiz, error) {
 
 // DeleteQuiz deletes a set and its attempts together.
 func (s *Store) DeleteQuiz(ctx context.Context, id string) error {
-	return s.mirrored(ctx, func(tx *sql.Tx) error { return deleteQuiz(ctx, tx, id) },
+	return s.mirrored(ctx, "", func(tx *sql.Tx) error { return deleteQuiz(ctx, tx, id) },
 		func(*sql.Tx) (func(), error) { return func() {}, nil })
 }
 

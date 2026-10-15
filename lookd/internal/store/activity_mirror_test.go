@@ -18,11 +18,11 @@ func TestActivityReportCountedOnce(t *testing.T) {
 	mirrors := 0
 	mirror := func([]ActivityRow) (func(), error) { mirrors++; return func() {}, nil }
 	for range 2 { // the second is a retry after a lost response
-		if err := s.AddActivityMirrored(ctx, "report-0001", "2026-10-13", "watch", "", "", 120, 0, mirror); err != nil {
+		if err := s.AddActivityMirrored(ctx, "", "report-0001", "2026-10-13", "watch", "", "", 120, 0, mirror); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if err := s.AddActivityMirrored(ctx, "report-0002", "2026-10-13", "watch", "", "", 30, 0, mirror); err != nil {
+	if err := s.AddActivityMirrored(ctx, "", "report-0002", "2026-10-13", "watch", "", "", 30, 0, mirror); err != nil {
 		t.Fatal(err)
 	}
 	rows, _ := s.ActivityRows(ctx)
@@ -42,7 +42,7 @@ func TestActivityCommitFailureUndoesMirror(t *testing.T) {
 	commitTx = func(tx *sql.Tx) error { tx.Rollback(); return errors.New("disk I/O error") }
 	defer func() { commitTx = orig }()
 	undone := false
-	err = s.AddActivityMirrored(ctx, "report-0003", "2026-10-13", "watch", "", "", 60, 0, func([]ActivityRow) (func(), error) {
+	err = s.AddActivityMirrored(ctx, "", "report-0003", "2026-10-13", "watch", "", "", 60, 0, func([]ActivityRow) (func(), error) {
 		return func() { undone = true }, nil
 	})
 	if err == nil || !undone {
@@ -53,7 +53,7 @@ func TestActivityCommitFailureUndoesMirror(t *testing.T) {
 		t.Fatalf("rows kept after failed commit: %+v", rows)
 	}
 	// The report id was rolled back too, so the retry is applied.
-	if err := s.AddActivityMirrored(ctx, "report-0003", "2026-10-13", "watch", "", "", 60, 0, func([]ActivityRow) (func(), error) { return func() {}, nil }); err != nil {
+	if err := s.AddActivityMirrored(ctx, "", "report-0003", "2026-10-13", "watch", "", "", 60, 0, func([]ActivityRow) (func(), error) { return func() {}, nil }); err != nil {
 		t.Fatal(err)
 	}
 	if rows, _ := s.ActivityRows(ctx); len(rows) != 1 {

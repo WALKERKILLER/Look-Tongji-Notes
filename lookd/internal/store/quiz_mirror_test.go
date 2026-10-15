@@ -25,7 +25,7 @@ func TestQuizDeleteCommitFailureKeepsEverything(t *testing.T) {
 	orig := commitTx
 	commitTx = func(tx *sql.Tx) error { tx.Rollback(); return errors.New("disk I/O error") }
 	restored := false
-	err = s.DeleteQuizMirrored(ctx, "q1", func() (func(), error) { return func() { restored = true }, nil })
+	err = s.DeleteQuizMirrored(ctx, "", "q1", func() (func(), error) { return func() { restored = true }, nil })
 	commitTx = orig
 	if err == nil || !restored {
 		t.Fatalf("err = %v, file restored = %v", err, restored)

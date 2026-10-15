@@ -310,7 +310,7 @@ route("GET", "/usage/calls", async (req) => {
 	const titles = new Map((await SessionManager.list(CWD, SESSIONS)).map((s) => [s.id, sessionTitle(s)]));
 	const calls = await usage.calls({
 		before: q.get("before") || undefined,
-		limit: Math.min(Number(q.get("limit")) || 50, 200),
+		limit: q.has("limit") ? Number(q.get("limit")) : 50,
 		from: q.get("from") || undefined,
 		to: q.get("to") || undefined,
 		model: q.get("model") || undefined,
