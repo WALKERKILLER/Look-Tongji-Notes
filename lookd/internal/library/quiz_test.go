@@ -105,3 +105,33 @@ func TestQuizReindexSkipsBadAttempts(t *testing.T) {
 		t.Fatalf("attempts after reindex = %+v, %v", got, err)
 	}
 }
+
+func TestQuizNotKeptWhenMirrorFails(t *testing.T) {
+	ctx := context.Background()
+	l, st := openLib(t)
+	qs := []store.QuizQuestion{{Stem: "1+1=?", Options: []store.QuizOption{{Text: "2"}, {Text: "3"}}, Answer: 0}}
+	// A file where the quizzes folder goes makes the mirror fail.
+	os.WriteFile(filepath.Join(l.Root, "quizzes"), []byte("x"), 0o644)
+	if _, err := l.SaveQuiz(ctx, store.Quiz{Title: "自测", Questions: qs}); err == nil {
+		t.Fatal("save reported success without its file")
+	}
+	if list, _ := st.Quizzes(ctx, "", ""); len(list) != 0 {
+		t.Fatalf("set kept without its file: %+v", list)
+	}
+	os.Remove(filepath.Join(l.Root, "quizzes"))
+
+	q, err := l.SaveQuiz(ctx, store.Quiz{Title: "自测", Questions: qs})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// An unreadable mirror (a directory) makes the attempt's rewrite fail.
+	p := l.quizPath(q.ID)
+	os.Remove(p)
+	os.MkdirAll(filepath.Join(p, "x"), 0o755)
+	if _, err := l.AddQuizAttempt(ctx, q.ID, 0, []int{0}); err == nil {
+		t.Fatal("attempt reported success without its file")
+	}
+	if a, _ := st.QuizAttempts(ctx, q.ID); len(a) != 0 {
+		t.Fatalf("attempt kept without its file: %+v", a)
+	}
+}

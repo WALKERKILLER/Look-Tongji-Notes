@@ -193,6 +193,13 @@ CREATE TABLE IF NOT EXISTS activity (
   PRIMARY KEY (day, kind, course_id, lecture_id)
 );
 
+-- Ids of applied activity reports, so a retried report is counted once
+-- (kept for store.ReportsKept; not mirrored).
+CREATE TABLE IF NOT EXISTS activity_reports (
+  id TEXT PRIMARY KEY,
+  at INTEGER NOT NULL
+);
+
 -- Practice quizzes (docs/specs/0002-tutor-quiz-cards.md), mirrored to quizzes/<id>.json.
 CREATE TABLE IF NOT EXISTS quizzes (
   id         TEXT PRIMARY KEY,

@@ -12,13 +12,14 @@ import (
 // Study activity lives in the index and is mirrored to activity.json, like
 // the schedule, so that rebuilding the index from files keeps it.
 
-// AddActivity records a report and rewrites activity.json in the same
-// transaction: if the file cannot be written the report is not kept.
-func (l *Library) AddActivity(ctx context.Context, day, kind, courseID, lectureID string, seconds, count int64) error {
+// AddActivity records a report (once per reportID) and rewrites
+// activity.json with it: if the file cannot be written the report is not
+// kept, and if the index then fails to commit the previous file returns.
+func (l *Library) AddActivity(ctx context.Context, reportID, day, kind, courseID, lectureID string, seconds, count int64) error {
 	l.actMu.Lock()
 	defer l.actMu.Unlock()
-	return l.Store.AddActivityMirrored(ctx, day, kind, courseID, lectureID, seconds, count, func(rows []store.ActivityRow) error {
-		return writeJSON(filepath.Join(l.Root, "activity.json"), map[string]any{"schema": "look-studio/activity@1", "rows": rows})
+	return l.Store.AddActivityMirrored(ctx, reportID, day, kind, courseID, lectureID, seconds, count, func(rows []store.ActivityRow) (func(), error) {
+		return replaceJSON(filepath.Join(l.Root, "activity.json"), map[string]any{"schema": "look-studio/activity@1", "rows": rows})
 	})
 }
 
@@ -35,7 +36,8 @@ func (l *Library) reindexActivity(ctx context.Context) int {
 	}
 	n := 0
 	for _, r := range f.Rows {
-		if r.Day != "" && r.Kind != "" && l.Store.PutActivity(ctx, r) == nil {
+		// Rows that a report could not have produced are skipped.
+		if store.CheckActivityRow(r) == nil && l.Store.PutActivity(ctx, r) == nil {
 			n++
 		}
 	}

@@ -25,7 +25,7 @@ Non-goals: provider billing reconciliation (costs are estimates from model price
 ### API (agent host, reached by the app as `/agent/usage…` through lookd)
 - `GET /usage/summary?from=YYYY-MM-DD&to=YYYY-MM-DD` →
   `{totals:{calls, input, output, cache_read, cache_write, cost, errors}, days:[{date, input, output, cache_read, cost, calls}], by_model:[…], by_purpose:[…], by_session:[{session_id, title, …}]}`; days use local time and include zero days in range.
-- `GET /usage/calls?before=<ts>&limit=50` → newest-first page of ledger lines with the session title resolved.
+- `GET /usage/calls?before=<cursor>&limit=50` → newest-first page of ledger lines with the session title resolved. Calls are ordered by (time, position in the ledger), and each carries `cursor` `<ts>:<position>`. The next page passes the last call's cursor, so calls sharing a millisecond are not skipped (a bare `<ts>` still means "older than"). `from`/`to` and `summary` dates must be real calendar days (`2026-02-31` → 400).
 - Bad dates → 400.
 
 ### UI
@@ -49,7 +49,7 @@ Non-goals: provider billing reconciliation (costs are estimates from model price
 - `flutter test`: widget test of the page with a stub summary (tiles, toggle, empty state).
 
 ## Evidence
-- Ledger and summaries: [usage.mjs](../../agent/src/usage.mjs), tests in [usage.test.mjs](../../agent/src/usage.test.mjs) (zero days, grouping, previous period, range errors, paging, idempotent backfill).
+- Ledger and summaries: [usage.mjs](../../agent/src/usage.mjs), tests in [usage.test.mjs](../../agent/src/usage.test.mjs) (zero days, grouping, previous period, range errors including impossible dates, paging with shared timestamps, idempotent backfill).
 - Recording: `recordUsage` in [host.mjs](../../agent/src/host.mjs) (every assistant message, with time to first token); `timeline`, `vision` and `test` purposes in [timeline.mjs](../../agent/src/timeline.mjs), [vision.mjs](../../agent/src/vision.mjs), [models.mjs](../../agent/src/models.mjs).
 - Page: [usage_page.dart](../../app/lib/features/usage/usage_page.dart), [charts.dart](../../app/lib/widgets/charts.dart); widget test [usage_page_test.dart](../../app/test/usage_page_test.dart).
 - Live check (2026-10-14): backfill imported 42 calls from 4 conversations; a chat turn with two tool round trips added 3 lines (one per assistant message, all with the session id and time to first token); a provider test added a `test` line; an invalid date returned 400.

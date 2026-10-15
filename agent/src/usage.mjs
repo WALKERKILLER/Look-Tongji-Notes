@@ -6,6 +6,8 @@ import { join } from "node:path";
 
 export const PURPOSES = ["chat", "timeline", "vision", "title", "test", "task", "quiz"];
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
+// A real calendar day: Date rolls 2026-02-31 over to March, so it must format back unchanged.
+const isDay = (s) => DAY.test(s) && localDay(dayStart(s)) === s;
 
 /** Ledger line for a finished Pi assistant message. */
 export function entryFrom(message, { purpose, session_id, task_id, ttft_ms } = {}) {
@@ -155,7 +157,7 @@ export class UsageLedger {
 
 	/** Aggregates for local days [from, to]; `titles` maps session id → title. */
 	async summary(from, to, titles = new Map()) {
-		if (!DAY.test(from) || !DAY.test(to) || from > to) throw rangeError();
+		if (!isDay(from) || !isDay(to) || from > to) throw rangeError();
 		const start = dayStart(from);
 		const end = dayStart(shiftDay(to, 1));
 		const span = Math.round((end - start) / 86_400_000);
@@ -191,23 +193,37 @@ export class UsageLedger {
 		};
 	}
 
-	/** Newest-first page of calls, optionally filtered. */
-	async calls({ before = Infinity, limit = 50, from, to, model, purpose, session_id } = {}) {
-		if ((from && !DAY.test(from)) || (to && !DAY.test(to))) throw rangeError();
+	/**
+	 * Newest-first page of calls, optionally filtered. Calls are ordered by
+	 * (ts, position in the ledger), and each carries `cursor` "<ts>:<position>";
+	 * pass the last one as `before` for the next page, so calls sharing a
+	 * millisecond are never skipped. A bare "<ts>" still means "older than ts".
+	 */
+	async calls({ before, limit = 50, from, to, model, purpose, session_id } = {}) {
+		if ((from && !isDay(from)) || (to && !isDay(to))) throw rangeError();
+		const cursor = parseCursor(before);
 		const start = from ? dayStart(from) : -Infinity;
 		const end = to ? dayStart(shiftDay(to, 1)) : Infinity;
 		const out = [];
 		const all = await this.entries();
-		for (let i = all.length - 1; i >= 0 && out.length < limit; i--) {
+		for (let i = 0; i < all.length; i++) {
 			const e = all[i];
-			if (e.ts >= before || e.ts < start || e.ts >= end) continue;
+			if (e.ts > cursor.ts || (e.ts === cursor.ts && i >= cursor.pos) || e.ts < start || e.ts >= end) continue;
 			if (model && `${e.provider}/${e.model}` !== model) continue;
 			if (purpose && e.purpose !== purpose) continue;
 			if (session_id && e.session_id !== session_id) continue;
-			out.push(e);
+			out.push({ ...e, cursor: `${e.ts}:${i}` });
 		}
-		return out.sort((a, b) => b.ts - a.ts);
+		const pos = (c) => Number(c.cursor.split(":")[1]);
+		return out.sort((a, b) => b.ts - a.ts || pos(b) - pos(a)).slice(0, limit);
 	}
+}
+
+function parseCursor(before) {
+	if (before == null || before === "") return { ts: Infinity, pos: Infinity };
+	const m = /^(\d+)(?::(\d+))?$/.exec(String(before));
+	if (!m) throw Object.assign(new Error("before 应为上一页最后一条的 cursor"), { status: 400 });
+	return { ts: Number(m[1]), pos: m[2] === undefined ? -1 : Number(m[2]) };
 }
 
 function rangeError() {

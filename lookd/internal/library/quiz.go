@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -33,10 +34,7 @@ func (l *Library) SaveQuiz(ctx context.Context, q store.Quiz) (store.Quiz, error
 		q.CourseID = lec.CourseID
 	}
 	q.ID, q.CreatedAt = NewID(), time.Now().Unix()
-	if err := l.Store.PutQuiz(ctx, q); err != nil {
-		return q, err
-	}
-	if err := l.writeQuiz(ctx, q.ID); err != nil {
+	if err := l.Store.PutQuizMirrored(ctx, q, l.mirrorQuiz); err != nil {
 		return q, err
 	}
 	return l.Store.Quiz(ctx, q.ID)
@@ -57,40 +55,40 @@ func (l *Library) AddQuizAttempt(ctx context.Context, quizID string, startedAt i
 		startedAt = now
 	}
 	a := store.QuizAttempt{ID: NewID(), QuizID: quizID, StartedAt: startedAt, FinishedAt: now, Answers: answers, Correct: correct, Total: len(answers)}
-	if err := l.Store.PutQuizAttempt(ctx, a); err != nil {
-		return a, err
-	}
-	return a, l.writeQuiz(ctx, quizID)
+	return a, l.Store.PutQuizAttemptMirrored(ctx, q, a, l.mirrorQuiz)
 }
 
-// DeleteQuiz removes the file copy first, so a set whose file cannot be
-// removed stays deleted from neither place (reindex would bring it back).
+// DeleteQuiz deletes the set, its attempts and its file copy together: if
+// the file cannot be removed nothing is deleted (reindex would bring the set
+// back), and if the index then fails to commit the file is restored.
 func (l *Library) DeleteQuiz(ctx context.Context, id string) error {
-	if _, err := l.Store.Quiz(ctx, id); err != nil {
-		return err
-	}
-	if err := os.Remove(l.quizPath(id)); err != nil && !errors.Is(err, os.ErrNotExist) {
-		return err
-	}
-	if err := l.Store.DeleteQuiz(ctx, id); err != nil {
-		l.writeQuiz(ctx, id) // put the file back while the index still has the set
-		return err
-	}
-	return nil
+	path := l.quizPath(id)
+	return l.Store.DeleteQuizMirrored(ctx, id, func() (func(), error) {
+		old, err := os.ReadFile(path)
+		if errors.Is(err, os.ErrNotExist) {
+			return func() {}, nil
+		} else if err != nil {
+			return nil, err
+		}
+		if err := os.Remove(path); err != nil {
+			return nil, err
+		}
+		return func() {
+			if err := writeFileAtomic(path, old); err != nil {
+				log.Printf("restore %s: %v", filepath.Base(path), err)
+			}
+		}, nil
+	})
 }
 
-func (l *Library) writeQuiz(ctx context.Context, id string) error {
-	q, err := l.Store.Quiz(ctx, id)
-	if err != nil {
-		return err
+// mirrorQuiz writes quizzes/<id>.json with the set and its attempts.
+func (l *Library) mirrorQuiz(q store.Quiz, attempts []store.QuizAttempt) (func(), error) {
+	if err := os.MkdirAll(filepath.Join(l.Root, "quizzes"), 0o755); err != nil {
+		return nil, err
 	}
-	attempts, err := l.Store.QuizAttempts(ctx, id)
-	if err != nil {
-		return err
-	}
-	os.MkdirAll(filepath.Join(l.Root, "quizzes"), 0o755)
 	q.Best, q.Last, q.LectureTitle = nil, nil, ""
-	return writeJSON(l.quizPath(id), map[string]any{"schema": "look-studio/quiz@1", "quiz": q, "attempts": attempts})
+	q.Count, q.Attempts = len(q.Questions), len(attempts)
+	return replaceJSON(l.quizPath(q.ID), map[string]any{"schema": "look-studio/quiz@1", "quiz": q, "attempts": attempts})
 }
 
 func (l *Library) reindexQuizzes(ctx context.Context) int {

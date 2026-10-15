@@ -84,6 +84,38 @@ void main() {
     });
   });
 
+  test('a report keeps its id until lookd confirms it', () async {
+    var now = DateTime(2026, 10, 14, 9);
+    final sent = <Map<String, Object>>[];
+    var lose = true; // the first response is lost after lookd applied it
+    final t = ActivityTracker(AppState(LookdService()), now: () => now, post: (r) async {
+      sent.add(r);
+      if (lose) {
+        lose = false;
+        throw Exception('connection reset');
+      }
+    });
+    addTearDown(t.dispose);
+    final c = t.clock('watch', lectureId: 'L1')..start();
+    for (var i = 0; i < 6; i++) {
+      now = now.add(const Duration(seconds: 10));
+      t.tickNow();
+    }
+    c.stop();
+    await t.flush();
+    await t.flush();
+    // The lost report was resent unchanged, so lookd can drop the repeat,
+    // and unique reports add up to the time watched.
+    final byId = <Object, List<Map<String, Object>>>{};
+    for (final r in sent) {
+      byId.putIfAbsent(r['id']!, () => []).add(r);
+    }
+    expect(byId.values.where((v) => v.length > 1).single.toSet().length, 1);
+    expect(byId.values.fold<int>(0, (s, v) => s + (v.first['seconds'] as int)), 60);
+    expect(t.pendingSeconds, isEmpty);
+    expect((sent.first['id'] as String).length, 24);
+  });
+
   testWidgets('home card shows figures and a day tooltip', (tester) async {
     await tester.binding.setSurfaceSize(const Size(900, 600));
     addTearDown(() => tester.binding.setSurfaceSize(null));
