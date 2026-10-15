@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'app.dart';
+import 'core/activity_tracker.dart';
 import 'core/app_state.dart';
 import 'core/lookd_service.dart';
 import 'core/profile.dart';
@@ -35,6 +36,7 @@ Future<void> main() async {
   unawaited(daemon.start());
   final app = AppState(daemon);
   unawaited(app.init());
+  ActivityTracker.instance = ActivityTracker(app);
   final screen = ScreenContext();
   final players = PlayerHub();
 
