@@ -80,6 +80,7 @@ test("calls pages newest first with filters", async () => {
 	assert.deepEqual(next.map((c) => new Date(c.ts).getHours()), [2, 1]);
 	assert.equal((await l.calls({ purpose: "vision" })).length, 2);
 	await assert.rejects(l.calls({ before: "x" }), { status: 400 });
+	for (const limit of [-1, 0, 1.5, 201, Number.NaN]) await assert.rejects(l.calls({ limit }), { status: 400 });
 });
 
 test("calls sharing a millisecond are not skipped across pages", async () => {
