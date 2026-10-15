@@ -4,7 +4,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:look_studio/core/activity_tracker.dart';
 import 'package:look_studio/core/app_state.dart';
 import 'package:look_studio/core/lookd_service.dart';
+import 'package:look_studio/core/models.dart';
 import 'package:look_studio/features/activity/activity_page.dart';
+import 'package:look_studio/features/library/note_reader.dart';
 import 'package:look_studio/widgets/heatmap.dart';
 
 void main() {
@@ -81,6 +83,16 @@ void main() {
       advance(30);
       c.stop();
       expect(t.pendingSeconds, {'read/': 150});
+    });
+
+    testWidgets('the note reader beside the player counts reading', (tester) async {
+      ActivityTracker.instance = t;
+      addTearDown(() => ActivityTracker.instance = null);
+      final note = Note({'id': 'n1', 'title': '第一讲', 'body': '# 栈\n\n后进先出。', 'lecture_id': 'L1', 'path': 'c/n1.md'});
+      await tester.pumpWidget(MaterialApp(home: Scaffold(body: NoteInlineReader(note: note, onBack: () {}, onEdit: () {}))));
+      advance(30);
+      expect(t.pendingSeconds, {'read/L1': 30});
+      await tester.pumpWidget(const SizedBox());
     });
   });
 

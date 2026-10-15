@@ -28,13 +28,21 @@ func CheckActivityRow(r ActivityRow) error {
 		return fmt.Errorf("activity kind %q", r.Kind)
 	case err != nil || d.Format("2006-01-02") != r.Day || r.Day < "2000-01-01" || d.After(time.Now().AddDate(0, 0, 1)):
 		return fmt.Errorf("activity day %q", r.Day)
-	case r.Seconds < 0 || r.Seconds > 86400 || r.Count < 0 || r.Count > 100000 || (r.Seconds == 0 && r.Count == 0):
+	case r.Seconds < 0 || r.Seconds > MaxDaySeconds || r.Count < 0 || r.Count > MaxDayCount || (r.Seconds == 0 && r.Count == 0):
 		return fmt.Errorf("activity totals %d s, %d", r.Seconds, r.Count)
 	case !TimedKinds[r.Kind] && r.Seconds != 0:
 		return fmt.Errorf("activity kind %q has seconds", r.Kind)
 	}
 	return nil
 }
+
+// A day bucket holds at most a whole day of seconds and MaxDayCount counts.
+// Writes saturate at these limits, and CheckActivityRow accepts up to them,
+// so every committed bucket survives a rebuild from activity.json.
+const (
+	MaxDaySeconds = 86400
+	MaxDayCount   = 100000
+)
 
 // ReportsKept is how long report ids are remembered for deduplication; the
 // app retries a report for at most a day.
@@ -51,12 +59,13 @@ type querier interface {
 
 func addActivity(ctx context.Context, q querier, day, kind, courseID, lectureID string, seconds, count int64) error {
 	_, err := q.ExecContext(ctx, `INSERT INTO activity(day,kind,course_id,lecture_id,seconds,count) VALUES(?,?,?,?,?,?)
- ON CONFLICT(day,kind,course_id,lecture_id) DO UPDATE SET seconds=seconds+excluded.seconds, count=count+excluded.count`,
-		day, kind, courseID, lectureID, seconds, count)
+ ON CONFLICT(day,kind,course_id,lecture_id) DO UPDATE SET seconds=MIN(seconds+excluded.seconds, ?), count=MIN(count+excluded.count, ?)`,
+		day, kind, courseID, lectureID, min(seconds, MaxDaySeconds), min(count, MaxDayCount), MaxDaySeconds, MaxDayCount)
 	return err
 }
 
-// AddActivity adds seconds and/or a count to one day bucket.
+// AddActivity adds seconds and/or a count to one day bucket, saturating at
+// MaxDaySeconds and MaxDayCount.
 func (s *Store) AddActivity(ctx context.Context, day, kind, courseID, lectureID string, seconds, count int64) error {
 	return addActivity(ctx, s.DB, day, kind, courseID, lectureID, seconds, count)
 }

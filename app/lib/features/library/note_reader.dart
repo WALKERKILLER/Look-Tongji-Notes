@@ -674,7 +674,8 @@ class _NoteInlineReaderState extends State<NoteInlineReader> {
   Widget build(BuildContext context) {
     final n = widget.note;
     final tt = Theme.of(context).textTheme;
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+    // Reading beside the player counts like the full note page.
+    return ActivityRegion(kind: 'read', lectureId: n.lectureId, child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Padding(
         padding: const EdgeInsets.fromLTRB(Space.xs, Space.xs, Space.xs, 0),
         child: Row(children: [
@@ -716,6 +717,6 @@ class _NoteInlineReaderState extends State<NoteInlineReader> {
           padding: const EdgeInsets.fromLTRB(Space.sm, Space.md, Space.sm, Space.xxl),
         ),
       ),
-    ]);
+    ]));
   }
 }

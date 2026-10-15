@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"path/filepath"
 	"testing"
 )
@@ -58,6 +59,41 @@ func TestActivityCommitFailureUndoesMirror(t *testing.T) {
 	}
 	if rows, _ := s.ActivityRows(ctx); len(rows) != 1 {
 		t.Fatalf("retry not applied: %+v", rows)
+	}
+}
+
+func TestActivityBucketSaturatesWithinRestorableLimits(t *testing.T) {
+	ctx := context.Background()
+	s, err := Open(filepath.Join(t.TempDir(), "db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	if err := s.AddActivity(ctx, "2026-10-13", "watch", "", "", MaxDaySeconds-100, 0); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.AddActivity(ctx, "2026-10-13", "ask", "", "", 0, MaxDayCount-10); err != nil {
+		t.Fatal(err)
+	}
+	var mirrored []ActivityRow
+	mirror := func(rows []ActivityRow) (func(), error) { mirrored = rows; return func() {}, nil }
+	for i, r := range []struct {
+		kind           string
+		seconds, count int64
+	}{{"watch", 300, 0}, {"watch", 300, 0}, {"ask", 0, 50}} {
+		if err := s.AddActivityMirrored(ctx, "", fmt.Sprintf("report-%04d", i), "2026-10-13", r.kind, "", "", r.seconds, r.count, mirror); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got := map[string]ActivityRow{}
+	for _, r := range mirrored {
+		if err := CheckActivityRow(r); err != nil {
+			t.Errorf("mirrored row would be dropped on rebuild: %v", err)
+		}
+		got[r.Kind] = r
+	}
+	if got["watch"].Seconds != MaxDaySeconds || got["ask"].Count != MaxDayCount {
+		t.Fatalf("rows = %+v", mirrored)
 	}
 }
 

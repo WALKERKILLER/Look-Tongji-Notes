@@ -33,8 +33,10 @@ func checkActivity(in activityIn, now time.Time) (string, error) {
 		return "", badRequest("seconds 应在 0–300 之间")
 	case in.Count < 0 || in.Count > 50:
 		return "", badRequest("count 应在 0–50 之间")
-	case in.Seconds == 0 && in.Count == 0:
-		return "", badRequest("seconds 或 count 至少一个大于 0")
+	case store.TimedKinds[in.Kind] && (in.Seconds == 0 || in.Count != 0):
+		return "", badRequest(in.Kind + " 只记 seconds（大于 0），count 应为 0")
+	case in.Kind == "ask" && (in.Count == 0 || in.Seconds != 0):
+		return "", badRequest("ask 只记 count（大于 0），seconds 应为 0")
 	}
 	t := now
 	if in.At != 0 {
@@ -59,9 +61,6 @@ func (s *Server) addActivity(_ http.ResponseWriter, r *http.Request) (any, error
 		if l, err := s.St.Lecture(r.Context(), in.LectureID); err == nil {
 			in.CourseID = l.CourseID
 		}
-	}
-	if !store.TimedKinds[in.Kind] {
-		in.Seconds = 0
 	}
 	if err := s.Lib.AddActivity(r.Context(), in.ID, day, in.Kind, in.CourseID, in.LectureID, in.Seconds, in.Count); err != nil {
 		return nil, err
