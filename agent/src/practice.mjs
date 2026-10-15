@@ -27,7 +27,12 @@ export function parseRef(ref) {
 		return null;
 	}
 	if (u.protocol !== "look:") return null;
-	const seg = u.pathname.split("/").filter(Boolean).map(decodeURIComponent);
+	let seg;
+	try {
+		seg = u.pathname.split("/").filter(Boolean).map(decodeURIComponent);
+	} catch {
+		return null; // malformed escapes such as %ZZ
+	}
 	switch (u.hostname) {
 		case "lecture": {
 			const t = u.searchParams.has("t") ? Number(u.searchParams.get("t")) : NaN;

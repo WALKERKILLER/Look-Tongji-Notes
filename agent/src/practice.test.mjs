@@ -10,7 +10,7 @@ test("parseRef reads the three link kinds", () => {
 	assert.deepEqual(parseRef("look://lecture/L1?t=125"), { kind: "time", lecture: "L1", sec: 125 });
 	assert.deepEqual(parseRef("look://slide/L1/3"), { kind: "slide", lecture: "L1", idx: 3 });
 	assert.equal(parseRef("look://courseware/L1?file=a.pdf&q=x").file, "a.pdf");
-	for (const bad of ["", "https://x", "look://lecture/L1", "look://slide/L1/x", "look://courseware/L1"]) assert.equal(parseRef(bad), null, bad);
+	for (const bad of ["", "https://x", "look://lecture/L1", "look://slide/L1/x", "look://courseware/L1", "look://lecture/%ZZ?t=10"]) assert.equal(parseRef(bad), null, bad);
 });
 
 test("checkQuiz requires reading and real sources", () => {
@@ -22,6 +22,7 @@ test("checkQuiz requires reading and real sources", () => {
 	assert.match(checkQuiz({ ...ok, questions: [q("look://lecture/L1?t=900")] }, reads, full), /不在本次读过的字幕范围内/);
 	assert.match(checkQuiz({ ...ok, questions: [q("look://slide/L2/1")] }, reads, full), /另一节课/);
 	assert.match(checkQuiz({ ...ok, questions: [q("")] }, reads, full), /ref 无效/);
+	assert.match(checkQuiz({ ...ok, questions: [q("look://lecture/%ZZ?t=10")] }, reads, full), /ref 无效/);
 	const same = { lecture_id: "L1", questions: [1, 2, 3, 4].map((i) => ({ ...q(`look://slide/L1/${i}`), stem: `s${i}` })) };
 	assert.match(checkQuiz(same, reads, full), /同一个位置/);
 });
