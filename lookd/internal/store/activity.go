@@ -158,12 +158,13 @@ type ActivityDay struct {
 	NotesNew    int64            `json:"notes_created"`
 	NotesEdited int64            `json:"notes_edited"`
 	Transcripts int64            `json:"transcripts"`
+	Quizzes     int64            `json:"quizzes"` // finished quiz attempts
 }
 
 // Active reports whether the day counts as a study day (heatmap, streaks,
 // totals): study time or any recorded event.
 func (d *ActivityDay) Active() bool {
-	return d.Minutes >= 1 || d.Asks > 0 || d.NotesNew > 0 || d.NotesEdited > 0 || d.Transcripts > 0
+	return d.Minutes >= 1 || d.Asks > 0 || d.NotesNew > 0 || d.NotesEdited > 0 || d.Transcripts > 0 || d.Quizzes > 0
 }
 
 // ActivityDays returns every day in [from, to] (inclusive, YYYY-MM-DD),
@@ -251,6 +252,24 @@ func (s *Store) ActivityDays(ctx context.Context, from, to, courseID string) ([]
 	if err != nil {
 		return nil, err
 	}
+	for rows.Next() {
+		var d string
+		var n int64
+		if err := rows.Scan(&d, &n); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		if a := day(d); a != nil {
+			a.Transcripts += n
+		}
+	}
+	rows.Close()
+
+	rows, err = s.DB.QueryContext(ctx, `SELECT date(a.finished_at,'unixepoch','localtime'), COUNT(*) FROM quiz_attempts a JOIN quizzes q ON q.id=a.quiz_id
+ WHERE (?='' OR q.course_id=?) AND date(a.finished_at,'unixepoch','localtime') BETWEEN ? AND ? GROUP BY 1`, courseID, courseID, from, to)
+	if err != nil {
+		return nil, err
+	}
 	defer rows.Close()
 	for rows.Next() {
 		var d string
@@ -259,7 +278,7 @@ func (s *Store) ActivityDays(ctx context.Context, from, to, courseID string) ([]
 			return nil, err
 		}
 		if a := day(d); a != nil {
-			a.Transcripts += n
+			a.Quizzes += n
 		}
 	}
 	return out, rows.Err()
@@ -278,7 +297,8 @@ func (s *Store) ActivityStreak(ctx context.Context, today time.Time) (Streak, er
 	if err := s.DB.QueryRowContext(ctx, `SELECT COALESCE(MIN(d),'') FROM (
  SELECT MIN(day) d FROM activity UNION ALL
  SELECT date(MIN(created_at),'unixepoch','localtime') FROM notes WHERE source='user' UNION ALL
- SELECT date(MIN(created_at),'unixepoch','localtime') FROM assets WHERE kind='transcript')`).Scan(&first); err != nil || first == "" {
+ SELECT date(MIN(created_at),'unixepoch','localtime') FROM assets WHERE kind='transcript' UNION ALL
+ SELECT date(MIN(finished_at),'unixepoch','localtime') FROM quiz_attempts)`).Scan(&first); err != nil || first == "" {
 		return Streak{}, err
 	}
 	days, err := s.ActivityDays(ctx, first, today.Format("2006-01-02"), "")
@@ -351,12 +371,22 @@ type DayNote struct {
 	Created   bool   `json:"created"`
 }
 
+// DayQuiz is a quiz attempt finished on a day.
+type DayQuiz struct {
+	QuizID    string `json:"quiz_id"`
+	Title     string `json:"title"`
+	LectureID string `json:"lecture_id"`
+	Correct   int    `json:"correct"`
+	Total     int    `json:"total"`
+}
+
 // ActivityDetail lists what happened on one day.
 type ActivityDetail struct {
 	ActivityDay
 	Lectures    []DayLecture `json:"lectures"`
 	Notes       []DayNote    `json:"notes"`
 	Transcribed []DayLecture `json:"transcribed"`
+	Attempts    []DayQuiz    `json:"attempts"`
 }
 
 func (s *Store) ActivityOn(ctx context.Context, day string) (ActivityDetail, error) {
@@ -364,7 +394,7 @@ func (s *Store) ActivityOn(ctx context.Context, day string) (ActivityDetail, err
 	if err != nil {
 		return ActivityDetail{}, err
 	}
-	d := ActivityDetail{ActivityDay: days[0], Lectures: []DayLecture{}, Notes: []DayNote{}, Transcribed: []DayLecture{}}
+	d := ActivityDetail{ActivityDay: days[0], Lectures: []DayLecture{}, Notes: []DayNote{}, Transcribed: []DayLecture{}, Attempts: []DayQuiz{}}
 	rows, err := s.DB.QueryContext(ctx, `SELECT a.lecture_id, COALESCE(NULLIF(a.course_id,''), l.course_id, ''), COALESCE(l.title,''),
  COALESCE(NULLIF(c.alias,''), c.title, ''), a.kind, SUM(a.seconds)
  FROM activity a LEFT JOIN lectures l ON l.id=a.lecture_id LEFT JOIN courses c ON c.id=COALESCE(NULLIF(a.course_id,''), l.course_id)
@@ -402,14 +432,28 @@ func (s *Store) ActivityOn(ctx context.Context, day string) (ActivityDetail, err
 	if err != nil {
 		return d, err
 	}
-	defer rows.Close()
 	for rows.Next() {
 		var l DayLecture
 		if err := rows.Scan(&l.LectureID, &l.CourseID, &l.Title, &l.CourseTitle); err != nil {
+			rows.Close()
 			return d, err
 		}
 		l.Kind = "transcript"
 		d.Transcribed = append(d.Transcribed, l)
+	}
+	rows.Close()
+	rows, err = s.DB.QueryContext(ctx, `SELECT q.id, q.title, q.lecture_id, a.correct, a.total FROM quiz_attempts a JOIN quizzes q ON q.id=a.quiz_id
+ WHERE date(a.finished_at,'unixepoch','localtime')=? ORDER BY a.finished_at`, day)
+	if err != nil {
+		return d, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var q DayQuiz
+		if err := rows.Scan(&q.QuizID, &q.Title, &q.LectureID, &q.Correct, &q.Total); err != nil {
+			return d, err
+		}
+		d.Attempts = append(d.Attempts, q)
 	}
 	return d, rows.Err()
 }

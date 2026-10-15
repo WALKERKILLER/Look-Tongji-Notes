@@ -464,7 +464,7 @@ func (l *Library) Reindex(ctx context.Context) (int, error) {
 		}
 		return nil
 	})
-	return count + l.reindexSchedule(ctx) + l.reindexActivity(ctx), err
+	return count + l.reindexSchedule(ctx) + l.reindexActivity(ctx) + l.reindexQuizzes(ctx), err
 }
 
 var srtTime = regexp.MustCompile(`(\d+):(\d+):(\d+)[,.](\d+)\s*-->\s*(\d+):(\d+):(\d+)[,.](\d+)`)
