@@ -14,13 +14,17 @@ import (
 
 // AddActivity records a report (once per reportID) and rewrites
 // activity.json with it: if the file cannot be written the report is not
-// kept, and if the index then fails to commit the previous file returns.
+// kept, and if the index then does not commit the previous file returns
+// (see mirror.go).
 func (l *Library) AddActivity(ctx context.Context, reportID, day, kind, courseID, lectureID string, seconds, count int64) error {
-	l.actMu.Lock()
-	defer l.actMu.Unlock()
-	return l.Store.AddActivityMirrored(ctx, reportID, day, kind, courseID, lectureID, seconds, count, func(rows []store.ActivityRow) (func(), error) {
-		return replaceJSON(filepath.Join(l.Root, "activity.json"), map[string]any{"schema": "look-studio/activity@1", "rows": rows})
+	l.mirrorMu.Lock()
+	defer l.mirrorMu.Unlock()
+	m := l.beginMirror()
+	err := l.Store.AddActivityMirrored(ctx, m.token(), reportID, day, kind, courseID, lectureID, seconds, count, func(rows []store.ActivityRow) (func(), error) {
+		return m.replace(filepath.Join(l.Root, "activity.json"), map[string]any{"schema": "look-studio/activity@1", "rows": rows})
 	})
+	m.finish(ctx, err)
+	return err
 }
 
 func (l *Library) reindexActivity(ctx context.Context) int {

@@ -64,9 +64,10 @@ func (s *Store) AddActivity(ctx context.Context, day, kind, courseID, lectureID 
 // AddActivityMirrored adds a report to a bucket in one transaction and keeps
 // the file copy in step with it:
 //   - a report id seen before is a retry and changes nothing;
+//   - token (when set) is recorded in the transaction, see MirrorCommitted;
 //   - mirror writes every resulting row; if it fails, nothing is kept;
-//   - if the commit then fails, mirror's undo restores the previous file.
-func (s *Store) AddActivityMirrored(ctx context.Context, reportID, day, kind, courseID, lectureID string, seconds, count int64, mirror func([]ActivityRow) (undo func(), err error)) error {
+//   - if the commit then fails, mirror's undo is called.
+func (s *Store) AddActivityMirrored(ctx context.Context, token, reportID, day, kind, courseID, lectureID string, seconds, count int64, mirror func([]ActivityRow) (undo func(), err error)) error {
 	tx, err := s.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -86,6 +87,9 @@ func (s *Store) AddActivityMirrored(ctx context.Context, reportID, day, kind, co
 		}
 	}
 	if err := addActivity(ctx, tx, day, kind, courseID, lectureID, seconds, count); err != nil {
+		return err
+	}
+	if err := markMirrorCommit(ctx, tx, token); err != nil {
 		return err
 	}
 	rows, err := activityRows(ctx, tx)

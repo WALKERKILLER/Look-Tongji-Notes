@@ -33,8 +33,10 @@ type Library struct {
 	Root  string
 	Store *store.Store
 	mu    sync.Mutex
-	actMu sync.Mutex
 	tpl   Templates
+
+	// mirrorMu serializes mirrored writes, recovery and Reindex (mirror.go).
+	mirrorMu sync.Mutex
 }
 
 func Open(root string, st *store.Store) (*Library, error) {
@@ -43,6 +45,11 @@ func Open(root string, st *store.Store) (*Library, error) {
 	}
 	l := &Library{Root: root, Store: st, tpl: DefaultTemplates}
 	l.writeReadme()
+	l.mirrorMu.Lock()
+	if err := l.recoverMirrors(context.Background()); err != nil {
+		log.Printf("library: %v", err)
+	}
+	l.mirrorMu.Unlock()
 	return l, nil
 }
 
@@ -170,31 +177,22 @@ func writeJSON(path string, v any) error {
 
 func writeFileAtomic(path string, b []byte) error {
 	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, b, 0o644); err != nil {
+	f, err := os.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o644)
+	if err != nil {
+		return err
+	}
+	_, err = f.Write(b)
+	if err == nil {
+		err = f.Sync()
+	}
+	if cerr := f.Close(); err == nil {
+		err = cerr
+	}
+	if err != nil {
 		os.Remove(tmp)
 		return err
 	}
 	return os.Rename(tmp, path)
-}
-
-// replaceJSON writes v to path and returns how to put the previous file back
-// (or remove the new one), for when the matching index change is not
-// committed after all.
-func replaceJSON(path string, v any) (undo func(), err error) {
-	old, readErr := os.ReadFile(path)
-	if readErr != nil && !errors.Is(readErr, os.ErrNotExist) {
-		return nil, readErr
-	}
-	if err := writeJSON(path, v); err != nil {
-		return nil, err
-	}
-	return func() {
-		if readErr != nil {
-			os.Remove(path)
-		} else if err := writeFileAtomic(path, old); err != nil {
-			log.Printf("restore %s: %v", filepath.Base(path), err)
-		}
-	}, nil
 }
 
 func (l *Library) writeCourseJSON(c store.Course) {
@@ -417,6 +415,11 @@ func orDefault(s, d string) string {
 // Reindex rebuilds transcript segments and notes from files on disk, so the
 // database can always be deleted and regenerated.
 func (l *Library) Reindex(ctx context.Context) (int, error) {
+	l.mirrorMu.Lock()
+	defer l.mirrorMu.Unlock()
+	if err := l.recoverMirrors(ctx); err != nil {
+		return 0, err
+	}
 	count := 0
 	err := filepath.WalkDir(l.Abs("courses"), func(p string, d os.DirEntry, err error) error {
 		if err != nil || d.IsDir() {
