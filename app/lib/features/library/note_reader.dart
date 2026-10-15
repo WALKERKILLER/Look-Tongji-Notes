@@ -15,6 +15,7 @@ import '../../widgets/md_reader.dart';
 import '../../widgets/report_screen.dart';
 import '../../widgets/states.dart';
 import '../player/player_page.dart';
+import '../plugins/plugin_views.dart';
 import 'note_editor.dart';
 
 /// A note opened for reading: contents on the left, the text in a readable
@@ -135,6 +136,13 @@ class _NotePageState extends State<NotePage> {
                 if (!tocPane && _doc!.headings.isNotEmpty) IconButton(tooltip: '目录', onPressed: _showToc, icon: const Icon(Icons.toc_rounded)),
                 IconButton(tooltip: '编辑', onPressed: () => setState(() => _editing = true), icon: const Icon(Icons.edit_outlined)),
               ],
+              if (reading)
+                PluginMenuButton(
+                  surface: 'note.toolbar',
+                  noteViews: true,
+                  exportScope: 'note',
+                  context_: {'note_id': n.id, if (n.lectureId.isNotEmpty) 'lecture_id': n.lectureId, if (n.courseId.isNotEmpty) 'course_id': n.courseId},
+                ),
               if (n != null && n.lectureId.isNotEmpty)
                 IconButton(
                   tooltip: '打开对应课次',

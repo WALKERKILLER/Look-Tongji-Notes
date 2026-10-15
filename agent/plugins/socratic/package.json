@@ -1,0 +1,31 @@
+{
+	"name": "@look-studio/plugin-socratic",
+	"version": "1.0.0",
+	"private": true,
+	"type": "module",
+	"license": "MIT",
+	"author": "Look Studio",
+	"lookStudio": {
+		"id": "socratic",
+		"title": "引导式提问",
+		"summary": "助手不直接给答案，而是用一连串提问引导你自己想出来",
+		"description": "开启后，助手会像助教一样先问你已经知道什么，再把问题拆成小步，一次只问一个问题；你卡住时给提示而不是答案，答对后让你用自己的话复述。适合做作业、复习概念和准备考试。可以随时在输入框的「+」菜单里开关。",
+		"icon": "psychology_alt",
+		"categories": ["tutor", "review"],
+		"engine": "^1.0.0",
+		"agent": "index.mjs",
+		"skills": ["skills"],
+		"permissions": [],
+		"settings": {
+			"type": "object",
+			"properties": {
+				"style": { "type": "string", "title": "引导力度", "enum": ["温和", "严格"], "default": "温和", "description": "温和：几次尝试后给出关键提示；严格：始终只给提示" },
+				"reveal_after": { "type": "integer", "title": "几次尝试后给答案", "minimum": 1, "maximum": 6, "default": 2 }
+			}
+		},
+		"examples": ["一步步引导我推导这节课的主定理", "别告诉我答案，帮我想清楚这道题", "考考我这节课的概念"],
+		"contributes": {
+			"actions": [{ "id": "toggle", "title": "引导式提问", "icon": "psychology_alt", "surface": "composer.plus", "action": "toggle" }]
+		}
+	}
+}
