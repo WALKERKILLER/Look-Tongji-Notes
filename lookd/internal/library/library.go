@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -164,11 +165,36 @@ func writeJSON(path string, v any) error {
 	if err != nil {
 		return err
 	}
+	return writeFileAtomic(path, append(b, '\n'))
+}
+
+func writeFileAtomic(path string, b []byte) error {
 	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, append(b, '\n'), 0o644); err != nil {
+	if err := os.WriteFile(tmp, b, 0o644); err != nil {
+		os.Remove(tmp)
 		return err
 	}
 	return os.Rename(tmp, path)
+}
+
+// replaceJSON writes v to path and returns how to put the previous file back
+// (or remove the new one), for when the matching index change is not
+// committed after all.
+func replaceJSON(path string, v any) (undo func(), err error) {
+	old, readErr := os.ReadFile(path)
+	if readErr != nil && !errors.Is(readErr, os.ErrNotExist) {
+		return nil, readErr
+	}
+	if err := writeJSON(path, v); err != nil {
+		return nil, err
+	}
+	return func() {
+		if readErr != nil {
+			os.Remove(path)
+		} else if err := writeFileAtomic(path, old); err != nil {
+			log.Printf("restore %s: %v", filepath.Base(path), err)
+		}
+	}, nil
 }
 
 func (l *Library) writeCourseJSON(c store.Course) {
