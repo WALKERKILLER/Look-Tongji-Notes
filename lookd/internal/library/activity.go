@@ -12,14 +12,14 @@ import (
 // Study activity lives in the index and is mirrored to activity.json, like
 // the schedule, so that rebuilding the index from files keeps it.
 
-func (l *Library) WriteActivity(ctx context.Context) error {
+// AddActivity records a report and rewrites activity.json in the same
+// transaction: if the file cannot be written the report is not kept.
+func (l *Library) AddActivity(ctx context.Context, day, kind, courseID, lectureID string, seconds, count int64) error {
 	l.actMu.Lock()
 	defer l.actMu.Unlock()
-	rows, err := l.Store.ActivityRows(ctx)
-	if err != nil {
-		return err
-	}
-	return writeJSON(filepath.Join(l.Root, "activity.json"), map[string]any{"schema": "look-studio/activity@1", "rows": rows})
+	return l.Store.AddActivityMirrored(ctx, day, kind, courseID, lectureID, seconds, count, func(rows []store.ActivityRow) error {
+		return writeJSON(filepath.Join(l.Root, "activity.json"), map[string]any{"schema": "look-studio/activity@1", "rows": rows})
+	})
 }
 
 func (l *Library) reindexActivity(ctx context.Context) int {

@@ -91,17 +91,30 @@ func TestActivityStreakAcrossMonthEnd(t *testing.T) {
 	if err := s.AddActivity(ctx, "2026-09-27", "read", "", "", 30, 0); err != nil {
 		t.Fatal(err)
 	}
+	// A finished transcript alone does: 09-28 joins the run.
+	if err := s.UpsertCourse(ctx, Course{ID: "c1", Title: "高等数学"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.UpsertLectures(ctx, []Lecture{{ID: "l1", CourseID: "c1", Title: "第一讲"}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.PutAsset(ctx, Asset{LectureID: "l1", Kind: "transcript", Path: "l1/transcript.md"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.DB.Exec(`UPDATE assets SET created_at=? WHERE kind='transcript'`, at("2026-09-28", 22)); err != nil {
+		t.Fatal(err)
+	}
 	today, _ := time.ParseInLocation("2006-01-02", "2026-10-03", time.Local)
 	st, err := s.ActivityStreak(ctx, today) // today inactive: streak still counts through yesterday
 	if err != nil {
 		t.Fatal(err)
 	}
-	if st.Current != 4 || st.Longest != 4 {
+	if st.Current != 5 || st.Longest != 5 {
 		t.Fatalf("streak: %+v", st)
 	}
 	later := today.AddDate(0, 0, 1)
 	st, _ = s.ActivityStreak(ctx, later)
-	if st.Current != 0 || st.Longest != 4 {
+	if st.Current != 0 || st.Longest != 5 {
 		t.Fatalf("broken streak: %+v", st)
 	}
 	empty := openTemp(t)

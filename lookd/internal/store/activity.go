@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"database/sql"
 	"time"
 )
 
@@ -13,12 +14,45 @@ import (
 // TimedKinds are the activity kinds measured in seconds; "ask" is a count.
 var TimedKinds = map[string]bool{"watch": true, "read": true, "practice": true}
 
-// AddActivity adds seconds and/or a count to one day bucket.
-func (s *Store) AddActivity(ctx context.Context, day, kind, courseID, lectureID string, seconds, count int64) error {
-	_, err := s.DB.ExecContext(ctx, `INSERT INTO activity(day,kind,course_id,lecture_id,seconds,count) VALUES(?,?,?,?,?,?)
+// querier is a database or a transaction.
+type querier interface {
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
+}
+
+func addActivity(ctx context.Context, q querier, day, kind, courseID, lectureID string, seconds, count int64) error {
+	_, err := q.ExecContext(ctx, `INSERT INTO activity(day,kind,course_id,lecture_id,seconds,count) VALUES(?,?,?,?,?,?)
  ON CONFLICT(day,kind,course_id,lecture_id) DO UPDATE SET seconds=seconds+excluded.seconds, count=count+excluded.count`,
 		day, kind, courseID, lectureID, seconds, count)
 	return err
+}
+
+// AddActivity adds seconds and/or a count to one day bucket.
+func (s *Store) AddActivity(ctx context.Context, day, kind, courseID, lectureID string, seconds, count int64) error {
+	return addActivity(ctx, s.DB, day, kind, courseID, lectureID, seconds, count)
+}
+
+// AddActivityMirrored adds to a bucket and hands every resulting row to
+// mirror inside one transaction; the add is rolled back if mirror fails, so
+// the index and its file copy never disagree and a retried report is not
+// counted twice.
+func (s *Store) AddActivityMirrored(ctx context.Context, day, kind, courseID, lectureID string, seconds, count int64, mirror func([]ActivityRow) error) error {
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if err := addActivity(ctx, tx, day, kind, courseID, lectureID, seconds, count); err != nil {
+		return err
+	}
+	rows, err := activityRows(ctx, tx)
+	if err != nil {
+		return err
+	}
+	if err := mirror(rows); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 // ActivityRow is one stored bucket, as mirrored to activity.json.
@@ -33,7 +67,11 @@ type ActivityRow struct {
 
 // ActivityRows returns every bucket in day order.
 func (s *Store) ActivityRows(ctx context.Context) ([]ActivityRow, error) {
-	rows, err := s.DB.QueryContext(ctx, `SELECT day,kind,course_id,lecture_id,seconds,count FROM activity ORDER BY day,kind,course_id,lecture_id`)
+	return activityRows(ctx, s.DB)
+}
+
+func activityRows(ctx context.Context, q querier) ([]ActivityRow, error) {
+	rows, err := q.QueryContext(ctx, `SELECT day,kind,course_id,lecture_id,seconds,count FROM activity ORDER BY day,kind,course_id,lecture_id`)
 	if err != nil {
 		return nil, err
 	}
@@ -49,9 +87,12 @@ func (s *Store) ActivityRows(ctx context.Context) ([]ActivityRow, error) {
 	return out, rows.Err()
 }
 
-// PutActivity sets a bucket, replacing its totals (used when reindexing).
+// PutActivity restores a bucket when reindexing. Totals only grow, so the
+// larger of the stored and restored values wins and an older file copy can
+// never lower newer totals.
 func (s *Store) PutActivity(ctx context.Context, r ActivityRow) error {
-	_, err := s.DB.ExecContext(ctx, `INSERT OR REPLACE INTO activity(day,kind,course_id,lecture_id,seconds,count) VALUES(?,?,?,?,?,?)`,
+	_, err := s.DB.ExecContext(ctx, `INSERT INTO activity(day,kind,course_id,lecture_id,seconds,count) VALUES(?,?,?,?,?,?)
+ ON CONFLICT(day,kind,course_id,lecture_id) DO UPDATE SET seconds=MAX(seconds,excluded.seconds), count=MAX(count,excluded.count)`,
 		r.Day, r.Kind, r.CourseID, r.LectureID, r.Seconds, r.Count)
 	return err
 }
@@ -67,8 +108,10 @@ type ActivityDay struct {
 	Transcripts int64            `json:"transcripts"`
 }
 
-func (d *ActivityDay) active() bool {
-	return d.Minutes >= 1 || d.Asks > 0 || d.NotesNew > 0 || d.NotesEdited > 0
+// Active reports whether the day counts as a study day (heatmap, streaks,
+// totals): study time or any recorded event.
+func (d *ActivityDay) Active() bool {
+	return d.Minutes >= 1 || d.Asks > 0 || d.NotesNew > 0 || d.NotesEdited > 0 || d.Transcripts > 0
 }
 
 // ActivityDays returns every day in [from, to] (inclusive, YYYY-MM-DD),
@@ -182,7 +225,8 @@ func (s *Store) ActivityStreak(ctx context.Context, today time.Time) (Streak, er
 	var first string
 	if err := s.DB.QueryRowContext(ctx, `SELECT COALESCE(MIN(d),'') FROM (
  SELECT MIN(day) d FROM activity UNION ALL
- SELECT date(MIN(created_at),'unixepoch','localtime') FROM notes WHERE source='user')`).Scan(&first); err != nil || first == "" {
+ SELECT date(MIN(created_at),'unixepoch','localtime') FROM notes WHERE source='user' UNION ALL
+ SELECT date(MIN(created_at),'unixepoch','localtime') FROM assets WHERE kind='transcript')`).Scan(&first); err != nil || first == "" {
 		return Streak{}, err
 	}
 	days, err := s.ActivityDays(ctx, first, today.Format("2006-01-02"), "")
@@ -192,7 +236,7 @@ func (s *Store) ActivityStreak(ctx context.Context, today time.Time) (Streak, er
 	var st Streak
 	run := 0
 	for i := range days {
-		if days[i].active() {
+		if days[i].Active() {
 			run++
 			st.Longest = max(st.Longest, run)
 		} else {
@@ -201,10 +245,10 @@ func (s *Store) ActivityStreak(ctx context.Context, today time.Time) (Streak, er
 	}
 	// Walk back from today (skipping an inactive today).
 	i := len(days) - 1
-	if i >= 0 && !days[i].active() {
+	if i >= 0 && !days[i].Active() {
 		i--
 	}
-	for ; i >= 0 && days[i].active(); i-- {
+	for ; i >= 0 && days[i].Active(); i-- {
 		st.Current++
 	}
 	return st, nil
