@@ -19,19 +19,19 @@ Non-goals: running while Look Studio is closed (no system service), event trigge
 - `schedule`: `{type: daily, time}`, `{type: weekly, days:[1..7], time}`, `{type: once, at}`; local time; minute precision.
 - `budget_usd`: per-run cost cap, default 0.20; a run that exceeds it is aborted after the current call and marked `budget`.
 - `catch_up`: when the app starts after a missed time, run once if the miss is under 12 hours (default on); without it a run still starts up to 5 minutes late. A missed time outside the window is recorded as a `skipped` run. Each scheduled time is handled once (the task keeps the last handled time); times before a task was created or rescheduled never run.
-- Validation: name ≤ 40 chars, prompt ≤ 4000, `HH:MM` times, at least one weekday, a real calendar `once` time in the future (`2026-02-30T08:00` is rejected, not rolled over), budget $0.01–$5.
+- Validation: name ≤ 40 chars, prompt ≤ 4000, `HH:MM` times, `days` an array with at least one weekday, a real calendar `once` time in the future (`2026-02-30T08:00` is rejected, not rolled over), budget $0.01–$5.
 - Stored in `<agent data dir>/tasks.json`; run history (last 50 per task) in `tasks-runs.jsonl`: `{task_id, name, run_id, started, finished, status: ok|error|budget|skipped|aborted, session_id, cost, summary, manual}`. Both files hold prompts and summaries, so they are written with mode 0600 (existing files are tightened on load), like `models.json`.
 
 ### Execution
 - The host checks due tasks every 30 s while running. One run at a time; a due run while another runs waits; a task never overlaps itself.
 - A run opens a new conversation named `定时 · <name> · MM-DD HH:mm` and prompts it with the task prompt plus a context line saying it is an unattended scheduled run (no user available to answer questions; finish with a short summary). Tool-call cap 24 per run (as chat). Usage is recorded with `purpose: task` and `task_id`.
 - A run stops on the budget, on a 15-minute timeout (`error`), or when its task is disabled or deleted (`aborted`).
-- A run whose history cannot be written is logged; the scheduler still clears it and moves on to the next queued run.
+- A run whose history cannot be written is logged; the scheduler still clears it and moves on to the next queued run. A check saves the handled times before writing `skipped` records, retries a failed save on the next check, and always starts queued runs.
 - On start and finish the host notifies lookd (`POST /api/agent/event`, `{type: agent_task, data}`; other types → 400), which publishes `agent_task` on the event bus.
 - Disabling or deleting a task cancels its pending run; deleting keeps its conversations.
 
 ### API (agent host, via `/agent/…`)
-`GET /tasks`, `POST /tasks`, `PUT /tasks/{id}`, `DELETE /tasks/{id}`, `POST /tasks/{id}/run` (run now), `GET /tasks/{id}/runs`, `GET /tasks/runs?status=&limit=` (runs of every task, newest first, default 100, at most 500; each with the task `name` and `deleted` when the task is gone). Validation errors → 400 with a Chinese message.
+`GET /tasks`, `POST /tasks`, `PUT /tasks/{id}`, `DELETE /tasks/{id}`, `POST /tasks/{id}/run` (run now), `GET /tasks/{id}/runs`, `GET /tasks/runs?status=&limit=` (runs of every task, newest first, default 100, at most 500; each with the task `name` and `deleted` when the task is gone). Validation errors → 400 with a Chinese message. Every host request body is limited to 1 MiB (413 beyond, checked while reading).
 
 ### UI
 Modelled on the sidebar entries of agent apps (Codex app *Automations*, Claude Code Desktop *Scheduled*): tasks are a destination of their own with a list, a detail view and a run history, not a menu item.
@@ -54,7 +54,7 @@ Modelled on the sidebar entries of agent apps (Codex app *Automations*, Claude C
 - Live: a task scheduled one minute ahead runs once, creates a conversation, records `task` usage and shows the snackbar; disabling before the time prevents the run.
 
 ## Evidence
-- Scheduler: [tasks.mjs](../../agent/src/tasks.mjs) with [tasks.test.mjs](../../agent/src/tasks.test.mjs) (previous and next runs across a month end, weekdays and a year end; catch-up and late windows; a time runs once; validation including overflowing dates; serial runs, budget status, abort on disable, skipped runs, history kept across a restart, 0600 modes, cross-task history with deleted tasks, a failed history write not stalling the queue).
+- Scheduler: [tasks.mjs](../../agent/src/tasks.mjs) with [tasks.test.mjs](../../agent/src/tasks.test.mjs) (previous and next runs across a month end, weekdays and a year end; catch-up and late windows; a time runs once; validation including overflowing dates; serial runs, budget status, abort on disable, skipped runs, history kept across a restart, 0600 modes, cross-task history with deleted tasks, a failed history write not stalling the queue, a failed skipped record still saving handled times); body limit in [http.test.mjs](../../agent/src/http.test.mjs).
 - Runner and routes: `runTask` and `/tasks` routes in [host.mjs](../../agent/src/host.mjs); lookd relay [agent_event.go](../../lookd/internal/server/agent_event.go).
 - App: [tasks_page.dart](../../app/lib/features/assistant/tasks_page.dart) (tab, list-detail, run history, templates, editor, run listener), unread count [task_inbox.dart](../../app/lib/features/assistant/task_inbox.dart), rail destination in [shell.dart](../../app/lib/shell.dart); [tasks_test.dart](../../app/test/tasks_test.dart) (wording; wide list beside detail, toggle request, run history with filters, skipped reason and deleted task; narrow cards and detail page; templates and the weekly and 工作日 schedules).
 - Live check (2026-10-15): a daily task set two minutes ahead with a $0.05 cap ran once at its time (not manually), produced `started` and `finished` `agent_task` events, a conversation titled `定时 · 验证A · 10-15 05:15`, and one usage line with purpose `task` and its task id; a second task disabled before the time never ran; an empty name and a non-task event type returned 400. The test tasks and their conversation were deleted afterwards.

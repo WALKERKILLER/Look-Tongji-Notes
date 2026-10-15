@@ -46,6 +46,8 @@ test("validation", () => {
 		[{ ...ok, name: "" }, /名称/],
 		[{ ...ok, schedule: { type: "daily", time: "25:00" } }, /HH:MM/],
 		[{ ...ok, schedule: { type: "weekly", days: [], time: "08:00" } }, /至少选一天/],
+		[{ ...ok, schedule: { type: "weekly", days: "1,5", time: "08:00" } }, /数组/],
+		[{ ...ok, schedule: { type: "weekly", days: { 1: true }, time: "08:00" } }, /数组/],
 		[{ ...ok, schedule: { type: "once", at: "2020-01-01T08:00" } }, /将来/],
 		[{ ...ok, schedule: { type: "once", at: "2099-02-30T08:00" } }, /时间无效/],
 		[{ ...ok, schedule: { type: "once", at: "2099-04-31T08:00" } }, /时间无效/],
@@ -144,6 +146,30 @@ test("existing files become private and a failed history write does not stall th
 		s.runNow(b.id);
 		await until(() => s.running === null && s.queue.length === 0 && s.runs.length === 2);
 		assert.deepEqual(s.runs.map((r) => r.name), ["甲", "乙"]);
+	} finally {
+		await rm(dir, { recursive: true, force: true });
+	}
+});
+
+test("a failed skipped-run record still saves handled times and runs due tasks", async () => {
+	const dir = await mkdtemp(join(tmpdir(), "tasks-"));
+	try {
+		let now = D("2026-10-14T08:00");
+		const ran = [];
+		const make = () => new TaskScheduler(dir, async (t) => (ran.push(t.name), { status: "ok" }), { now: () => now });
+		const s = make();
+		await s.load();
+		await s.create({ name: "错过", prompt: "p", schedule: { type: "daily", time: "09:00" }, catch_up: false });
+		await s.create({ name: "补跑", prompt: "p", schedule: { type: "daily", time: "21:00" } });
+		await mkdir(join(dir, "tasks-runs.jsonl")); // every history write fails
+		now = D("2026-10-14T21:30"); // 09:00 missed beyond 5 min, 21:00 within catch-up
+		await s.tick();
+		await until(() => s.running === null && ran.length === 1);
+		assert.deepEqual(ran, ["补跑"]);
+		// After a restart the missed slot is not handled again.
+		const again = make();
+		await again.load();
+		assert.equal(due(again.get(again.list().find((t) => t.name === "错过").id), now), null);
 	} finally {
 		await rm(dir, { recursive: true, force: true });
 	}

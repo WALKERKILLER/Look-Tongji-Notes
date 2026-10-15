@@ -36,6 +36,7 @@ export function validateTask(input, old = {}) {
 			schedule = { type: "daily", time };
 			break;
 		case "weekly": {
+			if (s.days != null && !Array.isArray(s.days)) throw bad("days 应为 1–7 的数组（周一到周日）");
 			const days = [...new Set((s.days ?? []).map(Number))].filter((d) => Number.isInteger(d) && d >= 1 && d <= 7).sort();
 			if (!validTime) throw bad("时间格式应为 HH:MM");
 			if (!days.length) throw bad("每周任务至少选一天");
@@ -139,6 +140,7 @@ export class TaskScheduler {
 		this.tasks = [];
 		this.queue = []; // {task_id, scheduled, manual}
 		this.running = null; // {task_id, run_id, ac, started}
+		this.unsaved = false; // handled times not yet written to tasks.json
 		this.runs = [];
 	}
 
@@ -249,21 +251,32 @@ export class TaskScheduler {
 	/** Checks for due tasks; called every 30 s. */
 	async tick() {
 		const now = this.now();
-		let changed = false;
+		const skipped = [];
 		for (const t of this.tasks) {
 			if (this.running?.task_id === t.id || this.queue.some((q) => q.task_id === t.id)) continue;
 			const d = due(t, now);
 			if (!d) continue;
 			t.handled = d.scheduled;
-			changed = true;
+			this.unsaved = true;
 			if (d.action === "run") {
 				this.queue.push({ task_id: t.id, scheduled: d.scheduled });
 			} else {
-				await this.record({ task_id: t.id, name: t.name, run_id: newRunId(), started: now.getTime(), finished: now.getTime(), status: "skipped", cost: 0, summary: `错过了 ${fmtStamp(d.scheduled)} 的运行（应用当时未运行）` });
+				skipped.push({ task_id: t.id, name: t.name, run_id: newRunId(), started: now.getTime(), finished: now.getTime(), status: "skipped", cost: 0, summary: `错过了 ${fmtStamp(d.scheduled)} 的运行（应用当时未运行）` });
 			}
 		}
-		if (changed) await this.save();
-		this.pump();
+		try {
+			// Handled times first: a slot must not be handled again after a
+			// restart. A failed save is retried on the next tick.
+			if (this.unsaved) {
+				await this.save();
+				this.unsaved = false;
+			}
+		} finally {
+			for (const rec of skipped) {
+				await this.record(rec).catch((e) => console.error(`skipped run not recorded: ${e?.message ?? e}`));
+			}
+			this.pump();
+		}
 	}
 
 	pump() {

@@ -14,6 +14,7 @@ import { createTools, TURN_TOOL_BUDGET } from "./tools.mjs";
 import { generateTimeline } from "./timeline.mjs";
 import { api } from "./lookd.mjs";
 import { fmtStamp, TaskScheduler } from "./tasks.mjs";
+import { httpError, readJson } from "./http.mjs";
 import { entryFrom, UsageLedger } from "./usage.mjs";
 
 const TOKEN = process.env.LOOKD_TOKEN ?? "";
@@ -218,21 +219,7 @@ function messageView(m) {
 
 // ---- HTTP ----
 
-function httpError(status, message) {
-	return Object.assign(new Error(message), { status });
-}
-
-async function body(req) {
-	const chunks = [];
-	for await (const c of req) chunks.push(c);
-	const raw = Buffer.concat(chunks).toString("utf8");
-	if (!raw) return {};
-	try {
-		return JSON.parse(raw);
-	} catch {
-		throw httpError(400, "请求体不是 JSON");
-	}
-}
+const body = (req) => readJson(req);
 
 function send(res, status, data) {
 	res.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });

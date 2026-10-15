@@ -7,7 +7,7 @@
   "main": "src/host.mjs",
   "scripts": {
     "start": "node src/host.mjs",
-    "check": "node --check src/host.mjs && node --check src/tools.mjs && node --check src/models.mjs && node --check src/catalog.mjs && node --check src/timeline.mjs && node --check src/vision.mjs && node --check src/usage.mjs && node --check src/practice.mjs && node --check src/tasks.mjs",
+    "check": "node --check src/host.mjs && node --check src/tools.mjs && node --check src/models.mjs && node --check src/catalog.mjs && node --check src/timeline.mjs && node --check src/vision.mjs && node --check src/usage.mjs && node --check src/practice.mjs && node --check src/tasks.mjs && node --check src/http.mjs",
     "test": "node --test 'src/**/*.test.mjs'"
   },
   "engines": { "node": ">=22" },
