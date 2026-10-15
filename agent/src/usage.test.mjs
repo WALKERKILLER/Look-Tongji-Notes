@@ -68,6 +68,8 @@ test("summary fills zero days, groups and compares with the previous period", as
 	assert.equal(s.by_session.find((r) => r.key === "a").title, "第一章");
 	await assert.rejects(l.summary("2026-10-07", "2026-10-05"), { status: 400 });
 	await assert.rejects(l.summary("10/05", "2026-10-07"), { status: 400 });
+	await assert.rejects(l.summary("2026-02-31", "2026-03-02"), { status: 400 }); // not a real day
+	await assert.rejects(l.calls({ from: "2026-02-30" }), { status: 400 });
 });
 
 test("calls pages newest first with filters", async () => {
@@ -77,6 +79,21 @@ test("calls pages newest first with filters", async () => {
 	const next = await l.calls({ before: page[1].ts, limit: 5 });
 	assert.deepEqual(next.map((c) => new Date(c.ts).getHours()), [2, 1]);
 	assert.equal((await l.calls({ purpose: "vision" })).length, 2);
+	await assert.rejects(l.calls({ before: "x" }), { status: 400 });
+});
+
+test("calls sharing a millisecond are not skipped across pages", async () => {
+	const same = at("2026-10-05", 9);
+	const l = await ledgerWith([1, 2, 3, 4, 5].map((n) => ({ ...entryFrom(msg(same)), output: n })));
+	const seen = [];
+	let before;
+	for (let i = 0; i < 5; i++) {
+		const page = await l.calls({ before, limit: 2 });
+		if (!page.length) break;
+		seen.push(...page.map((c) => c.output));
+		before = page.at(-1).cursor;
+	}
+	assert.deepEqual(seen, [5, 4, 3, 2, 1]);
 });
 
 test("backfill imports every assistant message once", async () => {
