@@ -108,16 +108,17 @@ func (l *Library) reindexQuizzes(ctx context.Context) int {
 		if json.Unmarshal(b, &f) != nil || f.Quiz.ID != strings.TrimSuffix(filepath.Base(p), ".json") || store.ValidateQuiz(&f.Quiz) != nil {
 			continue
 		}
-		if l.Store.PutQuiz(ctx, f.Quiz) != nil {
-			continue
-		}
-		// Only attempts that belong to this set and grade to their stored score.
+		// Only attempts that belong to this set and grade to their stored
+		// score; they replace whatever the index held for the set.
+		var attempts []store.QuizAttempt
 		for _, a := range f.Attempts {
 			if store.CheckAttempt(f.Quiz, a) == nil {
-				l.Store.PutQuizAttempt(ctx, a)
+				attempts = append(attempts, a)
 			}
 		}
-		n++
+		if l.Store.RestoreQuiz(ctx, f.Quiz, attempts) == nil {
+			n++
+		}
 	}
 	return n
 }
