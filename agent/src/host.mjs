@@ -309,7 +309,7 @@ route("GET", "/usage/calls", async (req) => {
 	const q = new URL(req.url, "http://x").searchParams;
 	const titles = new Map((await SessionManager.list(CWD, SESSIONS)).map((s) => [s.id, sessionTitle(s)]));
 	const calls = await usage.calls({
-		before: Number(q.get("before")) || Infinity,
+		before: q.get("before") || undefined,
 		limit: Math.min(Number(q.get("limit")) || 50, 200),
 		from: q.get("from") || undefined,
 		to: q.get("to") || undefined,

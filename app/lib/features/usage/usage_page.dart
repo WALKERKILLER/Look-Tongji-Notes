@@ -483,7 +483,7 @@ class _CallLogPageState extends State<CallLogPage> {
     if (_loading || _done) return;
     setState(() => _loading = true);
     try {
-      final before = _calls.isEmpty ? null : '${_calls.last['ts']}';
+      final before = _calls.isEmpty ? null : '${_calls.last['cursor'] ?? _calls.last['ts']}';
       final res = await (widget.fetch ?? _apiFetch(context))('/agent/usage/calls', {...widget.filter.query, 'limit': '60', 'before': ?before});
       final page = jsonList(res).whereType<Map>().map((e) => e.cast<String, dynamic>()).toList();
       if (!mounted) return;
