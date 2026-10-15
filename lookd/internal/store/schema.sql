@@ -199,3 +199,9 @@ CREATE TABLE IF NOT EXISTS activity_reports (
   id TEXT PRIMARY KEY,
   at INTEGER NOT NULL
 );
+
+-- Tokens of committed mirrored writes; see store/mirror.go (not mirrored).
+CREATE TABLE IF NOT EXISTS mirror_commits (
+  token TEXT PRIMARY KEY,
+  at    INTEGER NOT NULL
+);
