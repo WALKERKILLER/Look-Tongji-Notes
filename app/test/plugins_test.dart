@@ -20,6 +20,36 @@ Map<String, dynamic> _plugin(String id, {String state = 'enabled', Map<String, d
       ],
     };
 
+/// A store whose host calls stay in memory.
+class _FakeStore extends PluginStore {
+  _FakeStore(super.app, this.listings);
+  final List<Map<String, dynamic>> listings;
+  final updates = <(String, Map<String, dynamic>)>[];
+
+  @override
+  bool get ready => true;
+
+  @override
+  Future<void> load() async {
+    await Future<void>.value();
+    loaded = true;
+    notifyListeners();
+  }
+
+  @override
+  Future<Map<String, dynamic>> catalog() async => {'plugins': listings, 'errors': [], 'catalogs': []};
+
+  @override
+  Future<Map<String, dynamic>> update(String id, Map<String, dynamic> body) async {
+    updates.add((id, body));
+    final p = byId(id)!;
+    p['enabled'] = body['enabled'];
+    p['state'] = body['enabled'] == true ? 'enabled' : 'disabled';
+    notifyListeners();
+    return p;
+  }
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -155,5 +185,71 @@ void main() {
     await tester.tap(find.text('保存设置'));
     await tester.pump();
     expect(saved, {'port': 10045, 'style': '严格', 'auto': true});
+  });
+
+  group('插件 tab', () {
+    Map<String, dynamic> listing(String id, String title, {bool official = true}) => {
+          'id': id,
+          'title': title,
+          'summary': '$title 的简介',
+          'icon': 'hub',
+          'categories': ['notes'],
+          'source': 'bundled:$id',
+          'official': official,
+          'catalog': official ? 'official' : '社区目录',
+          'author': official ? null : '某人',
+        };
+
+    Future<_FakeStore> pumpTab(WidgetTester tester, Size size, {int view = 0}) async {
+      await tester.binding.setSurfaceSize(size);
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final store = _FakeStore(AppState(LookdService()), [listing('mindmap', '思维导图'), listing('anki', '闪卡导出', official: false)])
+        ..installed = [_plugin('mindmap'), _plugin('cards', state: 'needs_consent')];
+      pluginsView.value = view;
+      await tester.pumpWidget(ChangeNotifierProvider<PluginStore>.value(value: store, child: const MaterialApp(home: PluginsPage())));
+      await tester.pumpAndSettle();
+      return store;
+    }
+
+    testWidgets('wide: catalogs by source, a side pane, installed list beside detail', (tester) async {
+      final store = await pumpTab(tester, const Size(1400, 900));
+      expect(find.text('2 个已安装 · 1 个启用 · 1 个需要处理'), findsOneWidget);
+      expect(find.text('Look Studio 官方'), findsWidgets);
+      expect(find.text('社区目录'), findsOneWidget);
+      expect(find.byType(PluginDetailView), findsNothing);
+
+      await tester.tap(find.text('闪卡导出'));
+      await tester.pumpAndSettle();
+      expect(find.byType(PluginDetailView), findsOneWidget);
+      expect(find.widgetWithText(FilledButton, '安装'), findsWidgets);
+      await tester.tap(find.byTooltip('关闭'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.descendant(of: find.byType(SegmentedButton<int>), matching: find.text('已安装 2')));
+      await tester.pumpAndSettle();
+      expect(find.text('需要处理 · 1'), findsOneWidget);
+      expect(find.text('已启用 · 1'), findsOneWidget);
+      // The plugin needing consent comes first and is selected.
+      expect(find.widgetWithText(FilledButton, '查看并授权'), findsOneWidget);
+
+      await tester.tap(find.text('MINDMAP'));
+      await tester.pumpAndSettle();
+      expect(find.byType(Switch), findsOneWidget); // only in the detail pane
+      await tester.tap(find.byType(Switch));
+      await tester.pumpAndSettle();
+      expect(store.updates.single.$1, 'mindmap');
+      expect(store.updates.single.$2, {'enabled': false});
+      expect(find.text('已停用 · 1'), findsOneWidget);
+    });
+
+    testWidgets('narrow: installed cards with switches push the detail', (tester) async {
+      await pumpTab(tester, const Size(500, 900), view: 1);
+      expect(find.byType(Switch), findsOneWidget); // consent-pending cards have none
+      await tester.tap(find.text('MINDMAP'));
+      await tester.pumpAndSettle();
+      expect(find.byType(BackButton), findsOneWidget);
+      expect(find.byType(PluginDetailView), findsOneWidget);
+      expect(find.text('MINDMAP'), findsOneWidget); // the installed manifest wins over the listing
+    });
   });
 }

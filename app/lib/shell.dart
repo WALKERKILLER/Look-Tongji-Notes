@@ -13,6 +13,7 @@ import 'features/downloads/downloads_page.dart';
 import 'features/home/home_page.dart';
 import 'features/library/library_page.dart';
 import 'features/login/login_page.dart';
+import 'features/plugins/plugins_page.dart';
 import 'features/profile/profile_dialog.dart';
 import 'features/schedule/schedule_page.dart';
 import 'features/schedule/schedule_store.dart';
@@ -33,7 +34,7 @@ class _Dest {
 
 /// Tab indices, shared with pages that switch tabs.
 abstract final class Tabs {
-  static const home = 0, courses = 1, schedule = 2, downloads = 3, library = 4, tasks = 5, settings = 6;
+  static const home = 0, courses = 1, schedule = 2, downloads = 3, library = 4, tasks = 5, plugins = 6, settings = 7;
 }
 
 const _dests = [
@@ -43,10 +44,12 @@ const _dests = [
   _Dest('下载', Icons.download_outlined, Icons.download_rounded, '下载管理'),
   _Dest('资料库', Icons.auto_stories_outlined, Icons.auto_stories_rounded, '资料库'),
   _Dest('定时', Icons.schedule_outlined, Icons.schedule_rounded, '定时任务'),
+  _Dest('插件', Icons.extension_outlined, Icons.extension_rounded, '插件'),
   _Dest('设置', Icons.tune_outlined, Icons.tune_rounded, '设置'),
 ];
 
-/// The bottom bar leaves out 定时, reached from 设置 and the assistant there.
+/// The bottom bar leaves out 定时 and 插件, reached from 设置 and the
+/// assistant there.
 const _barTabs = [Tabs.home, Tabs.courses, Tabs.schedule, Tabs.downloads, Tabs.library, Tabs.settings];
 
 /// Lets any page switch tabs (e.g. "see all downloads").
@@ -114,6 +117,7 @@ class _AppShellState extends State<AppShell> {
         Tabs.downloads => const DownloadsPage(),
         Tabs.library => const LibraryPage(),
         Tabs.tasks => const TasksPage(),
+        Tabs.plugins => const PluginsPage(),
         _ => const SettingsPage(),
       };
 
@@ -139,6 +143,7 @@ class _AppShellState extends State<AppShell> {
     final downloads = app.activeJobCount;
     final dueSoon = context.watch<ScheduleStore>().dueSoon;
     final unread = context.watch<TaskInbox>().unread;
+    final attention = context.watch<PluginStore>().attention;
 
     // Tabs keep their navigators alive; switching uses an MD3 fade-through.
     final stack = Stack(fit: StackFit.expand, children: [
@@ -163,7 +168,8 @@ class _AppShellState extends State<AppShell> {
       if (i == Tabs.downloads && downloads > 0) return Badge.count(count: downloads, child: ic);
       if (i == Tabs.schedule && dueSoon > 0) return Badge.count(count: dueSoon, child: ic);
       if (i == Tabs.tasks && unread > 0) return Badge.count(count: unread, child: ic);
-      if (i == Tabs.settings && sc == SizeClass.compact && unread > 0) return Badge(child: ic);
+      if (i == Tabs.plugins && attention > 0) return Badge.count(count: attention, child: ic);
+      if (i == Tabs.settings && sc == SizeClass.compact && unread + attention > 0) return Badge(child: ic);
       return ic;
     }
 

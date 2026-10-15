@@ -79,7 +79,7 @@ A plugin is a directory or npm/git package whose `package.json` has a `lookStudi
 
 ### Marketplace
 - Catalogs: the bundled official catalog (`agent/plugins/catalog.json`: `{name, owner, plugins:[{source: <dir>, featured?}]}`, plugins under `agent/plugins/<id>/`, shipped with the agent) and user-added catalogs (HTTPS URL, or `owner/repo` for `look-catalog.json` on its default branch): `{name, owner, plugins:[{id, source, version, title, summary, icon, categories, author}]}`. `source` is `npm:<pkg>@<exact version>`, `git:<https url>#<ref>` or `path:<absolute dir>`.
-- Only the bundled catalog may mark plugins `official`. Third-party installs are off until 设置 → 插件 → 允许第三方插件 is on, and their consent dialog states that plugin code runs with the assistant's permissions.
+- Only the bundled catalog may mark plugins `official`. Third-party installs are off until 插件 → 来源 → 允许第三方插件 is on, and their consent dialog states that plugin code runs with the assistant's permissions.
 
 ### Agent integration
 - Plugin tools register with `exposure: "deferred"` and the plugin's `namespace`; `find_tools` lists loaded plugins as groups `plugin:<id>` (label = title, words from summary and categories) next to the core groups, so their schemas cost no context until loaded. Loading a group returns its tools and its skills as the playbook.
@@ -124,12 +124,14 @@ Actions run without a model call unless they return `{prompt}`. That keeps visua
 
 lookd relays `plugin_event` (`{plugin, kind: notify | status | update, …}`, ≤ 64 KB) from the agent host through `POST /api/agent/event` to `/api/events`.
 
-### UI (设置 → 插件, and 插件市场)
-- 设置 → 插件: 已安装的插件 (count, and a badge for plugins that need attention) and 插件市场. The composer's "+" menu also links both.
-- 插件 page: installed plugins as cards (tonal icon tile, title, 官方 badge, state 已停用 / 出错 / 需要授权, summary or error), an enable switch; 来源: 允许第三方插件 (with a confirmation), 插件目录, 从其他来源安装 (folder, npm, Git).
-- 插件市场: a search bar, category filter chips, a featured hero (a carousel when several are featured), and a grid of cards (icon tile, title, publisher, summary, categories, 安装 / 已安装 / 更新). Detail page: header with icon and actions, description, 试试这样问 (example prompts as chips that open the assistant), 权限, 会出现在, settings form, 助手获得的能力 (tools and skills), license and source.
+### UI (rail destination 插件)
+- Navigation: rail destination 插件 between 定时 and 设置, with a badge counting plugins that need attention (需要授权 or 出错). Phones leave it off the bottom bar; 设置 → 插件 (已安装的插件, 发现插件) and the composer's "+" menu (发现插件, 管理插件) open the tab on the matching view, closing the assistant first.
+- Header: title, a summary line (installed, enabled, needing attention, updatable), a 发现 / 已安装 segmented button, and a 来源 menu: 允许第三方插件 (with a confirmation), 插件目录…, 从文件夹、npm 或 Git 安装… (both need third-party plugins on), 刷新.
+- 发现: a search bar, category filter chips, a featured hero (a carousel when several are featured), then one section per catalog (Look Studio 官方 first, then each added catalog by name) of cards: tonal icon tile, title, publisher, summary, categories, 安装 / 已安装 / 更新. A failed catalog shows a banner; with third-party plugins off, a closing banner offers to allow them. On windows ≥ 880 px a card opens the plugin in a closable side pane; narrower windows push a detail page.
+- 已安装: plugins grouped 需要处理 / 已启用 / 已停用. On windows ≥ 880 px a selectable list sits beside the selected plugin's detail in a tonal pane; narrower windows show cards with an enable switch (none while consent is pending) that push the detail page.
+- Detail (pane or page): icon, title, state pill, publisher and version (and the available version), enable switch; actions 安装, 查看并授权, 更新, the plugin's pages, 卸载, 主页; load error; description; 试试这样问 (example prompts as chips that open the assistant once enabled); sections 助手获得的能力 (tools and skills), 会出现在, 权限, 设置 (the form from the schema); license and source.
 - Consent dialog lists permissions with icons (sensitive ones emphasized, new ones marked 新增); third-party sources show the warning in a tertiary-container banner.
-- Grid columns follow the window width; compact windows get one column.
+- Card grid columns follow the available width (one to four).
 
 ### Security
 Plugins run in the agent host process with the user's OS permissions; the permission list gates the `look` API and is a statement of intent, not a sandbox (as in Pi and dsh). Mitigations: official plugins are reviewed in this repository; third-party installs are opt-in with consent, pinned versions, `--ignore-scripts`; plugins cannot read lookd settings, auth or provider keys through the `look` API and spawned commands do not inherit `LOOKD_TOKEN`; plugins cannot start downloads.
@@ -144,21 +146,21 @@ Plugins run in the agent host process with the user's OS permissions; the permis
    - the first official plugin, 引导式提问 (`socratic`).
 2. lookd: relay `plugin_event`.
 3. App:
-   - 插件 page, 插件市场, detail page, consent dialog, settings form from the schema;
+   - the 插件 tab (发现, 已安装, detail pane or page), consent dialog, settings form from the schema;
    - view registry with the `checklist` view, and `look-view` blocks in `LookMarkdown`;
    - the contribution points: note view switcher, surface menus, export menus, plugin pages.
 4. Docs: architecture (plugin seam), overview, a plugin author guide in [agent/plugins/README.md](../../agent/plugins/README.md).
 
 ## Verification
 - `node --test agent/src/plugins.test.mjs`: manifest validation (id, engine, permissions, settings schema), install from a local fixture, consent required for added permissions, tool prefixing and deferred exposure, permission refusal, load error isolation, effects run on disable.
-- Widget tests: contributions of active plugins only, checklist and unknown view fallback, `look-view` blocks only for declared kinds, consent dialog, settings form validation and round trip.
+- Widget tests: contributions of active plugins only, checklist and unknown view fallback, `look-view` blocks only for declared kinds, consent dialog, settings form validation and round trip, the 插件 tab on wide and narrow windows.
 - `go test ./internal/server`: event types and size limit.
 - Live: install the official fixture plugin, its tool appears in `find_tools`, disable removes it from new conversations.
 
 ## Evidence
 - Agent: [plugins.mjs](../../agent/src/plugins.mjs) with [plugins.test.mjs](../../agent/src/plugins.test.mjs): manifest validation (id and reserved names, engine, permissions, exec and network declarations, views, paths, secret settings, surfaces); settings defaults and ranges; install, 0600 state, tools prefixed, deferred and namespaced through Pi's real `DefaultResourceLoader`; groups with skills as playbook; actions and undeclared views refused; `look.lookd` refusing a route outside the allow-list; tool calls counted against the conversation budget; a failing plugin isolated and cleanups run on disable; the third-party opt-in, consent for added permissions and official ids reserved; the bundled catalog valid; the socratic mode extending the system prompt. Wiring in [host.mjs](../../agent/src/host.mjs) and plugin groups in [tools.mjs](../../agent/src/tools.mjs).
 - lookd: `plugin_event` relay in [agent_event.go](../../lookd/internal/server/agent_event.go) with [agent_event_test.go](../../lookd/internal/server/agent_event_test.go).
-- App: [plugins.dart](../../app/lib/core/plugins.dart), [plugins_page.dart](../../app/lib/features/plugins/plugins_page.dart), [plugin_views.dart](../../app/lib/features/plugins/plugin_views.dart); [plugins_test.dart](../../app/test/plugins_test.dart) (contributions of active plugins only, checklist and unknown views, `look-view` blocks only for declared kinds, consent dialog, settings form).
+- App: [plugins.dart](../../app/lib/core/plugins.dart), [plugins_page.dart](../../app/lib/features/plugins/plugins_page.dart), [plugin_views.dart](../../app/lib/features/plugins/plugin_views.dart), rail destination in [shell.dart](../../app/lib/shell.dart); [plugins_test.dart](../../app/test/plugins_test.dart) (contributions of active plugins only, checklist and unknown views, `look-view` blocks only for declared kinds, consent dialog, settings form; the 插件 tab: summary line, catalog sections, side pane open and closed, 已安装 groups with the plugin needing consent selected first, enable switch only in the pane, and on a narrow window switch cards that push the detail page).
 - Official plugin and guide: [socratic](../../agent/plugins/socratic/package.json), [author guide](../../agent/plugins/README.md).
-- Live check (2026-10-16, release build): the catalog listed 引导式提问 as official and featured; preview and confirm installed it with its skill; its toggle answered with a toast and lookd's event stream carried the `plugin_event` status; a folder install was refused until 允许第三方插件 was on; the author guide's example, installed from a folder, loaded with its tool and skill; in a chat turn `find_tools` loaded `plugin:hello` with the skill as playbook and `hello__lectures` returned a `checklist` view built from lookd, with the socratic hook active; `plugins.json` was 0600 and `plugins/` 0700; a non-plugin event type returned 400. The test conversation and plugins were removed afterwards and the third-party switch turned off.
+- Live check (2026-10-16, release build): the catalog listed 引导式提问 as official and featured; preview and confirm installed it with its skill; its toggle answered with a toast and lookd's event stream carried the `plugin_event` status; a folder install was refused until 允许第三方插件 was on; the author guide's example, installed from a folder, loaded with its tool and skill; in a chat turn `find_tools` loaded `plugin:hello` with the skill as playbook and `hello__lectures` returned a `checklist` view built from lookd, with the socratic hook active; `plugins.json` was 0600 and `plugins/` 0700; a non-plugin event type returned 400. The test conversation and plugins were removed afterwards and the third-party switch turned off. After the 插件 tab redesign the release build started with lookd and the agent host, and `/agent/plugins` and `/agent/plugins/catalog`, which the tab reads, answered.
 - Not verified: npm and Git sources and user catalogs against the network (validation unit-tested), the surface menus with a plugin that contributes to them (no official plugin does yet), and the screens' look.

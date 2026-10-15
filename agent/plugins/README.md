@@ -73,9 +73,9 @@ Return views with `look.view(kind, data)` from tools, or `{view: {kind, data, ti
 
 ## 5. Try it
 
-1. 设置 → 插件 → 允许第三方插件.
-2. 从其他来源安装 → 文件夹 → choose your plugin folder; check the permissions and install.
-3. The plugin's card shows 出错 with the message if it failed to load. After editing, toggle it off and on to reload.
+1. 插件 → 来源 → 允许第三方插件.
+2. 来源 → 从文件夹、npm 或 Git 安装… → 文件夹 → choose your plugin folder; check the permissions and install.
+3. Under 已安装 the plugin shows 出错 with the message if it failed to load. After editing, toggle it off and on to reload.
 4. Ask the assistant something from your `examples`; the tool chip in the chat shows your plugin's title and the tool label.
 
 ## 6. Publish

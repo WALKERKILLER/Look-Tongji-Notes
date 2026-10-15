@@ -481,7 +481,6 @@ class _PlusMenu extends StatelessWidget {
     final entries = store.entries('actions', surface: 'composer.plus');
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
-    void push(Widget page) => Navigator.of(context, rootNavigator: true).push(MaterialPageRoute(builder: (_) => page));
     return MenuAnchor(
       alignmentOffset: const Offset(0, 4),
       menuChildren: [
@@ -494,13 +493,13 @@ class _PlusMenu extends StatelessWidget {
           ),
         if (entries.isNotEmpty) const Divider(height: Space.sm),
         MenuItemButton(
-          leadingIcon: const Icon(Icons.storefront_outlined, size: 20),
-          onPressed: store.ready ? () => push(const PluginMarketPage()) : null,
-          child: const Text('插件市场'),
+          leadingIcon: const Icon(Icons.explore_outlined, size: 20),
+          onPressed: store.ready ? () => openPlugins(context) : null,
+          child: const Text('发现插件'),
         ),
         MenuItemButton(
           leadingIcon: const Icon(Icons.extension_outlined, size: 20),
-          onPressed: store.ready ? () => push(const PluginsPage()) : null,
+          onPressed: store.ready ? () => openPlugins(context, installed: true) : null,
           child: Text('管理插件', style: tt.bodyMedium),
         ),
       ],

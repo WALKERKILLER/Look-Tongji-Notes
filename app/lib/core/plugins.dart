@@ -78,6 +78,9 @@ class PluginStore extends ChangeNotifier {
   /// Plugins that are loaded and working.
   Iterable<Map<String, dynamic>> get active => installed.where((p) => p['state'] == 'enabled');
 
+  /// Plugins waiting for consent or failing to load.
+  int get attention => installed.where((p) => p['state'] == 'needs_consent' || p['state'] == 'error').length;
+
   void setStatus(String id, Object? status) {
     final p = byId(id);
     if (p == null) return;
