@@ -56,6 +56,18 @@ const _toolLabels = {
   'read_quiz_results': ('查看作答', Icons.fact_check_outlined),
 };
 
+/// Shows the assistant over the current screen in a sheet, so the user keeps
+/// their place (practice, task history).
+Future<void> showAssistantSheet(BuildContext context) => showModalBottomSheet(
+      context: context,
+      useRootNavigator: true,
+      isScrollControlled: true,
+      showDragHandle: true,
+      useSafeArea: true,
+      constraints: const BoxConstraints(maxWidth: 720),
+      builder: (_) => const FractionallySizedBox(heightFactor: 0.85, child: AssistantPanel(docked: true, embedded: true)),
+    );
+
 /// Resident assistant: docked beside the shell on wide windows, full screen on
 /// phones, and as a tab inside the player.
 class AssistantPanel extends StatefulWidget {
@@ -551,6 +563,15 @@ class _ContextMeter extends StatelessWidget {
           leadingIcon: const Icon(Icons.insights_outlined, size: 18),
           onPressed: () => Navigator.of(context, rootNavigator: true).push(MaterialPageRoute(builder: (_) => const UsagePage())),
           child: const Text('查看用量'),
+        ),
+        MenuItemButton(
+          leadingIcon: const Icon(Icons.schedule_rounded, size: 18),
+          onPressed: () {
+            // Close the assistant when it covers the window, then show the tab.
+            Navigator.of(context, rootNavigator: true).popUntil((r) => r.isFirst);
+            ShellNav.goTo(Tabs.tasks);
+          },
+          child: const Text('定时任务'),
         ),
       ],
       builder: (context, m, _) => IconButton(

@@ -12,6 +12,9 @@ import {
 import { DATA_DIR, ModelPipeline } from "./models.mjs";
 import { createTools, TURN_TOOL_BUDGET } from "./tools.mjs";
 import { generateTimeline } from "./timeline.mjs";
+import { api } from "./lookd.mjs";
+import { fmtStamp, TaskScheduler } from "./tasks.mjs";
+import { httpError, readJson, replyError } from "./http.mjs";
 import { entryFrom, UsageLedger } from "./usage.mjs";
 
 const TOKEN = process.env.LOOKD_TOKEN ?? "";
@@ -216,21 +219,7 @@ function messageView(m) {
 
 // ---- HTTP ----
 
-function httpError(status, message) {
-	return Object.assign(new Error(message), { status });
-}
-
-async function body(req) {
-	const chunks = [];
-	for await (const c of req) chunks.push(c);
-	const raw = Buffer.concat(chunks).toString("utf8");
-	if (!raw) return {};
-	try {
-		return JSON.parse(raw);
-	} catch {
-		throw httpError(400, "请求体不是 JSON");
-	}
-}
+const body = (req) => readJson(req);
 
 function send(res, status, data) {
 	res.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
@@ -445,6 +434,82 @@ route("POST", "/chat", async (req, _m, res) => {
 	return undefined;
 });
 
+// ---- scheduled tasks ----
+
+const TASK_TIMEOUT_MS = 15 * 60_000;
+
+// Runs a task as a new conversation with no user present.
+async function runTask(task, signal) {
+	const conv = await openConversation(undefined);
+	const s = conv.session;
+	Object.assign(conv, { purpose: "task", taskId: task.id, busy: true, calls: 0, context: null, lastUser: task.prompt });
+	s.setSessionName(`定时 · ${task.name} · ${fmtStamp(Date.now())}`);
+	let cost = 0;
+	let over = false;
+	let timedOut = false;
+	const stop = () => s.abort().catch(() => {});
+	const unsub = s.subscribe((ev) => {
+		if (ev.type !== "message_end" || ev.message?.role !== "assistant") return;
+		cost += ev.message.usage?.cost?.total ?? 0;
+		if (cost > task.budget_usd && !over) {
+			over = true;
+			stop();
+		}
+	});
+	signal.addEventListener("abort", stop);
+	const timer = setTimeout(() => {
+		timedOut = true;
+		stop();
+	}, TASK_TIMEOUT_MS);
+	let failure = null;
+	try {
+		await s.prompt(
+			contextBlock({ run: "定时任务（无人值守）" }) +
+				`这是定时任务「${task.name}」的一次自动运行，没有用户在场回答问题：不要提问，也不要等待确认，直接完成。` +
+				`最后用一两句话总结做了什么、产出了什么（笔记、练习、日程等）。\n\n任务：${task.prompt}`,
+		);
+	} catch (e) {
+		failure = String(e?.message ?? e);
+	} finally {
+		clearTimeout(timer);
+		signal.removeEventListener("abort", stop);
+		unsub();
+		conv.busy = false;
+	}
+	const last = [...s.messages].reverse().find((m) => m.role === "assistant");
+	const said = (last?.content ?? []).filter((c) => c.type === "text").map((c) => c.text).join("").trim();
+	const base = { session_id: s.sessionId, cost };
+	if (over) return { ...base, status: "budget", summary: `费用超过上限 $${task.budget_usd}，已中止` };
+	if (timedOut) return { ...base, status: "error", summary: "运行超过 15 分钟，已中止" };
+	if (signal.aborted) return { ...base, status: "aborted" };
+	if (failure || last?.stopReason === "error") return { ...base, status: "error", summary: failure ?? last.errorMessage ?? "模型出错" };
+	return { ...base, status: "ok", summary: said.replace(/\s+/g, " ").slice(-300) };
+}
+
+const tasks = new TaskScheduler(DATA_DIR, runTask, {
+	notify: (data) => api("POST", "/api/agent/event", { type: "agent_task", data }).catch(() => {}),
+});
+await tasks.load();
+setTimeout(() => tasks.tick().catch((e) => console.error(`tasks: ${e.message}`)), 5000);
+setInterval(() => tasks.tick().catch((e) => console.error(`tasks: ${e.message}`)), 30_000);
+
+route("GET", "/tasks", async () => tasks.list());
+route("POST", "/tasks", async (req) => tasks.create(await body(req)));
+route("PUT", "/tasks/([^/]+)", async (req, [id]) => tasks.update(id, await body(req)));
+route("DELETE", "/tasks/([^/]+)", async (_req, [id]) => {
+	await tasks.remove(id);
+	return { ok: true };
+});
+route("POST", "/tasks/([^/]+)/run", async (_req, [id]) => tasks.runNow(id));
+route("GET", "/tasks/runs", async (req) => {
+	const q = new URL(req.url, "http://x").searchParams;
+	return tasks.allRuns({ status: q.get("status") || undefined, limit: Math.min(Number(q.get("limit")) || 100, 500) });
+});
+route("GET", "/tasks/([^/]+)/runs", async (_req, [id]) => {
+	tasks.get(id);
+	return tasks.runsOf(id);
+});
+
 const server = createServer(async (req, res) => {
 	if (req.headers.authorization !== `Bearer ${TOKEN}`) return send(res, 401, { error: "unauthorized" });
 	const url = new URL(req.url, "http://x");
@@ -455,8 +520,7 @@ const server = createServer(async (req, res) => {
 			const out = await r.fn(req, m.slice(1), res);
 			if (out !== undefined && !res.headersSent) send(res, 200, out);
 		} catch (e) {
-			if (!res.headersSent) send(res, e.status ?? 500, { error: String(e?.message ?? e) });
-			else res.end();
+			replyError(req, res, e);
 		}
 		return;
 	}

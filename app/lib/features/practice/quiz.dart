@@ -81,15 +81,7 @@ Future<void> askInSheet(BuildContext context, String prompt) async {
     return;
   }
   unawaited(a.send(prompt));
-  await showModalBottomSheet(
-    context: context,
-    useRootNavigator: true,
-    isScrollControlled: true,
-    showDragHandle: true,
-    useSafeArea: true,
-    constraints: const BoxConstraints(maxWidth: 720),
-    builder: (_) => const FractionallySizedBox(heightFactor: 0.85, child: AssistantPanel(docked: true, embedded: true)),
-  );
+  await showAssistantSheet(context);
 }
 
 Future<void> openPractice(BuildContext context, String quizId) =>
