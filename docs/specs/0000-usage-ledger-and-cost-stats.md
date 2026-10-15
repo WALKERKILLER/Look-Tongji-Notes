@@ -18,13 +18,14 @@ Non-goals: provider billing reconciliation (costs are estimates from model price
   - `input` excludes cached tokens; `cost` is the Pi-computed USD estimate (0 when the model has no price); `ok=false` for errored calls, which keep whatever usage the provider reported.
   - `purpose` ∈ `chat`, `timeline`, `vision`, `title`, `test`, `task`, `quiz`.
 - Every assistant message of a turn is recorded, including tool-loop round trips (counting only the last message of a turn under-reports several-fold).
+- On SIGINT/SIGTERM the host waits up to 3 s for appends in flight before exiting (lookd allows 5 s), so finished calls are not lost.
 - Backfill: on first start with no ledger, existing session files are scanned once and their assistant messages written as `purpose: chat` with their original timestamps; a marker line prevents a second backfill.
 - Deleting a conversation does not delete its ledger lines.
 - The ledger holds no prompt or response text.
 
 ### API (agent host, reached by the app as `/agent/usage…` through lookd)
 - `GET /usage/summary?from=YYYY-MM-DD&to=YYYY-MM-DD` →
-  `{totals:{calls, input, output, cache_read, cache_write, cost, errors}, days:[{date, input, output, cache_read, cost, calls}], by_model:[…], by_purpose:[…], by_session:[{session_id, title, …}]}`; days use local time and include zero days in range.
+  `{totals:{calls, input, output, cache_read, cache_write, cost, errors}, days:[{date, input, output, cache_read, cost, calls}], by_model:[…], by_purpose:[…], by_session:[{session_id, title, …}]}`; days use local time and include zero days in range. The range spans at most 366 days (本年 in a leap year); longer → 400.
 - `GET /usage/calls?before=<cursor>&limit=50` → newest-first page of ledger lines with the session title resolved. Calls are ordered by (time, position in the ledger), and each carries `cursor` `<ts>:<position>`. The next page passes the last call's cursor, so calls sharing a millisecond are not skipped (a bare `<ts>` still means "older than"). `limit` is an integer 1–200 (default 50; anything else → 400). `from`/`to` and `summary` dates must be real calendar days (`2026-02-31` → 400).
 - Bad dates → 400.
 
@@ -49,8 +50,8 @@ Non-goals: provider billing reconciliation (costs are estimates from model price
 - `flutter test`: widget test of the page with a stub summary (tiles, toggle, empty state).
 
 ## Evidence
-- Ledger and summaries: [usage.mjs](../../agent/src/usage.mjs), tests in [usage.test.mjs](../../agent/src/usage.test.mjs) (zero days, grouping, previous period, range errors including impossible dates, paging with shared timestamps, idempotent backfill).
-- Recording: `recordUsage` in [host.mjs](../../agent/src/host.mjs) (every assistant message, with time to first token); `timeline`, `vision` and `test` purposes in [timeline.mjs](../../agent/src/timeline.mjs), [vision.mjs](../../agent/src/vision.mjs), [models.mjs](../../agent/src/models.mjs).
+- Ledger and summaries: [usage.mjs](../../agent/src/usage.mjs), tests in [usage.test.mjs](../../agent/src/usage.test.mjs) (zero days, grouping, previous period, range errors including impossible dates and spans over 366 days, paging with shared timestamps, idempotent backfill, flush waiting for appends in flight).
+- Recording: `recordUsage` in [host.mjs](../../agent/src/host.mjs) (every assistant message, with time to first token; the signal handler awaits `usage.flush()`); `timeline`, `vision` and `test` purposes in [timeline.mjs](../../agent/src/timeline.mjs), [vision.mjs](../../agent/src/vision.mjs), [models.mjs](../../agent/src/models.mjs).
 - Page: [usage_page.dart](../../app/lib/features/usage/usage_page.dart), [charts.dart](../../app/lib/widgets/charts.dart); widget test [usage_page_test.dart](../../app/test/usage_page_test.dart).
 - Live check (2026-10-14): backfill imported 42 calls from 4 conversations; a chat turn with two tool round trips added 3 lines (one per assistant message, all with the session id and time to first token); a provider test added a `test` line; an invalid date returned 400.
 - Not covered: Pi's automatic context compaction makes a summarization call that is not an assistant message and is not recorded; the `title` purpose is reserved (titles are not model-generated today).

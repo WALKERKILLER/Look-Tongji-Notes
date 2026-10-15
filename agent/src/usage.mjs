@@ -68,9 +68,22 @@ export class UsageLedger {
 		this.path = join(dir, "usage.jsonl");
 		this.lines = null; // parsed entries, loaded lazily and kept in sync with appends
 		this.size = -1;
+		this.pending = new Set(); // appends in flight, awaited by flush()
 	}
 
-	async record(entry) {
+	record(entry) {
+		const p = this.append(entry);
+		this.pending.add(p);
+		p.finally(() => this.pending.delete(p));
+		return p;
+	}
+
+	/** Resolves once every append started so far has finished. */
+	async flush() {
+		await Promise.allSettled([...this.pending]);
+	}
+
+	async append(entry) {
 		try {
 			await appendFile(this.path, `${JSON.stringify(entry)}\n`);
 			if (this.lines) {
@@ -161,6 +174,7 @@ export class UsageLedger {
 		const start = dayStart(from);
 		const end = dayStart(shiftDay(to, 1));
 		const span = Math.round((end - start) / 86_400_000);
+		if (span > MAX_SPAN_DAYS) throw Object.assign(new Error(`日期范围最长 ${MAX_SPAN_DAYS} 天`), { status: 400 });
 		const prevStart = dayStart(shiftDay(from, -span));
 		const totals = emptyTotals();
 		const previous = emptyTotals();
@@ -222,6 +236,9 @@ export class UsageLedger {
 }
 
 export const MAX_PAGE = 200;
+
+/** Longest summary range: a leap year, the app's longest preset (本年). */
+export const MAX_SPAN_DAYS = 366;
 
 function parseCursor(before) {
 	if (before == null || before === "") return { ts: Infinity, pos: Infinity };

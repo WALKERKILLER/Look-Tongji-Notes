@@ -70,6 +70,18 @@ test("summary fills zero days, groups and compares with the previous period", as
 	await assert.rejects(l.summary("10/05", "2026-10-07"), { status: 400 });
 	await assert.rejects(l.summary("2026-02-31", "2026-03-02"), { status: 400 }); // not a real day
 	await assert.rejects(l.calls({ from: "2026-02-30" }), { status: 400 });
+	assert.equal((await l.summary("2024-01-01", "2024-12-31")).days.length, 366); // 本年 in a leap year
+	await assert.rejects(l.summary("2025-01-01", "2026-01-02"), { status: 400 }); // 367 days
+	await assert.rejects(l.summary("1970-01-01", "9999-12-31"), { status: 400 });
+});
+
+test("flush waits for appends still in flight", async () => {
+	const dir = await mkdtemp(join(tmpdir(), "usage-"));
+	const l = new UsageLedger(dir);
+	for (let i = 0; i < 20; i++) l.record(entryFrom(msg(at("2026-10-05") + i)));
+	await l.flush();
+	assert.equal((await readFile(join(dir, "usage.jsonl"), "utf8")).trim().split("\n").length, 20);
+	assert.equal(l.pending.size, 0);
 });
 
 test("calls pages newest first with filters", async () => {

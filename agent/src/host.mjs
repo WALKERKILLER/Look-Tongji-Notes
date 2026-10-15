@@ -466,10 +466,15 @@ server.listen(0, "127.0.0.1", () => {
 	process.stdout.write(`AGENT_READY ${server.address().port}\n`);
 });
 
+let stopping = false;
 for (const sig of ["SIGINT", "SIGTERM"]) {
-	process.on(sig, () => {
+	process.on(sig, async () => {
+		if (stopping) return;
+		stopping = true;
 		for (const c of live.values()) c.session.dispose();
 		server.close();
+		// Finished model calls reach the ledger first; lookd allows 5 s before killing us.
+		await Promise.race([usage.flush(), new Promise((r) => setTimeout(r, 3000))]);
 		process.exit(0);
 	});
 }
