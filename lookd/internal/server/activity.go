@@ -57,10 +57,9 @@ func (s *Server) addActivity(_ http.ResponseWriter, r *http.Request) (any, error
 	if !store.TimedKinds[in.Kind] {
 		in.Seconds = 0
 	}
-	if err := s.St.AddActivity(r.Context(), day, in.Kind, in.CourseID, in.LectureID, in.Seconds, in.Count); err != nil {
+	if err := s.Lib.AddActivity(r.Context(), day, in.Kind, in.CourseID, in.LectureID, in.Seconds, in.Count); err != nil {
 		return nil, err
 	}
-	s.Lib.WriteActivity(r.Context())
 	s.Bus.Publish("activity_changed", map[string]string{"day": day})
 	return ok(), nil
 }

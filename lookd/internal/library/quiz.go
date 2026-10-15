@@ -63,11 +63,19 @@ func (l *Library) AddQuizAttempt(ctx context.Context, quizID string, startedAt i
 	return a, l.writeQuiz(ctx, quizID)
 }
 
+// DeleteQuiz removes the file copy first, so a set whose file cannot be
+// removed stays deleted from neither place (reindex would bring it back).
 func (l *Library) DeleteQuiz(ctx context.Context, id string) error {
-	if err := l.Store.DeleteQuiz(ctx, id); err != nil {
+	if _, err := l.Store.Quiz(ctx, id); err != nil {
 		return err
 	}
-	os.Remove(l.quizPath(id))
+	if err := os.Remove(l.quizPath(id)); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	if err := l.Store.DeleteQuiz(ctx, id); err != nil {
+		l.writeQuiz(ctx, id) // put the file back while the index still has the set
+		return err
+	}
 	return nil
 }
 
@@ -103,8 +111,11 @@ func (l *Library) reindexQuizzes(ctx context.Context) int {
 		if l.Store.PutQuiz(ctx, f.Quiz) != nil {
 			continue
 		}
+		// Only attempts that belong to this set and grade to their stored score.
 		for _, a := range f.Attempts {
-			l.Store.PutQuizAttempt(ctx, a)
+			if store.CheckAttempt(f.Quiz, a) == nil {
+				l.Store.PutQuizAttempt(ctx, a)
+			}
 		}
 		n++
 	}

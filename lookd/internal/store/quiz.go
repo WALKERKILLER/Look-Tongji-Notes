@@ -149,6 +149,25 @@ func Grade(q Quiz, answers []int) (int, error) {
 	return correct, nil
 }
 
+// CheckAttempt verifies a restored attempt against its set: same set, one
+// valid answer per question, and the stored score matching a regrade.
+func CheckAttempt(q Quiz, a QuizAttempt) error {
+	if a.ID == "" || a.QuizID != q.ID {
+		return QuizError("作答记录不属于这套练习")
+	}
+	correct, err := Grade(q, a.Answers)
+	if err != nil {
+		return err
+	}
+	if a.Total != len(q.Questions) || a.Correct != correct {
+		return QuizError("作答记录的分数与题目不符")
+	}
+	if a.FinishedAt <= 0 || a.StartedAt > a.FinishedAt {
+		return QuizError("作答记录的时间无效")
+	}
+	return nil
+}
+
 func (s *Store) PutQuiz(ctx context.Context, q Quiz) error {
 	b, err := json.Marshal(q.Questions)
 	if err != nil {

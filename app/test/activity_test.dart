@@ -37,6 +37,10 @@ void main() {
       expect(title, startsWith('10月14日'));
       expect(lines, ['学习 42 分钟', '看课 30 · 阅读 12', '提问 2 次 · 笔记 1 篇']);
       expect(ActivityDay.empty.tooltip(DateTime(2026, 10, 14)).$2, ['没有学习记录']);
+      // A finished transcript alone makes an active day at the lowest level.
+      final t = ActivityDay({'date': '2026-10-14', 'transcripts': 1});
+      expect(t.active, isTrue);
+      expect(t.intensity, greaterThan(0));
       expect(fmtMinutes(125), '2 小时 5 分');
     });
   });
