@@ -19,7 +19,7 @@ import '../../widgets/states.dart';
 import '../../widgets/user_avatar.dart';
 import '../assistant/assistant_controller.dart';
 import '../profile/profile_dialog.dart';
-import '../assistant/tasks_page.dart';
+import '../../shell.dart';
 import '../usage/usage_page.dart';
 import 'asr_settings.dart';
 import 'mineru_settings.dart';
@@ -619,7 +619,7 @@ class _AssistantSettings extends StatelessWidget {
         title: const Text('定时任务'),
         subtitle: const Text('让助手按计划复盘、出题、汇总截止事项'),
         trailing: const Icon(Icons.chevron_right_rounded),
-        onTap: () => Navigator.of(context, rootNavigator: true).push(MaterialPageRoute(builder: (_) => const TasksPage())),
+        onTap: () => ShellScope.of(context).goTo(Tabs.tasks),
       ),
       SwitchListTile(contentPadding: EdgeInsets.zero, value: p.assistantDocked, onChanged: (v) => p.update((x) => x.assistantDocked = v), title: const Text('宽屏时常驻在右侧')),
       SwitchListTile(contentPadding: EdgeInsets.zero, value: p.chatBubbles, onChanged: (v) => p.update((x) => x.chatBubbles = v), title: const Text('回复使用气泡')),

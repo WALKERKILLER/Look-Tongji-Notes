@@ -514,6 +514,10 @@ route("DELETE", "/tasks/([^/]+)", async (_req, [id]) => {
 	return { ok: true };
 });
 route("POST", "/tasks/([^/]+)/run", async (_req, [id]) => tasks.runNow(id));
+route("GET", "/tasks/runs", async (req) => {
+	const q = new URL(req.url, "http://x").searchParams;
+	return tasks.allRuns({ status: q.get("status") || undefined, limit: Math.min(Number(q.get("limit")) || 100, 500) });
+});
 route("GET", "/tasks/([^/]+)/runs", async (_req, [id]) => {
 	tasks.get(id);
 	return tasks.runsOf(id);

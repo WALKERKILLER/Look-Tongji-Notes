@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -47,6 +47,9 @@ test("validation", () => {
 		[{ ...ok, schedule: { type: "daily", time: "25:00" } }, /HH:MM/],
 		[{ ...ok, schedule: { type: "weekly", days: [], time: "08:00" } }, /至少选一天/],
 		[{ ...ok, schedule: { type: "once", at: "2020-01-01T08:00" } }, /将来/],
+		[{ ...ok, schedule: { type: "once", at: "2099-02-30T08:00" } }, /时间无效/],
+		[{ ...ok, schedule: { type: "once", at: "2099-04-31T08:00" } }, /时间无效/],
+		[{ ...ok, schedule: { type: "once", at: "2099-01-01T24:00" } }, /时间无效/],
 		[{ ...ok, budget_usd: 10 }, /费用上限/],
 		[{ ...ok, schedule: { type: "hourly" } }, /schedule.type/],
 	]) {
@@ -114,6 +117,33 @@ test("scheduler runs due tasks one at a time and records history", async () => {
 		assert.equal(again.list().length, 2);
 		assert.equal(again.runsOf(b.id).length, 2);
 		assert.match(await readFile(join(dir, "tasks.json"), "utf8"), /每晚复盘/);
+		for (const f of ["tasks.json", "tasks-runs.jsonl"]) assert.equal((await stat(join(dir, f))).mode & 0o777, 0o600, f);
+
+		// Runs of every task, newest first, filterable; deleted tasks keep theirs.
+		await again.remove(b.id);
+		assert.deepEqual(again.allRuns().map((r) => [r.name, r.status]), [["贵", "skipped"], ["每晚复盘", "aborted"], ["贵", "budget"], ["每晚复盘", "ok"]]);
+		assert.deepEqual(again.allRuns({ status: "ok" }).map((r) => r.deleted), [false]);
+		assert.equal(again.allRuns({ status: "skipped" })[0].deleted, true);
+	} finally {
+		await rm(dir, { recursive: true, force: true });
+	}
+});
+
+test("existing files become private and a failed history write does not stall the queue", async () => {
+	const dir = await mkdtemp(join(tmpdir(), "tasks-"));
+	try {
+		await writeFile(join(dir, "tasks.json"), JSON.stringify({ tasks: [] }), { mode: 0o644 });
+		const s = new TaskScheduler(dir, async () => ({ status: "ok", summary: "完成" }), { now: () => D("2026-10-14T21:00") });
+		await s.load();
+		assert.equal((await stat(join(dir, "tasks.json"))).mode & 0o777, 0o600);
+		const a = await s.create({ name: "甲", prompt: "p", schedule: daily });
+		const b = await s.create({ name: "乙", prompt: "p", schedule: daily });
+		// A directory where the history file goes makes every append fail.
+		await mkdir(join(dir, "tasks-runs.jsonl"));
+		s.runNow(a.id);
+		s.runNow(b.id);
+		await until(() => s.running === null && s.queue.length === 0 && s.runs.length === 2);
+		assert.deepEqual(s.runs.map((r) => r.name), ["甲", "乙"]);
 	} finally {
 		await rm(dir, { recursive: true, force: true });
 	}

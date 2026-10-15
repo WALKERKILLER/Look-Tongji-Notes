@@ -1,7 +1,7 @@
 // Scheduled assistant tasks (docs/specs/0003-scheduled-agent-tasks.md).
 // Tasks run only while the app (and so this host) is running.
 import { randomBytes } from "node:crypto";
-import { appendFile, readFile, rename, writeFile } from "node:fs/promises";
+import { appendFile, chmod, readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 const bad = (message) => Object.assign(new Error(message), { status: 400 });
@@ -46,7 +46,9 @@ export function validateTask(input, old = {}) {
 			const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(String(s.at ?? ""));
 			if (!m) throw bad("一次性任务的时间格式应为 YYYY-MM-DDTHH:MM");
 			const when = new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]);
-			if (Number.isNaN(when.getTime())) throw bad("时间无效");
+			// Date rolls overflow over (02-30 → 03-02); the parts must survive as typed.
+			const parts = [when.getFullYear(), when.getMonth() + 1, when.getDate(), when.getHours(), when.getMinutes()];
+			if (parts.some((v, i) => v !== +m[i + 1])) throw bad("时间无效");
 			if (s.at !== old.schedule?.at && when <= new Date()) throw bad("一次性任务的时间需要在将来");
 			schedule = { type: "once", at: s.at };
 			break;
@@ -114,6 +116,10 @@ export function due(task, now) {
 	return { action: late <= (task.catch_up ? CATCH_UP_MS : LATE_MS) ? "run" : "skip", scheduled: t.getTime() };
 }
 
+// Tasks and run history hold the user's prompts and assistant summaries.
+const PRIVATE = 0o600;
+const keepPrivate = (path) => chmod(path, PRIVATE).catch(() => {});
+
 export const fmtStamp = (ms) => {
 	const d = new Date(ms);
 	return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
@@ -150,11 +156,15 @@ export class TaskScheduler {
 		} catch {
 			this.runs = [];
 		}
+		// Files written before modes were set.
+		await keepPrivate(this.file);
+		await keepPrivate(this.runsFile);
 	}
 
 	async save() {
 		const tmp = `${this.file}.tmp`;
-		await writeFile(tmp, JSON.stringify({ schema: "look-studio/tasks@1", tasks: this.tasks }, null, 1));
+		await writeFile(tmp, JSON.stringify({ schema: "look-studio/tasks@1", tasks: this.tasks }, null, 1), { mode: PRIVATE });
+		await chmod(tmp, PRIVATE);
 		await rename(tmp, this.file);
 	}
 
@@ -223,6 +233,19 @@ export class TaskScheduler {
 		return this.runs.filter((r) => r.task_id === id).reverse();
 	}
 
+	/** Runs of every task, newest first, optionally of one status. */
+	allRuns({ status, limit = 100 } = {}) {
+		const out = [];
+		for (let i = this.runs.length - 1; i >= 0 && out.length < limit; i--) {
+			const r = this.runs[i];
+			if (status && r.status !== status) continue;
+			const t = this.tasks.find((x) => x.id === r.task_id);
+			// Runs outlive a deleted task; older records carry no name.
+			out.push({ ...r, name: t?.name ?? r.name ?? null, deleted: !t });
+		}
+		return out;
+	}
+
 	/** Checks for due tasks; called every 30 s. */
 	async tick() {
 		const now = this.now();
@@ -236,7 +259,7 @@ export class TaskScheduler {
 			if (d.action === "run") {
 				this.queue.push({ task_id: t.id, scheduled: d.scheduled });
 			} else {
-				await this.record({ task_id: t.id, run_id: newRunId(), started: now.getTime(), finished: now.getTime(), status: "skipped", cost: 0, summary: `错过了 ${fmtStamp(d.scheduled)} 的运行（应用当时未运行）` });
+				await this.record({ task_id: t.id, name: t.name, run_id: newRunId(), started: now.getTime(), finished: now.getTime(), status: "skipped", cost: 0, summary: `错过了 ${fmtStamp(d.scheduled)} 的运行（应用当时未运行）` });
 			}
 		}
 		if (changed) await this.save();
@@ -261,6 +284,7 @@ export class TaskScheduler {
 			if (run.cancelled) r = { ...r, status: "aborted", summary: "任务被停用或删除，已中止" };
 			const rec = {
 				task_id: task.id,
+				name: task.name,
 				run_id: run.run_id,
 				started: run.started,
 				finished: this.now().getTime(),
@@ -270,10 +294,16 @@ export class TaskScheduler {
 				summary: String(r.summary ?? "").slice(0, 300),
 				manual: q.manual ?? false,
 			};
-			await this.record(rec);
-			this.running = null;
-			this.notify({ phase: "finished", name: task.name, ...rec });
-			this.pump();
+			try {
+				await this.record(rec);
+			} catch (e) {
+				console.error(`task run not recorded: ${e?.message ?? e}`);
+			} finally {
+				// A failed write must not leave the queue stuck behind this run.
+				this.running = null;
+				this.notify({ phase: "finished", ...rec });
+				this.pump();
+			}
 		})();
 	}
 
@@ -283,10 +313,11 @@ export class TaskScheduler {
 		if (perTask.length > RUNS_KEPT) {
 			const drop = new Set(perTask.slice(0, perTask.length - RUNS_KEPT));
 			this.runs = this.runs.filter((r) => !drop.has(r));
-			await writeFile(this.runsFile, this.runs.map((r) => JSON.stringify(r)).join("\n") + "\n");
+			await writeFile(this.runsFile, this.runs.map((r) => JSON.stringify(r)).join("\n") + "\n", { mode: PRIVATE });
 		} else {
-			await appendFile(this.runsFile, `${JSON.stringify(rec)}\n`);
+			await appendFile(this.runsFile, `${JSON.stringify(rec)}\n`, { mode: PRIVATE });
 		}
+		await keepPrivate(this.runsFile);
 	}
 }
 

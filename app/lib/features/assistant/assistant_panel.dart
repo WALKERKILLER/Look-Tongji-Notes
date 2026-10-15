@@ -26,7 +26,6 @@ import '../settings/models_page.dart';
 import '../settings/provider_presets.dart';
 import '../usage/usage_page.dart';
 import 'assistant_controller.dart';
-import 'tasks_page.dart';
 
 const _toolLabels = {
   'app_guide': ('查阅功能说明', Icons.menu_book_outlined),
@@ -567,7 +566,11 @@ class _ContextMeter extends StatelessWidget {
         ),
         MenuItemButton(
           leadingIcon: const Icon(Icons.schedule_rounded, size: 18),
-          onPressed: () => Navigator.of(context, rootNavigator: true).push(MaterialPageRoute(builder: (_) => const TasksPage())),
+          onPressed: () {
+            // Close the assistant when it covers the window, then show the tab.
+            Navigator.of(context, rootNavigator: true).popUntil((r) => r.isFirst);
+            ShellNav.goTo(Tabs.tasks);
+          },
           child: const Text('定时任务'),
         ),
       ],
