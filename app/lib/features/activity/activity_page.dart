@@ -51,10 +51,11 @@ class ActivityDay {
   /// Minutes per timed kind.
   int kindMinutes(String k) => (_int((j['by_kind'] as Map?)?[k]) / 60).round();
 
-  bool get active => minutes >= 1 || asks > 0 || notesCreated > 0 || notesEdited > 0 || quizzes > 0;
+  /// Same rule as lookd's ActivityDay.Active: study time or any event.
+  bool get active => minutes >= 1 || asks > 0 || notesCreated > 0 || notesEdited > 0 || transcripts > 0 || quizzes > 0;
 
-  /// Heatmap intensity: minutes, with days of only questions or notes shown
-  /// at the lowest step so they match the streak.
+  /// Heatmap intensity: minutes, with days of only events (questions, notes,
+  /// transcripts) shown at the lowest step so they match the streak.
   num get intensity => minutes > 0 ? minutes : (active ? .5 : 0);
 
   static final empty = ActivityDay(const {});
