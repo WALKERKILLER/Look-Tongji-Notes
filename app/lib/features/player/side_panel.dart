@@ -19,6 +19,7 @@ import 'lecture_player.dart';
 import 'outline_tab.dart';
 import 'player_page.dart';
 import '../library/note_reader.dart';
+import '../plugins/plugin_views.dart';
 import '../practice/quiz.dart';
 import '../../widgets/look_markdown.dart';
 
@@ -76,29 +77,41 @@ class _PlayerSidePanelState extends State<PlayerSidePanel> with SingleTickerProv
       listenable: ctl,
       builder: (context, _) => Column(children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(Space.sm, Space.xs, Space.sm, Space.xs),
-          child: TabBar(
-            controller: _tabs,
-            isScrollable: true,
-            tabAlignment: TabAlignment.start,
-            dividerColor: Colors.transparent,
-            indicatorSize: TabBarIndicatorSize.tab,
-            indicator: BoxDecoration(color: cs.secondaryContainer, borderRadius: BorderRadius.circular(Corners.full)),
-            indicatorPadding: const EdgeInsets.symmetric(vertical: 6),
-            labelColor: cs.onSecondaryContainer,
-            unselectedLabelColor: cs.onSurfaceVariant,
-            labelStyle: tt.labelLarge,
-            labelPadding: const EdgeInsets.symmetric(horizontal: 14),
-            splashBorderRadius: BorderRadius.circular(Corners.full),
-            overlayColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.hovered) ? cs.onSurface.withValues(alpha: 0.06) : null),
-            tabs: [
-              Tab(text: count('大纲', ctl.chapters.length), height: 44),
-              const Tab(text: '文字稿', height: 44),
-              Tab(text: count('资料', ctl.slides.length + ctl.courseware.length), height: 44),
-              Tab(text: count('笔记', ctl.notes.length + ctl.bookmarks.length), height: 44),
-              if (widget.assistant != null) const Tab(text: '助手', height: 44),
-            ],
-          ),
+          padding: const EdgeInsets.fromLTRB(Space.sm, Space.xs, Space.xs, Space.xs),
+          child: Row(children: [
+            Expanded(
+              child: TabBar(
+                controller: _tabs,
+                isScrollable: true,
+                tabAlignment: TabAlignment.start,
+                dividerColor: Colors.transparent,
+                indicatorSize: TabBarIndicatorSize.tab,
+                indicator: BoxDecoration(color: cs.secondaryContainer, borderRadius: BorderRadius.circular(Corners.full)),
+                indicatorPadding: const EdgeInsets.symmetric(vertical: 6),
+                labelColor: cs.onSecondaryContainer,
+                unselectedLabelColor: cs.onSurfaceVariant,
+                labelStyle: tt.labelLarge,
+                labelPadding: const EdgeInsets.symmetric(horizontal: 14),
+                splashBorderRadius: BorderRadius.circular(Corners.full),
+                overlayColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.hovered) ? cs.onSurface.withValues(alpha: 0.06) : null),
+                tabs: [
+                  Tab(text: count('大纲', ctl.chapters.length), height: 44),
+                  const Tab(text: '文字稿', height: 44),
+                  Tab(text: count('资料', ctl.slides.length + ctl.courseware.length), height: 44),
+                  Tab(text: count('笔记', ctl.notes.length + ctl.bookmarks.length), height: 44),
+                  if (widget.assistant != null) const Tab(text: '助手', height: 44),
+                ],
+              ),
+            ),
+            PluginMenuButton(
+              surface: 'lecture.menu',
+              context_: {
+                'lecture_id': ctl.lectureId,
+                if ((ctl.lecture?.courseId ?? '').isNotEmpty) 'course_id': ctl.lecture!.courseId,
+                't': ctl.position.value.inSeconds,
+              },
+            ),
+          ]),
         ),
         Expanded(
           child: TabBarView(controller: _tabs, children: [

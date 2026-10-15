@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'core/app_state.dart';
+import 'core/plugins.dart';
 import 'features/assistant/assistant_panel.dart';
 import 'features/assistant/task_inbox.dart';
 import 'features/assistant/tasks_page.dart';
@@ -17,6 +20,7 @@ import 'features/settings/settings_page.dart';
 import 'theme/prefs.dart';
 import 'theme/tokens.dart';
 import 'widgets/organic_shapes.dart';
+import 'widgets/states.dart';
 import 'widgets/user_avatar.dart';
 
 class _Dest {
@@ -84,12 +88,23 @@ class _AppShellState extends State<AppShell> {
   int _index = 0;
   final _navKeys = List.generate(_dests.length, (_) => GlobalKey<NavigatorState>());
   final _built = <int>{0};
+  StreamSubscription<String>? _notices;
 
   @override
   void initState() {
     super.initState();
     ShellNav._goTo = _select;
     ShellNav._keys = _navKeys;
+    // Plugin notices (look.notify) show wherever the user is.
+    _notices = context.read<PluginStore>().notices.listen((m) {
+      if (mounted) showSnack(context, m);
+    });
+  }
+
+  @override
+  void dispose() {
+    _notices?.cancel();
+    super.dispose();
   }
 
   Widget _root(int i) => switch (i) {

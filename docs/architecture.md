@@ -40,8 +40,10 @@ The app starts lookd ([lookd_service.dart](../app/lib/core/lookd_service.dart) s
 | `agent/src/usage.mjs` | Usage ledger (`usage.jsonl`): one line per model call, summaries and call paging |
 | `agent/src/practice.mjs` | Quiz grounding checks and playbook for `create_quiz` |
 | `agent/src/tasks.mjs` | Scheduled tasks: validation, next-run computation, queue and run history (`tasks.json`, `tasks-runs.jsonl`) |
-| `app/lib/core` | lookd client (`api.dart`), daemon discovery and startup, app state, models, study-time tracker (`activity_tracker.dart`) |
-| `app/lib/features/<area>` | Screens: activity, assistant, courses, courseware, downloads, home, library, login, player, practice, profile, schedule, settings |
+| `agent/src/plugins.mjs` | Plugin host: manifests, install state (`plugins.json`), catalogs, loading plugins as Pi extensions, the permission-gated Look API, actions |
+| `agent/plugins/` | Official plugins and their catalog; the [plugin author guide](../agent/plugins/README.md) |
+| `app/lib/core` | lookd client (`api.dart`), daemon discovery and startup, app state, models, study-time tracker (`activity_tracker.dart`), installed plugins and their contributions (`plugins.dart`) |
+| `app/lib/features/<area>` | Screens: activity, assistant, courses, courseware, downloads, home, library, login, player, plugins, practice, profile, schedule, settings |
 | `app/lib/widgets` | Shared widgets, including the Markdown/LaTeX renderer and reader, statistics charts (`charts.dart`) and the activity heatmap (`heatmap.dart`) |
 | `app/lib/theme` | Material 3 theme and spacing/motion tokens |
 
@@ -50,6 +52,7 @@ The app starts lookd ([lookd_service.dart](../app/lib/core/lookd_service.dart) s
 - **lookd HTTP API**: routes in `lookd/internal/server`; clients in [api.dart](../app/lib/core/api.dart) and [lookd.mjs](../agent/src/lookd.mjs).
 - **`look://` links**: parsed by `LookRef` in [look_markdown.dart](../app/lib/widgets/look_markdown.dart), produced by agent tools, documented for AI tools in [readme.go](../lookd/internal/library/readme.go).
 - **Markdown rendering**: every Markdown surface uses `LookMarkdown` in [look_markdown.dart](../app/lib/widgets/look_markdown.dart).
+- **Plugins**: a plugin is a package with a `lookStudio` manifest whose agent module is loaded as a Pi extension per conversation ([decision 0005](decisions/0005-plugins-as-pi-extensions-with-declarative-views.md), [spec 0004](specs/0004-plugin-platform.md)). Its tools reach the model through `find_tools` groups `plugin:<id>`; its results are data for views the app draws (`pluginViewBuilders` in [plugin_views.dart](../app/lib/features/plugins/plugin_views.dart)); its contributions appear through `PluginMenuButton` on the note toolbar, lecture side panel, course page and schedule items, and the composer's "+" menu.
 - **Library on disk**: layout owned by `lookd/internal/library`; `library.db` is an index over it, not the source of truth.
 - **Release package**: [release.yml](../.github/workflows/release.yml) places `lookd` and `agent/` next to the app executable, matching the discovery order above.
 

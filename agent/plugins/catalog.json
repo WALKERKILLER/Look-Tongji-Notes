@@ -1,0 +1,5 @@
+{
+	"name": "official",
+	"owner": { "name": "Look Studio" },
+	"plugins": [{ "source": "socratic", "featured": true }]
+}

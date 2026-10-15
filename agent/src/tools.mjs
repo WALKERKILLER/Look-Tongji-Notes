@@ -72,10 +72,10 @@ export const GROUPS = {
 	help: { label: "应用帮助", tools: ["app_guide"], words: "怎么 如何 功能 设置 帮助 使用 下载 登录 转写 模型 help" },
 };
 
-function matchGroups(query) {
+function matchGroups(query, groups = GROUPS) {
 	const q = (query ?? "").toLowerCase();
 	if (!q.trim()) return [];
-	return Object.entries(GROUPS)
+	return Object.entries(groups)
 		.map(([id, g]) => {
 			const terms = `${g.label} ${g.words} ${g.tools.join(" ")}`.toLowerCase().split(/\s+/);
 			const score = terms.filter((t) => t && (q.includes(t) || t.includes(q))).length;
@@ -212,7 +212,14 @@ async function unread(conv, lectureId) {
 
 // ---- tool definitions ----
 
-export function createTools(conv) {
+/**
+ * @param {object} conv the conversation (see host.mjs)
+ * @param {Record<string, {label: string, tools: string[], descriptions: Record<string, string>, playbook: string, words: string}>} [pluginGroups]
+ *   groups of the plugins loaded when the conversation opened (plugins.mjs)
+ */
+export function createTools(conv, pluginGroups = {}) {
+	const all = { ...GROUPS, ...pluginGroups };
+	const plugins = Object.entries(pluginGroups);
 	const tools = [
 		{
 			name: "find_tools",
@@ -222,24 +229,26 @@ export function createTools(conv) {
 				Object.entries(GROUPS)
 					.map(([id, g]) => `${id} (${g.label}: ${g.tools.join(", ")})`)
 					.join("; ") +
+				(plugins.length ? `. Plugin groups: ${plugins.map(([id, g]) => `${id} (${g.label})`).join("; ")}` : "") +
 				". Pass groups directly when you know them, or a query in the user's words. Loaded tools are callable from your next step.",
 			promptSnippet: "find_tools(groups|query): load tool groups (course, notes, schedule, outline, materials, practice, help)",
 			parameters: Type.Object({
-				groups: Type.Optional(Type.Array(Type.Union(Object.keys(GROUPS).map((k) => Type.Literal(k))))),
+				groups: Type.Optional(Type.Array(Type.Union(Object.keys(all).map((k) => Type.Literal(k))))),
 				query: Type.Optional(Type.String({ description: "What you need to do, e.g. 标记作业截止日期" })),
 			}),
 			execute: async (_id, { groups = [], query }) => {
-				let ids = [...new Set([...groups, ...matchGroups(query)])];
-				ids = [...new Set(ids.flatMap((id) => [id, ...(GROUPS[id]?.with ?? [])]))];
-				if (!ids.length) return text(`没有匹配的工具组。可选：${Object.entries(GROUPS).map(([id, g]) => `${id}（${g.label}）`).join("、")}`);
-				const names = [...new Set(ids.flatMap((id) => GROUPS[id].tools))];
+				let ids = [...new Set([...groups, ...matchGroups(query, all)])].filter((id) => all[id]);
+				ids = [...new Set(ids.flatMap((id) => [id, ...(all[id]?.with ?? [])]))];
+				if (!ids.length) return text(`没有匹配的工具组。可选：${Object.entries(all).map(([id, g]) => `${id}（${g.label}）`).join("、")}`);
+				const names = [...new Set(ids.flatMap((id) => all[id].tools))];
 				conv.load(names);
-				const lines = names.map((n) => {
-					const t = tools.find((x) => x.name === n);
-					return `- ${n}: ${t.description.split(/(?<=\.)\s/)[0]}`;
-				});
-				const playbook = [ids.includes("notes") && NOTE_PLAYBOOK, ids.includes("practice") && QUIZ_PLAYBOOK].filter(Boolean).map((p) => `\n\n${p}`).join("");
-				return text(`已加载 ${ids.map((id) => GROUPS[id].label).join("、")}，下一步即可调用：\n${lines.join("\n")}${playbook}`, { loaded: names });
+				const describe = (n) => tools.find((x) => x.name === n)?.description ?? plugins.find(([, g]) => n in g.descriptions)?.[1].descriptions[n] ?? "";
+				const lines = names.map((n) => `- ${n}: ${describe(n).split(/(?<=\.)\s/)[0]}`);
+				const playbook = [ids.includes("notes") && NOTE_PLAYBOOK, ids.includes("practice") && QUIZ_PLAYBOOK, ...ids.map((id) => pluginGroups[id]?.playbook)]
+					.filter(Boolean)
+					.map((p) => `\n\n${p}`)
+					.join("");
+				return text(`已加载 ${ids.map((id) => all[id].label).join("、")}，下一步即可调用：\n${lines.join("\n")}${playbook}`, { loaded: names });
 			},
 		},
 		{
@@ -783,7 +792,7 @@ export const TURN_TOOL_BUDGET = 24;
 const MAX_RESULT_CHARS = 16000;
 
 // guard enforces the per-turn call budget and caps result size.
-function guard(conv, tool) {
+export function guard(conv, tool) {
 	const run = tool.execute;
 	return {
 		...tool,
