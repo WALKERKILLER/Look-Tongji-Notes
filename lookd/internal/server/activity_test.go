@@ -22,6 +22,8 @@ func TestCheckActivity(t *testing.T) {
 		{"unknown kind", activityIn{Kind: "sleep", Seconds: 10}, "", true},
 		{"older than a day", activityIn{Kind: "watch", Seconds: 10, At: now.Add(-25 * time.Hour).Unix()}, "", true},
 		{"future", activityIn{Kind: "watch", Seconds: 10, At: now.Add(time.Hour).Unix()}, "", true},
+		{"report id", activityIn{ID: "a1b2c3d4e5f6", Kind: "watch", Seconds: 10}, "2026-10-14", false},
+		{"bad report id", activityIn{ID: "x/y", Kind: "watch", Seconds: 10}, "", true},
 	}
 	for _, c := range cases {
 		day, err := checkActivity(c.in, now)

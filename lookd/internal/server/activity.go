@@ -2,6 +2,7 @@ package server
 
 import (
 	"net/http"
+	"regexp"
 	"time"
 
 	"lookstudio/lookd/internal/store"
@@ -10,6 +11,7 @@ import (
 // Study activity for the heatmap (docs/specs/0001-learning-activity-heatmap.md).
 
 type activityIn struct {
+	ID        string `json:"id"` // stable per report, so a retry is counted once
 	Kind      string `json:"kind"`
 	Seconds   int64  `json:"seconds"`
 	Count     int64  `json:"count"`
@@ -18,10 +20,14 @@ type activityIn struct {
 	At        int64  `json:"at"` // unix seconds; 0 = now
 }
 
+var reportID = regexp.MustCompile(`^[A-Za-z0-9_-]{8,64}$`)
+
 // checkActivity validates a report and returns its local day.
 func checkActivity(in activityIn, now time.Time) (string, error) {
 	switch {
-	case !store.TimedKinds[in.Kind] && in.Kind != "ask":
+	case in.ID != "" && !reportID.MatchString(in.ID):
+		return "", badRequest("id 应为 8–64 位字母、数字、- 或 _")
+	case !store.ValidActivityKind(in.Kind):
 		return "", badRequest("kind 应为 watch、read、practice 或 ask")
 	case in.Seconds < 0 || in.Seconds > 300:
 		return "", badRequest("seconds 应在 0–300 之间")
@@ -57,7 +63,7 @@ func (s *Server) addActivity(_ http.ResponseWriter, r *http.Request) (any, error
 	if !store.TimedKinds[in.Kind] {
 		in.Seconds = 0
 	}
-	if err := s.Lib.AddActivity(r.Context(), day, in.Kind, in.CourseID, in.LectureID, in.Seconds, in.Count); err != nil {
+	if err := s.Lib.AddActivity(r.Context(), in.ID, day, in.Kind, in.CourseID, in.LectureID, in.Seconds, in.Count); err != nil {
 		return nil, err
 	}
 	s.Bus.Publish("activity_changed", map[string]string{"day": day})

@@ -192,3 +192,10 @@ CREATE TABLE IF NOT EXISTS activity (
   count      INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY (day, kind, course_id, lecture_id)
 );
+
+-- Ids of applied activity reports, so a retried report is counted once
+-- (kept for store.ReportsKept; not mirrored).
+CREATE TABLE IF NOT EXISTS activity_reports (
+  id TEXT PRIMARY KEY,
+  at INTEGER NOT NULL
+);

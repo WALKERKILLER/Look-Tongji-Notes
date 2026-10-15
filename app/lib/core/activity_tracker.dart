@@ -12,7 +12,9 @@ import 'app_state.dart';
 /// tracker credits the time since the last check to running clocks whose
 /// conditions hold, and every [flushEvery] it sends the totals.
 class ActivityTracker with WidgetsBindingObserver {
-  ActivityTracker(this.app, {this.now = DateTime.now}) {
+  ActivityTracker(this.app, {this.now = DateTime.now, Future<dynamic> Function(Map<String, Object> report)? post})
+      : _post = post ?? ((r) => app.api.post('/api/activity', r)),
+        _testing = post != null {
     WidgetsBinding.instance.addObserver(this);
     _ticker = Timer.periodic(tick, (_) => _check());
   }
@@ -28,6 +30,10 @@ class ActivityTracker with WidgetsBindingObserver {
 
   final AppState app;
   final DateTime Function() now;
+  final Future<dynamic> Function(Map<String, Object> report) _post;
+
+  /// A test seam for [_post]: sends even without a lookd connection.
+  final bool _testing;
   late final Timer _ticker;
   final _clocks = <ActivityClock>{};
   final _pending = <(String, String, String), _Bucket>{}; // (kind, lecture, local day)
@@ -75,9 +81,10 @@ class ActivityTracker with WidgetsBindingObserver {
   }
 
   /// Sends accumulated time and counts. Failed reports stay queued for a day,
-  /// the window lookd accepts back-dated reports in.
+  /// the window lookd accepts back-dated reports in. A report keeps its id
+  /// until lookd confirms it, so a retry after a lost response counts once.
   Future<void> flush() async {
-    if (_flushing || !app.connected) return;
+    if (_flushing || (!app.connected && !_testing)) return;
     _flushing = true;
     final t = _lastFlush = now();
     try {
@@ -88,15 +95,22 @@ class ActivityTracker with WidgetsBindingObserver {
         }
         final at = b.at.millisecondsSinceEpoch ~/ 1000;
         final lecture = {if (key.$2.isNotEmpty) 'lecture_id': key.$2};
-        while (b.seconds >= 1) {
-          final part = math.min(b.seconds.floor(), 300);
-          await app.api.post('/api/activity', {'kind': key.$1, 'seconds': part, 'at': at, ...lecture});
-          b.seconds -= part;
-        }
-        while (b.count > 0) {
-          final part = math.min(b.count, 50);
-          await app.api.post('/api/activity', {'kind': key.$1, 'count': part, 'at': at, ...lecture});
-          b.count -= part;
+        while (true) {
+          var r = b.unsent;
+          if (r == null) {
+            if (b.seconds >= 1) {
+              r = {'kind': key.$1, 'seconds': math.min(b.seconds.floor(), 300), 'at': at, ...lecture};
+            } else if (b.count > 0) {
+              r = {'kind': key.$1, 'count': math.min(b.count, 50), 'at': at, ...lecture};
+            } else {
+              break;
+            }
+            b.unsent = r = {...r, 'id': _reportId()};
+          }
+          await _post(r);
+          b.unsent = null;
+          b.seconds -= (r['seconds'] as int?) ?? 0;
+          b.count -= (r['count'] as int?) ?? 0;
         }
         // Keep the sub-second remainder only while its clock may add to it.
         if (b.seconds < 1 && b.count == 0 && !_clocks.any((c) => c.kind == key.$1 && c.lectureId == key.$2)) _pending.remove(key);
@@ -131,7 +145,13 @@ class _Bucket {
   DateTime at;
   double seconds = 0;
   int count = 0;
+
+  /// The report being sent, already counted in [seconds] or [count].
+  Map<String, Object>? unsent;
 }
+
+final _rand = math.Random.secure();
+String _reportId() => [for (var i = 0; i < 12; i++) _rand.nextInt(256).toRadixString(16).padLeft(2, '0')].join();
 
 /// Time on one surface (the player, a reader, a quiz).
 class ActivityClock {

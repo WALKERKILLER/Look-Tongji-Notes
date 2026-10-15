@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"time"
 )
 
@@ -13,6 +14,34 @@ import (
 
 // TimedKinds are the activity kinds measured in seconds; "ask" is a count.
 var TimedKinds = map[string]bool{"watch": true, "read": true, "practice": true}
+
+// ValidActivityKind reports whether kind is a timed kind or "ask".
+func ValidActivityKind(kind string) bool { return TimedKinds[kind] || kind == "ask" }
+
+// CheckActivityRow validates a stored bucket, e.g. one restored from
+// activity.json: a known kind, a real calendar day no later than tomorrow,
+// and totals within what one day can hold.
+func CheckActivityRow(r ActivityRow) error {
+	d, err := time.ParseInLocation("2006-01-02", r.Day, time.Local)
+	switch {
+	case !ValidActivityKind(r.Kind):
+		return fmt.Errorf("activity kind %q", r.Kind)
+	case err != nil || d.Format("2006-01-02") != r.Day || r.Day < "2000-01-01" || d.After(time.Now().AddDate(0, 0, 1)):
+		return fmt.Errorf("activity day %q", r.Day)
+	case r.Seconds < 0 || r.Seconds > 86400 || r.Count < 0 || r.Count > 100000 || (r.Seconds == 0 && r.Count == 0):
+		return fmt.Errorf("activity totals %d s, %d", r.Seconds, r.Count)
+	case !TimedKinds[r.Kind] && r.Seconds != 0:
+		return fmt.Errorf("activity kind %q has seconds", r.Kind)
+	}
+	return nil
+}
+
+// ReportsKept is how long report ids are remembered for deduplication; the
+// app retries a report for at most a day.
+const ReportsKept = 48 * time.Hour
+
+// commitTx is replaced in tests to simulate a failed commit.
+var commitTx = func(tx *sql.Tx) error { return tx.Commit() }
 
 // querier is a database or a transaction.
 type querier interface {
@@ -32,16 +61,30 @@ func (s *Store) AddActivity(ctx context.Context, day, kind, courseID, lectureID 
 	return addActivity(ctx, s.DB, day, kind, courseID, lectureID, seconds, count)
 }
 
-// AddActivityMirrored adds to a bucket and hands every resulting row to
-// mirror inside one transaction; the add is rolled back if mirror fails, so
-// the index and its file copy never disagree and a retried report is not
-// counted twice.
-func (s *Store) AddActivityMirrored(ctx context.Context, day, kind, courseID, lectureID string, seconds, count int64, mirror func([]ActivityRow) error) error {
+// AddActivityMirrored adds a report to a bucket in one transaction and keeps
+// the file copy in step with it:
+//   - a report id seen before is a retry and changes nothing;
+//   - mirror writes every resulting row; if it fails, nothing is kept;
+//   - if the commit then fails, mirror's undo restores the previous file.
+func (s *Store) AddActivityMirrored(ctx context.Context, reportID, day, kind, courseID, lectureID string, seconds, count int64, mirror func([]ActivityRow) (undo func(), err error)) error {
 	tx, err := s.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
+	if reportID != "" {
+		now := time.Now()
+		res, err := tx.ExecContext(ctx, `INSERT INTO activity_reports(id, at) VALUES(?, ?) ON CONFLICT(id) DO NOTHING`, reportID, now.Unix())
+		if err != nil {
+			return err
+		}
+		if n, _ := res.RowsAffected(); n == 0 {
+			return nil // already counted
+		}
+		if _, err := tx.ExecContext(ctx, `DELETE FROM activity_reports WHERE at < ?`, now.Add(-ReportsKept).Unix()); err != nil {
+			return err
+		}
+	}
 	if err := addActivity(ctx, tx, day, kind, courseID, lectureID, seconds, count); err != nil {
 		return err
 	}
@@ -49,10 +92,15 @@ func (s *Store) AddActivityMirrored(ctx context.Context, day, kind, courseID, le
 	if err != nil {
 		return err
 	}
-	if err := mirror(rows); err != nil {
+	undo, err := mirror(rows)
+	if err != nil {
 		return err
 	}
-	return tx.Commit()
+	if err := commitTx(tx); err != nil {
+		undo()
+		return err
+	}
+	return nil
 }
 
 // ActivityRow is one stored bucket, as mirrored to activity.json.
