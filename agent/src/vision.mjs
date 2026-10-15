@@ -8,6 +8,7 @@ import { readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fetchBytes } from "./lookd.mjs";
 import { DATA_DIR } from "./models.mjs";
+import { entryFrom } from "./usage.mjs";
 
 const CACHE = join(DATA_DIR, "vision-cache.json");
 const CACHE_MAX = 2000;
@@ -63,6 +64,7 @@ async function describe(pipeline, vm, img, signal) {
 		},
 		{ signal: AbortSignal.any([signal ?? new AbortController().signal, AbortSignal.timeout(120_000)]), maxTokens: 2000 },
 	);
+	pipeline.usage?.record(entryFrom(res, { purpose: "vision" }));
 	if (res.stopReason === "error") throw new Error(res.errorMessage ?? "识图失败");
 	const text = res.content.filter((x) => x.type === "text").map((x) => x.text).join("").trim();
 	c[key] = { text, at: Date.now() };

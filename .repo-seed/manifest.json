@@ -56,7 +56,7 @@
   "files": [
     {
       "path": "AGENTS.md",
-      "sha256": "fc6c1b1e2bb5698112db48cede2a5c199403705b6397913634a9924f5829cb62",
+      "sha256": "e6915861953a00da5eb5b03b00f379d18ef9233c8434719b61db85978b633405",
       "category": "instruction",
       "capability": "baseline",
       "userModified": true
@@ -75,21 +75,24 @@
     },
     {
       "path": "docs/architecture.md",
-      "sha256": "02dfb362910a5aab024261167a2e08408ee84966d6093fbb6f30dd79e8335461",
+      "sha256": "d6f984b1ec8173a944b3cc330c1de6eca08aca680226afe70da1dfb4e70cc074",
       "category": "docs",
-      "capability": "baseline"
+      "capability": "baseline",
+      "userModified": true
     },
     {
       "path": "docs/development.md",
-      "sha256": "5f1cd355a1e0e14f658c078cda75e13c37c1f4342d4b27d450d3063f7aa60c48",
+      "sha256": "2fbad9553a6266da268704843464787f15b26fb698b9646c6e76ec2af0b6c263",
       "category": "docs",
-      "capability": "baseline"
+      "capability": "baseline",
+      "userModified": true
     },
     {
       "path": "docs/testing.md",
-      "sha256": "bedd630899660537bef61c7d6ed0005566c67e308c271bd9bc7ab68ee5da283c",
+      "sha256": "f412b319307086b577274c4127423524779482d41f8ad39f87047b194654ab77",
       "category": "docs",
-      "capability": "baseline"
+      "capability": "baseline",
+      "userModified": true
     },
     {
       "path": ".agents/skills/repo-review/SKILL.md",
@@ -219,7 +222,8 @@
       "path": "docs/decisions/README.md",
       "sha256": "97da82361617740929b1244c37f31090a2803e23a10811307ebd00e8bcecda95",
       "category": "docs",
-      "capability": "decisions"
+      "capability": "decisions",
+      "userModified": true
     },
     {
       "path": "docs/decisions/0000-use-markdown-architectural-decision-records.md",
@@ -261,7 +265,8 @@
       "path": "docs/postmortems/README.md",
       "sha256": "2c25abcb13a98f5c3c7f4408665c24c80e47855e5540dfa83b76777e6c46f3c3",
       "category": "docs",
-      "capability": "postmortems"
+      "capability": "postmortems",
+      "userModified": true
     },
     {
       "path": "scripts/verify-postmortems.mjs",

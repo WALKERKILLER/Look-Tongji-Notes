@@ -36,9 +36,10 @@ The app starts lookd ([lookd_service.dart](../app/lib/core/lookd_service.dart) s
 | `agent/src/tools.mjs` | Tool groups, `find_tools`, note playbook, write guards |
 | `agent/src/models.mjs`, `catalog.mjs` | Providers, model preferences, models.dev metadata |
 | `agent/src/timeline.mjs`, `vision.mjs`, `lookd.mjs` | Outline generation, image bridge for text-only models, lookd client |
+| `agent/src/usage.mjs` | Usage ledger (`usage.jsonl`): one line per model call, summaries and call paging |
 | `app/lib/core` | lookd client (`api.dart`), daemon discovery and startup, app state, models |
 | `app/lib/features/<area>` | Screens: assistant, courses, courseware, downloads, home, library, login, player, profile, schedule, settings |
-| `app/lib/widgets` | Shared widgets, including the Markdown/LaTeX renderer and reader |
+| `app/lib/widgets` | Shared widgets, including the Markdown/LaTeX renderer and reader, and statistics charts (`charts.dart`) |
 | `app/lib/theme` | Material 3 theme and spacing/motion tokens |
 
 ## Seams

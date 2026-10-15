@@ -23,6 +23,7 @@ import '../schedule/schedule_widgets.dart';
 import '../settings/model_meta.dart';
 import '../settings/models_page.dart';
 import '../settings/provider_presets.dart';
+import '../usage/usage_page.dart';
 import 'assistant_controller.dart';
 
 const _toolLabels = {
@@ -541,6 +542,11 @@ class _ContextMeter extends StatelessWidget {
           leadingIcon: const Icon(Icons.compress_rounded, size: 18),
           onPressed: a.busy || a.compacting ? null : a.compact,
           child: const Text('立即压缩上下文'),
+        ),
+        MenuItemButton(
+          leadingIcon: const Icon(Icons.insights_outlined, size: 18),
+          onPressed: () => Navigator.of(context, rootNavigator: true).push(MaterialPageRoute(builder: (_) => const UsagePage())),
+          child: const Text('查看用量'),
         ),
       ],
       builder: (context, m, _) => IconButton(

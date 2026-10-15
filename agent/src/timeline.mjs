@@ -2,6 +2,7 @@
 // call over the (uniformly sampled) transcript, then lookd normalizes the
 // chapters so they tile the lecture from 00:00 to its end.
 import { api, get } from "./lookd.mjs";
+import { entryFrom } from "./usage.mjs";
 
 const enc = encodeURIComponent;
 const MAX_CHARS = 28000;
@@ -92,6 +93,7 @@ export async function generateTimeline(pipeline, lectureId, signal) {
 			},
 			{ signal: sig, maxTokens: 4000 },
 		);
+		pipeline.usage?.record(entryFrom(res, { purpose: "timeline" }));
 		if (res.stopReason === "error") throw new Error(res.errorMessage ?? "模型请求失败");
 		text = res.content.filter((c) => c.type === "text").map((c) => c.text).join("");
 		const lines = text.split("\n").filter((l) => /\d{1,3}:\d{2}\s*[-–—~～]\s*\d{1,3}:\d{2}/.test(l));

@@ -16,7 +16,7 @@ English is the working language of this repository. This document covers contrib
    node scripts/run-gates.mjs
    ```
    An authorized pre-commit capability enforces the same runner; run it early even when no hook is installed.
-4. Run the test command: `(cd lookd && go test -count=1 -race ./...) && (cd app && flutter test)`
+4. Run the test command: `(cd lookd && go test -count=1 -race ./...) && (cd agent && npm test) && (cd app && flutter test)`
 5. Run the lint command: `(cd lookd && test -z "$(gofmt -l .)" && go vet ./...) && (cd agent && npm run check) && (cd app && flutter analyze --no-fatal-infos)`
 6. Commit with a message that states the why; include a decision record reference when one changed.
 
