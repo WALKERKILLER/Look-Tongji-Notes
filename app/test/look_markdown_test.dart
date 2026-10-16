@@ -63,4 +63,12 @@ void main() {
     expect(prose.contains(r'$'), isFalse, reason: text);
     expect(text.contains(r'\begin'), isFalse);
   });
+
+  test('lookstudio:// links from exported notes parse like look://', () {
+    final ref = LookRef.parse('lookstudio://lecture/L1?t=723');
+    expect(ref, isA<TimeRef>());
+    expect((ref as TimeRef).lectureId, 'L1');
+    expect(ref.seconds, 723);
+    expect(LookRef.parse('https://example.com/?t=1'), isNull);
+  });
 }

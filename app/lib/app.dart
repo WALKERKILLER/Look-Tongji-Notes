@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'core/app_state.dart';
+import 'core/deep_links.dart';
 import 'core/lookd_service.dart';
 import 'features/login/login_page.dart';
 import 'shell.dart';
@@ -23,6 +24,7 @@ class LookApp extends StatelessWidget {
       final darkTheme = buildTheme(buildScheme(prefs, Brightness.dark, systemAccent: dark?.primary ?? accent), prefs);
       return MaterialApp(
         title: 'Look Studio',
+        navigatorKey: rootNavigatorKey,
         debugShowCheckedModeBanner: false,
         theme: lightTheme,
         darkTheme: darkTheme,
@@ -70,6 +72,7 @@ class RootGate extends StatelessWidget {
       child = const LoginPage(key: ValueKey('login'));
     } else {
       child = const AppShell(key: ValueKey('shell'));
+      WidgetsBinding.instance.addPostFrameCallback((_) => DeepLinks.ready());
     }
     return AnimatedSwitcher(
       duration: Motion.long2,

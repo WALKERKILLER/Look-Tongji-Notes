@@ -33,6 +33,8 @@ type Library struct {
 	Store *store.Store
 	mu    sync.Mutex
 	tpl   Templates
+	// exportMu keeps exports to the same vault from interleaving.
+	exportMu sync.Mutex
 }
 
 func Open(root string, st *store.Store) (*Library, error) {
@@ -391,6 +393,19 @@ func orDefault(s, d string) string {
 // database can always be deleted and regenerated.
 func (l *Library) Reindex(ctx context.Context) (int, error) {
 	count := 0
+	// Notes that belong to no course live in the top-level notes/ folder.
+	filepath.WalkDir(l.Abs("notes"), func(p string, d os.DirEntry, err error) error {
+		if err != nil || d.IsDir() || !strings.HasSuffix(d.Name(), ".md") {
+			return nil
+		}
+		if n, ok := parseNote(p); ok {
+			n.Path = l.Rel(p)
+			if l.Store.PutNote(ctx, n) == nil {
+				count++
+			}
+		}
+		return nil
+	})
 	err := filepath.WalkDir(l.Abs("courses"), func(p string, d os.DirEntry, err error) error {
 		if err != nil || d.IsDir() {
 			return nil

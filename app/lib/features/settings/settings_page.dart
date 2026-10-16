@@ -22,6 +22,7 @@ import '../profile/profile_dialog.dart';
 import 'asr_settings.dart';
 import 'mineru_settings.dart';
 import 'models_page.dart';
+import 'obsidian_settings.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -201,6 +202,8 @@ class _SettingsPageState extends State<SettingsPage> {
         subtitle: const Text('以硬链接生成 raw/<课程>/<节次>/原始数据/ 目录，不额外占空间'),
         onTap: () => _export(context),
       ),
+      const SizedBox(height: Space.lg),
+      ObsidianSettings(server: _server, put: _put),
     ]);
   }
 

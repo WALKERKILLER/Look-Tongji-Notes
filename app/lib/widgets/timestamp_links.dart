@@ -68,7 +68,7 @@ class TimeLink {
 
   static TimeLink? parse(String url) {
     final u = Uri.tryParse(url);
-    if (u == null || u.scheme != 'look') return null;
+    if (u == null || (u.scheme != 'look' && u.scheme != 'lookstudio')) return null;
     final t = int.tryParse(u.queryParameters['t'] ?? '');
     if (t == null) return null;
     if (u.host == 'seek') return TimeLink('', t);
