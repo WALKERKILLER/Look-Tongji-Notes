@@ -129,7 +129,7 @@ class _ObsidianSettingsState extends State<ObsidianSettings> {
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Text('Obsidian', style: tt.titleSmall),
       const SizedBox(height: Space.xs),
-      Text('把课程库单向导出到 Obsidian 仓库的子文件夹：课程页、节次页、笔记、转写稿和笔记引用的 PPT、课件。时间戳点击后回到 Look Studio；在 Obsidian 里改过的文件不会被覆盖。',
+      Text('把课程库单向导出到 Obsidian 仓库的子文件夹：一个总的“课程库”页，每门课一个文件夹，里面分“笔记”（按节次分文件夹，含引用的 PPT、课件）和“转写稿”。时间戳点击后回到 Look Studio；在 Obsidian 里改过的文件不会被覆盖。',
           style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
       const SizedBox(height: Space.md),
       Row(children: [
