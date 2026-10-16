@@ -66,14 +66,16 @@ func TestExportObsidian(t *testing.T) {
 		t.Fatalf("first export: %+v", res)
 	}
 	out := filepath.Join(vault, ObsidianFolder)
-	lecDir := filepath.Join(out, "海洋地质学", "2026-09-10 第一讲")
+	courseDir := filepath.Join(out, "海洋地质学")
+	notesDir := filepath.Join(courseDir, "笔记", "2026-09-10 第一讲")
+	filesDir := filepath.Join(notesDir, "附件")
 
-	gotNote := readFile(t, filepath.Join(lecDir, "notes", "板块构造.md"))
+	gotNote := readFile(t, filepath.Join(notesDir, "板块构造.md"))
 	for _, want := range []string{
 		`look_note_id: "` + note.ID + `"`,
 		"[12:03](lookstudio://lecture/L1?t=723)",
 		`$v=\frac{d}{t}$`,
-		"![PPT 12](../slides/0012_t00-12-03.jpg)",
+		"![PPT 12](附件/slides/0012_t00-12-03.jpg)",
 	} {
 		if !strings.Contains(gotNote, want) {
 			t.Errorf("note lacks %q:\n%s", want, gotNote)
@@ -82,20 +84,36 @@ func TestExportObsidian(t *testing.T) {
 	if strings.Contains(gotNote, "look://") {
 		t.Errorf("note still has look:// links:\n%s", gotNote)
 	}
-	if readFile(t, filepath.Join(lecDir, "slides", "0012_t00-12-03.jpg")) != "jpg" {
+	if readFile(t, filepath.Join(filesDir, "slides", "0012_t00-12-03.jpg")) != "jpg" {
 		t.Error("linked slide not copied")
 	}
-	lecPage := readFile(t, filepath.Join(lecDir, "2026-09-10 第一讲.md"))
-	for _, want := range []string{"[板块构造](notes/板块构造.md)", "[转写稿](transcript.md)", "[海洋地质学](../海洋地质学.md)"} {
-		if !strings.Contains(lecPage, want) {
-			t.Errorf("lecture page lacks %q:\n%s", want, lecPage)
+	transcript := readFile(t, filepath.Join(courseDir, "转写稿", "2026-09-10 第一讲.md"))
+	for _, want := range []string{"[板块构造](../笔记/2026-09-10%20第一讲/板块构造.md)", "[课程库](../../课程库.md)", "lookstudio://lecture/L1?t=0", "tags:\n  - look-studio/transcript"} {
+		if !strings.Contains(transcript, want) {
+			t.Errorf("transcript page lacks %q:\n%s", want, transcript)
 		}
 	}
-	if !strings.Contains(readFile(t, filepath.Join(lecDir, "transcript.md")), "lookstudio://lecture/L1?t=0") {
-		t.Error("transcript timestamps not linked")
+	if strings.Contains(transcript, "look-studio/transcript@1") {
+		t.Errorf("library front matter leaked into the transcript page:\n%s", transcript)
 	}
-	if !strings.Contains(readFile(t, filepath.Join(out, "课程库.md")), "(未归类笔记/随手记.md)") {
-		t.Error("index lacks the loose note:\n" + readFile(t, filepath.Join(out, "课程库.md")))
+	index := readFile(t, filepath.Join(out, "课程库.md"))
+	for _, want := range []string{"## 海洋地质学", "(海洋地质学/转写稿/2026-09-10%20第一讲.md)", "(海洋地质学/笔记/2026-09-10%20第一讲/板块构造.md)", "(未归类笔记/随手记.md)"} {
+		if !strings.Contains(index, want) {
+			t.Errorf("index lacks %q:\n%s", want, index)
+		}
+	}
+	// Only the index and folders at the top; the course folder holds just
+	// notes and transcripts.
+	for dir, want := range map[string]string{out: ".lookstudio-export.json 未归类笔记 海洋地质学 课程库.md", courseDir: "笔记 转写稿", filepath.Dir(notesDir): "2026-09-10 第一讲"} {
+		ents, err := os.ReadDir(dir)
+		must(err)
+		var names []string
+		for _, e := range ents {
+			names = append(names, e.Name())
+		}
+		if got := strings.Join(names, " "); got != want {
+			t.Errorf("%s holds %q, want %q", dir, got, want)
+		}
 	}
 
 	// Unchanged library: nothing is rewritten.
@@ -106,7 +124,7 @@ func TestExportObsidian(t *testing.T) {
 	}
 
 	// A note edited in the vault is kept; the new version goes beside it.
-	edited := filepath.Join(lecDir, "notes", "板块构造.md")
+	edited := filepath.Join(notesDir, "板块构造.md")
 	must(os.WriteFile(edited, []byte("我在 Obsidian 里改过"), 0o644))
 	note.Body += "\n补充一句\n"
 	_, err = lib.SaveNote(ctx, note)
@@ -116,25 +134,25 @@ func TestExportObsidian(t *testing.T) {
 	if len(res.Conflicts) != 1 || readFile(t, edited) != "我在 Obsidian 里改过" {
 		t.Fatalf("edited note not protected: %+v", res)
 	}
-	if !strings.Contains(readFile(t, filepath.Join(lecDir, "notes", "板块构造 (Look Studio).md")), "补充一句") {
+	if !strings.Contains(readFile(t, filepath.Join(notesDir, "板块构造 (Look Studio).md")), "补充一句") {
 		t.Error("new version not written beside the edited note")
 	}
 
 	// The "(Look Studio)" copy is protected the same way once edited.
-	copyPath := filepath.Join(lecDir, "notes", "板块构造 (Look Studio).md")
+	copyPath := filepath.Join(notesDir, "板块构造 (Look Studio).md")
 	must(os.WriteFile(copyPath, []byte("副本也改了"), 0o644))
 	note.Body += "\n再补一句\n"
 	_, err = lib.SaveNote(ctx, note)
 	must(err)
 	_, err = lib.ExportObsidian(ctx, vault, "")
 	must(err)
-	if readFile(t, copyPath) != "副本也改了" || !strings.Contains(readFile(t, filepath.Join(lecDir, "notes", "板块构造 (Look Studio 2).md")), "再补一句") {
+	if readFile(t, copyPath) != "副本也改了" || !strings.Contains(readFile(t, filepath.Join(notesDir, "板块构造 (Look Studio 2).md")), "再补一句") {
 		t.Fatal("edited conflict copy was overwritten")
 	}
 
 	// Attachments are copies: editing one in the vault leaves the library
 	// alone, and later exports keep the edit.
-	slide := filepath.Join(lecDir, "slides", "0012_t00-12-03.jpg")
+	slide := filepath.Join(filesDir, "slides", "0012_t00-12-03.jpg")
 	must(os.WriteFile(slide, []byte("annotated"), 0o644))
 	if readFile(t, lib.Abs(dir+"/slides/0012_t00-12-03.jpg")) != "jpg" {
 		t.Fatal("editing the exported slide changed the library")
@@ -215,5 +233,19 @@ func TestExportObsidianStopsAtSymlink(t *testing.T) {
 	}
 	if ents, _ := os.ReadDir(elsewhere); len(ents) != 0 {
 		t.Fatalf("files written outside the export: %v", ents)
+	}
+}
+
+func TestObsidianPlaces(t *testing.T) {
+	for _, c := range []struct{ got, want string }{
+		{noteFolder("courses/物化/2026-10-16第3-4节/notes/a-1.md"), "物化/笔记/2026-10-16第3-4节"},
+		{noteFolder("courses/物化/notes/a-1.md"), "物化/笔记/课程笔记"},
+		{noteFolder("notes/a-1.md"), "未归类笔记"},
+		{placeInExport("courses/物化/2026-10-16第3-4节/slides/0001.jpg"), "物化/笔记/2026-10-16第3-4节/附件/slides/0001.jpg"},
+		{placeInExport("courses/物化/2026-10-16第3-4节/courseware/讲义.pdf.parsed/images/a.jpg"), "物化/笔记/2026-10-16第3-4节/附件/courseware/讲义.pdf.parsed/images/a.jpg"},
+	} {
+		if c.got != c.want {
+			t.Errorf("got %q, want %q", c.got, c.want)
+		}
 	}
 }

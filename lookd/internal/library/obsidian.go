@@ -21,9 +21,17 @@ import (
 	"lookstudio/lookd/internal/store"
 )
 
-// The Obsidian export mirrors the library into a folder of an Obsidian vault
-// as plain Markdown: a page per course and lecture, the notes, transcripts,
-// and the slides, courseware and figures the notes link to. It is one-way;
+// The Obsidian export writes the library into a folder of an Obsidian vault
+// as plain Markdown:
+//
+//	课程库.md                      the one index: courses, lectures, notes, schedule
+//	<课程>/笔记/<节次>/<标题>.md   lecture notes, one folder per lecture (named by date)
+//	<课程>/笔记/<节次>/附件/...    slides, courseware and figures those notes link to
+//	<课程>/笔记/课程笔记/<标题>.md notes of the whole course
+//	<课程>/转写稿/<节次>.md        lecture details and outline, then the transcript
+//	未归类笔记/<标题>.md           only when there are notes outside any course
+//
+// It is one-way;
 // files the user edited in the vault are never overwritten (the new version
 // goes next to them as "<name> (Look Studio).md"). Attachments are copied,
 // never hard-linked, so editing them in the vault cannot change the library.
@@ -135,22 +143,58 @@ type obsidianExport struct {
 	res    ObsidianResult
 }
 
-// placeInExport maps a library path to its export path: course folders sit
-// at the export root, loose notes in their own folder.
-func placeInExport(rel string) string {
-	if r, ok := strings.CutPrefix(rel, "courses/"); ok {
-		return r
+// Export folder names; course and lecture folders are named as in the library.
+const (
+	indexPage         = "课程库.md"
+	notesFolder       = "笔记"
+	transcriptsFolder = "转写稿"
+	filesFolder       = "附件" // inside a lecture's notes folder
+	courseNotesFolder = "课程笔记"
+	looseNotesFolder  = "未归类笔记"
+)
+
+// courseOf splits a library path under courses/ into the course folder
+// name and the rest.
+func courseOf(rel string) (course, rest string, ok bool) {
+	r, ok := strings.CutPrefix(rel, "courses/")
+	if !ok {
+		return "", "", false
 	}
-	if r, ok := strings.CutPrefix(rel+"/", "notes/"); ok {
-		return strings.TrimSuffix("未归类笔记/"+r, "/")
-	}
-	return "_files/" + rel
+	course, rest, _ = strings.Cut(r, "/")
+	return course, rest, course != ""
 }
 
-// pageOf is the folder page of a library folder: "<folder>/<folder name>.md".
-func pageOf(dir string) string {
-	p := placeInExport(dir)
-	return p + "/" + path.Base(p) + ".md"
+// placeInExport is where a library file a note links to goes: in the
+// attachment folder of its lecture's notes, keeping the file's path inside
+// the lecture folder (slides/..., courseware/...).
+func placeInExport(rel string) string {
+	course, rest, ok := courseOf(rel)
+	if !ok {
+		return looseNotesFolder + "/" + filesFolder + "/" + rel
+	}
+	lecture, inLecture, _ := strings.Cut(rest, "/")
+	if inLecture == "" {
+		return course + "/" + notesFolder + "/" + filesFolder + "/" + rest
+	}
+	return course + "/" + notesFolder + "/" + lecture + "/" + filesFolder + "/" + inLecture
+}
+
+func transcriptPage(lec store.Lecture) string {
+	return path.Base(path.Dir(lec.Dir)) + "/" + transcriptsFolder + "/" + path.Base(lec.Dir) + ".md"
+}
+
+// noteFolder is the export folder of a note stored at library path rel:
+// courses/<课程>/<节次>/notes/ goes to <课程>/笔记/<节次>/, the course's own
+// notes/ to <课程>/笔记/课程笔记/.
+func noteFolder(rel string) string {
+	course, rest, ok := courseOf(rel)
+	if !ok {
+		return looseNotesFolder
+	}
+	if lecture, _, _ := strings.Cut(rest, "/"); lecture != "notes" {
+		return course + "/" + notesFolder + "/" + lecture
+	}
+	return course + "/" + notesFolder + "/" + courseNotesFolder
 }
 
 func (e *obsidianExport) SlidePath(lectureID string, idx int) string {
@@ -204,27 +248,25 @@ func (e *obsidianExport) run() error {
 
 	var index strings.Builder
 	index.WriteString(frontMatter([][2]string{{"title", "课程库"}}, "look-studio"))
-	index.WriteString("# 课程库\n\n由 Look Studio 导出。在这里修改过的文件不会被下次导出覆盖。\n\n")
+	index.WriteString("# 课程库\n\n由 Look Studio 导出。在这里修改过的文件不会被下次导出覆盖。\n")
 	for _, c := range courses {
 		if c.Dir == "" {
 			continue
 		}
-		page, err := e.course(c, notesIn, notePaths)
-		if err != nil {
+		if err := e.course(&index, c, notesIn, notePaths); err != nil {
 			return err
 		}
-		fmt.Fprintf(&index, "- %s\n", link(courseName(c), "课程库.md", page))
 	}
 	if len(loose) > 0 {
-		index.WriteString("\n## 未归类笔记\n\n")
+		index.WriteString("\n## " + looseNotesFolder + "\n\n")
 		for _, n := range loose {
 			if err := e.note(n, notePaths[n.ID], store.Course{}, store.Lecture{}); err != nil {
 				return err
 			}
-			fmt.Fprintf(&index, "- %s\n", link(n.Title, "课程库.md", notePaths[n.ID]))
+			fmt.Fprintf(&index, "- %s\n", link(n.Title, indexPage, notePaths[n.ID]))
 		}
 	}
-	if err := e.put("课程库.md", index.String()); err != nil {
+	if err := e.put(indexPage, index.String()); err != nil {
 		return err
 	}
 
@@ -269,7 +311,7 @@ func notePlaces(notes []store.Note) map[string]string {
 		if n.Path == "" {
 			continue
 		}
-		dir := placeInExport(path.Dir(n.Path))
+		dir := noteFolder(n.Path)
 		name := Sanitize(n.Title, "笔记")
 		p := dir + "/" + name + ".md"
 		if taken[strings.ToLower(p)] {
@@ -292,60 +334,74 @@ func courseName(c store.Course) string {
 	return c.Title
 }
 
-func (e *obsidianExport) course(c store.Course, notesIn map[string][]store.Note, notePaths map[string]string) (string, error) {
+// course writes a course's notes and transcripts and adds its section to
+// the index.
+func (e *obsidianExport) course(index *strings.Builder, c store.Course, notesIn map[string][]store.Note, notePaths map[string]string) error {
 	st := e.lib.Store
-	page := pageOf(c.Dir)
 	lectures, err := st.Lectures(e.ctx, c.ID)
 	if err != nil {
-		return "", err
+		return err
 	}
 	sched, _ := st.Schedule(e.ctx, store.ScheduleQuery{CourseID: c.ID})
 
-	var b strings.Builder
-	b.WriteString(frontMatter([][2]string{
-		{"title", courseName(c)}, {"teacher", c.Teacher}, {"term", c.Term}, {"look_course_id", c.ID},
-	}, "look-studio/course"))
-	fmt.Fprintf(&b, "# %s\n\n", courseName(c))
+	fmt.Fprintf(index, "\n## %s\n\n", courseName(c))
 	if meta := joinNonEmpty(" · ", c.Teacher, c.College, c.Term); meta != "" {
-		b.WriteString(meta + "\n\n")
+		index.WriteString(meta + "\n\n")
 	}
-	b.WriteString("## 课次\n\n")
 	for _, lec := range lectures {
 		if lec.Dir == "" {
 			continue
 		}
-		lecPage, err := e.lecture(c, lec, notesIn[lec.ID], notePaths, sched)
+		notes := notesIn[lec.ID]
+		// Notes first: the courseware they cite is linked from the transcript page.
+		for _, n := range notes {
+			if err := e.note(n, notePaths[n.ID], c, lec); err != nil {
+				return err
+			}
+		}
+		tp, err := e.transcript(c, lec, notes, notePaths, sched)
 		if err != nil {
-			return "", err
+			return err
 		}
-		line := "- " + link(lec.Title, page, lecPage)
-		if k := len(notesIn[lec.ID]); k > 0 {
-			line += fmt.Sprintf(" · %d 篇笔记", k)
+		parts := []string{"**" + lec.Title + "**"}
+		if tp != "" {
+			parts = append(parts, link("转写稿", indexPage, tp))
 		}
-		b.WriteString(line + "\n")
+		parts = append(parts, fmt.Sprintf("[在 Look Studio 中打开](%s)", portable.LectureLink(lec.ID, -1)))
+		index.WriteString("- " + strings.Join(parts, " · ") + "\n")
+		for _, n := range notes {
+			fmt.Fprintf(index, "  - %s\n", link(n.Title, indexPage, notePaths[n.ID]))
+		}
 	}
 	if ns := notesIn["course:"+c.ID]; len(ns) > 0 {
-		b.WriteString("\n## 课程笔记\n\n")
+		index.WriteString("\n课程笔记：\n\n")
 		for _, n := range ns {
 			if err := e.note(n, notePaths[n.ID], c, store.Lecture{}); err != nil {
-				return "", err
+				return err
 			}
-			fmt.Fprintf(&b, "- %s\n", link(n.Title, page, notePaths[n.ID]))
+			fmt.Fprintf(index, "- %s\n", link(n.Title, indexPage, notePaths[n.ID]))
 		}
 	}
 	if len(sched) > 0 {
-		b.WriteString("\n## 日程\n\n")
+		index.WriteString("\n日程：\n\n")
 		for _, it := range sched {
-			b.WriteString(scheduleLine(it) + "\n")
+			index.WriteString(scheduleLine(it) + "\n")
 		}
 	}
-	return page, e.put(page, b.String())
+	return nil
 }
 
-func (e *obsidianExport) lecture(c store.Course, lec store.Lecture, notes []store.Note, notePaths map[string]string, sched []store.ScheduleItem) (string, error) {
-	st := e.lib.Store
-	page := pageOf(lec.Dir)
-	dir := path.Dir(page)
+// transcript writes a lecture's transcript page: the lecture's details,
+// outline, notes, schedule and courseware, then the transcript. Returns ""
+// when the lecture has no transcript.
+func (e *obsidianExport) transcript(c store.Course, lec store.Lecture, notes []store.Note, notePaths map[string]string, sched []store.ScheduleItem) (string, error) {
+	raw, err := os.ReadFile(e.lib.Abs(lec.Dir + "/transcript.md"))
+	if errors.Is(err, fs.ErrNotExist) {
+		return "", nil
+	} else if err != nil {
+		return "", err
+	}
+	page := transcriptPage(lec)
 	var b strings.Builder
 	duration := ""
 	if lec.DurationS > 0 {
@@ -354,10 +410,10 @@ func (e *obsidianExport) lecture(c store.Course, lec store.Lecture, notes []stor
 	b.WriteString(frontMatter([][2]string{
 		{"title", lec.Title}, {"course", courseName(c)}, {"date", lec.Date}, {"lecturer", lec.Lecturer},
 		{"room", lec.Room}, {"duration", duration}, {"look_lecture_id", lec.ID},
-	}, "look-studio/lecture"))
-	fmt.Fprintf(&b, "# %s\n\n%s · [在 Look Studio 中打开](%s)\n", lec.Title, link(courseName(c), page, pageOf(c.Dir)), portable.LectureLink(lec.ID, -1))
+	}, "look-studio/transcript"))
+	fmt.Fprintf(&b, "# %s\n\n%s · [在 Look Studio 中打开](%s)\n", lec.Title, link("课程库", page, indexPage), portable.LectureLink(lec.ID, -1))
 
-	if chs, _ := st.Timeline(e.ctx, lec.ID); len(chs) > 0 {
+	if chs, _ := e.lib.Store.Timeline(e.ctx, lec.ID); len(chs) > 0 {
 		b.WriteString("\n## 大纲\n\n")
 		for _, ch := range chs {
 			fmt.Fprintf(&b, "- [%s](%s) %s\n", fmtClock(ch.StartMs), portable.LectureLink(lec.ID, ch.StartMs/1000), ch.Title)
@@ -366,47 +422,50 @@ func (e *obsidianExport) lecture(c store.Course, lec store.Lecture, notes []stor
 	if len(notes) > 0 {
 		b.WriteString("\n## 笔记\n\n")
 		for _, n := range notes {
-			if err := e.note(n, notePaths[n.ID], c, lec); err != nil {
-				return "", err
-			}
 			fmt.Fprintf(&b, "- %s\n", link(n.Title, page, notePaths[n.ID]))
 		}
 	}
-	var items []store.ScheduleItem
+	var items []string
 	for _, it := range sched {
 		if it.LectureID == lec.ID {
-			items = append(items, it)
+			items = append(items, scheduleLine(it))
 		}
 	}
 	if len(items) > 0 {
-		b.WriteString("\n## 日程\n\n")
-		for _, it := range items {
-			b.WriteString(scheduleLine(it) + "\n")
-		}
-	}
-
-	var files []string
-	if raw, err := os.ReadFile(e.lib.Abs(lec.Dir + "/transcript.md")); err == nil {
-		tp := dir + "/transcript.md"
-		if err := e.put(tp, e.conv.Markdown(string(raw), portable.Doc{Path: tp, LectureID: lec.ID})); err != nil {
-			return "", err
-		}
-		files = append(files, "- "+link("转写稿", page, tp))
+		b.WriteString("\n## 日程\n\n" + strings.Join(items, "\n") + "\n")
 	}
 	// Courseware files are copied only when a note cites them; the rest are
 	// listed by name, so automatic exports stay cheap.
+	var files []string
 	cw, _ := e.lib.Courseware(e.ctx, lec.ID)
 	for _, a := range cw {
 		if e.copies[a.Path] {
-			files = append(files, "- "+link("课件："+path.Base(a.Path), page, placeInExport(a.Path)))
+			files = append(files, "- "+link(path.Base(a.Path), page, placeInExport(a.Path)))
 		} else {
-			files = append(files, "- 课件："+path.Base(a.Path)+"（在 Look Studio 中查看）")
+			files = append(files, "- "+path.Base(a.Path)+"（在 Look Studio 中查看）")
 		}
 	}
 	if len(files) > 0 {
-		b.WriteString("\n## 资料\n\n" + strings.Join(files, "\n") + "\n")
+		b.WriteString("\n## 课件\n\n" + strings.Join(files, "\n") + "\n")
 	}
+	b.WriteString("\n## 转写稿\n\n")
+	b.WriteString(e.conv.Markdown(transcriptBody(string(raw)), portable.Doc{Path: page, LectureID: lec.ID}))
 	return page, e.put(page, b.String())
+}
+
+// transcriptBody drops the library file's own front matter and title; the
+// export page has its own.
+func transcriptBody(s string) string {
+	if strings.HasPrefix(s, "---\n") {
+		if end := strings.Index(s[4:], "\n---\n"); end >= 0 {
+			s = s[4+end+5:]
+		}
+	}
+	s = strings.TrimLeft(s, "\n")
+	if strings.HasPrefix(s, "# ") {
+		_, s, _ = strings.Cut(s, "\n")
+	}
+	return strings.TrimLeft(s, "\n")
 }
 
 func scheduleLine(it store.ScheduleItem) string {

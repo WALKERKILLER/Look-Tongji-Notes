@@ -63,7 +63,7 @@ library.db                      SQLite 索引（WAL 模式）
 
 ## 导出到 Obsidian
 
-设置 → 存储 → Obsidian 会把课程库导出到 Obsidian 仓库的子文件夹（默认 ` + "`LookStudio/`" + `）：课程页、节次页、带属性的笔记、转写稿和笔记引用的 PPT/课件。
+设置 → 存储 → Obsidian 会把课程库导出到 Obsidian 仓库的子文件夹（默认 ` + "`LookStudio/`" + `）：一个总的“课程库.md”，每门课一个文件夹，里面分“笔记”（按节次分文件夹，含笔记引用的 PPT/课件附件）和“转写稿”。
 链接改为相对路径的标准 Markdown，时间戳改为 ` + "`lookstudio://lecture/<课次id>?t=<秒>`" + `（点击后由 Look Studio 打开）。
 在 Obsidian 里改过的文件不会被覆盖，新版本另存为“(Look Studio)”副本。
 
