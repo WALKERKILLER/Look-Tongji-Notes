@@ -47,6 +47,9 @@ type Server struct {
 
 	syncMu     sync.Mutex
 	lastCourse time.Time
+
+	obsidianMu    sync.Mutex
+	obsidianTimer *time.Timer
 }
 
 func (s *Server) Handler() http.Handler {
@@ -139,6 +142,7 @@ func (s *Server) Handler() http.Handler {
 		err := s.Lib.DeleteNote(r.Context(), r.PathValue("id"))
 		if err == nil {
 			s.Bus.Publish("notes_changed", map[string]string{"id": r.PathValue("id")})
+			s.exportObsidianSoon()
 		}
 		return ok(), err
 	})
@@ -151,6 +155,7 @@ func (s *Server) Handler() http.Handler {
 		return map[string]int{"indexed": n}, err
 	})
 	h("POST /api/library/export", s.export)
+	h("POST /api/library/obsidian", s.exportObsidian)
 	h("GET /api/asr", func(http.ResponseWriter, *http.Request) (any, error) {
 		cfg, chans, events := s.Jobs.ASR.Status()
 		return map[string]any{"config": cfg, "channels": chans, "events": events}, nil
@@ -640,6 +645,7 @@ func (s *Server) putNote(_ http.ResponseWriter, r *http.Request) (any, error) {
 	n, err := s.Lib.SaveNote(r.Context(), n)
 	if err == nil {
 		s.Bus.Publish("notes_changed", map[string]string{"id": n.ID, "lecture_id": n.LectureID, "course_id": n.CourseID})
+		s.exportObsidianSoon()
 	}
 	return n, err
 }
@@ -712,6 +718,62 @@ func (s *Server) export(_ http.ResponseWriter, r *http.Request) (any, error) {
 	}
 	n, err := s.Lib.ExportSkill(r.Context(), in.Root)
 	return map[string]any{"exported": n, "root": in.Root}, err
+}
+
+// obsidianTarget reads the saved Obsidian export settings.
+func (s *Server) obsidianTarget(ctx context.Context) (vault, folder string, auto bool) {
+	kv, err := s.St.Settings(ctx)
+	if err != nil {
+		return "", "", false
+	}
+	json.Unmarshal(kv["obsidian.vault"], &vault)
+	json.Unmarshal(kv["obsidian.folder"], &folder)
+	json.Unmarshal(kv["obsidian.auto"], &auto)
+	return vault, folder, auto
+}
+
+// exportObsidian refreshes the Obsidian export, into the vault named in the
+// body or else the saved one.
+func (s *Server) exportObsidian(_ http.ResponseWriter, r *http.Request) (any, error) {
+	var in struct {
+		Vault  string `json:"vault"`
+		Folder string `json:"folder"`
+	}
+	if err := decode(r, &in); err != nil {
+		return nil, err
+	}
+	if in.Vault == "" {
+		in.Vault, in.Folder, _ = s.obsidianTarget(r.Context())
+	}
+	if _, err := s.Lib.ObsidianRoot(in.Vault, in.Folder); err != nil {
+		return nil, badRequest(err.Error())
+	}
+	return s.Lib.ExportObsidian(r.Context(), in.Vault, in.Folder)
+}
+
+// exportObsidianSoon refreshes the Obsidian export shortly after notes
+// change, when automatic export is on. Bursts of saves export once.
+func (s *Server) exportObsidianSoon() {
+	vault, folder, auto := s.obsidianTarget(context.Background())
+	if !auto || vault == "" {
+		return
+	}
+	s.obsidianMu.Lock()
+	defer s.obsidianMu.Unlock()
+	if s.obsidianTimer != nil {
+		s.obsidianTimer.Stop()
+	}
+	s.obsidianTimer = time.AfterFunc(3*time.Second, func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		defer cancel()
+		res, err := s.Lib.ExportObsidian(ctx, vault, folder)
+		event := map[string]any{"result": res}
+		if err != nil {
+			slog.Warn("obsidian export", "err", err)
+			event["error"] = err.Error()
+		}
+		s.Bus.Publish("obsidian_exported", event)
+	})
 }
 
 // ---- events & files ----

@@ -15,7 +15,8 @@ sealed class LookRef {
 
   static LookRef? parse(String url) {
     final u = Uri.tryParse(url);
-    if (u == null || u.scheme != 'look') return null;
+    // lookstudio:// is the same link as exported for other programs.
+    if (u == null || (u.scheme != 'look' && u.scheme != 'lookstudio')) return null;
     final t = TimeLink.parse(url);
     if (t != null) return TimeRef(t.lectureId, t.seconds);
     final seg = u.pathSegments;

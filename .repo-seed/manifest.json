@@ -77,7 +77,8 @@
       "path": "docs/architecture.md",
       "sha256": "02dfb362910a5aab024261167a2e08408ee84966d6093fbb6f30dd79e8335461",
       "category": "docs",
-      "capability": "baseline"
+      "capability": "baseline",
+      "userModified": true
     },
     {
       "path": "docs/development.md",
@@ -219,7 +220,8 @@
       "path": "docs/decisions/README.md",
       "sha256": "97da82361617740929b1244c37f31090a2803e23a10811307ebd00e8bcecda95",
       "category": "docs",
-      "capability": "decisions"
+      "capability": "decisions",
+      "userModified": true
     },
     {
       "path": "docs/decisions/0000-use-markdown-architectural-decision-records.md",

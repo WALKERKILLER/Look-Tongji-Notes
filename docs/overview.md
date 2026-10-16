@@ -39,3 +39,5 @@ Build and run instructions for each platform are in the [README](../README.md#bu
 | `~/.local/share/look-studio/` | `session.json` (login state), `seal.key`, `asr-usage.json`, `mineru.json` (sealed token, options, parse usage), `agent/` (model config, keys, conversations, `models-dev.json` cache, `provider-links.json`) |
 
 Settings → Course library can export to the skill's `raw/<course>/<lecture>/原始数据/` layout using hard links.
+
+Settings → Course library → Obsidian exports the library into a folder of an Obsidian vault as plain Markdown (course and lecture pages, notes with properties, transcripts, linked slides and courseware), on demand or automatically after notes change (`POST /api/library/obsidian`). Links become relative Markdown links and timestamps `lookstudio://lecture/<id>?t=<s>` deep links that open the app; files edited in the vault are never overwritten (the new version goes beside them as `(Look Studio)`). Contract: [0000-obsidian-export](specs/0000-obsidian-export.md).

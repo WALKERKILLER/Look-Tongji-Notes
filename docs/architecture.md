@@ -29,6 +29,7 @@ The app starts lookd ([lookd_service.dart](../app/lib/core/lookd_service.dart) s
 | `lookd/internal/asr` | Cloud ASR channels (bcut, JianYing), chunk pool, cooldowns and retries |
 | `lookd/internal/mineru` | MinerU courseware parsing client and sealed token |
 | `lookd/internal/library` | On-disk library layout, courseware search, schedule, timeline, README for AI tools |
+| `lookd/internal/portable` | Converts library Markdown (`look://` links, timestamps, math) to plain Markdown for exports |
 | `lookd/internal/store` | SQLite schema and FTS index ([schema.sql](../lookd/internal/store/schema.sql)); rebuildable from library files |
 | `lookd/internal/events` | SSE event fan-out |
 | `lookd/internal/agent` | Supervises the Node agent host and proxies `/agent/*` |
@@ -47,6 +48,7 @@ The app starts lookd ([lookd_service.dart](../app/lib/core/lookd_service.dart) s
 - **`look://` links**: parsed by `LookRef` in [look_markdown.dart](../app/lib/widgets/look_markdown.dart), produced by agent tools, documented for AI tools in [readme.go](../lookd/internal/library/readme.go).
 - **Markdown rendering**: every Markdown surface uses `LookMarkdown` in [look_markdown.dart](../app/lib/widgets/look_markdown.dart).
 - **Library on disk**: layout owned by `lookd/internal/library`; `library.db` is an index over it, not the source of truth.
+- **`lookstudio://` deep links**: produced by `lookd/internal/portable` for exported Markdown; received by the app over the `look/links` method channel (Linux runner, Android `MainActivity`).
 - **Release package**: [release.yml](../.github/workflows/release.yml) places `lookd` and `agent/` next to the app executable, matching the discovery order above.
 
 ## Conventions

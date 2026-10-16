@@ -33,6 +33,8 @@ type Library struct {
 	Store *store.Store
 	mu    sync.Mutex
 	tpl   Templates
+	// exportMu keeps exports to the same vault from interleaving.
+	exportMu sync.Mutex
 }
 
 func Open(root string, st *store.Store) (*Library, error) {

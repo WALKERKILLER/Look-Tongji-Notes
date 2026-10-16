@@ -8,6 +8,7 @@ import 'package:window_manager/window_manager.dart';
 
 import 'app.dart';
 import 'core/app_state.dart';
+import 'core/deep_links.dart';
 import 'core/lookd_service.dart';
 import 'core/profile.dart';
 import 'features/assistant/assistant_controller.dart';
@@ -52,4 +53,5 @@ Future<void> main() async {
     ],
     child: const LookApp(),
   ));
+  unawaited(DeepLinks.start());
 }

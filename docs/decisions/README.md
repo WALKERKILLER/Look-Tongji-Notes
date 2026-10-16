@@ -72,3 +72,4 @@ A decision starts `Proposed`. Once implemented, its status becomes `Accepted` an
 - [0002](0002-self-governing-repository-design.md) — Self-governing repository design
 - [0003](0003-repo-review-instantiated-per-project.md) — repo-review is instantiated per project, not shipped statically
 - [0004](0004-studio-on-an-orphan-app-branch.md) — Look Studio lives on an orphan `app` branch
+- [0005](0005-obsidian-one-way-export.md) — Obsidian integration starts as a one-way export with standard Markdown links
