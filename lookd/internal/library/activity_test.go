@@ -2,6 +2,7 @@ package library
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -60,7 +61,7 @@ func TestActivityNotKeptWhenMirrorFails(t *testing.T) {
 	ctx := context.Background()
 	l, st := openLib(t)
 	// A directory where the file should be makes the write fail.
-	if err := os.MkdirAll(filepath.Join(l.Root, "activity.json"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(l.Root, "activity", "2026.json"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	if err := l.AddActivity(ctx, "", "2026-10-13", "watch", "", "", 300, 0); err == nil {
@@ -68,6 +69,40 @@ func TestActivityNotKeptWhenMirrorFails(t *testing.T) {
 	}
 	if rows, _ := st.ActivityRows(ctx); len(rows) != 0 {
 		t.Fatalf("report kept without its mirror: %+v", rows)
+	}
+}
+
+func TestActivityMirroredPerYear(t *testing.T) {
+	ctx := context.Background()
+	l, st := openLib(t)
+	for _, day := range []string{"2025-12-31", "2026-01-01"} {
+		if err := l.AddActivity(ctx, "", day, "watch", "", "", 300, 0); err != nil {
+			t.Fatal(err)
+		}
+	}
+	old := filepath.Join(l.Root, "activity", "2025.json")
+	past := time.Now().Add(-time.Hour).Truncate(time.Second)
+	os.Chtimes(old, past, past)
+	if err := l.AddActivity(ctx, "", "2026-01-02", "read", "", "", 60, 0); err != nil {
+		t.Fatal(err)
+	}
+	if fi, err := os.Stat(old); err != nil || !fi.ModTime().Equal(past) {
+		t.Fatalf("a 2026 report rewrote 2025.json: %v", err)
+	}
+	var f struct{ Rows []store.ActivityRow }
+	b, _ := os.ReadFile(filepath.Join(l.Root, "activity", "2026.json"))
+	if json.Unmarshal(b, &f) != nil || len(f.Rows) != 2 {
+		t.Fatalf("2026.json rows = %+v", f.Rows)
+	}
+
+	// Reindex restores every year and the single file earlier versions wrote.
+	writeJSON(filepath.Join(l.Root, "activity.json"), map[string]any{"rows": []store.ActivityRow{{Day: "2024-05-01", Kind: "ask", Count: 3}}})
+	st.DB.Exec(`DELETE FROM activity`)
+	if _, err := l.Reindex(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if rows, _ := st.ActivityRows(ctx); len(rows) != 4 {
+		t.Fatalf("rows after reindex = %+v", rows)
 	}
 }
 

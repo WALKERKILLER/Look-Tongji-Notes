@@ -1,6 +1,9 @@
 package server
 
 import (
+	"context"
+	"database/sql"
+	"errors"
 	"net/http"
 	"regexp"
 	"time"
@@ -57,16 +60,38 @@ func (s *Server) addActivity(_ http.ResponseWriter, r *http.Request) (any, error
 	if err != nil {
 		return nil, err
 	}
-	if in.CourseID == "" && in.LectureID != "" {
-		if l, err := s.St.Lecture(r.Context(), in.LectureID); err == nil {
-			in.CourseID = l.CourseID
-		}
+	if err := resolveActivityIDs(r.Context(), s.St, &in); err != nil {
+		return nil, err
 	}
 	if err := s.Lib.AddActivity(r.Context(), in.ID, day, in.Kind, in.CourseID, in.LectureID, in.Seconds, in.Count); err != nil {
+		if errors.Is(err, store.ErrDayFull) {
+			return nil, badRequest(err.Error())
+		}
 		return nil, err
 	}
 	s.Bus.Publish("activity_changed", map[string]string{"day": day})
 	return ok(), nil
+}
+
+// resolveActivityIDs accepts only lectures and courses in the index, so
+// reports cannot invent buckets; a lecture sets its own course.
+func resolveActivityIDs(ctx context.Context, st *store.Store, in *activityIn) error {
+	if in.LectureID != "" {
+		l, err := st.Lecture(ctx, in.LectureID)
+		if errors.Is(err, sql.ErrNoRows) {
+			return badRequest("lecture_id 不在课程库中")
+		} else if err != nil {
+			return err
+		}
+		in.CourseID = l.CourseID
+	} else if in.CourseID != "" {
+		if _, err := st.Course(ctx, in.CourseID); errors.Is(err, sql.ErrNoRows) {
+			return badRequest("course_id 不在课程库中")
+		} else if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (s *Server) activity(_ http.ResponseWriter, r *http.Request) (any, error) {

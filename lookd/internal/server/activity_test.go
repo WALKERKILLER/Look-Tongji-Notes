@@ -1,8 +1,13 @@
 package server
 
 import (
+	"context"
+	"errors"
+	"path/filepath"
 	"testing"
 	"time"
+
+	"lookstudio/lookd/internal/store"
 )
 
 func TestCheckActivity(t *testing.T) {
@@ -34,5 +39,33 @@ func TestCheckActivity(t *testing.T) {
 		if (err != nil) != c.bad || day != c.day {
 			t.Errorf("%s: day=%q err=%v", c.name, day, err)
 		}
+	}
+}
+
+func TestResolveActivityIDs(t *testing.T) {
+	ctx := context.Background()
+	st, err := store.Open(filepath.Join(t.TempDir(), "db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	if err := st.UpsertCourse(ctx, store.Course{ID: "C1", Title: "数据结构"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.UpsertLectures(ctx, []store.Lecture{{ID: "L1", CourseID: "C1", Title: "栈"}}); err != nil {
+		t.Fatal(err)
+	}
+	in := activityIn{LectureID: "L1", CourseID: "C9"}
+	if err := resolveActivityIDs(ctx, st, &in); err != nil || in.CourseID != "C1" {
+		t.Fatalf("lecture: %+v %v", in, err)
+	}
+	for _, bad := range []activityIn{{LectureID: "made-up"}, {CourseID: "made-up"}} {
+		var api apiError
+		if err := resolveActivityIDs(ctx, st, &bad); !errors.As(err, &api) || api.Code != 400 {
+			t.Errorf("%+v: %v", bad, err)
+		}
+	}
+	if err := resolveActivityIDs(ctx, st, &activityIn{CourseID: "C1"}); err != nil {
+		t.Fatal(err)
 	}
 }

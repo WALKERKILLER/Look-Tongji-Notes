@@ -161,6 +161,8 @@ class ActivityClock {
   final String lectureId;
   final bool interactive;
   DateTime? _since;
+
+  /// Last interaction; an interactive clock credits nothing before the first.
   DateTime? _touched;
 
   bool get running => _since != null;
@@ -168,7 +170,7 @@ class ActivityClock {
   void start() {
     if (running) return;
     _since = _t.now();
-    _touched = _since;
+    _touched = interactive ? null : _since;
     _t._clocks.add(this);
   }
 
@@ -179,8 +181,13 @@ class ActivityClock {
     _t._clocks.remove(this);
   }
 
-  /// Marks user interaction (scroll, click, key, answer).
-  void touch() => _touched = _t.now();
+  /// Marks user interaction (scroll, click, key, answer). The first one
+  /// starts an interactive clock's time.
+  void touch() {
+    final t = _t.now();
+    if (interactive && _touched == null && running) _since = t;
+    _touched = t;
+  }
 
   void _credit(DateTime t) {
     final since = _since;
@@ -188,8 +195,9 @@ class ActivityClock {
     _since = t;
     var end = t;
     if (interactive) {
-      if (!_t._focused) return;
-      final idle = _touched!.add(ActivityTracker.idleAfter);
+      final touched = _touched;
+      if (!_t._focused || touched == null) return;
+      final idle = touched.add(ActivityTracker.idleAfter);
       if (idle.isBefore(end)) end = idle;
     } else if (!_t._visible) {
       return;

@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 )
@@ -44,6 +45,12 @@ const (
 	MaxDayCount   = 100000
 )
 
+// MaxDayBuckets bounds the (kind, course, lecture) buckets of one day; a
+// report that would add another is refused with ErrDayFull.
+const MaxDayBuckets = 500
+
+var ErrDayFull = errors.New("当天的学习记录条目已达上限")
+
 // ReportsKept is how long report ids are remembered for deduplication; the
 // app retries a report for at most a day.
 const ReportsKept = 48 * time.Hour
@@ -55,9 +62,18 @@ var commitTx = func(tx *sql.Tx) error { return tx.Commit() }
 type querier interface {
 	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
 	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
+	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
 }
 
 func addActivity(ctx context.Context, q querier, day, kind, courseID, lectureID string, seconds, count int64) error {
+	var buckets, exists int
+	if err := q.QueryRowContext(ctx, `SELECT count(*), coalesce(sum(kind=? AND course_id=? AND lecture_id=?), 0) FROM activity WHERE day=?`,
+		kind, courseID, lectureID, day).Scan(&buckets, &exists); err != nil {
+		return err
+	}
+	if exists == 0 && buckets >= MaxDayBuckets {
+		return ErrDayFull
+	}
 	_, err := q.ExecContext(ctx, `INSERT INTO activity(day,kind,course_id,lecture_id,seconds,count) VALUES(?,?,?,?,?,?)
  ON CONFLICT(day,kind,course_id,lecture_id) DO UPDATE SET seconds=MIN(seconds+excluded.seconds, ?), count=MIN(count+excluded.count, ?)`,
 		day, kind, courseID, lectureID, min(seconds, MaxDaySeconds), min(count, MaxDayCount), MaxDaySeconds, MaxDayCount)
@@ -74,7 +90,8 @@ func (s *Store) AddActivity(ctx context.Context, day, kind, courseID, lectureID 
 // the file copy in step with it:
 //   - a report id seen before is a retry and changes nothing;
 //   - token (when set) is recorded in the transaction, see MirrorCommitted;
-//   - mirror writes every resulting row; if it fails, nothing is kept;
+//   - mirror writes every resulting row of the day's year; if it fails,
+//     nothing is kept;
 //   - if the commit then fails, mirror's undo is called.
 func (s *Store) AddActivityMirrored(ctx context.Context, token, reportID, day, kind, courseID, lectureID string, seconds, count int64, mirror func([]ActivityRow) (undo func(), err error)) error {
 	tx, err := s.DB.BeginTx(ctx, nil)
@@ -101,7 +118,7 @@ func (s *Store) AddActivityMirrored(ctx context.Context, token, reportID, day, k
 	if err := markMirrorCommit(ctx, tx, token); err != nil {
 		return err
 	}
-	rows, err := activityRows(ctx, tx)
+	rows, err := activityRows(ctx, tx, day[:4])
 	if err != nil {
 		return err
 	}
@@ -128,11 +145,13 @@ type ActivityRow struct {
 
 // ActivityRows returns every bucket in day order.
 func (s *Store) ActivityRows(ctx context.Context) ([]ActivityRow, error) {
-	return activityRows(ctx, s.DB)
+	return activityRows(ctx, s.DB, "")
 }
 
-func activityRows(ctx context.Context, q querier) ([]ActivityRow, error) {
-	rows, err := q.QueryContext(ctx, `SELECT day,kind,course_id,lecture_id,seconds,count FROM activity ORDER BY day,kind,course_id,lecture_id`)
+// activityRows returns every bucket, or those of one year ("2026").
+func activityRows(ctx context.Context, q querier, year string) ([]ActivityRow, error) {
+	rows, err := q.QueryContext(ctx, `SELECT day,kind,course_id,lecture_id,seconds,count FROM activity
+ WHERE ?='' OR substr(day,1,4)=? ORDER BY day,kind,course_id,lecture_id`, year, year)
 	if err != nil {
 		return nil, err
 	}

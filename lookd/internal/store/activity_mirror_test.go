@@ -97,6 +97,29 @@ func TestActivityBucketSaturatesWithinRestorableLimits(t *testing.T) {
 	}
 }
 
+func TestActivityDayBucketLimit(t *testing.T) {
+	ctx := context.Background()
+	s, err := Open(filepath.Join(t.TempDir(), "db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	for i := range MaxDayBuckets {
+		if err := s.AddActivity(ctx, "2026-10-13", "watch", "", fmt.Sprintf("L%d", i), 10, 0); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := s.AddActivity(ctx, "2026-10-13", "watch", "", "one-more", 10, 0); !errors.Is(err, ErrDayFull) {
+		t.Fatalf("new bucket on a full day: %v", err)
+	}
+	if err := s.AddActivity(ctx, "2026-10-13", "watch", "", "L0", 10, 0); err != nil {
+		t.Fatalf("existing bucket on a full day: %v", err)
+	}
+	if err := s.AddActivity(ctx, "2026-10-14", "watch", "", "one-more", 10, 0); err != nil {
+		t.Fatalf("next day: %v", err)
+	}
+}
+
 func TestCheckActivityRow(t *testing.T) {
 	ok := ActivityRow{Day: "2026-10-13", Kind: "watch", Seconds: 600}
 	if err := CheckActivityRow(ok); err != nil {

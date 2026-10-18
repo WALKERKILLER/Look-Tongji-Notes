@@ -76,7 +76,9 @@ void main() {
 
     test('reading needs focus and interaction within 2 minutes', () {
       final c = t.clock('read', interactive: true)..start();
-      advance(300); // idle after the first 2 minutes
+      advance(60); // opened but untouched
+      c.touch();
+      advance(300); // idle after 2 minutes
       c.touch();
       advance(30);
       t.didChangeAppLifecycleState(AppLifecycleState.inactive);
@@ -85,11 +87,21 @@ void main() {
       expect(t.pendingSeconds, {'read/': 150});
     });
 
+    test('a reader opened and closed without interaction counts nothing', () {
+      final c = t.clock('read', interactive: true)..start();
+      advance(300);
+      c.stop();
+      expect(t.pendingSeconds, isEmpty);
+    });
+
     testWidgets('the note reader beside the player counts reading', (tester) async {
       ActivityTracker.instance = t;
       addTearDown(() => ActivityTracker.instance = null);
       final note = Note({'id': 'n1', 'title': '第一讲', 'body': '# 栈\n\n后进先出。', 'lecture_id': 'L1', 'path': 'c/n1.md'});
       await tester.pumpWidget(MaterialApp(home: Scaffold(body: NoteInlineReader(note: note, onBack: () {}, onEdit: () {}))));
+      advance(30);
+      expect(t.pendingSeconds, isEmpty); // nothing before the first interaction
+      await tester.tap(find.text('后进先出。'));
       advance(30);
       expect(t.pendingSeconds, {'read/L1': 30});
       await tester.pumpWidget(const SizedBox());
