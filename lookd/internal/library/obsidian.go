@@ -113,10 +113,7 @@ func (l *Library) ExportObsidian(ctx context.Context, vault, folder string) (Obs
 	}
 	l.exportMu.Lock()
 	defer l.exportMu.Unlock()
-	if err := os.MkdirAll(root, 0o755); err != nil {
-		return ObsidianResult{}, err
-	}
-	dir, err := openExportRoot(root)
+	dir, err := openExportRoot(vault, root)
 	if err != nil {
 		return ObsidianResult{}, err
 	}
@@ -531,13 +528,32 @@ func hashOf(b []byte) string {
 	return hex.EncodeToString(h[:])
 }
 
-// openExportRoot opens the checked export folder as an os.Root and makes
-// sure it is still the folder ObsidianRoot resolved, not something swapped
-// in since. From here on, paths are resolved by the kernel relative to this
-// handle and cannot leave it, even if a folder inside is replaced by a
-// symbolic link while the export runs.
-func openExportRoot(root string) (*os.Root, error) {
-	dir, err := os.OpenRoot(root)
+// openExportRoot creates and opens the checked export folder through an
+// os.Root of the vault, so creating it cannot follow a parent folder that
+// was swapped for a symbolic link out of the vault after ObsidianRoot ran.
+// The opened folder is then checked to still be the one ObsidianRoot
+// resolved. From here on, paths are resolved by the kernel relative to the
+// returned handle and cannot leave it, even if a folder inside is replaced
+// by a symbolic link while the export runs.
+func openExportRoot(vault, root string) (*os.Root, error) {
+	changed := errors.New("导出文件夹在检查后发生了变化，已停止导出")
+	realVault, err := filepath.EvalSymlinks(vault)
+	if err != nil {
+		return nil, err
+	}
+	rel, err := filepath.Rel(realVault, root)
+	if err != nil || rel == "." || !inside(root, realVault) {
+		return nil, changed
+	}
+	vr, err := os.OpenRoot(realVault)
+	if err != nil {
+		return nil, err
+	}
+	defer vr.Close()
+	if err := vr.MkdirAll(rel, 0o755); err != nil {
+		return nil, err
+	}
+	dir, err := vr.OpenRoot(rel)
 	if err != nil {
 		return nil, err
 	}
@@ -545,11 +561,11 @@ func openExportRoot(root string) (*os.Root, error) {
 	real, err2 := filepath.EvalSymlinks(root)
 	if err1 != nil || err2 != nil || real != root {
 		dir.Close()
-		return nil, errors.New("导出文件夹在检查后发生了变化，已停止导出")
+		return nil, changed
 	}
 	if fi, err := os.Lstat(real); err != nil || !os.SameFile(fi, opened) {
 		dir.Close()
-		return nil, errors.New("导出文件夹在检查后发生了变化，已停止导出")
+		return nil, changed
 	}
 	return dir, nil
 }

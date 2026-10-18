@@ -254,12 +254,13 @@ func TestObsidianPlaces(t *testing.T) {
 // process) still cannot take writes or deletions out of the export folder:
 // they go through the os.Root handle, not through re-resolved paths.
 func TestObsidianWritesStayInsideAfterSwap(t *testing.T) {
-	out, elsewhere := t.TempDir(), t.TempDir()
+	vault, elsewhere := t.TempDir(), t.TempDir()
+	out := filepath.Join(vault, ObsidianFolder)
 	victim := filepath.Join(elsewhere, "keep.md")
 	if err := os.WriteFile(victim, []byte("outside"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	dir, err := openExportRoot(out)
+	dir, err := openExportRoot(vault, out)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -297,8 +298,30 @@ func TestOpenExportRootRefusesSwappedFolder(t *testing.T) {
 	if err := os.Symlink(real, link); err != nil {
 		t.Fatal(err)
 	}
-	if dir, err := openExportRoot(link); err == nil {
+	if dir, err := openExportRoot(base, link); err == nil {
 		dir.Close()
 		t.Fatal("opened an export folder that is a symbolic link")
+	}
+}
+
+// A parent of a not-yet-existing export folder swapped for a link out of the
+// vault after the check: creating the folder must not follow it.
+func TestOpenExportRootCreatesInsideVault(t *testing.T) {
+	vault, elsewhere := t.TempDir(), t.TempDir()
+	lib, _ := newTestLibrary(t)
+	root, err := lib.ObsidianRoot(vault, "课程/LookStudio")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The swap, after ObsidianRoot and before the export creates the folder.
+	if err := os.Symlink(elsewhere, filepath.Join(vault, "课程")); err != nil {
+		t.Fatal(err)
+	}
+	if dir, err := openExportRoot(vault, root); err == nil {
+		dir.Close()
+		t.Fatal("created the export folder through a swapped-in symlink")
+	}
+	if ents, _ := os.ReadDir(elsewhere); len(ents) != 0 {
+		t.Fatalf("folder created outside the vault: %v", ents)
 	}
 }
