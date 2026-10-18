@@ -249,3 +249,56 @@ func TestObsidianPlaces(t *testing.T) {
 		}
 	}
 }
+
+// A folder replaced by a symbolic link after the checks (a sync tool, another
+// process) still cannot take writes or deletions out of the export folder:
+// they go through the os.Root handle, not through re-resolved paths.
+func TestObsidianWritesStayInsideAfterSwap(t *testing.T) {
+	out, elsewhere := t.TempDir(), t.TempDir()
+	victim := filepath.Join(elsewhere, "keep.md")
+	if err := os.WriteFile(victim, []byte("outside"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	dir, err := openExportRoot(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer dir.Close()
+	// The swap: what was checked as a folder is now a link out of the export.
+	if err := os.Symlink(elsewhere, filepath.Join(out, "笔记")); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeAtomic(dir, filepath.Join("笔记", "keep.md"), strings.NewReader("x")); err == nil {
+		t.Error("write followed a swapped-in symlink")
+	}
+	if err := writeAtomic(dir, filepath.Join("笔记", "new.md"), strings.NewReader("x")); err == nil {
+		t.Error("create followed a swapped-in symlink")
+	}
+	if err := dir.Remove(filepath.Join("笔记", "keep.md")); err == nil {
+		t.Error("remove followed a swapped-in symlink")
+	}
+	if got := readFile(t, victim); got != "outside" {
+		t.Fatalf("file outside the export changed: %q", got)
+	}
+	if ents, _ := os.ReadDir(elsewhere); len(ents) != 1 {
+		t.Fatalf("files created outside the export: %v", ents)
+	}
+}
+
+// The export folder itself replaced by a link between the check and the
+// export is refused.
+func TestOpenExportRootRefusesSwappedFolder(t *testing.T) {
+	base := t.TempDir()
+	real := filepath.Join(base, "real")
+	if err := os.Mkdir(real, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(base, "LookStudio")
+	if err := os.Symlink(real, link); err != nil {
+		t.Fatal(err)
+	}
+	if dir, err := openExportRoot(link); err == nil {
+		dir.Close()
+		t.Fatal("opened an export folder that is a symbolic link")
+	}
+}

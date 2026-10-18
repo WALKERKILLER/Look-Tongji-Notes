@@ -3,6 +3,7 @@ package library
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -115,10 +116,15 @@ func (l *Library) ExportObsidian(ctx context.Context, vault, folder string) (Obs
 	if err := os.MkdirAll(root, 0o755); err != nil {
 		return ObsidianResult{}, err
 	}
+	dir, err := openExportRoot(root)
+	if err != nil {
+		return ObsidianResult{}, err
+	}
+	defer dir.Close()
 	_, vaultErr := os.Stat(filepath.Join(vault, ".obsidian"))
 	e := &obsidianExport{
-		ctx: ctx, lib: l, root: root,
-		old:    readManifest(filepath.Join(root, obsidianManifest)),
+		ctx: ctx, lib: l, root: root, dir: dir,
+		old:    readManifest(dir),
 		files:  map[string]string{},
 		copies: map[string]bool{},
 		slides: map[string][]store.Slide{},
@@ -135,6 +141,7 @@ type obsidianExport struct {
 	ctx    context.Context
 	lib    *Library
 	root   string
+	dir    *os.Root // the export folder; every vault file operation goes through it
 	conv   *portable.Converter
 	old    map[string]string // manifest of the previous export
 	files  map[string]string // manifest of this export
@@ -287,11 +294,7 @@ func (e *obsidianExport) run() error {
 	if err != nil {
 		return err
 	}
-	abs, err := e.target(obsidianManifest)
-	if err != nil {
-		return err
-	}
-	return writeAtomic(abs, bytes.NewReader(manifest))
+	return e.write(obsidianManifest, bytes.NewReader(manifest))
 }
 
 // notePlaces gives every note an export path named after its title, next to
@@ -528,9 +531,33 @@ func hashOf(b []byte) string {
 	return hex.EncodeToString(h[:])
 }
 
-// target is the absolute path of an export file. It refuses paths that
-// leave the export folder or pass through a symbolic link, so writes and
-// deletions stay inside the folder the user chose.
+// openExportRoot opens the checked export folder as an os.Root and makes
+// sure it is still the folder ObsidianRoot resolved, not something swapped
+// in since. From here on, paths are resolved by the kernel relative to this
+// handle and cannot leave it, even if a folder inside is replaced by a
+// symbolic link while the export runs.
+func openExportRoot(root string) (*os.Root, error) {
+	dir, err := os.OpenRoot(root)
+	if err != nil {
+		return nil, err
+	}
+	opened, err1 := dir.Stat(".")
+	real, err2 := filepath.EvalSymlinks(root)
+	if err1 != nil || err2 != nil || real != root {
+		dir.Close()
+		return nil, errors.New("导出文件夹在检查后发生了变化，已停止导出")
+	}
+	if fi, err := os.Lstat(real); err != nil || !os.SameFile(fi, opened) {
+		dir.Close()
+		return nil, errors.New("导出文件夹在检查后发生了变化，已停止导出")
+	}
+	return dir, nil
+}
+
+// target checks an export path (slash, relative to the export folder) and
+// returns it in OS form for use with e.dir. A path through a symbolic link is
+// refused with a clear message; the os.Root handle is what actually keeps
+// operations inside the folder.
 func (e *obsidianExport) target(rel string) (string, error) {
 	parts := strings.Split(rel, "/")
 	for _, part := range parts {
@@ -538,10 +565,10 @@ func (e *obsidianExport) target(rel string) (string, error) {
 			return "", fmt.Errorf("无效的导出路径 %s", rel)
 		}
 	}
-	abs := e.root
+	p := ""
 	for _, part := range parts {
-		abs = filepath.Join(abs, part)
-		fi, err := os.Lstat(abs)
+		p = filepath.Join(p, part)
+		fi, err := e.dir.Lstat(p)
 		if errors.Is(err, fs.ErrNotExist) {
 			break
 		}
@@ -552,7 +579,16 @@ func (e *obsidianExport) target(rel string) (string, error) {
 			return "", fmt.Errorf("导出文件夹中的 %s 是符号链接，已停止导出", rel)
 		}
 	}
-	return filepath.Join(e.root, filepath.FromSlash(rel)), nil
+	return filepath.FromSlash(rel), nil
+}
+
+// write replaces export file rel with the content of r.
+func (e *obsidianExport) write(rel string, r io.Reader) error {
+	p, err := e.target(rel)
+	if err != nil {
+		return err
+	}
+	return writeAtomic(e.dir, p, r)
 }
 
 // put writes an export document unless the copy in the vault was edited
@@ -568,11 +604,11 @@ func (e *obsidianExport) put(rel, content string) error {
 		case i > 1:
 			cand = strings.TrimSuffix(rel, ".md") + fmt.Sprintf(" (Look Studio %d).md", i)
 		}
-		abs, err := e.target(cand)
+		p, err := e.target(cand)
 		if err != nil {
 			return err
 		}
-		cur, err := os.ReadFile(abs)
+		cur, err := e.dir.ReadFile(p)
 		if err != nil && !errors.Is(err, fs.ErrNotExist) {
 			return err
 		}
@@ -594,7 +630,7 @@ func (e *obsidianExport) put(rel, content string) error {
 				continue
 			}
 		}
-		if err := writeAtomic(abs, strings.NewReader(content)); err != nil {
+		if err := writeAtomic(e.dir, p, strings.NewReader(content)); err != nil {
 			return err
 		}
 		e.files[cand] = want
@@ -608,17 +644,17 @@ func (e *obsidianExport) put(rel, content string) error {
 // vault (or one the export did not write) is kept as it is.
 func (e *obsidianExport) copy(rel string) error {
 	dst := placeInExport(rel)
-	abs, err := e.target(dst)
+	p, err := e.target(dst)
 	if err != nil {
 		return err
 	}
-	want, err := hashFile(e.lib.Abs(rel))
+	want, err := hashFile(os.Open(e.lib.Abs(rel)))
 	if errors.Is(err, fs.ErrNotExist) {
 		return nil // gone from the library since the documents were written
 	} else if err != nil {
 		return err
 	}
-	cur, err := hashFile(abs)
+	cur, err := hashFile(e.dir.Open(p))
 	switch {
 	case err == nil && cur == want:
 		e.files[dst] = want
@@ -638,7 +674,7 @@ func (e *obsidianExport) copy(rel string) error {
 		return err
 	}
 	defer src.Close()
-	if err := writeAtomic(abs, src); err != nil {
+	if err := writeAtomic(e.dir, p, src); err != nil {
 		return err
 	}
 	e.files[dst] = want
@@ -646,8 +682,8 @@ func (e *obsidianExport) copy(rel string) error {
 	return nil
 }
 
-func hashFile(p string) (string, error) {
-	f, err := os.Open(p)
+// hashFile hashes an opened file: hashFile(os.Open(p)).
+func hashFile(f *os.File, err error) (string, error) {
 	if err != nil {
 		return "", err
 	}
@@ -659,51 +695,51 @@ func hashFile(p string) (string, error) {
 	return hex.EncodeToString(h.Sum(nil)), nil
 }
 
-// writeAtomic replaces abs with the content of r through a new, uniquely
-// named temporary file beside it, so no existing file is ever opened for
-// writing.
-func writeAtomic(abs string, r io.Reader) error {
-	if err := os.MkdirAll(filepath.Dir(abs), 0o755); err != nil {
+// writeAtomic replaces dir/p with the content of r through a new temporary
+// file beside it, created exclusively under a random name, so no existing
+// file is ever opened for writing. All of it happens inside dir.
+func writeAtomic(dir *os.Root, p string, r io.Reader) error {
+	if err := dir.MkdirAll(filepath.Dir(p), 0o755); err != nil {
 		return err
 	}
-	tmp, err := os.CreateTemp(filepath.Dir(abs), ".lookstudio-*.tmp")
+	var rnd [8]byte
+	rand.Read(rnd[:])
+	tmp := filepath.Join(filepath.Dir(p), ".lookstudio-"+hex.EncodeToString(rnd[:])+".tmp")
+	f, err := dir.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
 	if err != nil {
 		return err
 	}
-	_, err = io.Copy(tmp, r)
-	if cerr := tmp.Close(); err == nil {
+	_, err = io.Copy(f, r)
+	if cerr := f.Close(); err == nil {
 		err = cerr
 	}
 	if err == nil {
-		err = os.Chmod(tmp.Name(), 0o644)
-	}
-	if err == nil {
-		err = os.Rename(tmp.Name(), abs)
+		err = dir.Rename(tmp, p)
 	}
 	if err != nil {
-		os.Remove(tmp.Name())
+		dir.Remove(tmp)
 	}
 	return err
 }
 
 // removeStale deletes what the previous export wrote and this one did not,
-// unless the user has changed it since.
+// unless the user has changed it since. Emptied folders go too.
 func (e *obsidianExport) removeStale() {
 	for rel, want := range e.old {
 		if _, keep := e.files[rel]; keep {
 			continue
 		}
-		abs, err := e.target(rel)
+		p, err := e.target(rel)
 		if err != nil {
 			continue
 		}
-		if cur, err := hashFile(abs); err != nil || cur != want {
+		if cur, err := hashFile(e.dir.Open(p)); err != nil || cur != want {
 			continue
 		}
-		if os.Remove(abs) == nil {
+		if e.dir.Remove(p) == nil {
 			e.res.Removed++
-			for dir := filepath.Dir(abs); dir != e.root && inside(dir, e.root); dir = filepath.Dir(dir) {
-				if os.Remove(dir) != nil {
+			for d := filepath.Dir(p); d != "."; d = filepath.Dir(d) {
+				if e.dir.Remove(d) != nil {
 					break
 				}
 			}
@@ -711,11 +747,11 @@ func (e *obsidianExport) removeStale() {
 	}
 }
 
-func readManifest(p string) map[string]string {
+func readManifest(dir *os.Root) map[string]string {
 	var m struct {
 		Files map[string]string `json:"files"`
 	}
-	if b, err := os.ReadFile(p); err == nil {
+	if b, err := dir.ReadFile(obsidianManifest); err == nil {
 		json.Unmarshal(b, &m)
 	}
 	if m.Files == nil {
