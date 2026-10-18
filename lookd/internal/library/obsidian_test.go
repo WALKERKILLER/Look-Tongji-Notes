@@ -325,3 +325,53 @@ func TestOpenExportRootCreatesInsideVault(t *testing.T) {
 		t.Fatalf("folder created outside the vault: %v", ents)
 	}
 }
+
+// Audit of #18: with the library inside the vault, a component swapped for a
+// link to the library (still inside the vault) must not get a folder
+// created in the library.
+func TestOpenExportRootNoCreateInLibraryInsideVault(t *testing.T) {
+	vault := t.TempDir()
+	library := filepath.Join(vault, "library")
+	if err := os.Mkdir(library, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	root := filepath.Join(vault, "export", "new") // as checked, before the swap
+	if err := os.Symlink("library", filepath.Join(vault, "export")); err != nil {
+		t.Fatal(err)
+	}
+	if dir, err := openExportRoot(vault, root); err == nil {
+		dir.Close()
+		t.Fatal("opened an export folder through a link into the library")
+	}
+	if ents, _ := os.ReadDir(library); len(ents) != 0 {
+		t.Fatalf("created in the library: %v", ents)
+	}
+}
+
+// A file in the library that is a symbolic link to something outside it is
+// not copied into the vault.
+func TestExportObsidianSkipsLibrarySymlinks(t *testing.T) {
+	lib, ctx := newTestLibrary(t)
+	secret := filepath.Join(t.TempDir(), "secret.txt")
+	if err := os.WriteFile(secret, []byte("secret"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(secret, lib.Abs("leak.txt")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := lib.SaveNote(ctx, store.Note{Title: "n", Body: "[x](look://file/leak.txt)"}); err != nil {
+		t.Fatal(err)
+	}
+	vault := t.TempDir()
+	if _, err := lib.ExportObsidian(ctx, vault, ""); err != nil {
+		t.Fatal(err)
+	}
+	filepath.WalkDir(vault, func(p string, d os.DirEntry, err error) error {
+		if err == nil && !d.IsDir() {
+			if b, _ := os.ReadFile(p); string(b) == "secret" {
+				t.Errorf("file outside the library copied to %s", p)
+			}
+		}
+		return nil
+	})
+}

@@ -17,6 +17,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"syscall"
 
 	"lookstudio/lookd/internal/portable"
 	"lookstudio/lookd/internal/store"
@@ -118,9 +119,14 @@ func (l *Library) ExportObsidian(ctx context.Context, vault, folder string) (Obs
 		return ObsidianResult{}, err
 	}
 	defer dir.Close()
+	src, err := os.OpenRoot(l.Root)
+	if err != nil {
+		return ObsidianResult{}, err
+	}
+	defer src.Close()
 	_, vaultErr := os.Stat(filepath.Join(vault, ".obsidian"))
 	e := &obsidianExport{
-		ctx: ctx, lib: l, root: root, dir: dir,
+		ctx: ctx, lib: l, root: root, dir: dir, src: src,
 		old:    readManifest(dir),
 		files:  map[string]string{},
 		copies: map[string]bool{},
@@ -139,6 +145,7 @@ type obsidianExport struct {
 	lib    *Library
 	root   string
 	dir    *os.Root // the export folder; every vault file operation goes through it
+	src    *os.Root // the library; files notes link to are read through it
 	conv   *portable.Converter
 	old    map[string]string // manifest of the previous export
 	files  map[string]string // manifest of this export
@@ -215,9 +222,25 @@ func (e *obsidianExport) SlidePath(lectureID string, idx int) string {
 	return ""
 }
 
+// FileExists reports whether a note's link names a regular file inside the
+// library. Symbolic links are not followed out of it.
 func (e *obsidianExport) FileExists(rel string) bool {
-	fi, err := os.Stat(e.lib.Abs(rel))
-	return err == nil && !fi.IsDir()
+	p, ok := libraryPath(rel)
+	if !ok {
+		return false
+	}
+	fi, err := e.src.Lstat(p)
+	return err == nil && fi.Mode().IsRegular()
+}
+
+// libraryPath checks a slash path relative to the library root.
+func libraryPath(rel string) (string, bool) {
+	for _, part := range strings.Split(rel, "/") {
+		if part == "" || part == "." || part == ".." {
+			return "", false
+		}
+	}
+	return filepath.FromSlash(rel), true
 }
 
 // link is a Markdown link from export document `from` to export path `to`.
@@ -528,13 +551,15 @@ func hashOf(b []byte) string {
 	return hex.EncodeToString(h[:])
 }
 
-// openExportRoot creates and opens the checked export folder through an
-// os.Root of the vault, so creating it cannot follow a parent folder that
-// was swapped for a symbolic link out of the vault after ObsidianRoot ran.
-// The opened folder is then checked to still be the one ObsidianRoot
-// resolved. From here on, paths are resolved by the kernel relative to the
-// returned handle and cannot leave it, even if a folder inside is replaced
-// by a symbolic link while the export runs.
+// openExportRoot creates and opens the checked export folder one path
+// component at a time from an os.Root of the vault. Each component is
+// created with Mkdir in the already verified parent (which never follows a
+// link at the new name), must be a real directory (not a symbolic link),
+// and the handle opened for it must be that same directory. So a component
+// swapped for a link after ObsidianRoot ran, even one pointing elsewhere
+// inside the vault such as at the library, makes the export stop before
+// anything is created there. From here on, paths are resolved by the kernel
+// relative to the returned handle and cannot leave it.
 func openExportRoot(vault, root string) (*os.Root, error) {
 	changed := errors.New("导出文件夹在检查后发生了变化，已停止导出")
 	realVault, err := filepath.EvalSymlinks(vault)
@@ -545,29 +570,66 @@ func openExportRoot(vault, root string) (*os.Root, error) {
 	if err != nil || rel == "." || !inside(root, realVault) {
 		return nil, changed
 	}
-	vr, err := os.OpenRoot(realVault)
+	dir, err := os.OpenRoot(realVault)
 	if err != nil {
 		return nil, err
 	}
-	defer vr.Close()
-	if err := vr.MkdirAll(rel, 0o755); err != nil {
-		return nil, err
-	}
-	dir, err := vr.OpenRoot(rel)
-	if err != nil {
-		return nil, err
-	}
-	opened, err1 := dir.Stat(".")
-	real, err2 := filepath.EvalSymlinks(root)
-	if err1 != nil || err2 != nil || real != root {
+	for _, part := range strings.Split(rel, string(filepath.Separator)) {
+		if err := dir.Mkdir(part, 0o755); err != nil && !errors.Is(err, fs.ErrExist) {
+			dir.Close()
+			return nil, err
+		}
+		fi, err := dir.Lstat(part)
+		if err != nil || !fi.IsDir() {
+			dir.Close()
+			return nil, changed
+		}
+		next, err := dir.OpenRoot(part)
 		dir.Close()
-		return nil, changed
-	}
-	if fi, err := os.Lstat(real); err != nil || !os.SameFile(fi, opened) {
-		dir.Close()
-		return nil, changed
+		if err != nil {
+			return nil, err
+		}
+		if st, err := next.Stat("."); err != nil || !os.SameFile(fi, st) {
+			next.Close()
+			return nil, changed
+		}
+		dir = next
 	}
 	return dir, nil
+}
+
+// openRegular opens p in dir for reading, only if it is a regular file:
+// a FIFO, device or directory planted in its place is refused without
+// blocking. ErrNotExist passes through.
+func openRegular(dir *os.Root, p string) (*os.File, error) {
+	fi, err := dir.Lstat(p)
+	if err != nil {
+		return nil, err
+	}
+	if !fi.Mode().IsRegular() {
+		return nil, fmt.Errorf("%s 不是普通文件", p)
+	}
+	f, err := dir.OpenFile(p, os.O_RDONLY|syscall.O_NONBLOCK, 0)
+	if err != nil {
+		return nil, err
+	}
+	if st, err := f.Stat(); err != nil || !st.Mode().IsRegular() || !os.SameFile(fi, st) {
+		f.Close()
+		return nil, fmt.Errorf("%s 在读取时发生了变化", p)
+	}
+	return f, nil
+}
+
+// maxExportRead bounds what the export reads back from the vault.
+const maxExportRead = 64 << 20
+
+func readRegular(dir *os.Root, p string) ([]byte, error) {
+	f, err := openRegular(dir, p)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	return io.ReadAll(io.LimitReader(f, maxExportRead))
 }
 
 // target checks an export path (slash, relative to the export folder) and
@@ -624,7 +686,7 @@ func (e *obsidianExport) put(rel, content string) error {
 		if err != nil {
 			return err
 		}
-		cur, err := e.dir.ReadFile(p)
+		cur, err := readRegular(e.dir, p)
 		if err != nil && !errors.Is(err, fs.ErrNotExist) {
 			return err
 		}
@@ -664,13 +726,23 @@ func (e *obsidianExport) copy(rel string) error {
 	if err != nil {
 		return err
 	}
-	want, err := hashFile(os.Open(e.lib.Abs(rel)))
+	sp, ok := libraryPath(rel)
+	if !ok {
+		return nil
+	}
+	// One handle for hashing and copying, so the copy is what was hashed.
+	src, err := openRegular(e.src, sp)
 	if errors.Is(err, fs.ErrNotExist) {
 		return nil // gone from the library since the documents were written
 	} else if err != nil {
 		return err
 	}
-	cur, err := hashFile(e.dir.Open(p))
+	defer src.Close()
+	want, err := hashFile(src)
+	if err != nil {
+		return err
+	}
+	cur, err := hashAt(e.dir, p)
 	switch {
 	case err == nil && cur == want:
 		e.files[dst] = want
@@ -685,11 +757,9 @@ func (e *obsidianExport) copy(rel string) error {
 	case err != nil && !errors.Is(err, fs.ErrNotExist):
 		return err
 	}
-	src, err := os.Open(e.lib.Abs(rel))
-	if err != nil {
+	if _, err := src.Seek(0, io.SeekStart); err != nil {
 		return err
 	}
-	defer src.Close()
 	if err := writeAtomic(e.dir, p, src); err != nil {
 		return err
 	}
@@ -698,12 +768,18 @@ func (e *obsidianExport) copy(rel string) error {
 	return nil
 }
 
-// hashFile hashes an opened file: hashFile(os.Open(p)).
-func hashFile(f *os.File, err error) (string, error) {
+// hashAt hashes regular file p in dir.
+func hashAt(dir *os.Root, p string) (string, error) {
+	f, err := openRegular(dir, p)
 	if err != nil {
 		return "", err
 	}
 	defer f.Close()
+	return hashFile(f)
+}
+
+// hashFile hashes an opened file from its current offset.
+func hashFile(f *os.File) (string, error) {
 	h := sha256.New()
 	if _, err := io.Copy(h, f); err != nil {
 		return "", err
@@ -749,7 +825,7 @@ func (e *obsidianExport) removeStale() {
 		if err != nil {
 			continue
 		}
-		if cur, err := hashFile(e.dir.Open(p)); err != nil || cur != want {
+		if cur, err := hashAt(e.dir, p); err != nil || cur != want {
 			continue
 		}
 		if e.dir.Remove(p) == nil {
@@ -767,7 +843,7 @@ func readManifest(dir *os.Root) map[string]string {
 	var m struct {
 		Files map[string]string `json:"files"`
 	}
-	if b, err := dir.ReadFile(obsidianManifest); err == nil {
+	if b, err := readRegular(dir, obsidianManifest); err == nil {
 		json.Unmarshal(b, &m)
 	}
 	if m.Files == nil {

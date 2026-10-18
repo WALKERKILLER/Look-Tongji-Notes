@@ -48,8 +48,10 @@ type Server struct {
 	syncMu     sync.Mutex
 	lastCourse time.Time
 
-	obsidianMu    sync.Mutex
-	obsidianTimer *time.Timer
+	obsidianMu      sync.Mutex
+	obsidianTimer   *time.Timer
+	obsidianRunning bool // an automatic export is in progress
+	obsidianPending bool // notes changed during it; export again after
 }
 
 func (s *Server) Handler() http.Handler {
@@ -752,20 +754,38 @@ func (s *Server) exportObsidian(_ http.ResponseWriter, r *http.Request) (any, er
 }
 
 // exportObsidianSoon refreshes the Obsidian export shortly after notes
-// change, when automatic export is on. Bursts of saves export once.
+// change, when automatic export is on. Bursts of saves export once; while
+// an export runs, further changes queue a single follow-up instead of
+// piling up goroutines. Settings are read when the export starts, so
+// turning automatic export off or changing the vault takes effect at once.
 func (s *Server) exportObsidianSoon() {
-	vault, folder, auto := s.obsidianTarget(context.Background())
-	if !auto || vault == "" {
+	if _, _, auto := s.obsidianTarget(context.Background()); !auto {
 		return
 	}
 	s.obsidianMu.Lock()
 	defer s.obsidianMu.Unlock()
+	if s.obsidianRunning {
+		s.obsidianPending = true
+		return
+	}
 	if s.obsidianTimer != nil {
 		s.obsidianTimer.Stop()
 	}
-	s.obsidianTimer = time.AfterFunc(3*time.Second, func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-		defer cancel()
+	s.obsidianTimer = time.AfterFunc(3*time.Second, s.runObsidianExport)
+}
+
+func (s *Server) runObsidianExport() {
+	s.obsidianMu.Lock()
+	if s.obsidianRunning {
+		s.obsidianPending = true
+		s.obsidianMu.Unlock()
+		return
+	}
+	s.obsidianRunning = true
+	s.obsidianMu.Unlock()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	if vault, folder, auto := s.obsidianTarget(ctx); auto && vault != "" {
 		res, err := s.Lib.ExportObsidian(ctx, vault, folder)
 		event := map[string]any{"result": res}
 		if err != nil {
@@ -773,7 +793,17 @@ func (s *Server) exportObsidianSoon() {
 			event["error"] = err.Error()
 		}
 		s.Bus.Publish("obsidian_exported", event)
-	})
+	}
+	cancel()
+
+	s.obsidianMu.Lock()
+	s.obsidianRunning = false
+	again := s.obsidianPending
+	s.obsidianPending = false
+	s.obsidianMu.Unlock()
+	if again {
+		s.exportObsidianSoon()
+	}
 }
 
 // ---- events & files ----
