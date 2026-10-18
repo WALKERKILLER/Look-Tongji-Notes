@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { appendFile, mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { entryFrom, localDay, UsageLedger } from "./usage.mjs";
+import { entryFrom, KEEP_DAYS, localDay, UsageLedger } from "./usage.mjs";
 
 const at = (day, h = 12) => {
 	const [y, m, d] = day.split("-").map(Number);
@@ -73,6 +73,34 @@ test("summary fills zero days, groups and compares with the previous period", as
 	assert.equal((await l.summary("2024-01-01", "2024-12-31")).days.length, 366); // 本年 in a leap year
 	await assert.rejects(l.summary("2025-01-01", "2026-01-02"), { status: 400 }); // 367 days
 	await assert.rejects(l.summary("1970-01-01", "9999-12-31"), { status: 400 });
+});
+
+test("prune keeps the retention window and the backfill marker, never losing a concurrent append", async () => {
+	const dir = await mkdtemp(join(tmpdir(), "usage-"));
+	const l = new UsageLedger(dir);
+	const now = at("2026-10-18");
+	const day = 86_400_000;
+	await l.record({ backfill: true, ts: now - 900 * day, count: 0 });
+	await l.record(entryFrom(msg(now - (KEEP_DAYS + 1) * day)));
+	await l.record(entryFrom(msg(now - (KEEP_DAYS - 1) * day)));
+	assert.equal((await l.entries()).length, 2);
+	const [dropped] = await Promise.all([l.prune(now), l.record(entryFrom(msg(now)))]);
+	assert.equal(dropped, 1);
+	const lines = (await readFile(join(dir, "usage.jsonl"), "utf8")).trim().split("\n").map((x) => JSON.parse(x));
+	assert.equal(lines.length, 3);
+	assert.equal(lines[0].backfill, true);
+	assert.deepEqual((await l.entries()).map((e) => e.ts), [now - (KEEP_DAYS - 1) * day, now]);
+	assert.equal(await l.prune(now), 0);
+});
+
+test("entries reads only lines appended since the last load", async () => {
+	const dir = await mkdtemp(join(tmpdir(), "usage-"));
+	const l = new UsageLedger(dir);
+	await l.record(entryFrom(msg(at("2026-10-05"))));
+	assert.equal((await l.entries()).length, 1);
+	await appendFile(join(dir, "usage.jsonl"), `${JSON.stringify(entryFrom(msg(at("2026-10-06"))))}\n`);
+	const all = await l.entries();
+	assert.deepEqual(all.map((e) => localDay(e.ts)), ["2026-10-05", "2026-10-06"]);
 });
 
 test("flush waits for appends still in flight", async () => {

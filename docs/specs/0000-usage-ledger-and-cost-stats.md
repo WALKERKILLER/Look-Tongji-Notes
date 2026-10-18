@@ -21,6 +21,7 @@ Non-goals: provider billing reconciliation (costs are estimates from model price
 - On SIGINT/SIGTERM the host waits up to 3 s for appends in flight before exiting (lookd allows 5 s), so finished calls are not lost.
 - Backfill: on first start with no ledger, existing session files are scanned once and their assistant messages written as `purpose: chat` with their original timestamps; a marker line prevents a second backfill.
 - Deleting a conversation does not delete its ledger lines.
+- Retention: calls older than 739 days (two longest summary ranges, one and its previous period, plus a week) are pruned at host start and daily by an atomic rewrite; the backfill marker stays. Ledger writes run one at a time, so a prune never drops a concurrent append. After the first load, queries read only bytes appended since.
 - The ledger holds no prompt or response text.
 
 ### API (agent host, reached by the app as `/agent/usage…` through lookd)
@@ -50,7 +51,7 @@ Non-goals: provider billing reconciliation (costs are estimates from model price
 - `flutter test`: widget test of the page with a stub summary (tiles, toggle, empty state).
 
 ## Evidence
-- Ledger and summaries: [usage.mjs](../../agent/src/usage.mjs), tests in [usage.test.mjs](../../agent/src/usage.test.mjs) (zero days, grouping, previous period, range errors including impossible dates and spans over 366 days, paging with shared timestamps, idempotent backfill, flush waiting for appends in flight).
+- Ledger and summaries: [usage.mjs](../../agent/src/usage.mjs), tests in [usage.test.mjs](../../agent/src/usage.test.mjs) (zero days, grouping, previous period, range errors including impossible dates and spans over 366 days, paging with shared timestamps, idempotent backfill, flush waiting for appends in flight, pruning past the retention window with a concurrent append kept, incremental reads).
 - Recording: `recordUsage` in [host.mjs](../../agent/src/host.mjs) (every assistant message, with time to first token; the signal handler awaits `usage.flush()`); `timeline`, `vision` and `test` purposes in [timeline.mjs](../../agent/src/timeline.mjs), [vision.mjs](../../agent/src/vision.mjs), [models.mjs](../../agent/src/models.mjs).
 - Page: [usage_page.dart](../../app/lib/features/usage/usage_page.dart), [charts.dart](../../app/lib/widgets/charts.dart); widget test [usage_page_test.dart](../../app/test/usage_page_test.dart).
 - Live check (2026-10-14): backfill imported 42 calls from 4 conversations; a chat turn with two tool round trips added 3 lines (one per assistant message, all with the session id and time to first token); a provider test added a `test` line; an invalid date returned 400.

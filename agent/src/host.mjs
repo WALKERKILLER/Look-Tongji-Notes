@@ -25,9 +25,11 @@ const usage = new UsageLedger(DATA_DIR);
 pipeline.usage = usage;
 try {
 	await usage.backfill(SESSIONS);
+	await usage.prune();
 } catch (e) {
 	console.error(`usage backfill: ${e.message}`);
 }
+setInterval(() => usage.prune().catch((e) => console.error(`usage prune: ${e.message}`)), 86_400_000).unref();
 
 const SYSTEM = `你是 Look Studio 的常驻助手，帮助同济大学学生使用 Look 录课平台的课程录像。
 你能做的：介绍应用功能、查看课程与节次、阅读转写稿、看 PPT 与课件、全文搜索、整理与保存笔记、生成时间轴大纲、标记日程、出复习题。

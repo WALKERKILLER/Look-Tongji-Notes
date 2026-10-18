@@ -1,7 +1,7 @@
 // Usage ledger: one JSON line per model call, kept apart from conversations so
 // deleting a conversation never erases what it cost. Contract:
 // docs/specs/0000-usage-ledger-and-cost-stats.md
-import { appendFile, readdir, readFile, stat } from "node:fs/promises";
+import { appendFile, open, readdir, readFile, rename, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 export const PURPOSES = ["chat", "timeline", "vision", "title", "test", "task", "quiz"];
@@ -69,10 +69,17 @@ export class UsageLedger {
 		this.lines = null; // parsed entries, loaded lazily and kept in sync with appends
 		this.size = -1;
 		this.pending = new Set(); // appends in flight, awaited by flush()
+		this.tail = Promise.resolve(); // file writes run one at a time, so a prune never drops an append
+	}
+
+	serial(fn) {
+		const p = this.tail.then(fn);
+		this.tail = p.catch(() => {});
+		return p;
 	}
 
 	record(entry) {
-		const p = this.append(entry);
+		const p = this.serial(() => this.append(entry));
 		this.pending.add(p);
 		p.finally(() => this.pending.delete(p));
 		return p;
@@ -95,6 +102,7 @@ export class UsageLedger {
 		}
 	}
 
+	/** Parsed calls; after the first load only bytes appended since are read. */
 	async entries() {
 		let size = 0;
 		try {
@@ -103,20 +111,52 @@ export class UsageLedger {
 			return [];
 		}
 		if (this.lines && size === this.size) return this.lines;
-		const text = await readFile(this.path, "utf8");
-		this.lines = text
-			.split("\n")
-			.filter(Boolean)
-			.map((l) => {
-				try {
-					return JSON.parse(l);
-				} catch {
-					return null;
-				}
-			})
-			.filter((e) => e && typeof e.ts === "number" && !e.backfill);
+		if (this.lines && size > this.size) {
+			const fh = await open(this.path, "r");
+			try {
+				const buf = Buffer.alloc(size - this.size);
+				await fh.read(buf, 0, buf.length, this.size);
+				this.lines.push(...parseLines(buf.toString("utf8")));
+			} finally {
+				await fh.close();
+			}
+		} else {
+			this.lines = parseLines(await readFile(this.path, "utf8"));
+		}
 		this.size = size;
 		return this.lines;
+	}
+
+	/**
+	 * Drops calls older than KEEP_DAYS (the backfill marker stays), rewriting
+	 * the file atomically. The host runs it at start and daily.
+	 */
+	prune(now = Date.now()) {
+		return this.serial(async () => {
+			let text;
+			try {
+				text = await readFile(this.path, "utf8");
+			} catch {
+				return 0;
+			}
+			const cutoff = now - KEEP_DAYS * 86_400_000;
+			const lines = text.split("\n").filter(Boolean);
+			const kept = lines.filter((l) => {
+				try {
+					const e = JSON.parse(l);
+					return e.backfill === true || (typeof e.ts === "number" && e.ts >= cutoff);
+				} catch {
+					return false;
+				}
+			});
+			if (kept.length === lines.length) return 0;
+			const tmp = `${this.path}.tmp`;
+			await writeFile(tmp, kept.length ? `${kept.join("\n")}\n` : "");
+			await rename(tmp, this.path);
+			this.lines = null;
+			this.size = -1;
+			return lines.length - kept.length;
+		});
 	}
 
 	/**
@@ -239,6 +279,23 @@ export const MAX_PAGE = 200;
 
 /** Longest summary range: a leap year, the app's longest preset (本年). */
 export const MAX_SPAN_DAYS = 366;
+
+/** How long calls are kept: two longest ranges (one and its previous period) and a week. */
+export const KEEP_DAYS = 2 * MAX_SPAN_DAYS + 7;
+
+function parseLines(text) {
+	return text
+		.split("\n")
+		.filter(Boolean)
+		.map((l) => {
+			try {
+				return JSON.parse(l);
+			} catch {
+				return null;
+			}
+		})
+		.filter((e) => e && typeof e.ts === "number" && !e.backfill);
+}
 
 function parseCursor(before) {
 	if (before == null || before === "") return { ts: Infinity, pos: Infinity };
