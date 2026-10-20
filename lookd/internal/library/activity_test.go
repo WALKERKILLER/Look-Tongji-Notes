@@ -3,6 +3,7 @@ package library
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -125,5 +126,54 @@ func TestActivityReindexSkipsInvalidRows(t *testing.T) {
 	}
 	if _, err := st.ActivityStreak(ctx, time.Now()); err != nil {
 		t.Fatalf("streak after reindex: %v", err)
+	}
+}
+
+func TestActivityReindexKeepsTheDayCap(t *testing.T) {
+	ctx := context.Background()
+	l, st := openLib(t)
+	var rows []store.ActivityRow
+	for i := range store.MaxDayBuckets + 20 {
+		rows = append(rows, store.ActivityRow{Day: "2026-10-13", Kind: "read", CourseID: fmt.Sprintf("c%03d", i), Seconds: int64(i + 1)})
+	}
+	os.MkdirAll(filepath.Join(l.Root, "activity"), 0o755)
+	writeJSON(filepath.Join(l.Root, "activity", "2026.json"), map[string]any{"rows": rows})
+	if _, err := l.Reindex(ctx); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := st.ActivityRows(ctx)
+	if len(got) != store.MaxDayBuckets {
+		t.Fatalf("restored %d buckets", len(got))
+	}
+	for _, r := range got {
+		if r.Seconds <= 20 {
+			t.Fatalf("kept a small bucket %+v over larger ones", r)
+		}
+	}
+}
+
+func TestActivityRefusesASymlinkedDirectory(t *testing.T) {
+	ctx := context.Background()
+	l, _ := openLib(t)
+	outside := t.TempDir()
+	if err := os.Symlink(outside, filepath.Join(l.Root, "activity")); err != nil {
+		t.Fatal(err)
+	}
+	if err := l.AddActivity(ctx, "", "2026-10-13", "read", "", "", 60, 0); err == nil {
+		t.Fatal("a symlinked activity directory was written through")
+	}
+	if ents, _ := os.ReadDir(outside); len(ents) != 0 {
+		t.Fatalf("wrote outside the library: %v", ents)
+	}
+	os.Remove(filepath.Join(l.Root, "activity"))
+	os.Mkdir(filepath.Join(l.Root, "activity"), 0o755)
+	target := filepath.Join(outside, "2026.json")
+	os.WriteFile(target, []byte("{}"), 0o644)
+	os.Symlink(target, filepath.Join(l.Root, "activity", "2026.json"))
+	if err := l.AddActivity(ctx, "", "2026-10-13", "read", "", "", 60, 0); err == nil {
+		t.Fatal("a symlinked year file was written through")
+	}
+	if b, _ := os.ReadFile(target); string(b) != "{}" {
+		t.Fatalf("outside file changed: %s", b)
 	}
 }

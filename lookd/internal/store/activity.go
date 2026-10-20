@@ -65,7 +65,9 @@ type querier interface {
 	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
 }
 
-func addActivity(ctx context.Context, q querier, day, kind, courseID, lectureID string, seconds, count int64) error {
+// checkDayRoom returns ErrDayFull when the bucket is new and its day
+// already holds MaxDayBuckets.
+func checkDayRoom(ctx context.Context, q querier, day, kind, courseID, lectureID string) error {
 	var buckets, exists int
 	if err := q.QueryRowContext(ctx, `SELECT count(*), coalesce(sum(kind=? AND course_id=? AND lecture_id=?), 0) FROM activity WHERE day=?`,
 		kind, courseID, lectureID, day).Scan(&buckets, &exists); err != nil {
@@ -73,6 +75,13 @@ func addActivity(ctx context.Context, q querier, day, kind, courseID, lectureID 
 	}
 	if exists == 0 && buckets >= MaxDayBuckets {
 		return ErrDayFull
+	}
+	return nil
+}
+
+func addActivity(ctx context.Context, q querier, day, kind, courseID, lectureID string, seconds, count int64) error {
+	if err := checkDayRoom(ctx, q, day, kind, courseID, lectureID); err != nil {
+		return err
 	}
 	_, err := q.ExecContext(ctx, `INSERT INTO activity(day,kind,course_id,lecture_id,seconds,count) VALUES(?,?,?,?,?,?)
  ON CONFLICT(day,kind,course_id,lecture_id) DO UPDATE SET seconds=MIN(seconds+excluded.seconds, ?), count=MIN(count+excluded.count, ?)`,
@@ -169,8 +178,12 @@ func activityRows(ctx context.Context, q querier, year string) ([]ActivityRow, e
 
 // PutActivity restores a bucket when reindexing. Totals only grow, so the
 // larger of the stored and restored values wins and an older file copy can
-// never lower newer totals.
+// never lower newer totals. A new bucket on a day that is already full is
+// refused with ErrDayFull, as a report would be.
 func (s *Store) PutActivity(ctx context.Context, r ActivityRow) error {
+	if err := checkDayRoom(ctx, s.DB, r.Day, r.Kind, r.CourseID, r.LectureID); err != nil {
+		return err
+	}
 	_, err := s.DB.ExecContext(ctx, `INSERT INTO activity(day,kind,course_id,lecture_id,seconds,count) VALUES(?,?,?,?,?,?)
  ON CONFLICT(day,kind,course_id,lecture_id) DO UPDATE SET seconds=MAX(seconds,excluded.seconds), count=MAX(count,excluded.count)`,
 		r.Day, r.Kind, r.CourseID, r.LectureID, r.Seconds, r.Count)
