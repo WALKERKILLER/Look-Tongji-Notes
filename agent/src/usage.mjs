@@ -4,7 +4,7 @@
 import { appendFile, open, readdir, readFile, rename, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-export const PURPOSES = ["chat", "timeline", "vision", "title", "test", "task", "quiz"];
+export const PURPOSES = ["chat", "timeline", "vision", "title", "test", "task", "quiz", "memory"];
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 // A real calendar day: Date rolls 2026-02-31 over to March, so it must format back unchanged.
 const isDay = (s) => DAY.test(s) && localDay(dayStart(s)) === s;
