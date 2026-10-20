@@ -12,6 +12,7 @@ import '../../theme/tokens.dart';
 import '../../widgets/course_visuals.dart';
 import '../../widgets/report_screen.dart';
 import '../../widgets/states.dart';
+import '../assistant/assistant_panel.dart';
 import '../player/player_page.dart';
 import '../plugins/plugin_views.dart';
 import 'courses_page.dart';
@@ -142,6 +143,15 @@ class _CoursePageState extends State<CoursePage> {
                       ),
                     ]
                   : [
+                      if (course != null)
+                        Padding(
+                          padding: const EdgeInsets.only(right: Space.xs),
+                          child: FilledButton.tonalIcon(
+                            onPressed: () => openCourseAssistant(context, widget.courseId, course.title),
+                            icon: const Icon(Icons.forum_outlined, size: 18),
+                            label: const Text('课程助手'),
+                          ),
+                        ),
                       IconButton(
                         tooltip: '刷新课表',
                         onPressed: _syncing ? null : () => _load(sync: true),

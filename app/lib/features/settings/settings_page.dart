@@ -21,6 +21,8 @@ import '../assistant/assistant_controller.dart';
 import '../plugins/plugins_page.dart';
 import '../profile/profile_dialog.dart';
 import '../../shell.dart';
+import '../assistant/bot_avatar.dart';
+import '../assistant/bot_page.dart';
 import '../assistant/runtime_setup.dart';
 import '../usage/usage_page.dart';
 import 'asr_settings.dart';
@@ -608,6 +610,14 @@ class _AssistantSettings extends StatelessWidget {
         onTap: () => Navigator.of(context, rootNavigator: true).push(MaterialPageRoute(builder: (_) => const ModelsPage())),
       ),
       _VisionModelTile(a: a),
+      ListTile(
+        contentPadding: EdgeInsets.zero,
+        leading: BotAvatar(size: 28, shape: a.botShape, color: a.botColor, animate: false),
+        title: Text(a.botName),
+        subtitle: const Text('常驻 bot 的形象、记忆与学习方式'),
+        trailing: const Icon(Icons.chevron_right_rounded),
+        onTap: () => Navigator.of(context, rootNavigator: true).push(MaterialPageRoute(builder: (_) => const BotPage())),
+      ),
       ListTile(
         contentPadding: EdgeInsets.zero,
         leading: const Icon(Icons.terminal_rounded),

@@ -29,6 +29,9 @@ enum OrganicShape {
   oval,
   arch,
   heart,
+  pebble,
+  droplet,
+  ghost,
 }
 
 const int kShapeSamples = 180;
@@ -130,6 +133,14 @@ List<Offset> _outline(OrganicShape s) {
       return polar((t) => 1 / math.sqrt(math.pow(math.cos(t) / 1.0, 2) + math.pow(math.sin(t) / 0.72, 2)));
     case OrganicShape.arch:
       return _arch();
+    case OrganicShape.pebble:
+      // A river stone: wider than tall, a little lopsided.
+      return polar((t) => (1 + 0.035 * math.sin(2 * t + 0.6)) / math.sqrt(math.pow(math.cos(t), 2) + math.pow(math.sin(t) / 0.8, 2)));
+    case OrganicShape.droplet:
+      // Round bottom drawn up to a soft point at the top (t = 0).
+      return polar((t) => 0.7 + 0.32 * math.pow((1 + math.cos(t)) / 2, 5));
+    case OrganicShape.ghost:
+      return _ghost();
     case OrganicShape.heart:
       return [
         for (var i = 0; i < n; i++)
@@ -203,6 +214,26 @@ List<Offset> _arch() {
   }
   for (var i = 1; i < 40; i++) {
     out.add(Offset(-1, 0.7 - 0.85 * i / 40));
+  }
+  return out;
+}
+
+/// A dome over straight sides and a three-scallop hem.
+List<Offset> _ghost() {
+  final out = <Offset>[];
+  for (var i = 0; i <= 180; i++) {
+    final a = math.pi + math.pi * i / 180;
+    out.add(Offset(math.cos(a) * 0.86, math.sin(a) * 0.86 - 0.1));
+  }
+  for (var i = 1; i <= 40; i++) {
+    out.add(Offset(0.86, -0.1 + 0.82 * i / 40));
+  }
+  for (var i = 0; i <= 120; i++) {
+    final x = 0.86 - 1.72 * i / 120;
+    out.add(Offset(x, 0.72 + 0.1 * (1 - math.cos(3 * math.pi * i / 60)) / 2));
+  }
+  for (var i = 1; i < 40; i++) {
+    out.add(Offset(-0.86, 0.72 - 0.82 * i / 40));
   }
   return out;
 }

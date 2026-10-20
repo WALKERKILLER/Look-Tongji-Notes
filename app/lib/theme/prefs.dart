@@ -54,32 +54,35 @@ class UiPrefs extends ChangeNotifier {
     final raw = _sp.getString('ui');
     if (raw == null) return;
     try {
-      final m = jsonDecode(raw) as Map<String, dynamic>;
-      themeMode = ThemeMode.values.byName(m['themeMode'] ?? 'system');
-      dynamicColor = m['dynamicColor'] ?? dynamicColor;
-      seed = Color(m['seed'] ?? seed.toARGB32());
-      variant = DynamicSchemeVariant.values.byName(m['variant'] ?? variant.name);
-      contrast = ContrastLevel.values.byName(m['contrast'] ?? contrast.name);
-      textScale = (m['textScale'] ?? 1.0).toDouble();
-      fontFamily = m['fontFamily'];
-      compactDensity = m['compactDensity'] ?? false;
-      reduceMotion = m['reduceMotion'] ?? false;
-      chatBubbles = m['chatBubbles'] ?? true;
-      showThinking = m['showThinking'] ?? true;
-      streamAnimation = GptMarkdownAnimation.values.byName(m['streamAnimation'] ?? streamAnimation.name);
-      chatTextScale = (m['chatTextScale'] ?? 1.0).toDouble();
-      assistantDocked = m['assistantDocked'] ?? true;
-      lecturesNewestFirst = m['lecturesNewestFirst'] ?? false;
-      defaultSpeed = (m['defaultSpeed'] ?? 1.0).toDouble();
-      boostSpeed = (m['boostSpeed'] ?? 2.0).toDouble();
-      seekStepSec = m['seekStepSec'] ?? 10;
-      autoResume = m['autoResume'] ?? true;
-      slideFollow = m['slideFollow'] ?? true;
-      subtitleScale = (m['subtitleScale'] ?? 1.0).toDouble();
-      showSubtitles = m['showSubtitles'] ?? true;
+      _fromJson(jsonDecode(raw) as Map<String, dynamic>);
     } catch (_) {
       // Corrupt prefs fall back to defaults.
     }
+  }
+
+  void _fromJson(Map<String, dynamic> m) {
+    themeMode = ThemeMode.values.byName(m['themeMode'] ?? 'system');
+    dynamicColor = m['dynamicColor'] ?? dynamicColor;
+    seed = Color(m['seed'] ?? seed.toARGB32());
+    variant = DynamicSchemeVariant.values.byName(m['variant'] ?? variant.name);
+    contrast = ContrastLevel.values.byName(m['contrast'] ?? contrast.name);
+    textScale = (m['textScale'] ?? 1.0).toDouble();
+    fontFamily = m['fontFamily'];
+    compactDensity = m['compactDensity'] ?? false;
+    reduceMotion = m['reduceMotion'] ?? false;
+    chatBubbles = m['chatBubbles'] ?? true;
+    showThinking = m['showThinking'] ?? true;
+    streamAnimation = GptMarkdownAnimation.values.byName(m['streamAnimation'] ?? streamAnimation.name);
+    chatTextScale = (m['chatTextScale'] ?? 1.0).toDouble();
+    assistantDocked = m['assistantDocked'] ?? true;
+    lecturesNewestFirst = m['lecturesNewestFirst'] ?? false;
+    defaultSpeed = (m['defaultSpeed'] ?? 1.0).toDouble();
+    boostSpeed = (m['boostSpeed'] ?? 2.0).toDouble();
+    seekStepSec = m['seekStepSec'] ?? 10;
+    autoResume = m['autoResume'] ?? true;
+    slideFollow = m['slideFollow'] ?? true;
+    subtitleScale = (m['subtitleScale'] ?? 1.0).toDouble();
+    showSubtitles = m['showSubtitles'] ?? true;
   }
 
   Map<String, dynamic> _toJson() => {
@@ -106,6 +109,22 @@ class UiPrefs extends ChangeNotifier {
         'subtitleScale': subtitleScale,
         'showSubtitles': showSubtitles,
       };
+
+  /// The preferences as stored (the assistant reads its registry keys).
+  Map<String, dynamic> toJson() => _toJson();
+
+  /// Applies stored-form values (the bot's setting changes and their undo);
+  /// an invalid value leaves every preference as it was.
+  void applyJson(Map<String, dynamic> patch) {
+    final before = _toJson();
+    try {
+      _fromJson({...before, ...patch});
+    } catch (_) {
+      _fromJson(before);
+      return;
+    }
+    update((_) {});
+  }
 
   /// Apply a mutation, notify listeners and persist.
   void update(void Function(UiPrefs p) change) {

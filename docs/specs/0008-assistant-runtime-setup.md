@@ -54,4 +54,7 @@ lookd uses `-node` when given (`source: flag`); otherwise the Node.js recorded i
 - Live: with `LOOK_NODE` pointing nowhere and no system Node.js on `PATH`, the app installs Node.js into the data directory and the assistant starts.
 
 ## Evidence
-Pending until implementation.
+- lookd: [agentenv.go](../../lookd/internal/agentenv/agentenv.go) with [agentenv_test.go](../../lookd/internal/agentenv/agentenv_test.go) (full install with a fake Node, checksum mismatch, version resolution, archive entries escaping the target refused, the npm time limit, a second start refused while one runs); supervisor restart in [supervisor.go](../../lookd/internal/agent/supervisor.go) with [supervisor_test.go](../../lookd/internal/agent/supervisor_test.go); routes in [server.go](../../lookd/internal/server/server.go).
+- App: [runtime_setup.dart](../../app/lib/features/assistant/runtime_setup.dart) with [runtime_setup_test.dart](../../app/test/runtime_setup_test.dart) (mirror choice, progress events, failure and retry); entry points in the assistant panel and 设置 → 助手 → 运行环境.
+- Live check (2026-10-21, release build): `GET /api/agent/runtime` reported the system Node.js (`source: flag`) and the agent's dependencies as ready.
+- Not verified: a real download and install of Node.js and the npm dependencies on a machine without them.

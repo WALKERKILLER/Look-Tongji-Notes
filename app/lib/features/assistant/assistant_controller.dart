@@ -6,6 +6,7 @@ import '../../core/activity_tracker.dart';
 import '../../core/api.dart';
 import '../../core/app_state.dart';
 import '../../core/format.dart';
+import 'bot_avatar.dart';
 
 /// One rendered piece of an assistant turn.
 class ChatBlock {
@@ -26,6 +27,12 @@ class ChatBlock {
 
   List<Map<String, dynamic>> get actions =>
       ((details?['actions'] as List?) ?? const []).whereType<Map>().map((e) => e.cast<String, dynamic>()).toList();
+
+  /// An app operation the bot ran (`details.app`): open, player, prefs or done.
+  Map<String, dynamic>? get appOp => (details?['app'] as Map?)?.cast<String, dynamic>();
+
+  /// A change waiting on a card (`details.proposal`), with its current state.
+  Map<String, dynamic>? get proposal => (details?['proposal'] as Map?)?.cast<String, dynamic>();
 }
 
 class ChatMessage {
@@ -49,6 +56,9 @@ class ChatSession {
   final Map<String, dynamic> j;
   String get id => '${j['id']}';
   String get title => '${j['title'] ?? '新对话'}';
+  String get kind => '${j['kind'] ?? 'chat'}';
+  String get courseId => '${j['course_id'] ?? ''}';
+  String get course => '${j['course'] ?? ''}';
   DateTime get modified => DateTime.tryParse('${j['modified']}')?.toLocal() ?? DateTime.fromMillisecondsSinceEpoch(0);
   int get messages => (j['messages'] as num?)?.toInt() ?? 0;
 }
@@ -57,6 +67,7 @@ class ChatSession {
 class AssistantController extends ChangeNotifier {
   AssistantController(this.app, this.screen, this.players) {
     app.addListener(_onApp);
+    _events = app.events.listen(_onAppEvent);
   }
   final AppState app;
   final ScreenContext screen;
@@ -73,6 +84,7 @@ class AssistantController extends ChangeNotifier {
   Map<String, dynamic>? models;
   Object? modelsError;
   StreamSubscription? _stream;
+  StreamSubscription? _events;
   bool _wasReady = false;
   bool _disposed = false;
 
@@ -95,6 +107,8 @@ class AssistantController extends ChangeNotifier {
       _wasReady = true;
       unawaited(refreshSessions());
       unawaited(loadModels());
+      unawaited(loadBot(openThread: view == 'bot' && sessionId == null && messages.isEmpty));
+      if (_appState != null) unawaited(pushAppState(_appState!));
     } else if (!ready) {
       _wasReady = false;
     }
@@ -188,6 +202,228 @@ class AssistantController extends ChangeNotifier {
     return '导入了 ${imp['providers'] ?? 0} 个服务商、${imp['keys'] ?? 0} 个密钥';
   }
 
+  // ---- the resident bot (docs/specs/0007-resident-bot-and-course-agents.md) ----
+
+  /// GET /agent/bot: name, shape, color, persona, session_id, memory switches.
+  Map<String, dynamic> bot = const {};
+  String get botName => '${bot['name'] ?? '小 Look'}';
+  String get botShape => '${bot['shape'] ?? 'pebble'}';
+  String get botColor => '${bot['color'] ?? 'theme'}';
+  bool consolidating = false;
+
+  /// 'bot' shows the bot's single thread; 'sessions' course agents and chats.
+  String view = 'bot';
+
+  /// The course of a course agent not yet started (it starts with the first message).
+  ({String id, String title})? pendingCourse;
+
+  /// The course of the open conversation, when it is a course agent.
+  ({String id, String title})? course;
+
+  bool composerFocused = false;
+  DateTime? _happyUntil, _confusedUntil;
+  Timer? _moodTimer;
+
+  /// Memory files changed (by the bot or a consolidation run); the bot page reloads.
+  final memoryChanged = ValueNotifier<int>(0);
+
+  final _appOps = StreamController<Map<String, dynamic>>.broadcast();
+
+  /// App operations from tool results as they happen (never from history).
+  Stream<Map<String, dynamic>> get appOps => _appOps.stream;
+
+  BotMood get mood {
+    final now = DateTime.now();
+    if (busy) {
+      final r = messages.last;
+      if (r.blocks.any((b) => b.kind == 'tool' && b.running)) return BotMood.working;
+      final b = r.lastBlock;
+      if (b != null && b.kind == 'text' && b.text.isNotEmpty) return BotMood.talking;
+      return BotMood.thinking;
+    }
+    if (_confusedUntil != null && now.isBefore(_confusedUntil!)) return BotMood.confused;
+    if (_happyUntil != null && now.isBefore(_happyUntil!)) return BotMood.happy;
+    if (consolidating) return BotMood.dreaming;
+    if (pendingProposals > 0) return BotMood.notify;
+    if (composerFocused) return BotMood.listening;
+    return BotMood.idle;
+  }
+
+  /// Cards in the open conversation that still wait for the user.
+  int get pendingProposals {
+    var n = 0;
+    for (final m in messages) {
+      for (final b in m.blocks) {
+        if (b.proposal?['state'] == 'pending') n++;
+      }
+    }
+    return n;
+  }
+
+  void _flash({bool happy = false, bool confused = false}) {
+    final until = DateTime.now().add(const Duration(milliseconds: 2400));
+    if (happy) _happyUntil = until;
+    if (confused) _confusedUntil = until;
+    _moodTimer?.cancel();
+    _moodTimer = Timer(const Duration(milliseconds: 2500), notifyListeners);
+  }
+
+  void setComposerFocused(bool v) {
+    if (v == composerFocused) return;
+    composerFocused = v;
+    notifyListeners();
+  }
+
+  void _onAppEvent(Map<String, dynamic> e) {
+    if (e['type'] != 'bot_event') return;
+    final d = (e['data'] as Map?)?.cast<String, dynamic>() ?? const {};
+    switch (d['kind']) {
+      case 'consolidating':
+        consolidating = true;
+      case 'consolidated':
+      case 'failed':
+        consolidating = false;
+        memoryChanged.value++;
+        unawaited(loadBot());
+      case 'memory_changed':
+        memoryChanged.value++;
+    }
+    notifyListeners();
+  }
+
+  Future<void> loadBot({bool openThread = false}) async {
+    try {
+      bot = (await app.api.get('/agent/bot') as Map).cast<String, dynamic>();
+      consolidating = bot['consolidating'] == true;
+      notifyListeners();
+      final id = bot['session_id'];
+      if (openThread && id is String && id.isNotEmpty && view == 'bot' && sessionId == null) await openSession(id);
+    } catch (_) {}
+  }
+
+  Future<void> updateBot(Map<String, dynamic> patch) async {
+    bot = (await app.api.put('/agent/bot', patch) as Map).cast<String, dynamic>();
+    notifyListeners();
+  }
+
+  /// Starts a new bot thread; memory stays.
+  Future<void> resetBot() async {
+    bot = (await app.api.post('/agent/bot/reset') as Map).cast<String, dynamic>();
+    if (view == 'bot') _clear();
+    notifyListeners();
+  }
+
+  Future<void> consolidateNow() async {
+    bot = (await app.api.post('/agent/bot/memory/consolidate') as Map).cast<String, dynamic>();
+    consolidating = bot['consolidating'] == true;
+    notifyListeners();
+  }
+
+  Future<List<Map<String, dynamic>>> memoryFiles() async =>
+      jsonList(await app.api.get('/agent/bot/memory')).whereType<Map>().map((e) => e.cast<String, dynamic>()).toList();
+
+  Future<Map<String, dynamic>> readMemory(String path) async =>
+      (await app.api.get('/agent/bot/memory/file', {'path': path}) as Map).cast<String, dynamic>();
+
+  Future<void> writeMemory(String path, String content, {String? baseHash}) async {
+    await app.api.put('/agent/bot/memory/file', {'path': path, 'content': content, 'base_hash': ?baseHash});
+    memoryChanged.value++;
+  }
+
+  Future<void> deleteMemory(String path) async {
+    await app.api.call('DELETE', '/agent/bot/memory/file?path=${Uri.encodeQueryComponent(path)}');
+    memoryChanged.value++;
+  }
+
+  Future<List<Map<String, dynamic>>> memoryRuns() async =>
+      jsonList(await app.api.get('/agent/bot/memory/runs')).whereType<Map>().map((e) => e.cast<String, dynamic>()).toList();
+
+  Map<String, dynamic>? _appState;
+
+  /// Sends the app preferences the bot may read (PUT /agent/app-state).
+  Future<void> pushAppState(Map<String, dynamic> prefs) async {
+    _appState = prefs;
+    if (!ready) return;
+    try {
+      await app.api.put('/agent/app-state', prefs);
+    } catch (_) {}
+  }
+
+  /// Shows the bot's thread.
+  Future<void> showBot() async {
+    if (busy) return;
+    view = 'bot';
+    pendingCourse = null;
+    _clear();
+    notifyListeners();
+    final id = bot['session_id'];
+    if (id is String && id.isNotEmpty) await openSession(id);
+  }
+
+  /// Shows course agents and chats, starting from a new conversation.
+  void showSessions() {
+    if (busy) return;
+    view = 'sessions';
+    _clear();
+    notifyListeners();
+    unawaited(refreshSessions());
+  }
+
+  /// Opens the latest conversation of a course's agent, or prepares a new one.
+  Future<void> openCourseAgent(String courseId, String title, {bool fresh = false}) async {
+    if (busy) return;
+    view = 'sessions';
+    await refreshSessions();
+    final latest = fresh ? null : sessions.where((s) => s.kind == 'course' && s.courseId == courseId).firstOrNull;
+    if (latest != null) {
+      pendingCourse = null;
+      await openSession(latest.id);
+      return;
+    }
+    _clear();
+    pendingCourse = (id: courseId, title: title);
+    course = pendingCourse;
+    notifyListeners();
+  }
+
+  void _clear() {
+    sessionId = null;
+    messages = [];
+    stats = null;
+    course = null;
+  }
+
+  Future<Map<String, dynamic>> _proposal(ChatBlock b, String action) async {
+    final id = '${b.proposal?['id']}';
+    final r = (await app.api.post('/agent/proposals/$id/$action') as Map).cast<String, dynamic>();
+    final p = {...?b.proposal, 'state': r['state']};
+    b.details = {...?b.details, 'proposal': p};
+    notifyListeners();
+    final result = (r['result'] as Map?)?.cast<String, dynamic>();
+    if (result?['app'] is Map) _appOps.add({'op': 'prefs', 'set': result!['app'], 'silent': true});
+    return r;
+  }
+
+  Future<void> applyProposal(ChatBlock b) async {
+    await _proposal(b, 'apply');
+    _flash(happy: true);
+  }
+
+  Future<void> dismissProposal(ChatBlock b) => _proposal(b, 'dismiss');
+
+  Future<void> undoProposal(ChatBlock b) => _proposal(b, 'undo');
+
+  /// Undoes an operation applied at once (its chip's 撤销).
+  Future<void> undoApplied(ChatBlock b) async {
+    final id = '${b.appOp?['proposal_id'] ?? ''}';
+    if (id.isEmpty) return;
+    final r = (await app.api.post('/agent/proposals/$id/undo') as Map).cast<String, dynamic>();
+    b.details = {...?b.details, 'app': {...?b.appOp, 'undone': true}};
+    final result = (r['result'] as Map?)?.cast<String, dynamic>();
+    if (result?['app'] is Map) _appOps.add({'op': 'prefs', 'set': result!['app'], 'silent': true});
+    notifyListeners();
+  }
+
   // ---- sessions ----
 
   Future<void> refreshSessions() async {
@@ -199,9 +435,21 @@ class AssistantController extends ChangeNotifier {
 
   void newChat() {
     if (busy) return;
-    sessionId = null;
-    messages = [];
-    stats = null;
+    if (view == 'bot') view = 'sessions';
+    _clear();
+    final c = screen.value;
+    // A new conversation on a course or lecture page starts as that course's agent.
+    pendingCourse = (c['course_id'] ?? '').isNotEmpty ? (id: c['course_id']!, title: c['course'] ?? '') : null;
+    course = pendingCourse;
+    notifyListeners();
+  }
+
+  /// A new conversation that is not bound to a course.
+  void newPlainChat() {
+    if (busy) return;
+    view = 'sessions';
+    _clear();
+    pendingCourse = null;
     notifyListeners();
   }
 
@@ -215,6 +463,10 @@ class AssistantController extends ChangeNotifier {
       final r = (await app.api.get('/agent/sessions/$id') as Map).cast<String, dynamic>();
       messages = _fromHistory(jsonList(r['messages']));
       stats = (r['stats'] as Map?)?.cast<String, dynamic>();
+      view = r['kind'] == 'bot' && id == bot['session_id'] ? 'bot' : 'sessions';
+      final cid = '${r['course_id'] ?? ''}';
+      course = cid.isEmpty ? null : (id: cid, title: '${r['course'] ?? ''}');
+      pendingCourse = null;
     } catch (e) {
       messages = [ChatMessage.assistant()..error = '无法打开对话：$e'];
     }
@@ -225,7 +477,7 @@ class AssistantController extends ChangeNotifier {
   Future<void> deleteSession(String id) async {
     await app.api.delete('/agent/sessions/$id');
     sessions.removeWhere((s) => s.id == id);
-    if (sessionId == id) newChat();
+    if (sessionId == id) newPlainChat();
     notifyListeners();
   }
 
@@ -290,6 +542,8 @@ class AssistantController extends ChangeNotifier {
     final done = Completer<void>();
     _stream = app.api.sse('/agent/chat', method: 'POST', body: {
       'session_id': ?sessionId,
+      if (sessionId == null && view == 'bot') 'agent': 'bot',
+      if (sessionId == null && view != 'bot') 'course_id': ?pendingCourse?.id,
       'message': msg,
       'context': _context(),
     }).listen(
@@ -313,6 +567,11 @@ class AssistantController extends ChangeNotifier {
       case 'start':
         sessionId = '${e['session_id']}';
         r.model = e['model']?.toString();
+        if (e['kind'] == 'bot') bot = {...bot, 'session_id': sessionId};
+        if (pendingCourse != null) {
+          course = pendingCourse;
+          pendingCourse = null;
+        }
       case 'block':
         r.blocks.add(e['kind'] == 'thinking' ? ChatBlock.thinking() : ChatBlock.text());
         r.status = null;
@@ -337,6 +596,8 @@ class AssistantController extends ChangeNotifier {
           b.result = '${e['text'] ?? ''}';
           b.ms = (e['ms'] as num?)?.toInt() ?? 0;
           if (e['details'] is Map) b.details = (e['details'] as Map).cast<String, dynamic>();
+          final op = b.appOp;
+          if (op != null && !b.error) _appOps.add(op);
         }
       case 'message_end':
         if (e['usage'] is Map) {
@@ -369,6 +630,7 @@ class AssistantController extends ChangeNotifier {
   }
 
   void _finish(ChatMessage r) {
+    if (r.streaming) r.error == null ? _flash(happy: true) : _flash(confused: true);
     r.streaming = false;
     r.status = null;
     for (final b in r.blocks) {
@@ -416,6 +678,10 @@ class AssistantController extends ChangeNotifier {
     _disposed = true;
     app.removeListener(_onApp);
     _stream?.cancel();
+    _events?.cancel();
+    _moodTimer?.cancel();
+    _appOps.close();
+    memoryChanged.dispose();
     super.dispose();
   }
 }

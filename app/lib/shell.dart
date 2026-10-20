@@ -5,7 +5,10 @@ import 'package:provider/provider.dart';
 
 import 'core/app_state.dart';
 import 'core/plugins.dart';
+import 'features/assistant/assistant_controller.dart';
 import 'features/assistant/assistant_panel.dart';
+import 'features/assistant/bot_avatar.dart';
+import 'features/assistant/bot_ops.dart';
 import 'features/assistant/task_inbox.dart';
 import 'features/assistant/tasks_page.dart';
 import 'features/courses/courses_page.dart';
@@ -64,9 +67,18 @@ class ShellScope extends InheritedWidget {
 /// Navigation for widgets outside the tab navigators (the assistant panel).
 abstract final class ShellNav {
   static void Function(int)? _goTo;
+  static int Function()? _current;
   static List<GlobalKey<NavigatorState>> _keys = const [];
 
   static void goTo(int tab) => _goTo?.call(tab);
+
+  /// The selected tab.
+  static int get current => _current?.call() ?? Tabs.home;
+
+  /// Pops the page on top of [tab]'s navigator.
+  static void pop(int tab) {
+    if (tab < _keys.length) _keys[tab].currentState?.maybePop();
+  }
 
   /// Switches to [tab] and opens [page] on top of it.
   static void push(int tab, Widget page) {
@@ -92,21 +104,36 @@ class _AppShellState extends State<AppShell> {
   final _navKeys = List.generate(_dests.length, (_) => GlobalKey<NavigatorState>());
   final _built = <int>{0};
   StreamSubscription<String>? _notices;
+  StreamSubscription? _botOps;
+  late final UiPrefs _prefs = context.read<UiPrefs>();
+  late final AssistantController _assistant = context.read<AssistantController>();
 
   @override
   void initState() {
     super.initState();
     ShellNav._goTo = _select;
+    ShellNav._current = () => _index;
     ShellNav._keys = _navKeys;
     // Plugin notices (look.notify) show wherever the user is.
     _notices = context.read<PluginStore>().notices.listen((m) {
       if (mounted) showSnack(context, m);
     });
+    // The bot's app operations (docs/specs/0007-resident-bot-and-course-agents.md)
+    // and the preferences it may read.
+    _botOps = _assistant.appOps.listen((op) {
+      if (mounted) BotOps.run(context, op);
+    });
+    _prefs.addListener(_pushPrefs);
+    _pushPrefs();
   }
+
+  void _pushPrefs() => _assistant.pushAppState(_prefs.toJson());
 
   @override
   void dispose() {
     _notices?.cancel();
+    _botOps?.cancel();
+    _prefs.removeListener(_pushPrefs);
     super.dispose();
   }
 
@@ -331,32 +358,30 @@ class _BrandPainter extends CustomPainter {
   bool shouldRepaint(_BrandPainter o) => o.fill != fill || o.ring != ring;
 }
 
+/// The bot on the rail and the compact layout's floating button: tap to
+/// open it.
 class _AssistantFab extends StatelessWidget {
   const _AssistantFab({required this.compact});
   final bool compact;
 
-  void _open(BuildContext context) {
-    final sc = context.sizeClass;
-    if (sc.index >= SizeClass.expanded.index) {
-      context.read<UiPrefs>().update((p) => p.assistantDocked = true);
-      return;
-    }
-    Navigator.of(context, rootNavigator: true).push(MaterialPageRoute(
-      fullscreenDialog: true,
-      builder: (_) => const Scaffold(body: SafeArea(child: AssistantPanel(docked: false))),
-    ));
-  }
-
   @override
   Widget build(BuildContext context) {
-    final busy = context.select<AppState, bool>((a) => a.agentReady);
-    final fab = FloatingActionButton(
-      heroTag: 'assistant',
-      tooltip: '助手',
-      onPressed: () => _open(context),
-      child: Icon(busy ? Icons.auto_awesome_rounded : Icons.auto_awesome_outlined),
+    final a = context.watch<AssistantController>();
+    final cs = Theme.of(context).colorScheme;
+    return Semantics(
+      label: '${a.botName}，${kBotMoodLabels[a.mood]}',
+      child: FloatingActionButton(
+        heroTag: 'assistant',
+        tooltip: a.botName,
+        backgroundColor: cs.surfaceContainerHigh,
+        elevation: compact ? null : 0,
+        onPressed: () {
+          openAssistantPanel(context);
+          if (a.view != 'bot') a.showBot();
+        },
+        child: BotAvatar(size: 44, shape: a.botShape, color: a.botColor, mood: a.mood, followPointer: false),
+      ),
     );
-    return compact ? fab : fab;
   }
 }
 
