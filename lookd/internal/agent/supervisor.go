@@ -24,7 +24,7 @@ type Status struct {
 }
 
 type Supervisor struct {
-	Node   string // node binary
+	Node   string // node binary; change it with Restart once running
 	Script string // agent host entry (host.mjs)
 	Env    []string
 
@@ -32,6 +32,42 @@ type Supervisor struct {
 	status  Status
 	proxy   *httputil.ReverseProxy
 	logTail []string
+	wake    chan struct{} // Restart signals the run loop
+	stopRun context.CancelFunc
+}
+
+func (s *Supervisor) wakeCh() chan struct{} {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.wake == nil {
+		s.wake = make(chan struct{}, 1)
+	}
+	return s.wake
+}
+
+// Restart stops the running host, if any, and starts it again with node
+// (unchanged when empty). A supervisor waiting for Node.js starts now.
+func (s *Supervisor) Restart(node string) {
+	wake := s.wakeCh()
+	s.mu.Lock()
+	if node != "" {
+		s.Node = node
+	}
+	stop := s.stopRun
+	s.mu.Unlock()
+	select {
+	case wake <- struct{}{}:
+	default:
+	}
+	if stop != nil {
+		stop()
+	}
+}
+
+func (s *Supervisor) config() (node, script string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.Node, s.Script
 }
 
 func (s *Supervisor) Status() Status {
@@ -65,21 +101,51 @@ func (s *Supervisor) log(line string) {
 }
 
 // Run starts the host and restarts it with backoff until ctx ends.
+// Run keeps the agent host running until ctx ends, restarting it with a
+// growing delay after a crash. Without Node.js or the script it reports
+// disabled and waits for Restart.
 func (s *Supervisor) Run(ctx context.Context) {
-	if s.Script == "" || s.Node == "" {
-		s.set(Status{State: "disabled", Error: "未配置 Node.js 或 agent host"})
-		return
-	}
-	if _, err := os.Stat(s.Script); err != nil {
-		s.set(Status{State: "disabled", Error: "agent host 不存在: " + s.Script})
-		return
-	}
+	wake := s.wakeCh()
 	backoff := time.Second
 	for ctx.Err() == nil {
+		node, script := s.config()
+		var why string
+		if script == "" {
+			why = "找不到助手程序（agent/src/host.mjs）"
+		} else if _, err := os.Stat(script); err != nil {
+			why = "agent host 不存在: " + script
+		} else if node == "" {
+			why = "未找到 Node.js"
+		}
+		if why != "" {
+			s.set(Status{State: "disabled", Error: why})
+			select {
+			case <-ctx.Done():
+				return
+			case <-wake:
+				continue
+			}
+		}
+		select { // a Restart before this start is already served by it
+		case <-wake:
+		default:
+		}
 		started := time.Now()
-		err := s.once(ctx)
+		octx, cancel := context.WithCancel(ctx)
+		s.mu.Lock()
+		s.stopRun = cancel
+		s.mu.Unlock()
+		err := s.once(octx, node, script)
+		cancel()
+		s.mu.Lock()
+		s.stopRun = nil
+		s.mu.Unlock()
 		if ctx.Err() != nil {
 			return
+		}
+		if octx.Err() != nil { // Restart
+			backoff = time.Second
+			continue
 		}
 		msg := "agent host 已退出"
 		if err != nil {
@@ -93,15 +159,18 @@ func (s *Supervisor) Run(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 			return
+		case <-wake:
+			backoff = time.Second
+			continue
 		case <-time.After(backoff):
 		}
 		backoff = min(backoff*2, 30*time.Second)
 	}
 }
 
-func (s *Supervisor) once(ctx context.Context) error {
+func (s *Supervisor) once(ctx context.Context, node, script string) error {
 	s.set(Status{State: "starting"})
-	cmd := exec.CommandContext(ctx, s.Node, s.Script)
+	cmd := exec.CommandContext(ctx, node, script)
 	cmd.Env = append(os.Environ(), s.Env...)
 	cmd.Cancel = func() error { return cmd.Process.Signal(os.Interrupt) }
 	cmd.WaitDelay = 5 * time.Second

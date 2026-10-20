@@ -32,6 +32,7 @@ The app starts lookd ([lookd_service.dart](../app/lib/core/lookd_service.dart) s
 | `lookd/internal/store` | SQLite schema and FTS index ([schema.sql](../lookd/internal/store/schema.sql)); rebuildable from library files (schedule and activity via their JSON mirrors) |
 | `lookd/internal/events` | SSE event fan-out |
 | `lookd/internal/agent` | Supervises the Node agent host and proxies `/agent/*` |
+| `lookd/internal/agentenv` | Installs Node.js and the agent's npm dependencies into the data directory ([spec 0008](specs/0008-assistant-runtime-setup.md)) |
 | `agent/src/host.mjs` | Agent host: HTTP endpoints, system prompt, sessions |
 | `agent/src/http.mjs` | Request body reading with the 1 MiB limit and 30 s deadline, HTTP error replies |
 | `agent/src/tools.mjs` | Tool groups, `find_tools`, note playbook, write guards |

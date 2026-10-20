@@ -33,7 +33,7 @@ agent/  Node.js host for the embedded Pi Agent (@earendil-works/pi-coding-agent 
 
 ## Build
 
-Build and run instructions for each platform are in the [README](../README.md#build-from-source). ffmpeg is needed for transcription, and Node.js for the assistant.
+Build and run instructions for each platform are in the [README](../README.md#build-from-source). ffmpeg is needed for transcription, and Node.js for the assistant. Without Node.js 22+ or the agent's dependencies the assistant panel and 设置 → 助手 → 运行环境 offer a one-click install into the data directory ([spec 0008](specs/0008-assistant-runtime-setup.md)).
 
 ## Data
 

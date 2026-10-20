@@ -90,8 +90,11 @@ class LookdService extends ChangeNotifier {
     }
     final agent = _find('LOOK_AGENT', ['agent/src/host.mjs'], ['look-studio/agent/src/host.mjs', 'agent/src/host.mjs']);
     final node = _findNode();
+    // Without Node.js lookd still gets the agent, so the in-app runtime
+    // install (docs/specs/0008-assistant-runtime-setup.md) can set it up.
     final args = ['-exit-on-stdin-eof'];
-    if (agent != null && node != null) args.addAll(['-node', node, '-agent', agent]);
+    if (agent != null) args.addAll(['-agent', agent]);
+    if (node != null) args.addAll(['-node', node]);
     state = DaemonState.starting;
     notifyListeners();
     try {

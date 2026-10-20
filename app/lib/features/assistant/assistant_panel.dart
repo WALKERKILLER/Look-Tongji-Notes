@@ -29,6 +29,7 @@ import '../settings/models_page.dart';
 import '../settings/provider_presets.dart';
 import '../usage/usage_page.dart';
 import 'assistant_controller.dart';
+import 'runtime_setup.dart';
 
 const _toolLabels = {
   'app_guide': ('查阅功能说明', Icons.menu_book_outlined),
@@ -295,14 +296,17 @@ class _AssistantPanelState extends State<AssistantPanel> {
 
   Widget _body(BuildContext context, AssistantController a) {
     if (!a.ready) {
-      final failed = a.agentState == 'failed' || a.agentState == 'stopped';
-      return failed
-          ? EmptyState(
-              icon: Icons.smart_toy_outlined,
-              title: '助手没有启动',
-              body: a.agentError.isEmpty ? '需要 Node.js 运行内置的 Pi Agent。' : a.agentError,
-            )
-          : const CenteredLoader(label: '正在启动助手');
+      if (a.agentState != 'disabled' && a.agentState != 'crashed') return const CenteredLoader(label: '正在启动助手');
+      final cs = Theme.of(context).colorScheme;
+      return ListView(padding: const EdgeInsets.all(Space.lg), children: [
+        Text('助手没有启动', style: Theme.of(context).textTheme.titleMedium),
+        if (a.agentError.isNotEmpty) ...[
+          const SizedBox(height: Space.xs),
+          Text(a.agentError, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+        ],
+        const SizedBox(height: Space.lg),
+        const Center(child: RuntimeSetupCard()),
+      ]);
     }
     if (a.models != null && a.selected == null) {
       return EmptyState(

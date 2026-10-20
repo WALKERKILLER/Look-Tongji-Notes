@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"lookstudio/lookd/internal/agent"
+	"lookstudio/lookd/internal/agentenv"
 	"lookstudio/lookd/internal/asr"
 	"lookstudio/lookd/internal/dl"
 	"lookstudio/lookd/internal/events"
@@ -42,6 +43,10 @@ type Server struct {
 	Eng   *dl.Engine
 	Bus   *events.Bus
 	Agent *agent.Supervisor
+	// Runtime installs Node.js and the agent's dependencies.
+	Runtime *agentenv.Manager
+	// Ctx lives as long as the daemon; background work started by a request uses it.
+	Ctx context.Context
 	// MinerU parses uploaded courseware.
 	MinerU *mineru.Service
 
@@ -173,6 +178,24 @@ func (s *Server) Handler() http.Handler {
 	h("GET /api/activity/day", s.activityDay)
 	h("POST /api/activity", s.addActivity)
 	h("POST /api/agent/event", s.agentEvent)
+	h("GET /api/agent/runtime", func(_ http.ResponseWriter, r *http.Request) (any, error) { return s.Runtime.Status(r.Context()), nil })
+	h("POST /api/agent/runtime/install", func(_ http.ResponseWriter, r *http.Request) (any, error) {
+		var in struct {
+			Mirror string `json:"mirror"`
+		}
+		if err := decode(r, &in); err != nil {
+			return nil, err
+		}
+		if _, ok := agentenv.Mirrors[in.Mirror]; !ok {
+			return nil, badRequest("mirror 只能是 npmmirror 或 official")
+		}
+		if err := s.Runtime.Start(s.Ctx, in.Mirror); errors.Is(err, agentenv.ErrRunning) {
+			return nil, apiError{http.StatusConflict, err.Error()}
+		} else if err != nil {
+			return nil, err
+		}
+		return s.Runtime.Status(r.Context()), nil
+	})
 	h("GET /api/quizzes", s.quizzes)
 	h("POST /api/quizzes", s.addQuiz)
 	h("GET /api/quizzes/{id}", s.quiz)

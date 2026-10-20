@@ -12,6 +12,8 @@ class ApiError implements Exception {
   String toString() => message;
 }
 
+typedef ApiCall = Future<dynamic> Function(String method, String path, [Object? body]);
+
 /// HTTP client for lookd (and the agent host behind /agent).
 class Api {
   Api(this.baseUrl, this.token);
@@ -26,6 +28,13 @@ class Api {
 
   /// URL usable by media players and image loaders.
   String fileUrl(String rel) => '$baseUrl/files/${rel.split('/').map(Uri.encodeComponent).join('/')}?token=$token';
+
+  /// One request by method; paths may carry a query string. Widgets take
+  /// this as an [ApiCall] so tests can answer without a daemon.
+  Future<dynamic> call(String method, String path, [Object? body]) {
+    final u = Uri.parse(path);
+    return _send(method, u.path, body: method == 'GET' || method == 'DELETE' ? null : body ?? const {}, query: u.queryParameters);
+  }
 
   Future<dynamic> _send(String method, String path, {Object? body, Map<String, String>? query, Duration? timeout}) async {
     final req = http.Request(method, uri(path, query))..headers.addAll(_headers);
