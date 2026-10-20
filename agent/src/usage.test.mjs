@@ -103,6 +103,30 @@ test("entries reads only lines appended since the last load", async () => {
 	assert.deepEqual(all.map((e) => localDay(e.ts)), ["2026-10-05", "2026-10-06"]);
 });
 
+test("concurrent reads, appends and prunes count each call once", async () => {
+	const dir = await mkdtemp(join(tmpdir(), "usage-"));
+	const l = new UsageLedger(dir);
+	const now = at("2026-10-18");
+	await l.record(entryFrom(msg(now - (KEEP_DAYS + 1) * 86_400_000)));
+	await l.record(entryFrom(msg(now - 1)));
+	await l.entries();
+	const work = [];
+	for (let i = 0; i < 10; i++) work.push(l.record(entryFrom(msg(now + i))), l.entries());
+	work.push(l.prune(now), l.entries());
+	await Promise.all(work);
+	assert.equal((await l.entries()).length, 11);
+	// A read waits for queued writes instead of interleaving with them.
+	let open;
+	l.serial(() => new Promise((r) => (open = r)));
+	let read = false;
+	const pending = l.entries().then(() => (read = true));
+	await new Promise((r) => setTimeout(r, 20));
+	assert.equal(read, false);
+	open();
+	await pending;
+	assert.equal(read, true);
+});
+
 test("flush waits for appends still in flight", async () => {
 	const dir = await mkdtemp(join(tmpdir(), "usage-"));
 	const l = new UsageLedger(dir);

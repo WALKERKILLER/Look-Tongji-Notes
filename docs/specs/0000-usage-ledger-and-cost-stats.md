@@ -21,7 +21,7 @@ Non-goals: provider billing reconciliation (costs are estimates from model price
 - On SIGINT/SIGTERM the host waits up to 3 s for appends in flight before exiting (lookd allows 5 s), so finished calls are not lost.
 - Backfill: on first start with no ledger, existing session files are scanned once and their assistant messages written as `purpose: chat` with their original timestamps; a marker line prevents a second backfill.
 - Deleting a conversation does not delete its ledger lines.
-- Retention: calls older than 739 days (two longest summary ranges, one and its previous period, plus a week) are pruned at host start and daily by an atomic rewrite; the backfill marker stays. Ledger writes run one at a time, so a prune never drops a concurrent append. After the first load, queries read only bytes appended since.
+- Retention: calls older than 739 days (two longest summary ranges, one and its previous period, plus a week) are pruned at host start and daily by an atomic rewrite; the backfill marker stays. Ledger writes and cache reloads run one at a time in one queue, so a prune never drops a concurrent append and a query never counts a call twice or reads a cache a prune reset. After the first load, queries read only bytes appended since.
 - The ledger holds no prompt or response text.
 
 ### API (agent host, reached by the app as `/agent/usage…` through lookd)

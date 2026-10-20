@@ -102,8 +102,15 @@ export class UsageLedger {
 		}
 	}
 
-	/** Parsed calls; after the first load only bytes appended since are read. */
-	async entries() {
+	/**
+	 * Parsed calls; after the first load only bytes appended since are read.
+	 * Runs in the write queue, so an append or prune never interleaves with it.
+	 */
+	entries() {
+		return this.serial(() => this.load());
+	}
+
+	async load() {
 		let size = 0;
 		try {
 			size = (await stat(this.path)).size;
@@ -203,8 +210,11 @@ export class UsageLedger {
 		}
 		found.sort((a, b) => a.ts - b.ts);
 		const out = [...found, { backfill: true, ts: Date.now(), count: found.length }];
-		await appendFile(this.path, out.map((e) => JSON.stringify(e)).join("\n") + "\n");
-		this.lines = null;
+		await this.serial(async () => {
+			await appendFile(this.path, out.map((e) => JSON.stringify(e)).join("\n") + "\n");
+			this.lines = null;
+			this.size = -1;
+		});
 		return found.length;
 	}
 
