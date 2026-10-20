@@ -111,6 +111,20 @@ func (s *Server) Handler() http.Handler {
 		}
 		return map[string]any{"ok": true, "freed": freed}, s.St.ClearFinishedJobs(r.Context())
 	})
+	h("POST /api/jobs/bulk", func(_ http.ResponseWriter, r *http.Request) (any, error) {
+		var in struct {
+			Action string   `json:"action"`
+			IDs    []string `json:"ids"`
+		}
+		if err := decode(r, &in); err != nil {
+			return nil, err
+		}
+		if in.Action != "pause" && in.Action != "resume" && in.Action != "retry" {
+			return nil, badRequest("action 只能是 pause、resume 或 retry")
+		}
+		n, err := s.Jobs.Bulk(r.Context(), in.Action, in.IDs)
+		return map[string]any{"changed": n}, err
+	})
 	h("POST /api/jobs/{id}/{action}", s.jobAction)
 	h("DELETE /api/jobs/{id}", func(_ http.ResponseWriter, r *http.Request) (any, error) {
 		if r.URL.Query().Get("files") == "1" {

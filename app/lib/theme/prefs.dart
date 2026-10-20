@@ -38,6 +38,9 @@ class UiPrefs extends ChangeNotifier {
   double chatTextScale = 1.0;
   bool assistantDocked = true;
 
+  // Course page: lectures run from the first to the last unless flipped.
+  bool lecturesNewestFirst = false;
+
   // Player
   double defaultSpeed = 1.0;
   double boostSpeed = 2.0;
@@ -66,6 +69,7 @@ class UiPrefs extends ChangeNotifier {
       streamAnimation = GptMarkdownAnimation.values.byName(m['streamAnimation'] ?? streamAnimation.name);
       chatTextScale = (m['chatTextScale'] ?? 1.0).toDouble();
       assistantDocked = m['assistantDocked'] ?? true;
+      lecturesNewestFirst = m['lecturesNewestFirst'] ?? false;
       defaultSpeed = (m['defaultSpeed'] ?? 1.0).toDouble();
       boostSpeed = (m['boostSpeed'] ?? 2.0).toDouble();
       seekStepSec = m['seekStepSec'] ?? 10;
@@ -93,6 +97,7 @@ class UiPrefs extends ChangeNotifier {
         'streamAnimation': streamAnimation.name,
         'chatTextScale': chatTextScale,
         'assistantDocked': assistantDocked,
+        'lecturesNewestFirst': lecturesNewestFirst,
         'defaultSpeed': defaultSpeed,
         'boostSpeed': boostSpeed,
         'seekStepSec': seekStepSec,

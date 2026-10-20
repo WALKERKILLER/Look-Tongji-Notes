@@ -714,3 +714,15 @@ func (e *Engine) FetchSmall(ctx context.Context, u string, h http.Header, dest s
 	}
 	return 0, last
 }
+
+// Status returns the HTTP status behind a download error, or 0.
+func Status(err error) int {
+	var s statusErr
+	if errors.As(err, &s) {
+		return s.code
+	}
+	return 0
+}
+
+// Stalled reports whether err is a connection that stopped delivering data.
+func Stalled(err error) bool { return errors.Is(err, errStalled) }

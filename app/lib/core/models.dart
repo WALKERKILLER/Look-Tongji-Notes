@@ -96,6 +96,9 @@ class Job {
   String get stage => _s(j['stage']);
   int get updatedAt => _i(j['updated_at']);
   bool get active => state == 'running' || state == 'queued';
+
+  /// When a queued job retries by itself after a network failure.
+  DateTime? get retryAt => _i(j['retry_at']) > 0 ? DateTime.fromMillisecondsSinceEpoch(_i(j['retry_at']) * 1000) : null;
 }
 
 class Slide {

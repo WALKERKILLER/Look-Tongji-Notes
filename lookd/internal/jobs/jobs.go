@@ -54,6 +54,7 @@ type Manager struct {
 	running map[string]*runCtl
 	live    map[string]*store.Job
 	busy    map[string]int
+	retry   map[string]retryState
 	wake    chan struct{}
 }
 
@@ -64,7 +65,7 @@ type runCtl struct {
 
 func New(st *store.Store, lib *library.Library, cl *tongji.Client, eng *dl.Engine, a *asr.Pool, bus *events.Bus) *Manager {
 	m := &Manager{St: st, Lib: lib, Cl: cl, Eng: eng, ASR: a, Bus: bus,
-		running: map[string]*runCtl{}, live: map[string]*store.Job{}, busy: map[string]int{}, wake: make(chan struct{}, 1)}
+		running: map[string]*runCtl{}, live: map[string]*store.Job{}, busy: map[string]int{}, retry: map[string]retryState{}, wake: make(chan struct{}, 1)}
 	m.SetConfig(Config{VideoParallel: 2, SlideParallel: 8})
 	return m
 }
@@ -103,7 +104,9 @@ func (m *Manager) poke() {
 
 func jobID(lectureID, kind string) string { return lectureID + "-" + kind }
 
-// Enqueue queues the given artifact kinds for a lecture (idempotent).
+// Enqueue queues the given artifact kinds for a lecture (idempotent). A
+// paused, failed or canceled job is queued again with its progress, and its
+// download resumes from the checkpoint.
 func (m *Manager) Enqueue(ctx context.Context, lectureID string, kinds []string) ([]store.Job, error) {
 	lec, err := m.St.Lecture(ctx, lectureID)
 	if err != nil {
@@ -120,7 +123,15 @@ func (m *Manager) Enqueue(ctx context.Context, lectureID string, kinds []string)
 			return nil, fmt.Errorf("未知任务类型 %s", k)
 		}
 		id := jobID(lectureID, k)
-		if j, err := m.St.Job(ctx, id); err == nil && (j.State == "running" || j.State == "queued") {
+		m.clearRetry(id)
+		if j, err := m.St.Job(ctx, id); err == nil && j.State != "done" {
+			if j.State != "running" && j.State != "queued" {
+				j.State, j.Error = "queued", ""
+				if err := m.St.PutJob(ctx, j); err != nil {
+					return nil, err
+				}
+				m.Bus.Publish("job", j)
+			}
 			out = append(out, j)
 			continue
 		}
@@ -148,9 +159,51 @@ func (m *Manager) List(ctx context.Context) ([]store.Job, error) {
 	for i := range js {
 		if l, ok := m.live[js[i].ID]; ok {
 			js[i] = *l
+		} else if r, ok := m.retry[js[i].ID]; ok && js[i].State == "queued" {
+			js[i].RetryAt = r.at.Unix()
 		}
 	}
 	return js, nil
+}
+
+func (m *Manager) clearRetry(id string) {
+	m.mu.Lock()
+	delete(m.retry, id)
+	m.mu.Unlock()
+}
+
+// Bulk pauses every queued or running job, resumes every paused one, or
+// retries every failed one; ids, when given, limit it to those jobs. It
+// returns how many jobs it changed.
+func (m *Manager) Bulk(ctx context.Context, action string, ids []string) (int, error) {
+	from := map[string][]string{"pause": {"queued", "running"}, "resume": {"paused"}, "retry": {"failed"}}[action]
+	if from == nil {
+		return 0, fmt.Errorf("未知操作 %s", action)
+	}
+	js, err := m.St.Jobs(ctx, from...)
+	if err != nil {
+		return 0, err
+	}
+	only := map[string]bool{}
+	for _, id := range ids {
+		only[id] = true
+	}
+	n := 0
+	for _, j := range js {
+		if len(ids) > 0 && !only[j.ID] {
+			continue
+		}
+		if action == "pause" {
+			err = m.Pause(ctx, j.ID)
+		} else {
+			err = m.Resume(ctx, j.ID)
+		}
+		if err != nil {
+			return n, err
+		}
+		n++
+	}
+	return n, nil
 }
 
 func (m *Manager) Pause(ctx context.Context, id string) error  { return m.stop(ctx, id, "paused") }
@@ -159,6 +212,7 @@ func (m *Manager) Cancel(ctx context.Context, id string) error { return m.stop(c
 func (m *Manager) stop(ctx context.Context, id, reason string) error {
 	m.mu.Lock()
 	rc := m.running[id]
+	delete(m.retry, id)
 	m.mu.Unlock()
 	if rc != nil {
 		rc.reason.Store(reason)
@@ -182,9 +236,10 @@ func (m *Manager) Resume(ctx context.Context, id string) error {
 	if err != nil {
 		return err
 	}
-	if j.State == "running" || j.State == "queued" {
+	if j.State == "running" || (j.State == "queued" && j.Error == "") {
 		return nil
 	}
+	m.clearRetry(id) // a job waiting to retry runs now
 	j.State, j.Error = "queued", ""
 	if err := m.St.PutJob(ctx, j); err != nil {
 		return err
@@ -234,7 +289,7 @@ func (m *Manager) schedule(ctx context.Context) {
 	for i := len(js) - 1; i >= 0; i-- {
 		j := js[i]
 		m.mu.Lock()
-		if _, ok := m.running[j.ID]; ok || m.busy[j.Kind] >= m.limit(j.Kind) {
+		if _, ok := m.running[j.ID]; ok || m.busy[j.Kind] >= m.limit(j.Kind) || time.Now().Before(m.retry[j.ID].at) {
 			m.mu.Unlock()
 			continue
 		}
@@ -243,7 +298,7 @@ func (m *Manager) schedule(ctx context.Context) {
 		m.running[j.ID] = rc
 		m.busy[j.Kind]++
 		jj := j
-		jj.State = "running"
+		jj.State, jj.Error = "running", ""
 		m.live[j.ID] = &jj
 		m.mu.Unlock()
 		m.St.PutJob(ctx, jj)
@@ -294,10 +349,11 @@ func (m *Manager) run(ctx context.Context, rc *runCtl, j store.Job) {
 	m.busy[j.Kind]--
 	final := *live
 	m.mu.Unlock()
-	final.Speed, final.Conns = 0, 0
+	final.Speed, final.Conns, final.Stage = 0, 0, ""
 	switch {
 	case err == nil:
-		final.State, final.Progress, final.Error, final.Stage = "done", 1, "", ""
+		final.State, final.Progress, final.Error = "done", 1, ""
+		m.clearRetry(j.ID)
 	case ctx.Err() != nil:
 		reason, _ := rc.reason.Load().(string)
 		if reason == "" {
@@ -305,8 +361,22 @@ func (m *Manager) run(ctx context.Context, rc *runCtl, j store.Job) {
 		}
 		final.State = reason
 	default:
-		final.State, final.Error = "failed", err.Error()
-		slog.Warn("job failed", "id", j.ID, "err", err)
+		m.mu.Lock()
+		r := m.retry[j.ID]
+		at, again := nextRetry(err, r.n, time.Now())
+		if again {
+			m.retry[j.ID] = retryState{n: r.n + 1, at: at}
+		} else {
+			delete(m.retry, j.ID)
+		}
+		m.mu.Unlock()
+		if again {
+			final.State, final.Error, final.RetryAt = "queued", fmt.Sprintf("网络中断，将自动重试（第 %d/%d 次）：%v", r.n+1, len(retryDelays), err), at.Unix()
+			slog.Info("job will retry", "id", j.ID, "at", at, "err", err)
+		} else {
+			final.State, final.Error = "failed", err.Error()
+			slog.Warn("job failed", "id", j.ID, "err", err)
+		}
 	}
 	m.St.PutJob(context.Background(), final)
 	m.Bus.Publish("job", final)

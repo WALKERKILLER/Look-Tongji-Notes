@@ -63,6 +63,9 @@ String fmtUntil(DateTime t) {
   return '${d.inMinutes} 分钟';
 }
 
+/// Time of day, `14:05:30`.
+String fmtClockTime(DateTime t) => '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}:${t.second.toString().padLeft(2, '0')}';
+
 const kindLabels = {'video': '视频', 'slides': 'PPT', 'courseware': '课件', 'transcript': '转写', 'audio': '音频', 'parse': '课件解析'};
 
 const weekdayNames = _weekdays;

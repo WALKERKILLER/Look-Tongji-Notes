@@ -7,6 +7,7 @@ import '../../core/api.dart';
 import '../../core/app_state.dart';
 import '../../core/format.dart';
 import '../../core/models.dart';
+import '../../theme/prefs.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/course_visuals.dart';
 import '../../widgets/report_screen.dart';
@@ -30,7 +31,6 @@ class _CoursePageState extends State<CoursePage> {
   bool _loading = true;
   bool _syncing = false;
   final Set<String> _sel = {};
-  bool _newestFirst = true;
   StreamSubscription? _sub;
 
   bool get _selecting => _sel.isNotEmpty;
@@ -88,12 +88,17 @@ class _CoursePageState extends State<CoursePage> {
     final compact = context.isCompact;
     final pad = compact ? Space.lg : Space.xl;
 
-    final list = [..._lectures]..sort((a, b) => _newestFirst ? b.beginAt - a.beginAt : a.beginAt - b.beginAt);
+    final prefs = context.watch<UiPrefs>();
+    final newestFirst = prefs.lecturesNewestFirst;
+    // Lectures are numbered from the first to the last, whichever way they are shown.
+    final ordered = [..._lectures]..sort((a, b) => a.beginAt != b.beginAt ? a.beginAt - b.beginAt : a.id.compareTo(b.id));
+    final ordinal = {for (final (i, l) in ordered.indexed) l.id: i + 1};
+    final list = newestFirst ? ordered.reversed.toList() : ordered;
     final playable = list.where((l) => l.hasPlayback).toList();
     final local = list.where((l) => l.assets.isNotEmpty).length;
     // Resume where the student left off: the last lecture with progress if
     // unfinished, else the next playable one; first lecture when untouched.
-    final chrono = [...playable]..sort((a, b) => a.beginAt - b.beginAt);
+    final chrono = ordered.where((l) => l.hasPlayback).toList();
     Lecture? resume;
     final lastIdx = chrono.lastIndexWhere((l) => l.positionMs > 0);
     if (lastIdx < 0) {
@@ -187,14 +192,14 @@ class _CoursePageState extends State<CoursePage> {
                       Text('${list.length} 节课', style: tt.titleMedium),
                       const Spacer(),
                       TextButton.icon(
-                        onPressed: () => setState(() => _newestFirst = !_newestFirst),
+                        onPressed: () => prefs.update((p) => p.lecturesNewestFirst = !newestFirst),
                         icon: AnimatedRotation(
-                          turns: _newestFirst ? 0 : 0.5,
+                          turns: newestFirst ? 0 : 0.5,
                           duration: Motion.medium2,
                           curve: Motion.emphasized,
                           child: const Icon(Icons.arrow_downward_rounded, size: 18),
                         ),
-                        label: Text(_newestFirst ? '最新在前' : '最早在前'),
+                        label: Text(newestFirst ? '最新在前' : '第一节在前'),
                       ),
                       TextButton.icon(
                         onPressed: playable.isEmpty ? null : () => setState(() => _sel.addAll(playable.where((l) => l.assets.isEmpty).map((l) => l.id))),
@@ -228,6 +233,7 @@ class _CoursePageState extends State<CoursePage> {
                       child: _LectureTile(
                         key: ValueKey(l.id),
                         lecture: l,
+                        ordinal: ordinal[l.id]!,
                         selecting: _selecting,
                         selected: _sel.contains(l.id),
                         onTap: () {
@@ -404,6 +410,7 @@ class _LectureTile extends StatefulWidget {
   const _LectureTile({
     super.key,
     required this.lecture,
+    required this.ordinal,
     required this.selecting,
     required this.selected,
     required this.onTap,
@@ -411,6 +418,7 @@ class _LectureTile extends StatefulWidget {
     required this.onDownload,
   });
   final Lecture lecture;
+  final int ordinal;
   final bool selecting, selected;
   final VoidCallback onTap, onDownload;
   final VoidCallback? onLongPress;
@@ -478,6 +486,7 @@ class _LectureTileState extends State<_LectureTile> {
                         const SizedBox(height: 2),
                         Text(
                           [
+                            '第 ${widget.ordinal} 节',
                             fmtLectureDate(d),
                             if (l.durationS > 0) fmtDuration(l.durationS),
                             if (l.room.isNotEmpty) l.room,
