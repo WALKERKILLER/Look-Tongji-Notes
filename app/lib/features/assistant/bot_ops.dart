@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -63,9 +64,13 @@ abstract final class BotOps {
   static int? _backTab;
   static int? _pushedTab;
   static bool _rootPushed = false;
+  static Map<String, dynamic>? _lastOpen;
 
   /// Whether the last opened page can be left with [back].
   static bool get canGoBack => _backTab != null;
+
+  /// Whether [op] opened the page [back] would leave (older chips cannot).
+  static bool canGoBackFrom(Map<String, dynamic> op) => canGoBack && mapEquals(op, _lastOpen);
 
   static void run(BuildContext context, Map<String, dynamic> op) {
     switch (op['op']) {
@@ -92,10 +97,14 @@ abstract final class BotOps {
 
   static void _open(BuildContext context, Map<String, dynamic> op) {
     final target = '${op['target']}';
+    _lastOpen = Map.of(op);
     _backTab = ShellNav.current;
     _pushedTab = null;
     _rootPushed = false;
     final tab = _tabTargets[target];
+    // Tabs sit under full-screen routes (the compact assistant, a sheet, the
+    // player): close them so the page shows, as the chat's buttons do.
+    if (tab != null || target == 'course' || target == 'note') rootNavigator.currentState?.popUntil((r) => r.isFirst);
     if (tab != null) {
       ShellNav.goTo(tab);
       final day = DateTime.tryParse('${op['day'] ?? ''}');
@@ -139,5 +148,6 @@ abstract final class BotOps {
     _backTab = null;
     _pushedTab = null;
     _rootPushed = false;
+    _lastOpen = null;
   }
 }

@@ -181,7 +181,9 @@ class _AssistantPanelState extends State<AssistantPanel> {
 
   void runAction(Map<String, dynamic> act) {
     final players = context.read<PlayerHub>();
-    final lectureId = '${act['lecture_id'] ?? ''}';
+    // Without its own lecture an action belongs to the open player, else the lecture on screen.
+    final own = '${act['lecture_id'] ?? ''}';
+    final lectureId = own.isNotEmpty ? own : context.read<ScreenContext>().value['lecture_id'] ?? '';
     final courseId = '${act['course_id'] ?? ''}';
     final secs = (act['seconds'] as num?)?.toInt();
     final root = Navigator.of(context, rootNavigator: true);
@@ -192,35 +194,40 @@ class _AssistantPanelState extends State<AssistantPanel> {
     switch (act['kind']) {
       case 'seek':
         final p = players.value;
-        if (p != null && (lectureId.isEmpty || p.lectureId == lectureId)) {
+        if (p != null && (own.isEmpty || p.lectureId == own)) {
           p.seekTo((secs ?? 0) * 1000);
           leaveFullscreenPanel();
+          revealPlayer(p);
         } else if (lectureId.isNotEmpty) {
           leaveFullscreenPanel();
           root.push(MaterialPageRoute(builder: (_) => PlayerPage(lectureId: lectureId, startMs: (secs ?? 0) * 1000)));
+        } else {
+          showSnack(context, '这个时间点没有对应的课次');
         }
       case 'open_lecture':
-        if (lectureId.isEmpty) return;
+        if (lectureId.isEmpty) return showSnack(context, '没有指明要打开哪一节课');
         leaveFullscreenPanel();
         root.push(MaterialPageRoute(builder: (_) => PlayerPage(lectureId: lectureId, startMs: secs == null ? null : secs * 1000)));
       case 'open_course':
-        if (courseId.isEmpty) return;
+        if (courseId.isEmpty) return showSnack(context, '没有指明要打开哪门课');
         leaveFullscreenPanel();
         if (widget.embedded) root.maybePop();
         ShellNav.push(Tabs.courses, CoursePage(courseId: courseId));
       case 'open_note':
         final id = '${act['note_id'] ?? ''}';
-        if (id.isEmpty) return;
+        if (id.isEmpty) return showSnack(context, '没有指明要打开哪篇笔记');
         leaveFullscreenPanel();
         if (widget.embedded) root.maybePop();
         ShellNav.push(Tabs.library, NotePage(noteId: id));
       case 'download':
-        if (lectureId.isEmpty) return;
-        showDownloadSheet(context, [lectureId]);
+        if (lectureId.isEmpty) return showSnack(context, '没有指明要下载哪一节课');
+        showDownloadSheet(context, [lectureId], kinds: [for (final k in (act['kinds'] as List?) ?? const []) '$k']);
       case 'open_schedule':
         leaveFullscreenPanel();
         if (widget.embedded) root.maybePop();
         ShellNav.goTo(Tabs.schedule);
+      default:
+        showSnack(context, '这个版本还不支持该操作');
     }
   }
 
@@ -713,7 +720,6 @@ class _ModeChips extends StatelessWidget {
                     visualDensity: VisualDensity.compact,
                     deleteButtonTooltipMessage: '关闭',
                     onDeleted: () => runPluginEntry(context, e, context_),
-                    onPressed: () {},
                   ),
               ]),
             ),
@@ -963,9 +969,11 @@ class _AssistantTurn extends StatelessWidget {
               b.text,
               style: tt.bodyMedium?.copyWith(height: 1.65),
               lectureId: ctxLecture,
-              onRef: (r) => openRef(context, r,
-                  lectureId: ctxLecture,
-                  onSeek: (t) => onAction({'kind': 'seek', 'lecture_id': t.lectureId.isNotEmpty ? t.lectureId : ctxLecture, 'seconds': t.seconds})),
+              onRef: (r) => r is LectureRef
+                  ? onAction({'kind': 'open_lecture', 'lecture_id': r.lectureId})
+                  : openRef(context, r,
+                      lectureId: ctxLecture,
+                      onSeek: (t) => onAction({'kind': 'seek', 'lecture_id': t.lectureId.isNotEmpty ? t.lectureId : ctxLecture, 'seconds': t.seconds})),
               isStreaming: live,
               animation: prefs.reduceMotion ? GptMarkdownAnimation.none : prefs.streamAnimation,
               codeBuilder: (context, name, code, closed) => (closed ? lookViewBlock(context, name, code) : null) ?? _CodeBlock(lang: name, code: code),
@@ -1034,8 +1042,9 @@ Widget _appChip(BuildContext context, ChatBlock b, Map<String, dynamic> op) {
     icon: icon,
     done: op['undone'] == true,
     actionLabel: op['op'] == 'open' ? '返回' : '撤销',
+    doneLabel: op['op'] == 'open' ? '已返回' : '已撤销',
     onAction: op['op'] == 'open'
-        ? (BotOps.canGoBack ? () async => BotOps.back() : null)
+        ? (BotOps.canGoBackFrom(op) ? () async => BotOps.back() : null)
         : undoable
             ? () => a.undoApplied(b)
             : null,

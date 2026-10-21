@@ -212,7 +212,13 @@ class _CoursePageState extends State<CoursePage> {
                         label: Text(newestFirst ? '最新在前' : '第一节在前'),
                       ),
                       TextButton.icon(
-                        onPressed: playable.isEmpty ? null : () => setState(() => _sel.addAll(playable.where((l) => l.assets.isEmpty).map((l) => l.id))),
+                        onPressed: playable.isEmpty
+                            ? null
+                            : () {
+                                // Start with the lectures that have nothing downloaded; when all have something, with all of them.
+                                final missing = playable.where((l) => l.assets.isEmpty);
+                                setState(() => _sel.addAll((missing.isEmpty ? playable : missing).map((l) => l.id)));
+                              },
                         icon: const Icon(Icons.checklist_rounded, size: 18),
                         label: const Text('批量下载'),
                       ),

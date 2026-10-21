@@ -83,8 +83,10 @@ Future<void> runPluginEntry(BuildContext context, PluginEntry e, Map<String, dyn
   }
 }
 
-/// A list of items with done states and a progress header.
-/// Data: `{title?, items: [{text, done?, note?}]}`.
+/// A list of items with done states and a progress header, as reported by
+/// the plugin (read-only: the view is a snapshot of a tool result).
+/// Data: `{title?, items: [{text, done?, note?}]}`; agent-operator items
+/// carry `state` (todo | done | failed) and `evidence` instead.
 class ChecklistView extends StatelessWidget {
   const ChecklistView({super.key, required this.data});
   final Map<String, dynamic> data;
@@ -94,7 +96,8 @@ class ChecklistView extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
     final items = [for (final x in jsonList(data['items'])) if (x is Map) x.cast<String, dynamic>()];
-    final done = items.where((x) => x['done'] == true).length;
+    String state(Map x) => x['done'] == true ? 'done' : '${x['state'] ?? 'todo'}';
+    final done = items.where((x) => state(x) == 'done').length;
     return Container(
       padding: const EdgeInsets.all(Space.lg),
       decoration: BoxDecoration(color: cs.surfaceContainerLow, borderRadius: BorderRadius.circular(Corners.lg), border: Border.all(color: cs.outlineVariant)),
@@ -115,17 +118,26 @@ class ChecklistView extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.symmetric(vertical: Space.xs),
             child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Icon(x['done'] == true ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded, size: 20, color: x['done'] == true ? cs.primary : cs.outline),
+              // Status marks, not checkboxes: a pending item is a dot.
+              SizedBox.square(
+                dimension: 20,
+                child: switch (state(x)) {
+                  'done' => Icon(Icons.check_circle_rounded, size: 20, color: cs.primary),
+                  'failed' => Icon(Icons.error_rounded, size: 20, color: cs.error),
+                  _ => Icon(Icons.circle, size: 8, color: cs.outline),
+                },
+              ),
               const SizedBox(width: Space.md),
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text('${x['text'] ?? ''}',
                       style: tt.bodyMedium?.copyWith(
-                        color: x['done'] == true ? cs.onSurfaceVariant : cs.onSurface,
-                        decoration: x['done'] == true ? TextDecoration.lineThrough : null,
+                        color: state(x) == 'done' ? cs.onSurfaceVariant : cs.onSurface,
+                        decoration: state(x) == 'done' ? TextDecoration.lineThrough : null,
                         decorationColor: cs.onSurfaceVariant,
                       )),
-                  if ('${x['note'] ?? ''}'.isNotEmpty) Text('${x['note']}', style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+                  for (final k in const ['note', 'evidence'])
+                    if ('${x[k] ?? ''}'.isNotEmpty) Text('${x[k]}', style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
                 ]),
               ),
             ]),

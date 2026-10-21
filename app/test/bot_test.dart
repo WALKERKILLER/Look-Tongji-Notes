@@ -176,6 +176,20 @@ void main() {
     expect(find.text('撤销'), findsNothing);
   });
 
+  testWidgets('返回 on an opened page runs once, then the chip says so', (tester) async {
+    var back = 0;
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: AppOpChip(label: '已打开 课程', icon: Icons.open_in_new_rounded, actionLabel: '返回', doneLabel: '已返回', onAction: () async => back++),
+      ),
+    ));
+    await tester.tap(find.text('返回'));
+    await tester.pumpAndSettle();
+    expect(back, 1);
+    expect(find.text('已返回 · 已打开 课程'), findsOneWidget);
+    expect(find.text('返回'), findsNothing);
+  });
+
   testWidgets('the memory editor names new files and refuses bad names', (tester) async {
     final saved = <(String, String)>[];
     await tester.pumpWidget(MaterialApp(

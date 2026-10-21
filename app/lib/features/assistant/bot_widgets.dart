@@ -18,13 +18,16 @@ const _kindIcons = <String, IconData>{
 
 /// An operation the bot already did, with 返回 (navigation) or 撤销.
 class AppOpChip extends StatefulWidget {
-  const AppOpChip({super.key, required this.label, required this.icon, this.actionLabel, this.onAction, this.done = false});
+  const AppOpChip({super.key, required this.label, required this.icon, this.actionLabel, this.doneLabel = '已撤销', this.onAction, this.done = false});
   final String label;
   final IconData icon;
   final String? actionLabel;
+  final String doneLabel;
+
+  /// Runs once: after it succeeds the chip shows [doneLabel].
   final Future<void> Function()? onAction;
 
-  /// The action already ran (撤销 done): the chip says so and offers nothing.
+  /// The action already ran: the chip says so and offers nothing.
   final bool done;
 
   @override
@@ -32,28 +35,29 @@ class AppOpChip extends StatefulWidget {
 }
 
 class _AppOpChipState extends State<AppOpChip> {
-  bool _busy = false;
+  bool _busy = false, _ran = false;
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
-    final fg = widget.done ? cs.onSurfaceVariant : cs.onTertiaryContainer;
+    final done = widget.done || _ran;
+    final fg = done ? cs.onSurfaceVariant : cs.onTertiaryContainer;
     return Container(
       constraints: const BoxConstraints(minHeight: 40),
       padding: const EdgeInsets.only(left: Space.md, right: Space.xs),
       decoration: BoxDecoration(
-        color: widget.done ? cs.surfaceContainerHigh : cs.tertiaryContainer,
+        color: done ? cs.surfaceContainerHigh : cs.tertiaryContainer,
         borderRadius: BorderRadius.circular(Corners.full),
       ),
       child: Row(mainAxisSize: MainAxisSize.min, children: [
-        Icon(widget.done ? Icons.undo_rounded : widget.icon, size: 16, color: fg),
+        Icon(done ? Icons.undo_rounded : widget.icon, size: 16, color: fg),
         const SizedBox(width: Space.sm),
         Flexible(
-          child: Text(widget.done ? '已撤销 · ${widget.label}' : widget.label,
+          child: Text(done ? '${widget.doneLabel} · ${widget.label}' : widget.label,
               style: tt.labelLarge?.copyWith(color: fg), maxLines: 1, overflow: TextOverflow.ellipsis),
         ),
-        if (widget.onAction != null && !widget.done) ...[
+        if (widget.onAction != null && !done) ...[
           const SizedBox(width: Space.xs),
           TextButton(
             style: TextButton.styleFrom(foregroundColor: cs.onTertiaryContainer, visualDensity: VisualDensity.compact),
@@ -63,6 +67,7 @@ class _AppOpChipState extends State<AppOpChip> {
                     setState(() => _busy = true);
                     try {
                       await widget.onAction!();
+                      _ran = true;
                     } finally {
                       if (mounted) setState(() => _busy = false);
                     }
