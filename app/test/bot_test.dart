@@ -1,4 +1,7 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:look_studio/features/assistant/bot_avatar.dart';
 import 'package:look_studio/features/assistant/bot_page.dart';
@@ -51,6 +54,29 @@ void main() {
     await tester.pumpWidget(const SizedBox());
   });
 
+  testWidgets('ears, antennas and headphones stay inside the mascot\'s box', (tester) async {
+    final key = GlobalKey();
+    for (final shape in kBotShapes.keys) {
+      for (final mood in [BotMood.idle, BotMood.happy, BotMood.confused, BotMood.dreaming, BotMood.notify]) {
+        // A 100 px mascot in the middle of a 200 px transparent canvas.
+        await tester.pumpWidget(Center(
+          child: RepaintBoundary(
+            key: key,
+            child: SizedBox.square(dimension: 200, child: Center(child: BotAvatar(size: 100, shape: shape, mood: mood, animate: false))),
+          ),
+        ));
+        final boundary = key.currentContext!.findRenderObject()! as RenderRepaintBoundary;
+        final bytes = (await tester.runAsync(() async => (await boundary.toImage()).toByteData(format: ui.ImageByteFormat.rawRgba)))!;
+        var inside = true;
+        for (var i = 0; i < 200 * 200; i++) {
+          final x = i % 200, y = i ~/ 200;
+          if (bytes.getUint8(i * 4 + 3) > 40 && (x < 50 || x >= 150 || y < 50 || y >= 150)) inside = false;
+        }
+        expect(inside, isTrue, reason: '$shape $mood');
+      }
+    }
+  });
+
   test('bot colours come from fixed roles: the same bot in light and dark', () {
     final light = ColorScheme.fromSeed(seedColor: Colors.blue);
     final dark = ColorScheme.fromSeed(seedColor: Colors.blue, brightness: Brightness.dark);
@@ -58,9 +84,12 @@ void main() {
     for (final k in kBotColorKeys) {
       final a = botPalette(light, k), b = botPalette(dark, k);
       expect(a.body, b.body, reason: k);
-      // Eyes stay legible on the body (WCAG contrast of at least 4.5:1).
+      // The face screen stands out from the shell (WCAG contrast of at least 4.5:1).
       final l1 = a.body.computeLuminance(), l2 = a.ink.computeLuminance();
       expect((l1 + 0.05) / (l2 + 0.05), greaterThan(4.5), reason: k);
+      // The eyes glow on the dark face screen.
+      final l3 = a.eye.computeLuminance();
+      expect((l3 + 0.05) / (l2 + 0.05), greaterThan(7), reason: k);
     }
     expect(botPalette(light, 'teal').body, isNot(botPalette(light, 'rose').body));
     expect(kBotColorKeys.length, kSeedPalette.length + 1);
