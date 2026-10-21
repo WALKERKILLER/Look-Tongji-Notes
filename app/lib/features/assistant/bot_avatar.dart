@@ -7,12 +7,14 @@ import 'package:flutter/scheduler.dart';
 import '../../theme/prefs.dart';
 import '../../widgets/organic_shapes.dart';
 
-// The resident bot's mascot: one filled shape with two capsule eyes cut out
-// of it, no mouth. The eyes carry every mood.
+// The resident bot's mascot: a smooth, matte body lit softly from above, two
+// ink capsule eyes with a catchlight, blush that comes with warm moods and a
+// contact shadow that keeps it on the ground. No mouth; eyes and posture
+// carry every mood.
 // Source: bloub by Jérémy Perret (MIT) — https://github.com/jeremy-prt/bloub
 // Derived: bodies as polar radius profiles that morph by interpolating radii,
-// eyes as holes in the body, ease-out-quint morphs (design only; written for
-// Flutter on the app's shape library). The look follows Grok Bot's mascot.
+// ease-out-quint morphs (design only; written for Flutter on the app's shape
+// library). The single-shape, capsule-eyed character follows Grok Bot's mascot.
 
 enum BotMood { idle, listening, thinking, working, talking, happy, confused, dreaming, notify }
 
@@ -28,14 +30,14 @@ const kBotMoodLabels = <BotMood, String>{
   BotMood.notify: '有卡片等你确认',
 };
 
-/// Body shapes by the bot.json key, in picker order.
+/// Body shapes by the bot.json key, in picker order (agent/src/bot.mjs SHAPES).
 const kBotShapes = <String, (OrganicShape, String)>{
   'pebble': (OrganicShape.pebble, '鹅卵石'),
-  'circle': (OrganicShape.circle, '圆团'),
+  'mochi': (OrganicShape.mochi, '团子'),
+  'bean': (OrganicShape.bean, '豆豆'),
+  'circle': (OrganicShape.circle, '圆圆'),
   'squircle': (OrganicShape.squircle, '方糖'),
-  'capsule': (OrganicShape.pill, '胶囊'),
-  'cookie': (OrganicShape.cookie9, '曲奇'),
-  'cloud': (OrganicShape.puffy, '云朵'),
+  'capsule': (OrganicShape.capsule, '胶囊'),
   'droplet': (OrganicShape.droplet, '水滴'),
   'ghost': (OrganicShape.ghost, '小幽灵'),
 };
@@ -50,23 +52,35 @@ String botColorLabel(String key) {
 
 final _schemes = <(String, Brightness), ColorScheme>{};
 
-/// The bot's tonal pair: body (primary role) and accent (tertiary role) of
-/// its seed in the current brightness.
-(Color, Color) botColors(ColorScheme cs, String key) {
+ColorScheme _schemeOf(ColorScheme cs, String key) {
   final i = kBotColorKeys.indexOf(key);
-  if (i <= 0) return (cs.primary, cs.tertiary);
-  final s = _schemes.putIfAbsent((key, cs.brightness), () => ColorScheme.fromSeed(seedColor: kSeedPalette[i - 1].$2, brightness: cs.brightness));
-  return (s.primary, s.tertiary);
+  if (i <= 0) return cs;
+  return _schemes.putIfAbsent((key, cs.brightness), () => ColorScheme.fromSeed(seedColor: kSeedPalette[i - 1].$2, brightness: cs.brightness));
+}
+
+/// The bot's colours from M3 fixed roles, so it looks the same in light and
+/// dark themes: body (primary fixed dim), eyes (on primary fixed), blush
+/// (tertiary fixed dim).
+({Color body, Color ink, Color blush}) botPalette(ColorScheme cs, String key) {
+  final s = _schemeOf(cs, key);
+  return (body: s.primaryFixedDim, ink: s.onPrimaryFixed, blush: s.tertiaryFixedDim);
+}
+
+/// Body and accent colour of the bot (chips, swatches).
+(Color, Color) botColors(ColorScheme cs, String key) {
+  final s = _schemeOf(cs, key);
+  return (s.primaryFixedDim, s.tertiary);
 }
 
 OrganicShape _shapeOf(String key) => (kBotShapes[key] ?? kBotShapes['pebble']!).$1;
 
 /// Where the eyes sit (fraction of the radius below centre) for a body.
 double _eyeLine(String key) => switch (key) {
-      'droplet' => 0.16,
-      'ghost' => -0.1,
-      'cloud' => 0.04,
-      _ => -0.04,
+      'droplet' => 0.2,
+      'ghost' => -0.06,
+      'bean' => 0.06,
+      'mochi' => 0.02,
+      _ => -0.02,
     };
 
 /// The animated mascot. [animate] off draws a still pose (lists of shapes,
@@ -95,7 +109,7 @@ class BotAvatar extends StatefulWidget {
 
 /// Everything the painter needs; mutated by the ticker, repainted through [frame].
 class _Pose {
-  double eyeW = 0.15, eyeH = 0.34, gazeX = 0, gazeY = 0, arc = 0, asym = 0;
+  double eyeW = 0.13, eyeH = 0.28, gazeX = 0, gazeY = 0, arc = 0, asym = 0, blush = 0.2;
   double sx = 1, sy = 1, tilt = 0, lift = 0, badge = 0, dream = 0, time = 0;
   late Float64List radii;
   String shape = 'pebble';
@@ -186,7 +200,7 @@ class _BotAvatarState extends State<BotAvatar> with SingleTickerProviderStateMix
     final p = _pose;
     final t = p.time;
     final since = t - _moodAt;
-    var eyeW = 0.15, eyeH = 0.34, gx = 0.0, gy = 0.0, arc = 0.0, asym = 0.0;
+    var eyeW = 0.13, eyeH = 0.28, gx = 0.0, gy = 0.0, arc = 0.0, asym = 0.0, blush = 0.2;
     var sx = 1.0, sy = 1.0, tilt = 0.0, lift = 0.0, badge = 0.0, dream = 0.0;
 
     // Idle gaze wanders; a near pointer wins.
@@ -205,21 +219,22 @@ class _BotAvatarState extends State<BotAvatar> with SingleTickerProviderStateMix
         sy = 1 + 0.018 * breath;
         sx = 1 - 0.008 * breath;
       case BotMood.listening:
-        eyeH = 0.38;
-        eyeW = 0.165;
+        eyeH = 0.31;
+        eyeW = 0.14;
+        blush = 0.35;
         gx = _pointer?.dx ?? 0;
         gy = _pointer?.dy ?? 0.35;
         tilt = still ? 0 : 0.05;
         sy = 1 + 0.012 * breath;
       case BotMood.thinking:
-        eyeH = 0.27;
+        eyeH = 0.22;
         gx = 0.55;
         gy = -0.6;
         tilt = still ? 0 : 0.05 * math.sin(t * 1.6);
         sy = 1 + 0.015 * breath;
       case BotMood.working:
-        eyeH = 0.26;
-        eyeW = 0.16;
+        eyeH = 0.2;
+        eyeW = 0.14;
         gx = still ? 0 : math.sin(t * 3.4) * 0.75;
         gy = 0.1;
         sy = still ? 1 : 1 + 0.012 * math.sin(t * 9);
@@ -227,10 +242,12 @@ class _BotAvatarState extends State<BotAvatar> with SingleTickerProviderStateMix
         gx = look.dx * 0.4;
         gy = look.dy * 0.4;
         final beat = still ? 0.0 : math.sin(2 * math.pi * t * 3.1).abs();
-        sy = 1 + 0.045 * beat;
-        sx = 1 - 0.02 * beat;
+        sy = 1 + 0.035 * beat;
+        sx = 1 - 0.015 * beat;
+        blush = 0.4;
       case BotMood.happy:
         arc = 1;
+        blush = 0.75;
         lift = still || since > 1.4 ? 0 : -0.1 * math.sin(math.pi * (since * 2.2 % 1)).abs();
         sy = 1 + (lift < 0 ? 0.03 : 0.018 * breath);
       case BotMood.confused:
@@ -244,8 +261,9 @@ class _BotAvatarState extends State<BotAvatar> with SingleTickerProviderStateMix
         sy = 1 + 0.04 * slow;
         sx = 1 - 0.015 * slow;
         dream = 1;
+        blush = 0.3;
       case BotMood.notify:
-        eyeH = 0.38;
+        eyeH = 0.31;
         badge = 1;
         final hop = still ? 0.0 : (t % 2.6 < 0.5 ? math.sin(math.pi * (t % 2.6) / 0.5) : 0.0);
         lift = -0.08 * hop;
@@ -271,13 +289,14 @@ class _BotAvatarState extends State<BotAvatar> with SingleTickerProviderStateMix
     p.gazeY = to(p.gazeY, gy);
     p.arc = to(p.arc, arc);
     p.asym = to(p.asym, asym);
+    p.blush = to(p.blush, blush);
     p.sx = to(p.sx, sx);
     p.sy = to(p.sy, sy);
     p.tilt = to(p.tilt, tilt);
     p.lift = to(p.lift, lift);
     p.badge = to(p.badge, badge);
     p.dream = to(p.dream, dream);
-    if (blink > 0) p.eyeH = p.eyeH + (0.045 - p.eyeH) * blink;
+    if (blink > 0) p.eyeH = p.eyeH + (0.035 - p.eyeH) * blink;
   }
 
   void _hover(PointerEvent e) {
@@ -290,10 +309,11 @@ class _BotAvatarState extends State<BotAvatar> with SingleTickerProviderStateMix
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final (body, accent) = botColors(cs, widget.color);
+    final pal = botPalette(cs, widget.color);
     Widget paint = CustomPaint(
       size: Size.square(widget.size),
-      painter: _BotPainter(_pose, _frame, body: body, accent: accent, ring: cs.surfaceContainerLow),
+      painter: _BotPainter(_pose, _frame,
+          body: pal.body, ink: pal.ink, blush: pal.blush, accent: cs.tertiary, ring: cs.surfaceContainerLow, shadow: cs.shadow),
     );
     if (widget.followPointer && widget.animate) {
       // The hover area reaches past the body so the eyes turn as the pointer nears.
@@ -309,14 +329,27 @@ class _BotAvatarState extends State<BotAvatar> with SingleTickerProviderStateMix
 }
 
 class _BotPainter extends CustomPainter {
-  _BotPainter(this.p, Listenable frame, {required this.body, required this.accent, required this.ring}) : super(repaint: frame);
+  _BotPainter(this.p, Listenable frame,
+      {required this.body, required this.ink, required this.blush, required this.accent, required this.ring, required this.shadow})
+      : super(repaint: frame);
   final _Pose p;
-  final Color body, accent, ring;
+  final Color body, ink, blush, accent, ring, shadow;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final r = size.shortestSide / 2 * 0.8;
-    final c = size.center(Offset.zero);
+    final r = size.shortestSide / 2 * 0.76;
+    final c = size.center(Offset.zero).translate(0, -r * 0.04);
+    final fine = size.shortestSide >= 44; // details that only read at larger sizes
+
+    // Contact shadow: tighter and darker when the body is down, fainter as it lifts.
+    final up = (-p.lift).clamp(0.0, 0.2) / 0.2;
+    canvas.drawOval(
+      Rect.fromCenter(center: c + Offset(0, r * 1.02), width: r * 1.25 * (1 - 0.25 * up) * p.sx, height: r * 0.16 * (1 - 0.3 * up)),
+      Paint()
+        ..color = shadow.withValues(alpha: 0.16 * (1 - 0.5 * up))
+        ..maskFilter = MaskFilter.blur(BlurStyle.normal, math.max(1, r * 0.06)),
+    );
+
     canvas.save();
     canvas.translate(c.dx, c.dy + p.lift * r);
     canvas.rotate(p.tilt);
@@ -326,54 +359,84 @@ class _BotPainter extends CustomPainter {
     canvas.translate(0, -r);
 
     final box = Rect.fromCircle(center: Offset.zero, radius: r);
-    canvas.saveLayer(box.inflate(r * 0.3), Paint());
-    canvas.drawPath(shapePath(p.radii, box), Paint()..color = body);
+    final path = shapePath(p.radii, box);
+    // Matte body: a soft light from the upper left, a little depth toward the base.
+    canvas.drawPath(
+      path,
+      Paint()
+        ..shader = RadialGradient(
+          center: const Alignment(-0.4, -0.55),
+          radius: 1.15,
+          colors: [Color.lerp(body, Colors.white, 0.22)!, body, Color.lerp(body, Colors.black, 0.07)!],
+          stops: const [0, 0.55, 1],
+        ).createShader(box),
+    );
 
-    // Eyes are holes: whatever is behind the mascot shows through.
-    final hole = Paint()..blendMode = BlendMode.clear;
-    final y = (_eyeLine(p.shape) + p.gazeY * 0.1) * r;
-    final dx = 0.27 * r;
+    final y = (_eyeLine(p.shape) + p.gazeY * 0.08) * r;
+    final dx = 0.25 * r;
+
+    // Blush under the eyes.
+    if (p.blush > 0.02) {
+      final bp = Paint()
+        ..color = blush.withValues(alpha: 0.55 * p.blush.clamp(0.0, 1.0))
+        ..maskFilter = MaskFilter.blur(BlurStyle.normal, math.max(0.6, r * 0.035));
+      for (final side in const [-1, 1]) {
+        canvas.drawOval(Rect.fromCenter(center: Offset(side * r * 0.47 + p.gazeX * 0.05 * r, y + r * 0.2), width: r * 0.2, height: r * 0.1), bp);
+      }
+    }
+
+    final inkPaint = Paint()..color = ink;
     for (final side in const [-1, 1]) {
-      final ec = Offset(side * dx + p.gazeX * 0.11 * r, y);
+      final ec = Offset(side * dx + p.gazeX * 0.1 * r, y);
       final arc = p.arc.abs();
       if (arc < 0.5) {
         final grow = 1 + side * p.asym * 0.5;
         final w = p.eyeW * r * (1 + side * p.asym * 0.15);
-        final h = math.max(w * 0.3, p.eyeH * r * grow * (1 - arc * 2));
-        canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromCenter(center: ec, width: w, height: h), Radius.circular(math.min(w, h) / 2)), hole);
+        final h = math.max(w * 0.32, p.eyeH * r * grow * (1 - arc * 2));
+        final eye = RRect.fromRectAndRadius(Rect.fromCenter(center: ec, width: w, height: h), Radius.circular(math.min(w, h) / 2));
+        canvas.drawRRect(eye, inkPaint);
+        // Catchlight, offset toward the light, only while the eye is open.
+        if (fine && h > w * 1.3) {
+          canvas.drawCircle(
+            ec + Offset(-w * 0.18, -h * 0.24),
+            w * 0.2,
+            Paint()..color = Colors.white.withValues(alpha: 0.85 * ((h / w - 1.3) / 0.5).clamp(0.0, 1.0)),
+          );
+        }
       } else {
-        // Happy (∩) or sleeping (∪) eyes.
+        // Smiling (∩) or sleeping (∪) eyes as soft ink strokes.
         final k = (arc - 0.5) * 2;
-        final w = p.eyeW * r * 1.9;
+        final w = p.eyeW * r * 2;
         final stroke = Paint()
-          ..blendMode = BlendMode.clear
+          ..color = ink
           ..style = PaintingStyle.stroke
           ..strokeCap = StrokeCap.round
-          ..strokeWidth = p.eyeW * r * 0.62 * k;
-        final rect = Rect.fromCenter(center: ec + Offset(0, p.arc > 0 ? w * 0.18 : -w * 0.18), width: w, height: w * 0.9);
-        canvas.drawArc(rect, p.arc > 0 ? math.pi * 1.1 : math.pi * 0.1, math.pi * 0.8, false, stroke);
+          ..strokeWidth = p.eyeW * r * 0.58 * k;
+        final rect = Rect.fromCenter(center: ec + Offset(0, p.arc > 0 ? w * 0.2 : -w * 0.2), width: w, height: w * 0.8);
+        canvas.drawArc(rect, p.arc > 0 ? math.pi * 1.12 : math.pi * 0.12, math.pi * 0.76, false, stroke);
       }
     }
-    canvas.restore();
 
     if (p.badge > 0.02) {
-      final at = Offset(r * 0.72, -r * 0.72);
-      final pulse = 1 + 0.12 * math.sin(p.time * 5);
-      canvas.drawCircle(at, r * 0.2 * p.badge * pulse + 2, Paint()..color = ring);
-      canvas.drawCircle(at, r * 0.2 * p.badge * pulse, Paint()..color = accent);
+      final at = Offset(r * 0.74, -r * 0.7);
+      final pulse = 1 + 0.08 * math.sin(p.time * 4);
+      final rad = r * 0.17 * p.badge * pulse;
+      canvas.drawCircle(at, rad + math.max(1.5, r * 0.06), Paint()..color = ring);
+      canvas.drawCircle(at, rad, Paint()..color = accent);
     }
     canvas.restore();
 
     if (p.dream > 0.02) {
-      // Three dots drift up and away from the sleeping head.
+      // Three small dots drift up and away from the sleeping head.
       for (var i = 0; i < 3; i++) {
-        final ph = (p.time / 2.4 + i / 3) % 1;
-        final o = c + Offset(r * (0.55 + ph * 0.5), -r * (0.6 + ph * 0.7));
-        canvas.drawCircle(o, r * (0.06 + 0.05 * ph), Paint()..color = accent.withValues(alpha: p.dream * (1 - ph) * 0.9));
+        final ph = (p.time / 2.8 + i / 3) % 1;
+        final o = c + Offset(r * (0.55 + ph * 0.45), -r * (0.62 + ph * 0.6));
+        canvas.drawCircle(o, r * (0.045 + 0.04 * ph), Paint()..color = ink.withValues(alpha: p.dream * (1 - ph) * 0.45));
       }
     }
   }
 
   @override
-  bool shouldRepaint(_BotPainter o) => o.body != body || o.accent != accent || o.ring != ring || o.p != p;
+  bool shouldRepaint(_BotPainter o) =>
+      o.body != body || o.ink != ink || o.blush != blush || o.accent != accent || o.ring != ring || o.shadow != shadow || o.p != p;
 }

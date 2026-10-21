@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, rm, stat } from "node:fs/promises";
+import { mkdtemp, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -27,12 +27,15 @@ test("identity, kinds and marks persist privately", async () => {
 	const { bot, dir, done } = await fresh();
 	try {
 		await bot.update({ name: "阿布", memory: { learn_from_courses: true } });
+		await writeFile(join(dir, "bot", "bot.json"), JSON.stringify({ ...bot.state, shape: "cookie" }));
+		await bot.update({});
 		await bot.setSession("s-bot");
 		await bot.setKind("s-course", { kind: "course", course_id: 42 });
 		await bot.setMarks({ "s-bot": 3 });
 		const again = new Bot(dir);
 		await again.load();
 		assert.equal(again.identity().name, "阿布");
+		assert.equal(again.identity().shape, "pebble");
 		assert.deepEqual(again.identity().memory, { auto: true, learn_from_courses: true });
 		assert.deepEqual(again.kindOf("s-bot"), { kind: "bot" });
 		assert.deepEqual(again.kindOf("s-course"), { kind: "course", course_id: "42" });

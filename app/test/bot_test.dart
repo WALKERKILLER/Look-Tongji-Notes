@@ -15,11 +15,19 @@ Widget _host(Widget child, {bool reduceMotion = false}) => MaterialApp(
     );
 
 void main() {
-  test('every bot shape resamples to the shared profile', () {
+  test('every bot shape is a smooth profile without lobes or creases', () {
     for (final e in kBotShapes.values) {
       final r = shapeRadii(e.$1);
       expect(r.length, kShapeSamples);
-      expect(r.every((v) => v > 0.3 && v <= 1.0), isTrue, reason: '${e.$1}');
+      expect(r.every((v) => v > 0.5 && v <= 1.0), isTrue, reason: '${e.$1}');
+      // The second difference spikes at a crease and ripples on scalloped
+      // outlines (the retired cloud reached 0.17, the cookie 0.006).
+      var bend = 0.0;
+      for (var i = 0; i < r.length; i++) {
+        final d = (r[(i + 1) % r.length] - 2 * r[i] + r[(i - 1 + r.length) % r.length]).abs();
+        if (d > bend) bend = d;
+      }
+      expect(bend, lessThan(0.003), reason: '${e.$1}');
     }
   });
 
@@ -43,12 +51,18 @@ void main() {
     await tester.pumpWidget(const SizedBox());
   });
 
-  test('bot colours are tonal pairs of the seed palette', () {
-    final cs = ColorScheme.fromSeed(seedColor: Colors.blue);
-    expect(botColors(cs, 'theme'), (cs.primary, cs.tertiary));
-    final (body, accent) = botColors(cs, 'teal');
-    expect(body, isNot(cs.primary));
-    expect(accent, isNot(body));
+  test('bot colours come from fixed roles: the same bot in light and dark', () {
+    final light = ColorScheme.fromSeed(seedColor: Colors.blue);
+    final dark = ColorScheme.fromSeed(seedColor: Colors.blue, brightness: Brightness.dark);
+    expect(botPalette(light, 'theme').body, light.primaryFixedDim);
+    for (final k in kBotColorKeys) {
+      final a = botPalette(light, k), b = botPalette(dark, k);
+      expect(a.body, b.body, reason: k);
+      // Eyes stay legible on the body (WCAG contrast of at least 4.5:1).
+      final l1 = a.body.computeLuminance(), l2 = a.ink.computeLuminance();
+      expect((l1 + 0.05) / (l2 + 0.05), greaterThan(4.5), reason: k);
+    }
+    expect(botPalette(light, 'teal').body, isNot(botPalette(light, 'rose').body));
     expect(kBotColorKeys.length, kSeedPalette.length + 1);
     expect(botColorLabel('teal'), kSeedPalette[1].$1);
   });

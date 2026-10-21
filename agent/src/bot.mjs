@@ -8,7 +8,7 @@ import { randomBytes } from "node:crypto";
 import { chmod, mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-export const SHAPES = ["circle", "pebble", "squircle", "capsule", "cookie", "cloud", "droplet", "ghost"];
+export const SHAPES = ["pebble", "mochi", "bean", "circle", "squircle", "capsule", "droplet", "ghost"];
 // Keys of the app's seed palette (kSeedPalette in app/lib/theme/prefs.dart), in order.
 export const COLORS = ["theme", "blue", "teal", "green", "amber", "red", "rose", "violet", "graphite"];
 export const KINDS = ["bot", "course", "chat", "task"];
@@ -104,6 +104,8 @@ export class Bot {
 		await chmod(this.dir, 0o700).catch(() => {});
 		const saved = await readJSON(this.file, {});
 		this.state = { ...structuredClone(DEFAULT_BOT), ...saved, memory: { ...DEFAULT_BOT.memory, ...(saved.memory ?? {}) }, marks: saved.marks ?? {} };
+		// Shapes retired from the set fall back to the default body.
+		if (!SHAPES.includes(this.state.shape)) this.state.shape = DEFAULT_BOT.shape;
 		this.meta = await readJSON(this.metaFile, {});
 		this.proposals = await readJSON(this.proposalsFile, []);
 	}

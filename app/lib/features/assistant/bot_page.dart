@@ -193,7 +193,7 @@ class _BotPageState extends State<BotPage> {
                       },
                 icon: a.consolidating
                     ? const SizedBox.square(dimension: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                    : const Icon(Icons.auto_awesome_outlined, size: 18),
+                    : const Icon(Icons.bedtime_outlined, size: 18),
                 label: Text(a.consolidating ? '正在沉淀' : '立即沉淀'),
               ),
             ]),
@@ -449,7 +449,7 @@ class _RunTile extends StatelessWidget {
     final changes = [for (final c in (run['changes'] as List?) ?? const []) (c as Map).cast<String, dynamic>()];
     final at = DateTime.fromMillisecondsSinceEpoch(((run['at'] as num?) ?? 0).toInt());
     final (title, icon, color) = switch (status) {
-      'ok' => ('整理了 ${changes.length} 处', Icons.auto_awesome_rounded, cs.primary),
+      'ok' => ('整理了 ${changes.length} 处', Icons.task_alt_rounded, cs.primary),
       'error' => ('没有完成', Icons.error_outline_rounded, cs.error),
       _ => ('没有需要记的', Icons.check_rounded, cs.onSurfaceVariant),
     };

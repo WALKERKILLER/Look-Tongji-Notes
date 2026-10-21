@@ -17,7 +17,7 @@ const kUsagePurposes = <String, (String, IconData)>{
   'test': ('连接测试', Icons.network_check_rounded),
   'task': ('定时任务', Icons.schedule_rounded),
   'quiz': ('出题', Icons.quiz_outlined),
-  'memory': ('记忆沉淀', Icons.auto_awesome_outlined),
+  'memory': ('记忆沉淀', Icons.bedtime_outlined),
 };
 
 String purposeLabel(String p) => kUsagePurposes[p]?.$1 ?? p;
