@@ -343,11 +343,12 @@ class _LibraryPageState extends State<LibraryPage> {
                       style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant, height: 1.6)),
                   const SizedBox(height: Space.lg),
                   Wrap(spacing: Space.sm, runSpacing: Space.sm, children: [
-                    FilledButton.tonalIcon(
-                      onPressed: _lib == null ? null : () => openPath('${_lib!['root']}'),
-                      icon: const Icon(Icons.folder_open_outlined),
-                      label: const Text('打开文件夹'),
-                    ),
+                    if (canOpenFolders)
+                      FilledButton.tonalIcon(
+                        onPressed: _lib == null ? null : () => openPath('${_lib!['root']}'),
+                        icon: const Icon(Icons.folder_open_outlined),
+                        label: const Text('打开文件夹'),
+                      ),
                     OutlinedButton.icon(
                       onPressed: () async {
                         try {

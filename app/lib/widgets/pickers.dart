@@ -11,6 +11,9 @@ import 'package:path/path.dart' as p;
 /// Returns null when cancelled.
 Future<String?> pickDirectory(BuildContext context, {String? initial, String confirm = '选择', String title = '选择文件夹'}) async {
   final start = initial != null && initial.isNotEmpty && Directory(initial).existsSync() ? initial : null;
+  // Android's picker answers with content:// addresses, not paths lookd
+  // could use.
+  if (Platform.isAndroid) return _askPath(context, initial ?? '', confirm, title);
   try {
     return await getDirectoryPath(initialDirectory: start, confirmButtonText: confirm);
   } on UnimplementedError {

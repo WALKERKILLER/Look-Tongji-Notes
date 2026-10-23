@@ -10,6 +10,7 @@ import 'app.dart';
 import 'core/activity_tracker.dart';
 import 'core/app_state.dart';
 import 'core/deep_links.dart';
+import 'core/background_work.dart';
 import 'core/lookd_service.dart';
 import 'core/plugins.dart';
 import 'core/profile.dart';
@@ -40,6 +41,7 @@ Future<void> main() async {
   final app = AppState(daemon);
   unawaited(app.init());
   ActivityTracker.instance = ActivityTracker(app);
+  if (Platform.isAndroid) BackgroundWork(app);
   final screen = ScreenContext();
   final players = PlayerHub();
 

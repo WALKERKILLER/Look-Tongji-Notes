@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/android_bridge.dart';
 import '../../core/api.dart';
 import '../../core/app_state.dart';
 import '../../core/format.dart';
@@ -77,7 +78,11 @@ class _DataSettingsState extends State<DataSettings> {
   Future<void> _export() async {
     final now = DateTime.now();
     final name = 'LookStudio-备份-${now.year}${'${now.month}'.padLeft(2, '0')}${'${now.day}'.padLeft(2, '0')}.zip';
-    final path = await pickSavePath(context, suggestedName: name, type: _backupType, confirm: '导出');
+    // Android saves through the system's document screen after the export.
+    final android = Platform.isAndroid;
+    final path = android
+        ? '${(await AndroidBridge.info())['cacheDir']}/$name'
+        : await pickSavePath(context, suggestedName: name, type: _backupType, confirm: '导出');
     if (path == null || !mounted) return;
     final e = _estimate ?? {};
     setState(() {
@@ -89,6 +94,12 @@ class _DataSettingsState extends State<DataSettings> {
       await context.read<AppState>().api.download('/api/data/export', {if (_media) 'media': '1'}, File(path),
           onProgress: (n) => mounted ? setState(() => _done = n) : null);
       if (!mounted) return;
+      if (android) {
+        final saved = await AndroidBridge.saveAs(path, name: name, mime: 'application/zip');
+        await File(path).delete().catchError((_) => File(path));
+        if (mounted) showSnack(context, saved ? '备份已保存（${fmtBytes(_done)}）' : '没有保存备份');
+        return;
+      }
       showSnack(context, '备份已保存（${fmtBytes(_done)}）', action: '在文件夹中显示', onAction: () => revealPath(path));
     } catch (err) {
       if (mounted) showSnack(context, '导出失败：$err');
@@ -149,8 +160,8 @@ class _DataSettingsState extends State<DataSettings> {
       showSnack(
         context,
         r['written'] == 0 ? '没有需要恢复的文件，本机已是最新' : '已恢复 ${r['written']} 个文件（${fmtBytes(r['bytes'] as num? ?? 0)}）',
-        action: conflict.isEmpty ? null : '查看被替换的文件',
-        onAction: conflict.isEmpty ? null : () => revealPath(conflict),
+        action: conflict.isEmpty || !canOpenFolders ? null : '查看被替换的文件',
+        onAction: conflict.isEmpty || !canOpenFolders ? null : () => revealPath(conflict),
       );
       unawaited(_load());
     } catch (e) {
@@ -377,7 +388,7 @@ class _StorageGroup extends StatelessWidget {
             child: Text('课程库', style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
           ),
         ),
-        if (root.isNotEmpty) IconButton(tooltip: '在文件管理器中打开', onPressed: () => openPath(root), icon: const Icon(Icons.folder_open_rounded)),
+        if (root.isNotEmpty && canOpenFolders) IconButton(tooltip: '在文件管理器中打开', onPressed: () => openPath(root), icon: const Icon(Icons.folder_open_rounded)),
       ]),
       const SizedBox(height: Space.md),
       if (total > 0) _Bar(parts: [for (final c in cats) (bytes(c['bytes']) / total, _color(cs, '${c['key']}'))]),

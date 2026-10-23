@@ -33,6 +33,7 @@ import (
 	"lookstudio/lookd/internal/mineru"
 	"lookstudio/lookd/internal/notify"
 	"lookstudio/lookd/internal/notion"
+	"lookstudio/lookd/internal/rootfs"
 	"lookstudio/lookd/internal/server"
 	"lookstudio/lookd/internal/store"
 	"lookstudio/lookd/internal/tongji"
@@ -51,7 +52,58 @@ func defaultLibrary() string {
 	return filepath.Join(home, "LookStudio")
 }
 
+// unpack is how the Android app installs its Linux workspace:
+// lookd unpack <archive.tar.gz> <dir> [sha256]. It prints "PROGRESS <bytes>"
+// lines and runs without the guest, straight from the app's library folder.
+func unpack(args []string) {
+	if len(args) < 2 {
+		fmt.Fprintln(os.Stderr, "usage: lookd unpack <archive.tar.gz> <dir> [sha256]")
+		os.Exit(2)
+	}
+	f, err := os.Open(args[0])
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	defer f.Close()
+	want := ""
+	if len(args) > 2 {
+		want = args[2]
+	}
+	var last int64
+	err = rootfs.Unpack(f, args[1], want, func(n int64) {
+		if n-last >= 1<<20 {
+			last = n
+			fmt.Printf("PROGRESS %d\n", n)
+		}
+	})
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	fmt.Println("DONE")
+}
+
+// prune is how release packaging slims the bundled agent:
+// lookd prune <node_modules>... deletes declarations and source maps
+// with the same rule as the in-app runtime setup.
+func prune(dirs []string) {
+	var freed int64
+	for _, d := range dirs {
+		freed += agentenv.PruneModules(d)
+	}
+	fmt.Printf("freed %d MB\n", freed>>20)
+}
+
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "unpack" {
+		unpack(os.Args[2:])
+		return
+	}
+	if len(os.Args) > 1 && os.Args[1] == "prune" {
+		prune(os.Args[2:])
+		return
+	}
 	dataDir := flag.String("data", defaultDataDir(), "private state (session, keys, agent config)")
 	libRoot := flag.String("library", "", "library root (courses, notes, library.db)")
 	addr := flag.String("addr", "127.0.0.1:0", "listen address")

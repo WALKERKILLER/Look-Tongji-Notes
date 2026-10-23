@@ -114,6 +114,15 @@ class AppState extends ChangeNotifier {
     _events.add(e);
   }
 
+  /// Reads lookd's health again, e.g. after installing ffmpeg.
+  Future<void> refreshHealth() async {
+    if (!connected) return;
+    try {
+      health = (await api.get('/api/health') as Map).cast<String, dynamic>();
+      notifyListeners();
+    } catch (_) {}
+  }
+
   Future<void> loadCourses({bool sync = false, bool quiet = false}) async {
     if (!connected) return;
     if (!quiet) {

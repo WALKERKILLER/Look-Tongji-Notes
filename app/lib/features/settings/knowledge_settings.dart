@@ -95,7 +95,7 @@ class _KnowledgeSettingsState extends State<KnowledgeSettings> {
           contentPadding: EdgeInsets.zero,
           title: const Text('位置'),
           subtitle: Text(daemon.libraryRoot),
-          trailing: IconButton(tooltip: '打开', onPressed: () => openPath(daemon.libraryRoot), icon: const Icon(Icons.open_in_new_rounded)),
+          trailing: canOpenFolders ? IconButton(tooltip: '打开', onPressed: () => openPath(daemon.libraryRoot), icon: const Icon(Icons.open_in_new_rounded)) : null,
         ),
         const SizedBox(height: Space.sm),
         Text('文件夹命名模板', style: tt.titleSmall),

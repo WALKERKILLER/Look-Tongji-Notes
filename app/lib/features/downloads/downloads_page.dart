@@ -411,11 +411,12 @@ class _LocalViewState extends State<_LocalView> {
                             ),
                             MenuAnchor(
                               menuChildren: [
-                                MenuItemButton(
-                                  leadingIcon: const Icon(Icons.folder_open_outlined),
-                                  onPressed: () => revealLecture(context, entry.key),
-                                  child: const Text('在文件夹中显示'),
-                                ),
+                                if (canOpenFolders)
+                                  MenuItemButton(
+                                    leadingIcon: const Icon(Icons.folder_open_outlined),
+                                    onPressed: () => revealLecture(context, entry.key),
+                                    child: const Text('在文件夹中显示'),
+                                  ),
                                 MenuItemButton(
                                   leadingIcon: Icon(Icons.delete_forever_outlined, color: cs.error),
                                   onPressed: () => _delete(entry.key, [for (final x in list) x.kind],
@@ -574,7 +575,7 @@ class _JobTile extends StatelessWidget {
             if (job.state == 'paused')
               IconButton(tooltip: '继续', onPressed: () => app.jobAction(job.id, 'resume'), icon: const Icon(Icons.play_arrow_rounded)),
             if (failed) IconButton(tooltip: '重试', onPressed: () => app.jobAction(job.id, 'retry'), icon: const Icon(Icons.refresh_rounded)),
-            if (done) IconButton(tooltip: '在文件夹中显示', onPressed: () => revealLecture(context, job.lectureId), icon: const Icon(Icons.folder_open_outlined)),
+            if (done && canOpenFolders) IconButton(tooltip: '在文件夹中显示', onPressed: () => revealLecture(context, job.lectureId), icon: const Icon(Icons.folder_open_outlined)),
             if (job.active || job.state == 'paused')
               IconButton(tooltip: '取消', onPressed: () => app.jobAction(job.id, 'cancel'), icon: const Icon(Icons.close_rounded))
             else

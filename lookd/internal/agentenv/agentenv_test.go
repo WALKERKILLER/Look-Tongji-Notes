@@ -234,3 +234,50 @@ func TestDependencyInstallTimesOut(t *testing.T) {
 		t.Fatalf("install: %+v", in)
 	}
 }
+
+func TestPruneKeepsCode(t *testing.T) {
+	dir := t.TempDir()
+	files := map[string]bool{ // path → kept
+		"openai/index.js":              true,
+		"openai/index.d.ts":            false,
+		"openai/index.d.mts":           false,
+		"openai/index.js.map":          false,
+		"typebox/build/type.d.cts":     false,
+		"typebox/build/type.mjs":       true,
+		"pi/docs/extensions.md":        true,
+		"pi/dist/main.d.ts.map":        false,
+		"es-map/map":                   true,
+		"source-map/lib/mappings.wasm": true,
+	}
+	for p := range files {
+		writeTest(t, filepath.Join(dir, p), "x")
+	}
+	if n := PruneModules(dir); n != 5 {
+		t.Fatalf("freed %d bytes, want 5", n)
+	}
+	for p, kept := range files {
+		if _, err := os.Stat(filepath.Join(dir, p)); (err == nil) != kept {
+			t.Errorf("%s: kept=%v, want %v", p, err == nil, kept)
+		}
+	}
+
+	node := t.TempDir()
+	writeTest(t, filepath.Join(node, "include/node/v8.h"), "hhhh")
+	writeTest(t, filepath.Join(node, "bin/node"), "n")
+	if n := PruneNode(node); n != 4 {
+		t.Fatalf("freed %d bytes from node, want 4", n)
+	}
+	if _, err := os.Stat(filepath.Join(node, "bin/node")); err != nil {
+		t.Fatal("removed the node binary")
+	}
+}
+
+func writeTest(t *testing.T, p, s string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(p, []byte(s), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}

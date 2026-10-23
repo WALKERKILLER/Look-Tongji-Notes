@@ -7,6 +7,7 @@ import 'core/deep_links.dart';
 import 'core/lookd_service.dart';
 import 'features/assistant/tasks_page.dart';
 import 'features/login/login_page.dart';
+import 'features/setup/workspace_setup_page.dart';
 import 'shell.dart';
 import 'theme/prefs.dart';
 import 'theme/theme.dart';
@@ -62,7 +63,9 @@ class RootGate extends StatelessWidget {
     final daemon = context.watch<LookdService>();
     final app = context.watch<AppState>();
     Widget child;
-    if (daemon.state == DaemonState.failed) {
+    if (daemon.state == DaemonState.setup) {
+      child = const WorkspaceSetupPage(key: ValueKey('setup'));
+    } else if (daemon.state == DaemonState.failed) {
       child = Scaffold(
         key: const ValueKey('failed'),
         body: EmptyState(
