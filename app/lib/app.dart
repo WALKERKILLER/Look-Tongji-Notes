@@ -4,12 +4,17 @@ import 'package:provider/provider.dart';
 
 import 'core/app_state.dart';
 import 'core/lookd_service.dart';
+import 'features/assistant/tasks_page.dart';
 import 'features/login/login_page.dart';
 import 'shell.dart';
 import 'theme/prefs.dart';
 import 'theme/theme.dart';
 import 'theme/tokens.dart';
 import 'widgets/states.dart';
+
+/// App-wide snackbars and navigation for events that arrive on any screen.
+final rootMessenger = GlobalKey<ScaffoldMessengerState>();
+final rootNavigator = GlobalKey<NavigatorState>();
 
 class LookApp extends StatelessWidget {
   const LookApp({super.key});
@@ -24,6 +29,8 @@ class LookApp extends StatelessWidget {
       return MaterialApp(
         title: 'Look Studio',
         debugShowCheckedModeBanner: false,
+        scaffoldMessengerKey: rootMessenger,
+        navigatorKey: rootNavigator,
         theme: lightTheme,
         darkTheme: darkTheme,
         themeMode: prefs.themeMode,
@@ -36,7 +43,7 @@ class LookApp extends StatelessWidget {
               textScaler: TextScaler.linear(prefs.textScale),
               disableAnimations: prefs.reduceMotion || mq.disableAnimations,
             ),
-            child: child!,
+            child: TaskRunListener(messenger: rootMessenger, navigator: rootNavigator, child: child!),
           );
         },
         home: const RootGate(),
