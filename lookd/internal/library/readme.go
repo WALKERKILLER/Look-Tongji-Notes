@@ -61,6 +61,12 @@ library.db                      SQLite 索引（WAL 模式）
 
 示例：` + "`sqlite3 library.db \"SELECT l.title, g.start_ms/1000 AS sec, g.text FROM segments_fts f JOIN segments g ON g.rowid=f.rowid JOIN lectures l ON l.id=g.lecture_id WHERE segments_fts MATCH '板块构造' LIMIT 10\"`" + `
 
+## 导出到 Obsidian
+
+设置 → 存储 → Obsidian 会把课程库导出到 Obsidian 仓库的子文件夹（默认 ` + "`LookStudio/`" + `）：一个总的“课程库.md”，每门课一个文件夹，里面分“笔记”（按节次分文件夹，含笔记引用的 PPT/课件附件）和“转写稿”。
+链接改为相对路径的标准 Markdown，时间戳改为 ` + "`lookstudio://lecture/<课次id>?t=<秒>`" + `（点击后由 Look Studio 打开）。
+在 Obsidian 里改过的文件不会被覆盖，新版本另存为“(Look Studio)”副本。
+
 ## 与 Look Tongji Notes skill 互通
 
 设置 → 存储 → “导出到 skill 工作区” 会生成 ` + "`raw/<课程>/<节次>/原始数据/`" + ` 结构（硬链接，不重复占用空间），

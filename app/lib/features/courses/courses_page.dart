@@ -5,6 +5,7 @@ import '../../core/app_state.dart';
 import '../../core/models.dart';
 import '../../theme/prefs.dart';
 import '../../theme/tokens.dart';
+import '../../widgets/horizontal_scroller.dart';
 import '../../widgets/states.dart';
 import 'course_card.dart';
 import 'course_page.dart';
@@ -81,7 +82,8 @@ class _CoursesPageState extends State<CoursesPage> {
                   backgroundColor: WidgetStatePropertyAll(cs.surfaceContainerHigh),
                 ),
                 const SizedBox(height: Space.md),
-                SingleChildScrollView(
+                HorizontalScroller(fade: true, builder: (c) => SingleChildScrollView(
+                  controller: c,
                   scrollDirection: Axis.horizontal,
                   child: Row(children: [
                     for (final t in terms) ...[
@@ -102,7 +104,7 @@ class _CoursesPageState extends State<CoursesPage> {
                       ),
                     ],
                   ]),
-                ),
+                )),
               ]),
             ),
           ),

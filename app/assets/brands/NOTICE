@@ -1,2 +1,7 @@
 mineru.png is the MinerU site icon (https://mineru.net), used only to label the
 MinerU integration. MinerU is a trademark of its respective owners.
+
+obsidian.svg and notion.svg are from @lobehub/icons-static-svg 1.95.1
+(https://github.com/lobehub/lobe-icons, MIT License, Copyright (c) 2023
+LobeHub). They are used only to label the Obsidian and Notion integrations.
+Obsidian and Notion are trademarks of their respective owners.

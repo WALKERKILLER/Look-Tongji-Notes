@@ -167,6 +167,25 @@ func (p *Pool) SetLocal(name, note string, eng Engine) {
 	p.signal()
 }
 
+// TakeLocal removes the local channel unless it is transcribing, and
+// reports whether the local models are now unused.
+func (p *Pool) TakeLocal() bool {
+	p.mu.Lock()
+	for i, c := range p.chans {
+		if c.id == LocalID {
+			if c.inflight > 0 {
+				p.mu.Unlock()
+				return false
+			}
+			p.chans = append(p.chans[:i:i], p.chans[i+1:]...)
+			break
+		}
+	}
+	p.mu.Unlock()
+	p.signal()
+	return true
+}
+
 func (p *Pool) signal() {
 	p.mu.Lock()
 	close(p.wake)

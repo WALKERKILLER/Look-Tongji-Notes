@@ -6,6 +6,7 @@ import '../../core/app_state.dart';
 import '../../core/format.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/charts.dart';
+import '../../widgets/horizontal_scroller.dart';
 import '../../widgets/states.dart';
 
 /// What each ledger `purpose` means to the user.
@@ -374,7 +375,8 @@ class _DailyTable extends StatelessWidget {
     final figs = Theme.of(context).textTheme.bodySmall?.copyWith(fontFeatures: const [FontFeature.tabularFigures()]);
     final rows = [for (var i = dates.length - 1; i >= 0; i--) i].where((i) => values[i].any((v) => v > 0)).toList();
     if (rows.isEmpty) return const Text('没有记录');
-    return SingleChildScrollView(
+    return HorizontalScroller(buttons: false, builder: (c) => SingleChildScrollView(
+      controller: c,
       scrollDirection: Axis.horizontal,
       child: DataTable(
         headingRowHeight: 36,
@@ -394,7 +396,7 @@ class _DailyTable extends StatelessWidget {
             ]),
         ],
       ),
-    );
+    ));
   }
 }
 

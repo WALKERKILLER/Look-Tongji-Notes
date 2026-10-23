@@ -13,6 +13,7 @@ import '../../core/profile.dart';
 import '../../shell.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/course_visuals.dart';
+import '../../widgets/horizontal_scroller.dart';
 import '../../widgets/organic_shapes.dart';
 import '../../widgets/states.dart';
 import '../../widgets/user_avatar.dart';
@@ -125,15 +126,20 @@ class _HomePageState extends State<HomePage> {
                 padding: EdgeInsets.symmetric(horizontal: pad - 4),
                 child: SizedBox(
                   height: 200,
-                  child: CarouselView(
+                  child: HorizontalScroller(
+                    carousel: true,
                     itemExtent: 280,
-                    shrinkExtent: 180,
-                    itemSnapping: true,
-                    backgroundColor: cs.surfaceContainer,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Corners.xl)),
-                    onTap: (i) => Navigator.of(context, rootNavigator: true)
-                        .push(MaterialPageRoute(builder: (_) => PlayerPage(lectureId: _recent[i].id))),
-                    children: [for (final l in _recent) _ContinueCard(lecture: l, course: app.course(l.courseId))],
+                    builder: (c) => CarouselView(
+                      controller: c as CarouselController,
+                      itemExtent: 280,
+                      shrinkExtent: 180,
+                      itemSnapping: true,
+                      backgroundColor: cs.surfaceContainer,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Corners.xl)),
+                      onTap: (i) => Navigator.of(context, rootNavigator: true)
+                          .push(MaterialPageRoute(builder: (_) => PlayerPage(lectureId: _recent[i].id))),
+                      children: [for (final l in _recent) _ContinueCard(lecture: l, course: app.course(l.courseId))],
+                    ),
                   ),
                 ),
               ),

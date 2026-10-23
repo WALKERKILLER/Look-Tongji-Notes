@@ -37,6 +37,9 @@ type Library struct {
 
 	// mirrorMu serializes mirrored writes, recovery and Reindex (mirror.go).
 	mirrorMu sync.Mutex
+
+	// exportMu keeps exports to the same vault from interleaving.
+	exportMu sync.Mutex
 }
 
 func Open(root string, st *store.Store) (*Library, error) {
@@ -440,6 +443,19 @@ func (l *Library) Reindex(ctx context.Context) (int, error) {
 		return 0, err
 	}
 	count := 0
+	// Notes that belong to no course live in the top-level notes/ folder.
+	filepath.WalkDir(l.Abs("notes"), func(p string, d os.DirEntry, err error) error {
+		if err != nil || d.IsDir() || !strings.HasSuffix(d.Name(), ".md") {
+			return nil
+		}
+		if n, ok := parseNote(p); ok {
+			n.Path = l.Rel(p)
+			if l.Store.PutNote(ctx, n) == nil {
+				count++
+			}
+		}
+		return nil
+	})
 	err := filepath.WalkDir(l.Abs("courses"), func(p string, d os.DirEntry, err error) error {
 		if err != nil || d.IsDir() {
 			return nil

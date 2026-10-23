@@ -6,6 +6,7 @@ import '../../core/format.dart';
 import '../../core/models.dart';
 import '../../shell.dart';
 import '../../theme/tokens.dart';
+import '../../widgets/horizontal_scroller.dart';
 import '../../widgets/states.dart';
 import '../player/player_page.dart';
 import '../plugins/plugin_views.dart';
@@ -385,7 +386,8 @@ class _EditorState extends State<_Editor> {
           onSubmitted: (_) => _save(),
         ),
         const SizedBox(height: Space.sm),
-        SingleChildScrollView(
+        HorizontalScroller(fade: true, builder: (c) => SingleChildScrollView(
+          controller: c,
           scrollDirection: Axis.horizontal,
           child: SegmentedButton<String>(
             showSelectedIcon: false,
@@ -396,7 +398,7 @@ class _EditorState extends State<_Editor> {
             selected: {_kind},
             onSelectionChanged: (s) => setState(() => _kind = s.first),
           ),
-        ),
+        )),
         const SizedBox(height: Space.lg),
         Wrap(spacing: Space.sm, runSpacing: Space.sm, children: [
           InputChip(

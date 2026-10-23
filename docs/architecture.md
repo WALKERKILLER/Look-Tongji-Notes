@@ -35,6 +35,8 @@ The app starts lookd ([lookd_service.dart](../app/lib/core/lookd_service.dart) s
 | `lookd/internal/fudan` | Fudan UIS sign-in and WebVPN addresses |
 | `lookd/internal/mineru` | MinerU courseware parsing client and sealed token |
 | `lookd/internal/library` | On-disk library layout, courseware search, schedule, timeline, README for AI tools |
+| `lookd/internal/portable` | Converts library Markdown (`look://` links, timestamps, math) to plain Markdown for exports |
+| `lookd/internal/notion` | Notion API client (pacing, retries) and the one-way sync of `library.KnowledgeDocs` with edit detection ([spec 0013](specs/0013-notion-sync.md), [decision 0011](decisions/0011-notion-sync-through-an-internal-integration.md)) |
 | `lookd/internal/store` | SQLite schema and FTS index ([schema.sql](../lookd/internal/store/schema.sql)); rebuildable from library files (schedule and activity via their JSON mirrors) |
 | `lookd/internal/events` | SSE event fan-out |
 | `lookd/internal/agent` | Supervises the Node agent host and proxies `/agent/*` |
@@ -65,6 +67,7 @@ The app starts lookd ([lookd_service.dart](../app/lib/core/lookd_service.dart) s
 - **Plugins**: a plugin is a package with a `lookStudio` manifest whose agent module is loaded as a Pi extension per conversation ([decision 0005](decisions/0005-plugins-as-pi-extensions-with-declarative-views.md), [spec 0004](specs/0004-plugin-platform.md)). Its tools reach the model through `find_tools` groups `plugin:<id>`; its results are data for views the app draws (`pluginViewBuilders` in [plugin_views.dart](../app/lib/features/plugins/plugin_views.dart)); its contributions appear through `PluginMenuButton` on the note toolbar, lecture side panel, course page and schedule items, and the composer's "+" menu.
 - **Bot and conversation kinds**: the agent host keeps one bot thread and course agents, told apart by `sessions-meta.json` ([decision 0006](decisions/0006-resident-bot-with-file-memory.md), [spec 0007](specs/0007-resident-bot-and-course-agents.md)). Bot memory lives in Markdown files the host injects into prompts; app operations come back as `details.app` (run by `BotOps` in [bot_ops.dart](../app/lib/features/assistant/bot_ops.dart)) or as proposals the host applies through `/agent/proposals/{id}/apply`.
 - **Library on disk**: layout owned by `lookd/internal/library`; `library.db` is an index over it, not the source of truth.
+- **`lookstudio://` deep links**: produced by `lookd/internal/portable` for exported Markdown; received by the app over the `look/links` method channel (Linux runner, Android `MainActivity`).
 - **Release package**: [release.yml](../.github/workflows/release.yml) places `lookd` and `agent/` next to the app executable, matching the discovery order above.
 
 ## Conventions

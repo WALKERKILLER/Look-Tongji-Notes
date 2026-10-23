@@ -6,8 +6,10 @@ import 'package:provider/provider.dart';
 import '../../core/api.dart';
 import '../../core/app_state.dart';
 import '../../core/format.dart';
+import '../../core/open_path.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/look_markdown.dart' show openPlainLink;
+import '../../widgets/pickers.dart';
 import '../../widgets/states.dart';
 import 'asr_bench.dart';
 
@@ -170,6 +172,31 @@ class _LocalAsrPageState extends State<LocalAsrPage> {
     if (ctx != null) Scrollable.ensureVisible(ctx, duration: Motion.medium2, curve: Motion.emphasized, alignment: 0.3);
   }
 
+  /// Picks a new folder for the engine and models; asks whether the
+  /// downloaded ones should move along. [dir] skips the picker (恢复默认).
+  Future<void> _relocate(_J loc, {String? dir}) async {
+    final current = '${loc['dir'] ?? ''}';
+    dir ??= await pickDirectory(context, initial: current, title: '模型存储位置');
+    if (dir == null || dir == current || !mounted) return;
+    var move = false;
+    final used = (loc['used'] as num?) ?? 0;
+    if (used > 0) {
+      final choice = await showDialog<bool>(
+        context: context,
+        builder: (c) => _MoveDialog(to: dir!, used: used),
+      );
+      if (choice == null) return;
+      move = choice;
+    }
+    try {
+      final st = _map(await _call('PUT', '/api/asr/local/location', {'dir': dir, 'move': move}));
+      if (mounted) setState(() => _st = {...?_st, 'status': st});
+      if (!move && mounted) showSnack(context, '之后下载的模型会保存到新位置');
+    } catch (e) {
+      if (mounted) showSnack(context, '$e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final st = _st;
@@ -239,6 +266,15 @@ class _LocalAsrPageState extends State<LocalAsrPage> {
                   ),
                 ),
               const SizedBox(height: Space.xl),
+              Text('存储位置', style: tt.titleMedium),
+              const SizedBox(height: Space.sm),
+              _Storage(
+                loc: _map(status['location']),
+                install: install,
+                onChange: () => _relocate(_map(status['location'])),
+                onReset: () => _relocate(_map(status['location']), dir: '${_map(status['location'])['default']}'),
+              ),
+              const SizedBox(height: Space.xl),
               Text('下载来源', style: tt.titleMedium),
               const SizedBox(height: Space.xs),
               Text(
@@ -269,6 +305,136 @@ class _LocalAsrPageState extends State<LocalAsrPage> {
   }
 }
 
+/// Where the engine and models are kept, with the space they use and what
+/// is left on that disk.
+class _Storage extends StatelessWidget {
+  const _Storage({required this.loc, required this.install, required this.onChange, required this.onReset});
+  final _J loc, install;
+  final VoidCallback onChange, onReset;
+
+  /// Below this, a model download may not fit.
+  static const _low = 2 << 30;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+    final dir = '${loc['dir'] ?? ''}';
+    final custom = loc['custom'] == true;
+    final used = (loc['used'] as num?) ?? 0;
+    final free = (loc['free'] as num?) ?? -1;
+    final running = install['state'] == 'running';
+    final moving = running && '${install['model'] ?? ''}'.isEmpty;
+    final moveFailed = install['state'] == 'failed' && '${install['model'] ?? ''}'.isEmpty;
+    final low = free >= 0 && free < _low;
+    return Card.outlined(
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.all(Space.lg),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(color: cs.secondaryContainer, borderRadius: Corners.all(Corners.lg)),
+              child: Icon(custom ? Icons.folder_special_outlined : Icons.folder_outlined, color: cs.onSecondaryContainer),
+            ),
+            const SizedBox(width: Space.lg),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(custom ? '自定义位置' : '默认位置', style: tt.labelLarge?.copyWith(color: cs.primary)),
+                const SizedBox(height: Space.xxs),
+                Tooltip(
+                  message: dir,
+                  waitDuration: const Duration(milliseconds: 600),
+                  child: Text(dir, style: tt.bodyLarge, maxLines: 2, overflow: TextOverflow.ellipsis),
+                ),
+                const SizedBox(height: Space.xs),
+                Text(
+                  [
+                    '已用 ${fmtBytes(used)}',
+                    if (free >= 0) '磁盘剩余 ${fmtBytes(free)}',
+                  ].join(' · '),
+                  style: tt.bodySmall?.copyWith(color: low ? cs.error : cs.onSurfaceVariant, fontFeatures: const [FontFeature.tabularFigures()]),
+                ),
+              ]),
+            ),
+          ]),
+          if (low && !moving) ...[
+            const SizedBox(height: Space.md),
+            Text('这块磁盘剩余空间不多，模型可能下载不完。可以换到空间更大的磁盘。', style: tt.bodySmall?.copyWith(color: cs.error)),
+          ],
+          if (moving) ...[
+            const SizedBox(height: Space.lg),
+            _Progress(p: install),
+          ],
+          if (moveFailed) ...[
+            const SizedBox(height: Space.md),
+            Text('${install['error']}', style: tt.bodySmall?.copyWith(color: cs.error)),
+          ],
+          const SizedBox(height: Space.lg),
+          Wrap(spacing: Space.sm, runSpacing: Space.sm, children: [
+            FilledButton.tonalIcon(
+              onPressed: running ? null : onChange,
+              icon: const Icon(Icons.drive_file_move_outline, size: 18),
+              label: const Text('更改位置'),
+            ),
+            TextButton.icon(
+              onPressed: dir.isEmpty ? null : () => openPath(dir),
+              icon: const Icon(Icons.open_in_new_rounded, size: 18),
+              label: const Text('在文件管理器中打开'),
+            ),
+            if (custom) TextButton(onPressed: running ? null : onReset, child: const Text('恢复默认')),
+          ]),
+          if (running && !moving) ...[
+            const SizedBox(height: Space.xs),
+            Text('下载完成后才能更改位置', style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+          ],
+        ]),
+      ),
+    );
+  }
+}
+
+/// Asks whether downloaded models move to the new folder; pops true to
+/// move, false to only switch, null to cancel.
+class _MoveDialog extends StatelessWidget {
+  const _MoveDialog({required this.to, required this.used});
+  final String to;
+  final num used;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+    return AlertDialog(
+      icon: const Icon(Icons.drive_file_move_outline),
+      title: const Text('把已下载的模型一起移过去？'),
+      content: SizedBox(
+        width: 440,
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: Space.md, vertical: Space.sm),
+            decoration: BoxDecoration(color: cs.surfaceContainerHighest, borderRadius: Corners.all(Corners.md)),
+            child: Text(to, style: tt.bodyMedium),
+          ),
+          const SizedBox(height: Space.lg),
+          Text('移动：${fmtBytes(used)} 的引擎和模型会搬到新位置，旧位置随后清空。跨磁盘时需要复制一会儿，期间不能转写。',
+              style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
+          const SizedBox(height: Space.sm),
+          Text('只更改位置：旧文件留在原处，之后下载到新位置；新位置里已有的模型会直接可用。',
+              style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
+        ]),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('取消')),
+        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('只更改位置')),
+        FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('移动')),
+      ],
+    );
+  }
+}
+
 class _Hero extends StatelessWidget {
   const _Hero({required this.active, required this.install, required this.models});
   final _J? active;
@@ -281,7 +447,10 @@ class _Hero extends StatelessWidget {
     final tt = Theme.of(context).textTheme;
     final running = install['state'] == 'running';
     final name = running ? models.where((m) => m['id'] == install['model']).firstOrNull : null;
-    final (icon, title, body) = active != null
+    final moving = running && '${install['model'] ?? ''}'.isEmpty;
+    final (icon, title, body) = moving
+        ? (Icons.drive_file_move_outline, '正在移动模型', '移动完成前本地识别暂停，云端渠道照常转写。可以离开这个页面。')
+        : active != null
         ? (Icons.offline_bolt_rounded, '正在使用 ${active!['name']}', '转写会交给本机模型，不受限流和额度影响；开着的云端渠道也会并行分担一部分。想让音频完全不离开电脑，在“设置 → 转写”里关掉云端渠道。')
         : running
         ? (Icons.downloading_rounded, '正在下载 ${name?['name'] ?? '模型'}', '下载完成后会自动启用。可以离开这个页面，进度会在后台继续。')

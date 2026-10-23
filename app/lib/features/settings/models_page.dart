@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../core/api.dart';
 import '../../theme/tokens.dart';
+import '../../widgets/horizontal_scroller.dart';
 import '../../widgets/states.dart';
 import '../assistant/assistant_controller.dart';
 import 'add_provider_page.dart';
@@ -207,7 +208,8 @@ class _CurrentCardState extends State<_CurrentCard> {
           const SizedBox(height: Space.lg),
           Text('思考强度', style: tt.labelLarge?.copyWith(color: cs.onPrimaryContainer)),
           const SizedBox(height: Space.sm),
-          SingleChildScrollView(
+          HorizontalScroller(fade: true, builder: (c) => SingleChildScrollView(
+            controller: c,
             scrollDirection: Axis.horizontal,
             child: SegmentedButton<String>(
               showSelectedIcon: false,
@@ -215,7 +217,7 @@ class _CurrentCardState extends State<_CurrentCard> {
               selected: {a.thinking},
               onSelectionChanged: (s) => a.setPrefs({'thinking': s.first}),
             ),
-          ),
+          )),
         ],
         const SizedBox(height: Space.lg),
         TextField(

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'core/app_state.dart';
+import 'core/deep_links.dart';
 import 'core/lookd_service.dart';
 import 'features/assistant/tasks_page.dart';
 import 'features/login/login_page.dart';
@@ -14,7 +15,7 @@ import 'widgets/states.dart';
 
 /// App-wide snackbars and navigation for events that arrive on any screen.
 final rootMessenger = GlobalKey<ScaffoldMessengerState>();
-final rootNavigator = GlobalKey<NavigatorState>();
+final rootNavigator = rootNavigatorKey;
 
 class LookApp extends StatelessWidget {
   const LookApp({super.key});
@@ -77,6 +78,7 @@ class RootGate extends StatelessWidget {
       child = const LoginPage(key: ValueKey('login'));
     } else {
       child = const AppShell(key: ValueKey('shell'));
+      WidgetsBinding.instance.addPostFrameCallback((_) => DeepLinks.ready());
     }
     return AnimatedSwitcher(
       duration: Motion.long2,
