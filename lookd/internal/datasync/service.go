@@ -226,7 +226,7 @@ func (s *Service) client(rawURL, folder, user, pass string) (*Client, error) {
 }
 
 // Configure saves the WebDAV account after checking it can create the
-// sync folder.
+// sync folder and write and delete files in it.
 func (s *Service) Configure(ctx context.Context, in Settings) (Status, error) {
 	addr, folder, err := normalize(in.URL, in.Folder)
 	if err != nil {
@@ -247,6 +247,13 @@ func (s *Service) Configure(ctx context.Context, in Settings) (Status, error) {
 		return Status{}, err
 	}
 	if err := root.MkdirAll(ctx, folder); err != nil {
+		return Status{}, err
+	}
+	dir, err := s.client(addr, folder, strings.TrimSpace(in.User), pass)
+	if err != nil {
+		return Status{}, err
+	}
+	if err := dir.CheckWrite(ctx, "state/write-check"); err != nil {
 		return Status{}, err
 	}
 	sealed := ""

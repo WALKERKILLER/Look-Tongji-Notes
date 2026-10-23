@@ -812,6 +812,7 @@ async function consolidate(transcript) {
 const consolidator = new Consolidator(bot, { candidates: consolidationCandidates, run: consolidate, notify: botEvent });
 
 async function botView() {
+	await bot.fresh();
 	const runs = await bot.runs();
 	return { ...bot.identity(), consolidating: !!consolidator.running, last_run: runs[0] ?? null };
 }

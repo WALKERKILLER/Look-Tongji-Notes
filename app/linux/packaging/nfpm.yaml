@@ -1,4 +1,5 @@
 # deb, rpm and Arch packages from the staged bundle; see package.sh.
+# Contents with expand: true take their paths from package.sh's environment.
 name: look-studio
 arch: ${NFPM_ARCH}
 platform: linux
@@ -17,14 +18,17 @@ contents:
   - src: ${STAGE}/
     dst: /opt/look-studio/
     type: tree
+    expand: true
   - src: /opt/look-studio/look_studio
     dst: /usr/bin/look-studio
     type: symlink
   - src: ${PACKAGING}/cn.lookstudio.look_studio.desktop
     dst: /usr/share/applications/cn.lookstudio.look_studio.desktop
+    expand: true
   - src: ${ICONS}/
     dst: /usr/share/icons/hicolor/
     type: tree
+    expand: true
 
 overrides:
   deb:
@@ -45,7 +49,7 @@ overrides:
     depends:
       - gtk3
       - mpv
-    optdepends:
+    recommends: # written as optdepend
       - "ffmpeg: transcription"
       - "nodejs: the assistant"
 

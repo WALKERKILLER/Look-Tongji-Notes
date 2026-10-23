@@ -57,8 +57,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { arch: x64, runner: ubuntu-22.04 }
-          - { arch: arm64, runner: ubuntu-22.04-arm }
+          - { arch: x64, runner: ubuntu-22.04, flutter_channel: stable }
+          # Flutter publishes no Linux arm64 SDK archive; the master channel
+          # makes the action clone the repository and check out the version tag.
+          - { arch: arm64, runner: ubuntu-22.04-arm, flutter_channel: master }
     runs-on: ${{ matrix.runner }}
     env:
       VERSION: ${{ needs.prepare.outputs.version }}
@@ -80,7 +82,7 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
-          channel: stable
+          channel: ${{ matrix.flutter_channel }}
           cache: true
       - name: Packaging tools
         run: |

@@ -5,7 +5,7 @@
 // Derived: consolidate after an idle pause or a number of turns, a capped
 // background run that may add and edit but not delete (design only).
 import { randomBytes } from "node:crypto";
-import { chmod, mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readFile, rename, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 export const SHAPES = ["pebble", "mochi", "bean", "circle", "squircle", "capsule", "droplet", "ghost"];
@@ -90,11 +90,12 @@ export class Bot {
 		this.state = structuredClone(DEFAULT_BOT);
 		this.meta = {};
 		this.proposals = [];
+		this.seen = "";
 		this.tail = Promise.resolve();
 	}
 
 	serial(fn) {
-		const p = this.tail.then(fn);
+		const p = this.tail.then(() => this.refresh()).then(fn);
 		this.tail = p.catch(() => {});
 		return p;
 	}
@@ -102,12 +103,36 @@ export class Bot {
 	async load() {
 		await mkdir(this.dir, { recursive: true, mode: 0o700 });
 		await chmod(this.dir, 0o700).catch(() => {});
+		await this.read();
+	}
+
+	/** Size and modification time of the files, to notice a replaced one. */
+	async signature() {
+		const one = (f) => stat(f).then((s) => `${s.size}@${s.mtimeMs}`, () => "-");
+		return (await Promise.all([this.file, this.metaFile, this.proposalsFile].map(one))).join(" ");
+	}
+
+	/** Reads the files again when they changed on disk: data sync replaces
+	 * them with another device's copy while the host runs. */
+	async refresh() {
+		if ((await this.signature()) === this.seen) return;
+		await this.read().catch(() => {}); // a half-written copy: keep the state, try again next time
+	}
+
+	/** Waits for pending changes and picks up synced files. */
+	fresh() {
+		return this.serial(() => {});
+	}
+
+	async read() {
+		const seen = await this.signature();
 		const saved = await readJSON(this.file, {});
 		this.state = { ...structuredClone(DEFAULT_BOT), ...saved, memory: { ...DEFAULT_BOT.memory, ...(saved.memory ?? {}) }, marks: saved.marks ?? {} };
 		// Shapes retired from the set fall back to the default body.
 		if (!SHAPES.includes(this.state.shape)) this.state.shape = DEFAULT_BOT.shape;
 		this.meta = await readJSON(this.metaFile, {});
 		this.proposals = await readJSON(this.proposalsFile, []);
+		this.seen = seen;
 	}
 
 	identity() {

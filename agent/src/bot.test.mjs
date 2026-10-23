@@ -23,6 +23,22 @@ test("identity patches are validated", () => {
 	assert.deepEqual(validateBotPatch({ session_id: "x", marks: {} }), {});
 });
 
+test("a bot.json replaced on disk (data sync) is picked up, not overwritten", async () => {
+	const { bot, dir, done } = await fresh();
+	try {
+		await bot.update({ name: "阿布" });
+		await writeFile(join(dir, "bot", "bot.json"), JSON.stringify({ ...bot.state, shape: "capsule", color: "green" }));
+		await bot.fresh();
+		assert.equal(bot.identity().shape, "capsule");
+		await bot.setMarks({ s: 1 });
+		const again = new Bot(dir);
+		await again.load();
+		assert.deepEqual([again.identity().name, again.identity().shape, again.identity().color, again.mark("s")], ["阿布", "capsule", "green", 1]);
+	} finally {
+		await done();
+	}
+});
+
 test("identity, kinds and marks persist privately", async () => {
 	const { bot, dir, done } = await fresh();
 	try {
