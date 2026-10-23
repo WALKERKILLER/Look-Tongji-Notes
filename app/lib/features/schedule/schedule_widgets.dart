@@ -8,6 +8,7 @@ import '../../shell.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/states.dart';
 import '../player/player_page.dart';
+import '../plugins/plugin_views.dart';
 import 'schedule_store.dart';
 
 /// Visual identity of a schedule kind, built from color-scheme roles.
@@ -208,6 +209,10 @@ class ScheduleTile extends StatelessWidget {
                     ],
                   ]),
                 ),
+              ),
+              PluginMenuButton(
+                surface: 'schedule.item',
+                context_: {'schedule_id': item.id, if (item.courseId.isNotEmpty) 'course_id': item.courseId, if (item.lectureId.isNotEmpty) 'lecture_id': item.lectureId},
               ),
               PopupMenuButton<String>(
                 tooltip: '更多',

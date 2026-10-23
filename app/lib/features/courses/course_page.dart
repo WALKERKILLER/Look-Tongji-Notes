@@ -12,6 +12,7 @@ import '../../widgets/course_visuals.dart';
 import '../../widgets/report_screen.dart';
 import '../../widgets/states.dart';
 import '../player/player_page.dart';
+import '../plugins/plugin_views.dart';
 import 'courses_page.dart';
 import 'download_sheet.dart';
 
@@ -141,6 +142,7 @@ class _CoursePageState extends State<CoursePage> {
                         onPressed: _syncing ? null : () => _load(sync: true),
                         icon: _syncing ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2.5)) : const Icon(Icons.sync_rounded),
                       ),
+                      if (course != null) PluginMenuButton(surface: 'course.menu', exportScope: 'course', context_: {'course_id': widget.courseId}),
                       if (course != null)
                         Builder(
                           builder: (ctx) => IconButton(

@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import '../../core/api.dart';
 import '../../core/app_state.dart';
 import '../../core/format.dart';
+import '../../core/plugins.dart';
 import '../../shell.dart';
 import '../../theme/prefs.dart';
 import '../../theme/tokens.dart';
@@ -19,6 +20,8 @@ import '../courses/download_sheet.dart';
 import '../../widgets/look_markdown.dart';
 import '../library/note_reader.dart';
 import '../player/player_page.dart';
+import '../plugins/plugin_views.dart';
+import '../plugins/plugins_page.dart';
 import '../practice/quiz.dart';
 import '../schedule/schedule_widgets.dart';
 import '../settings/model_meta.dart';
@@ -403,14 +406,24 @@ class _AssistantPanelState extends State<AssistantPanel> {
       padding: const EdgeInsets.fromLTRB(Space.md, Space.xs, Space.md, Space.md),
       child: Container(
         decoration: BoxDecoration(color: cs.surfaceContainerHighest, borderRadius: BorderRadius.circular(Corners.xl)),
-        padding: const EdgeInsets.fromLTRB(Space.lg, Space.sm, Space.sm, Space.sm),
+        padding: const EdgeInsets.fromLTRB(Space.xs, Space.sm, Space.sm, Space.sm),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
           Row(children: [
+            const SizedBox(width: Space.md),
             Icon(player != null ? Icons.play_circle_outline_rounded : Icons.my_location_rounded, size: 14, color: cs.onSurfaceVariant),
             const SizedBox(width: 4),
             Flexible(child: Text(ctxLabel, style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant), maxLines: 1, overflow: TextOverflow.ellipsis)),
           ]),
+          _ModeChips(context_: {'session_id': a.sessionId}),
           Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+            _PlusMenu(
+              context_: {'session_id': a.sessionId},
+              onPrompt: (p) {
+                if (a.busy) return;
+                a.send(p);
+                _toBottom();
+              },
+            ),
             Expanded(
               child: CallbackShortcuts(
                 bindings: {const SingleActivator(LogicalKeyboardKey.enter): _send},
@@ -451,6 +464,93 @@ class _AssistantPanelState extends State<AssistantPanel> {
           ]),
         ]),
       ),
+    );
+  }
+}
+
+/// The composer's "+" menu: plugin actions for the chat, and the way to
+/// manage plugins.
+class _PlusMenu extends StatelessWidget {
+  const _PlusMenu({required this.context_, required this.onPrompt});
+  final Map<String, dynamic> context_;
+  final ValueChanged<String> onPrompt;
+
+  @override
+  Widget build(BuildContext context) {
+    final store = context.watch<PluginStore>();
+    final entries = store.entries('actions', surface: 'composer.plus');
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+    return MenuAnchor(
+      alignmentOffset: const Offset(0, 4),
+      menuChildren: [
+        for (final e in entries)
+          MenuItemButton(
+            leadingIcon: Icon(pluginIcon(e.icon), size: 20),
+            trailingIcon: (store.byId(e.pluginId)?['status'] as Map?)?['active'] == true ? Icon(Icons.check_rounded, size: 18, color: cs.primary) : null,
+            onPressed: () => runPluginEntry(context, e, context_, onPrompt: onPrompt),
+            child: Text(e.title),
+          ),
+        if (entries.isNotEmpty) const Divider(height: Space.sm),
+        MenuItemButton(
+          leadingIcon: const Icon(Icons.explore_outlined, size: 20),
+          onPressed: store.ready ? () => openPlugins(context) : null,
+          child: const Text('发现插件'),
+        ),
+        MenuItemButton(
+          leadingIcon: const Icon(Icons.extension_outlined, size: 20),
+          onPressed: store.ready ? () => openPlugins(context, installed: true) : null,
+          child: Text('管理插件', style: tt.bodyMedium),
+        ),
+      ],
+      builder: (context, c, _) => Padding(
+        padding: const EdgeInsets.only(right: Space.xs, bottom: 2),
+        child: IconButton(
+          tooltip: '更多功能',
+          visualDensity: VisualDensity.compact,
+          onPressed: () => c.isOpen ? c.close() : c.open(),
+          icon: const Icon(Icons.add_circle_outline_rounded),
+        ),
+      ),
+    );
+  }
+}
+
+/// Composer modes that plugins switched on (a toggle action whose status is
+/// `{active: true}`), each removable in place.
+class _ModeChips extends StatelessWidget {
+  const _ModeChips({required this.context_});
+  final Map<String, dynamic> context_;
+
+  @override
+  Widget build(BuildContext context) {
+    final store = context.watch<PluginStore>();
+    final on = [
+      for (final e in store.entries('actions', surface: 'composer.plus'))
+        if ((store.byId(e.pluginId)?['status'] as Map?)?['active'] == true) e,
+    ];
+    return AnimatedSize(
+      duration: Motion.medium2,
+      curve: Motion.emphasized,
+      alignment: Alignment.topLeft,
+      child: on.isEmpty
+          ? const SizedBox(width: double.infinity)
+          : Padding(
+              padding: const EdgeInsets.fromLTRB(Space.md, Space.sm, 0, 0),
+              child: Wrap(spacing: Space.sm, runSpacing: Space.xs, children: [
+                for (final e in on)
+                  InputChip(
+                    avatar: Icon(pluginIcon(e.icon), size: 18),
+                    label: Text(e.title),
+                    selected: true,
+                    showCheckmark: false,
+                    visualDensity: VisualDensity.compact,
+                    deleteButtonTooltipMessage: '关闭',
+                    onDeleted: () => runPluginEntry(context, e, context_),
+                    onPressed: () {},
+                  ),
+              ]),
+            ),
     );
   }
 }
@@ -674,6 +774,7 @@ class _AssistantTurn extends StatelessWidget {
           if (b.name == 'save_note' && d?['note'] is Map) {
             children.add(_NoteCard(note: (d!['note'] as Map).cast<String, dynamic>(), onAction: onAction));
           }
+          if (d?['view'] is Map) children.add(PluginView(view: (d!['view'] as Map).cast<String, dynamic>()));
           if (d?['timeline'] is List && (d!['timeline'] as List).isNotEmpty) {
             children.add(_OutlineCard(lectureId: '${d['lecture_id'] ?? ''}', chapters: jsonList(d['timeline']), onAction: onAction));
           }
@@ -688,7 +789,7 @@ class _AssistantTurn extends StatelessWidget {
                   onSeek: (t) => onAction({'kind': 'seek', 'lecture_id': t.lectureId.isNotEmpty ? t.lectureId : ctxLecture, 'seconds': t.seconds})),
               isStreaming: live,
               animation: prefs.reduceMotion ? GptMarkdownAnimation.none : prefs.streamAnimation,
-              codeBuilder: (context, name, code, closed) => _CodeBlock(lang: name, code: code),
+              codeBuilder: (context, name, code, closed) => (closed ? lookViewBlock(context, name, code) : null) ?? _CodeBlock(lang: name, code: code),
             ));
           }
       }
@@ -852,7 +953,10 @@ class _ToolCardState extends State<_ToolCard> {
     final b = widget.block;
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
-    final (label, icon) = _toolLabels[b.name] ?? (b.name, Icons.build_outlined);
+    final plugins = context.watch<PluginStore>();
+    final plugin = plugins.toolPlugin(b.name);
+    final (label, icon) = _toolLabels[b.name] ??
+        (plugin != null ? ('${plugin['title']} · ${plugins.toolLabel(b.name) ?? b.name}', pluginIcon(plugin['icon'])) : (b.name, Icons.build_outlined));
     final args = b.args == null ? '' : const JsonEncoder.withIndent('  ').convert(b.args);
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       InkWell(
