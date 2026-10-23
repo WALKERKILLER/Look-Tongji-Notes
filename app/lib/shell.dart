@@ -16,6 +16,7 @@ import 'features/downloads/downloads_page.dart';
 import 'features/home/home_page.dart';
 import 'features/library/library_page.dart';
 import 'features/login/login_page.dart';
+import 'features/notifications/notification_center.dart';
 import 'features/plugins/plugins_page.dart';
 import 'features/profile/profile_dialog.dart';
 import 'features/schedule/schedule_page.dart';
@@ -105,6 +106,7 @@ class _AppShellState extends State<AppShell> {
   final _built = <int>{0};
   StreamSubscription<String>? _notices;
   StreamSubscription? _botOps;
+  StreamSubscription? _daemonNotes;
   late final UiPrefs _prefs = context.read<UiPrefs>();
   late final AssistantController _assistant = context.read<AssistantController>();
 
@@ -123,6 +125,12 @@ class _AppShellState extends State<AppShell> {
     _botOps = _assistant.appOps.listen((op) {
       if (mounted) BotOps.run(context, op);
     });
+    // New replays, lectures and Canvas items (docs/specs/0010-live-refresh.md).
+    _daemonNotes = context.read<AppState>().events.where((e) => e['type'] == 'notification').listen((e) {
+      if (!mounted) return;
+      final n = (e['data'] as Map).cast<String, dynamic>();
+      showSnack(context, '${n['title']}', action: '查看', onAction: () => openNotification(context, n));
+    });
     _prefs.addListener(_pushPrefs);
     _pushPrefs();
   }
@@ -133,6 +141,7 @@ class _AppShellState extends State<AppShell> {
   void dispose() {
     _notices?.cancel();
     _botOps?.cancel();
+    _daemonNotes?.cancel();
     _prefs.removeListener(_pushPrefs);
     super.dispose();
   }
@@ -244,10 +253,14 @@ class _AppShellState extends State<AppShell> {
           trailingAtBottom: true,
           trailing: Padding(
             padding: const EdgeInsets.only(bottom: Space.lg),
-            child: Tooltip(
-              message: '${userDisplayName(context)} · 个人资料',
-              child: InkWell(customBorder: const CircleBorder(), onTap: () => showProfileDialog(context), child: const UserAvatar(size: 40)),
-            ),
+            child: Column(children: [
+              const NotificationBell(),
+              const SizedBox(height: Space.md),
+              Tooltip(
+                message: '${userDisplayName(context)} · 个人资料',
+                child: InkWell(customBorder: const CircleBorder(), onTap: () => showProfileDialog(context), child: const UserAvatar(size: 40)),
+              ),
+            ]),
           ),
           destinations: [
             for (var i = 0; i < _dests.length; i++)

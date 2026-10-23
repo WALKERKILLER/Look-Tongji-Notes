@@ -39,7 +39,7 @@ const GUIDE = {
 	transcript: `转写使用免费云端识别（必剪、剪映两个渠道负载均衡，可在 设置 → 转写 中开关渠道和选择分配方式）：自动提取 16kHz 单声道音频，切成 20 分钟的段识别，某渠道被限流时自动冷却并换另一个，已完成的段在重试时保留。结果写入 transcript.srt 与 transcript.md（按约 60 秒分段，带 [mm:ss] 时间戳），并建立全文索引。`,
 	courseware: `Look 平台不提供课件，可以自己上传：播放器 → 资料 → 课件 → 上传（PDF、PPT、Word、Excel、图片）。上传后用 MinerU 在线解析为 Markdown（公式、表格、图片都会保留），解析结果保存在课件旁的 .parsed/full.md，助手可以阅读。设置 → 课件解析 里填写 MinerU Token 后单文件可达 200 MB / 200 页、每天 1000 页优先额度；不填写时使用免登录轻量模式（10 MB / 20 页以内）。`,
 	outline: `大纲即时间轴：把一节课按阶段分成若干章节（格式“起始-结束：内容”，与 Look Tongji Notes skill 的 *_timeline.txt 相同）。在播放器的“大纲”页点“生成大纲”，或让助手生成。章节会显示在进度条上，点击即可跳转。`,
-	schedule: `日程页按月历和列表显示作业、考试、活动。助手只在原话里出现明确日期（如“10月20日交”“下周三考试”）时才会标记，每条都带原话和录像时间点，可以在聊天卡片里撤销。也可以在日程页手动添加、勾选完成。`,
+	schedule: `日程页按月历和列表显示作业、考试、活动。助手只在原话里出现明确日期（如“10月20日交”“下周三考试”）时才会标记，每条都带原话和录像时间点，可以在聊天卡片里撤销。也可以在日程页手动添加、勾选完成。连接 Canvas（设置 → 学校与 Canvas）后，Canvas 上的作业会自动出现在日程里，点开在 Canvas 查看，只能勾选完成或从日程隐藏。`,
 	notes: `笔记保存为 Markdown 文件（带 YAML 头），位于 课程库/courses/<课程>/<节次>/notes/。助手整理笔记时以字幕为主，遇到重点和不确定处会查看当时的 PPT、搜索已上传的课件来核对，然后保存，标记为 source: agent。笔记在阅读器里打开：左侧目录、正文里的时间戳/PPT/课件引用点开后在右侧显示原声、当时的 PPT 和课件原文。不能看图的对话模型需要在 设置 → 助手 → 识图模型 里选一个能看图的模型。资料库页面可全文搜索。`,
 	models: `设置 → 模型 可添加提供商：内置 40+ 家（OpenAI、Anthropic、DeepSeek、OpenRouter 等，只需填 API Key），或添加 OpenAI/Anthropic 兼容端点（Base URL + 模型 ID）。也可一键导入 Pi CLI（~/.pi/agent）的配置。可选思考强度。`,
 	library: `课程库是一个普通文件夹（默认 ~/LookStudio），README.md 说明了结构，任何 AI 工具都能直接阅读。library.db 是可重建的 SQLite 索引。可导出为 Look Tongji Notes skill 的工作区格式（含时间轴大纲与课件）。`,
@@ -539,7 +539,8 @@ export function createTools(conv, pluginGroups = {}, extra = {}) {
 		{
 			name: "update_schedule",
 			label: "修改日程",
-			description: "Change a schedule item (title, date, done) or remove one you marked by mistake (remove: true; only items with source agent).",
+			description:
+				"Change a schedule item (title, date, done) or remove one you marked by mistake (remove: true; only items with source agent). Items with source canvas come from the school's Canvas: only done can change.",
 			parameters: Type.Object({
 				id: Type.String(),
 				title: Type.Optional(Type.String()),
@@ -553,6 +554,7 @@ export function createTools(conv, pluginGroups = {}, extra = {}) {
 				const it = items.find((x) => x.id === id);
 				if (!it) throw new Error("没有这条日程");
 				if (remove) {
+					if (it.source === "canvas") throw new Error("这条作业来自 Canvas，不能删除；用户可以在日程页把它从日程隐藏。");
 					if (it.source !== "agent") throw new Error("这条是用户自己添加的，不能删除；请让用户在日程页处理。");
 					await api("DELETE", `/api/schedule/${enc(id)}`);
 					return text(`已删除「${it.title}」`, { removed: id });

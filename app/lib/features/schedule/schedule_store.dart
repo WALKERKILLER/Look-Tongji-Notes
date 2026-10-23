@@ -109,8 +109,14 @@ class ScheduleStore extends ChangeNotifier {
     }
   }
 
-  /// Puts back an item removed by mistake (same fields, new id).
-  Future<ScheduleItem> restore(ScheduleItem it) => add({...it.j}..remove('id'));
+  /// Puts back an item removed by mistake (same fields, new id). A Canvas
+  /// assignment is only hidden, so it is shown again.
+  Future<ScheduleItem> restore(ScheduleItem it) async {
+    if (!it.isCanvas) return add({...it.j}..remove('id'));
+    final back = ScheduleItem((await app.api.patch('/api/schedule/${it.id}', {'hidden': false}) as Map).cast<String, dynamic>());
+    _replace(back);
+    return back;
+  }
 
   @override
   void dispose() {

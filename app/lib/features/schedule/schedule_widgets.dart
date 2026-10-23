@@ -9,6 +9,7 @@ import '../../theme/tokens.dart';
 import '../../widgets/states.dart';
 import '../player/player_page.dart';
 import '../plugins/plugin_views.dart';
+import '../../widgets/look_markdown.dart' show openPlainLink;
 import 'schedule_store.dart';
 
 /// Visual identity of a schedule kind, built from color-scheme roles.
@@ -107,6 +108,24 @@ class KindLabel extends StatelessWidget {
       );
 }
 
+/// Marks an item that comes from Canvas (read-only, opened on Canvas).
+class CanvasBadge extends StatelessWidget {
+  const CanvasBadge({super.key});
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(6, 2, 8, 2),
+      decoration: BoxDecoration(border: Border.all(color: cs.outlineVariant), borderRadius: BorderRadius.circular(Corners.full)),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Icon(Icons.cloud_sync_outlined, size: 13, color: cs.onSurfaceVariant),
+        const SizedBox(width: 3),
+        Text('Canvas', style: Theme.of(context).textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant)),
+      ]),
+    );
+  }
+}
+
 /// Round check that fills with a short spring when toggled.
 class DoneCheck extends StatelessWidget {
   const DoneCheck({super.key, required this.done, required this.color, required this.onChanged});
@@ -177,7 +196,7 @@ class ScheduleTile extends StatelessWidget {
         borderRadius: BorderRadius.circular(Corners.lg),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
-          onTap: () => showScheduleEditor(context, item: item),
+          onTap: () => item.isCanvas ? openPlainLink(context, item.url) : showScheduleEditor(context, item: item),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(Space.xs, Space.sm, Space.xs, Space.sm),
             child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -200,6 +219,7 @@ class ScheduleTile extends StatelessWidget {
                     const SizedBox(height: Space.xs),
                     Wrap(spacing: Space.sm, runSpacing: Space.xs, crossAxisAlignment: WrapCrossAlignment.center, children: [
                       KindLabel(style: st),
+                      if (item.isCanvas) const CanvasBadge(),
                       if (meta.isNotEmpty) Text(meta.join(' · '), style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
                       if (item.overdue) Text(fmtCountdown(item), style: tt.labelSmall?.copyWith(color: cs.error)),
                     ]),
@@ -219,17 +239,24 @@ class ScheduleTile extends StatelessWidget {
                 icon: Icon(Icons.more_vert_rounded, color: cs.onSurfaceVariant),
                 onSelected: (v) async {
                   if (v == 'edit') showScheduleEditor(context, item: item);
+                  if (v == 'open') openPlainLink(context, item.url);
                   if (v == 'delete') {
                     await store.remove(item);
                     if (context.mounted) {
-                      showSnack(context, '已删除「${item.title}」', action: '撤销', onAction: () => store.restore(item));
+                      showSnack(context, '${item.isCanvas ? '已从日程隐藏' : '已删除'}「${item.title}」', action: '撤销', onAction: () => store.restore(item));
                     }
                   }
                 },
-                itemBuilder: (_) => const [
-                  PopupMenuItem(value: 'edit', child: ListTile(leading: Icon(Icons.edit_outlined), title: Text('编辑'), contentPadding: EdgeInsets.zero)),
-                  PopupMenuItem(value: 'delete', child: ListTile(leading: Icon(Icons.delete_outline_rounded), title: Text('删除'), contentPadding: EdgeInsets.zero)),
-                ],
+                itemBuilder: (_) => item.isCanvas
+                    ? [
+                        if (item.url.isNotEmpty)
+                          const PopupMenuItem(value: 'open', child: ListTile(leading: Icon(Icons.open_in_new_rounded), title: Text('在 Canvas 打开'), contentPadding: EdgeInsets.zero)),
+                        const PopupMenuItem(value: 'delete', child: ListTile(leading: Icon(Icons.visibility_off_outlined), title: Text('从日程隐藏'), contentPadding: EdgeInsets.zero)),
+                      ]
+                    : const [
+                        PopupMenuItem(value: 'edit', child: ListTile(leading: Icon(Icons.edit_outlined), title: Text('编辑'), contentPadding: EdgeInsets.zero)),
+                        PopupMenuItem(value: 'delete', child: ListTile(leading: Icon(Icons.delete_outline_rounded), title: Text('删除'), contentPadding: EdgeInsets.zero)),
+                      ],
               ),
             ]),
           ),
@@ -272,6 +299,7 @@ class _Mention extends StatelessWidget {
 
 /// Create or edit an item. Returns when the sheet closes.
 Future<void> showScheduleEditor(BuildContext context, {ScheduleItem? item, DateTime? day}) {
+  if (item != null && item.isCanvas) return openPlainLink(context, item.url); // edited on Canvas
   final wide = !context.isCompact;
   final editor = _Editor(item: item, day: day);
   if (wide) {

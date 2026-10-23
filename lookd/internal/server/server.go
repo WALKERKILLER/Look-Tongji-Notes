@@ -22,11 +22,14 @@ import (
 	"lookstudio/lookd/internal/agent"
 	"lookstudio/lookd/internal/agentenv"
 	"lookstudio/lookd/internal/asr"
+	"lookstudio/lookd/internal/canvas"
 	"lookstudio/lookd/internal/dl"
 	"lookstudio/lookd/internal/events"
 	"lookstudio/lookd/internal/jobs"
 	"lookstudio/lookd/internal/library"
+	"lookstudio/lookd/internal/localasr"
 	"lookstudio/lookd/internal/mineru"
+	"lookstudio/lookd/internal/notify"
 	"lookstudio/lookd/internal/store"
 	"lookstudio/lookd/internal/tongji"
 )
@@ -49,9 +52,17 @@ type Server struct {
 	Ctx context.Context
 	// MinerU parses uploaded courseware.
 	MinerU *mineru.Service
+	// Local installs and runs on-device speech recognition models.
+	Local *localasr.Manager
+	// Notes is the in-app notification feed.
+	Notes *notify.Feed
+	// Canvas reads courses, assignments and files from the school's Canvas.
+	Canvas *canvas.Service
 
-	syncMu     sync.Mutex
-	lastCourse time.Time
+	syncMu        sync.Mutex
+	lastCourse    time.Time
+	watchOnceInit sync.Once
+	w             *watchState
 }
 
 func (s *Server) Handler() http.Handler {
@@ -174,6 +185,37 @@ func (s *Server) Handler() http.Handler {
 		cfg, chans, events := s.Jobs.ASR.Status()
 		return map[string]any{"config": cfg, "channels": chans, "events": events}, nil
 	})
+	h("GET /api/asr/local", s.localASRStatus)
+	h("POST /api/asr/local/install", s.localASRInstall)
+	h("POST /api/asr/local/cancel", func(http.ResponseWriter, *http.Request) (any, error) {
+		s.Local.Cancel()
+		return ok(), nil
+	})
+	h("DELETE /api/asr/local/models/{id}", s.localASRRemove)
+	h("GET /api/watch", s.watchStatus)
+	h("POST /api/watch/run", s.watchNow)
+	h("GET /api/notifications", func(http.ResponseWriter, *http.Request) (any, error) {
+		items, unread := s.Notes.List()
+		return map[string]any{"items": items, "unread": unread}, nil
+	})
+	h("POST /api/notifications/read", func(_ http.ResponseWriter, r *http.Request) (any, error) {
+		var in struct {
+			IDs []string `json:"ids"`
+			All bool     `json:"all"`
+		}
+		if err := decode(r, &in); err != nil {
+			return nil, err
+		}
+		if in.All {
+			in.IDs = nil
+		} else if len(in.IDs) == 0 {
+			return nil, badRequest("ids 或 all 必填")
+		}
+		s.Notes.MarkRead(in.IDs)
+		_, unread := s.Notes.List()
+		s.Bus.Publish("notifications_read", map[string]int{"unread": unread})
+		return map[string]int{"unread": unread}, nil
+	})
 	h("GET /api/activity", s.activity)
 	h("GET /api/activity/day", s.activityDay)
 	h("POST /api/activity", s.addActivity)
@@ -205,6 +247,15 @@ func (s *Server) Handler() http.Handler {
 	h("POST /api/schedule", s.addSchedule)
 	h("PATCH /api/schedule/{id}", s.patchSchedule)
 	h("DELETE /api/schedule/{id}", s.deleteSchedule)
+
+	h("GET /api/canvas", s.canvasStatus)
+	h("POST /api/canvas/connect", s.canvasConnect)
+	h("POST /api/canvas/disconnect", s.canvasDisconnect)
+	h("POST /api/canvas/sync", s.canvasSyncNow)
+	h("PUT /api/canvas/links/{id}", s.canvasSetLink)
+	h("GET /api/canvas/courses/{id}", s.canvasCourse)
+	h("GET /api/canvas/courses/{id}/files", s.canvasFiles)
+	h("POST /api/canvas/files/{id}/download", s.canvasDownload)
 	h("GET /api/lectures/{id}/timeline", s.timeline)
 	h("PUT /api/lectures/{id}/timeline", s.putTimeline)
 	h("DELETE /api/lectures/{id}/timeline", s.deleteTimeline)
@@ -722,6 +773,7 @@ func (s *Server) ApplySettings(ctx context.Context) {
 		pc.Concurrency = int(n)
 	}
 	s.Jobs.ASR.SetConfig(pc)
+	s.applyLocalASR(ctx)
 	var tpl library.Templates
 	if get("library.templates", &tpl) {
 		s.Lib.SetTemplates(tpl)

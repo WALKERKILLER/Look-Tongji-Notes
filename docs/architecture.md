@@ -9,7 +9,9 @@ Feature behavior (login, downloads, transcription, notes, schedule, outline, cou
 ```text
 app (Flutter) ── HTTP + SSE on 127.0.0.1, per-run token ──▶ lookd (Go daemon)
                                                              ├─ supervises agent (Node.js, Pi SDK) and proxies /agent/*
-                                                             ├─ Tongji IAM + Look API, cloud ASR channels, MinerU
+                                                             ├─ Tongji IAM + Look API, cloud and local ASR channels, MinerU
+                                                             ├─ Canvas (Tongji IAM / Fudan UIS sign-in or token)
+                                                             ├─ watcher: adaptive polling → notification feed → SSE
                                                              └─ ~/LookStudio library files + library.db index
 agent ── HTTP with LOOKD_URL / LOOKD_TOKEN ──▶ lookd (its only data source)
 ```
@@ -22,11 +24,15 @@ The app starts lookd ([lookd_service.dart](../app/lib/core/lookd_service.dart) s
 | --- | --- |
 | `lookd/cmd/lookd` | Daemon entry point |
 | `lookd/cmd/logintest`, `lookd/cmd/probe` | Manual tools against the live service (`LOOK_USER`/`LOOK_PASS`); not run in CI |
-| `lookd/internal/server` | HTTP API for the app and the agent — the main seam |
+| `lookd/internal/server` | HTTP API for the app and the agent — the main seam; the lecture watcher (`watch.go`, [spec 0010](specs/0010-live-refresh.md)); school profiles, Canvas sign-in adapters and the schedule merge (`canvas.go`, [spec 0011](specs/0011-canvas-and-schools.md)) |
 | `lookd/internal/tongji` | IAM login, JWT renewal, sealed session, Look API client |
 | `lookd/internal/jobs` | Download, transcription and parse jobs with per-kind concurrency and persistence |
 | `lookd/internal/dl` | Segmented, resumable downloader |
-| `lookd/internal/asr` | Cloud ASR channels (bcut, JianYing), chunk pool, cooldowns and retries |
+| `lookd/internal/asr` | Cloud ASR channels (bcut, JianYing), chunk pool with the optional `local` channel, cooldowns and retries |
+| `lookd/internal/localasr` | Local recognition: model catalog with digests and benchmarks, verified resumable installs, sherpa-onnx runner and punctuation realignment ([spec 0009](specs/0009-local-asr-models.md), [decision 0007](decisions/0007-sherpa-onnx-command-line-for-local-asr.md)) |
+| `lookd/internal/notify` | In-app notification feed (`notifications.json`), deduplicated by id and published as `notification` events |
+| `lookd/internal/canvas` | Canvas REST client and service: session or token sign-in with renewal and token rotation, sync cache, notifications, course links, files ([decision 0009](decisions/0009-canvas-through-the-school-sso-session.md)) |
+| `lookd/internal/fudan` | Fudan UIS sign-in and WebVPN addresses |
 | `lookd/internal/mineru` | MinerU courseware parsing client and sealed token |
 | `lookd/internal/library` | On-disk library layout, courseware search, schedule, timeline, README for AI tools |
 | `lookd/internal/store` | SQLite schema and FTS index ([schema.sql](../lookd/internal/store/schema.sql)); rebuildable from library files (schedule and activity via their JSON mirrors) |
@@ -47,7 +53,7 @@ The app starts lookd ([lookd_service.dart](../app/lib/core/lookd_service.dart) s
 | `agent/src/plugins.mjs` | Plugin host: manifests, install state (`plugins.json`), catalogs, loading plugins as Pi extensions, the permission-gated Look API, actions |
 | `agent/plugins/` | Official plugins and their catalog; the [plugin author guide](../agent/plugins/README.md) |
 | `app/lib/core` | lookd client (`api.dart`), daemon discovery and startup, app state, models, study-time tracker (`activity_tracker.dart`), installed plugins and their contributions (`plugins.dart`) |
-| `app/lib/features/<area>` | Screens: activity, assistant, courses, courseware, downloads, home, library, login, player, plugins, practice, profile, schedule, settings |
+| `app/lib/features/<area>` | Screens: activity, assistant, courses, courseware, downloads, home, library, login, notifications, player, plugins, practice, profile, schedule, settings |
 | `app/lib/widgets` | Shared widgets, including the Markdown/LaTeX renderer and reader, statistics charts (`charts.dart`) and the activity heatmap (`heatmap.dart`) |
 | `app/lib/theme` | Material 3 theme and spacing/motion tokens |
 

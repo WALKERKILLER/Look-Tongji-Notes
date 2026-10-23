@@ -23,11 +23,14 @@ import (
 	"lookstudio/lookd/internal/agent"
 	"lookstudio/lookd/internal/agentenv"
 	"lookstudio/lookd/internal/asr"
+	"lookstudio/lookd/internal/canvas"
 	"lookstudio/lookd/internal/dl"
 	"lookstudio/lookd/internal/events"
 	"lookstudio/lookd/internal/jobs"
 	"lookstudio/lookd/internal/library"
+	"lookstudio/lookd/internal/localasr"
 	"lookstudio/lookd/internal/mineru"
+	"lookstudio/lookd/internal/notify"
 	"lookstudio/lookd/internal/server"
 	"lookstudio/lookd/internal/store"
 	"lookstudio/lookd/internal/tongji"
@@ -140,11 +143,17 @@ func run(dataDir, libRoot, addr, node, agentScript string, watchStdin bool) erro
 	}}
 	mgr.MinerU = mineru.NewService(filepath.Join(dataDir, "mineru.json"), tongji.Seal, tongji.Unseal)
 	rt.Restart = sup.Restart
-	srv := &server.Server{Token: token, Sess: sess, Cl: client, St: st, Lib: lib, Jobs: mgr, Eng: eng, Bus: bus, Agent: sup, Runtime: rt, Ctx: ctx, MinerU: mgr.MinerU}
+	local := &localasr.Manager{Dir: filepath.Join(dataDir, "asr")}
+	srv := &server.Server{Token: token, Sess: sess, Cl: client, St: st, Lib: lib, Jobs: mgr, Eng: eng, Bus: bus, Agent: sup, Runtime: rt, Ctx: ctx, MinerU: mgr.MinerU, Local: local}
+	local.Publish = srv.OnLocalASR
+	srv.Notes = notify.Open(filepath.Join(dataDir, "notifications.json"), func(it notify.Item) { bus.Publish("notification", it) })
 	srv.ApplySettings(ctx)
 
 	go sess.Run(ctx)
 	go mgr.Run(ctx)
+	srv.Canvas = &canvas.Service{Dir: dataDir, Transport: sess.Transport(), AuthFor: srv.CanvasAuth,
+		Notify: srv.Notes.Add, Publish: bus.Publish}
+	go srv.RunWatcher(ctx)
 	go sup.Run(ctx)
 	go func() {
 		t := time.NewTicker(2 * time.Second)

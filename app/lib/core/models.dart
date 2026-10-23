@@ -192,6 +192,10 @@ class ScheduleItem {
   String get quote => _s(j['quote']);
   String get source => _s(j['source']);
   bool get done => _b(j['done']);
+
+  /// A Canvas assignment: read-only except done, opened on Canvas.
+  bool get isCanvas => source == 'canvas';
+  String get url => _s(j['url']);
   DateTime get day => DateTime.tryParse(dueDate) ?? DateTime(1970);
   bool get overdue {
     final n = DateTime.now();

@@ -78,6 +78,10 @@ func NewSession(statePath string, onChange func(AuthState)) *Session {
 	return s
 }
 
+// Client is the HTTP client carrying the IAM single sign-on cookies; other
+// Tongji services (such as Canvas) sign in through it.
+func (s *Session) Client() *http.Client { return s.hc }
+
 // Transport exposes the shared keep-alive transport for other HTTP users.
 func (s *Session) Transport() http.RoundTripper { return s.api.Transport }
 

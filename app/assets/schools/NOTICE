@@ -1,0 +1,10 @@
+fudan.svg is the Fudan University emblem from Wikimedia Commons
+(https://commons.wikimedia.org/wiki/File:Fudan_University_Logo.svg).
+Original by Fudan University; vector by Prcmise. The file is in the public
+domain, but the emblem is a trademark of Fudan University; it is used only to
+identify the school. Look Studio inlined its single CSS class as a fill
+attribute so that the SVG renderer draws it.
+
+The Tongji University emblem is not bundled. The app downloads it at runtime
+from https://upload.wikimedia.org/wikipedia/zh/f/f8/Tongji_University_Emblem.svg
+and keeps it in the app support folder.

@@ -19,6 +19,7 @@ import '../../widgets/user_avatar.dart';
 import '../activity/activity_page.dart';
 import '../courses/course_card.dart';
 import '../courses/course_page.dart';
+import '../notifications/notification_center.dart';
 import '../player/player_page.dart';
 import '../profile/profile_dialog.dart';
 import '../schedule/schedule_page.dart';
@@ -253,6 +254,8 @@ class _Welcome extends StatelessWidget {
             ),
           ]),
         ),
+        // The navigation rail carries the bell on wider windows.
+        if (compact) const NotificationBell(),
       ]),
       AnimatedSize(
         duration: Motion.medium4,
