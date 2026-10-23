@@ -237,7 +237,7 @@ class _CanvasCourseViewState extends State<CanvasCourseView> {
       final r = _map(await (widget.api != null ? _call('POST', path, body) : context.read<AppState>().api.post(path, body, const Duration(minutes: 10))));
       if (!mounted) return;
       setState(() => _saved[id] = '${r['path']}');
-      showSnack(context, '已保存到课程文件夹', action: '打开', onAction: () => openPath('$_root/${r['path']}'));
+      showSnack(context, '已保存到课程文件夹', action: '在文件夹中显示', onAction: () => revealPath('$_root/${r['path']}'));
     } catch (e) {
       if (mounted) showSnack(context, '下载失败：$e');
     } finally {

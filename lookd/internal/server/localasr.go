@@ -49,6 +49,9 @@ func (s *Server) applyLocalASR(ctx context.Context) {
 // installs, so it starts working without another click.
 func (s *Server) OnLocalASR(p localasr.Progress) {
 	s.Bus.Publish("asr_local", p)
+	if p.State == "failed" && p.Model == "" {
+		s.applyLocalASR(s.Ctx) // a failed move: back to the models where they are
+	}
 	if p.State != "done" {
 		return
 	}
@@ -85,6 +88,34 @@ func (s *Server) localASRInstall(_ http.ResponseWriter, r *http.Request) (any, e
 	}
 	if err != nil {
 		return nil, badRequest(err.Error())
+	}
+	return s.Local.Status(), nil
+}
+
+// localASRLocation changes the folder that holds the engine and models;
+// see localasr.Manager.Relocate. A move finishes in the background and
+// puts the local channel back through OnLocalASR.
+func (s *Server) localASRLocation(_ http.ResponseWriter, r *http.Request) (any, error) {
+	var in struct {
+		Dir  string `json:"dir"`
+		Move bool   `json:"move"`
+	}
+	if err := decode(r, &in); err != nil {
+		return nil, err
+	}
+	// No transcription may start on the models while they change place.
+	if !s.Jobs.ASR.TakeLocal() {
+		return nil, apiError{http.StatusConflict, localasr.ErrInUse.Error()}
+	}
+	err := s.Local.Relocate(in.Dir, in.Move, nil)
+	if err != nil || !in.Move {
+		s.applyLocalASR(r.Context())
+	}
+	switch {
+	case errors.Is(err, localasr.ErrRunning):
+		return nil, apiError{http.StatusConflict, err.Error()}
+	case err != nil:
+		return nil, apiError{http.StatusBadRequest, err.Error()}
 	}
 	return s.Local.Status(), nil
 }

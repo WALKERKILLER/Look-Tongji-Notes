@@ -24,6 +24,16 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <!-- lookstudio:// links go to the look/links channel only, not to
+                 Flutter's route-based deep linking (the app has no routes). -->
+            <meta-data android:name="flutter_deeplinking_enabled" android:value="false" />
+            <!-- lookstudio:// links, e.g. timestamps in notes exported to Obsidian -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="lookstudio"/>
+            </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->

@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -10,7 +8,6 @@ import '../../core/api.dart';
 import '../../core/app_state.dart';
 import '../../core/format.dart';
 import '../../core/lookd_service.dart';
-import '../../core/open_path.dart';
 import '../../core/profile.dart';
 import '../../theme/prefs.dart';
 import '../../theme/tokens.dart';
@@ -27,9 +24,62 @@ import '../assistant/runtime_setup.dart';
 import '../usage/usage_page.dart';
 import '../canvas/canvas_page.dart';
 import 'asr_settings.dart';
+import 'knowledge_settings.dart';
 import 'mineru_settings.dart';
 import 'models_page.dart';
+import 'settings_common.dart';
 import 'watch_settings.dart';
+
+/// Opens a settings category from elsewhere (the bot's `open_page settings`).
+abstract final class SettingsNav {
+  static final section = ValueNotifier<String?>(null);
+  static void open(String section) => SettingsNav.section.value = section;
+}
+
+/// One row in the list pane and the pane it opens.
+class _Category {
+  const _Category(this.id, this.title, this.icon, this.summary, this.items);
+  final String id, title, summary;
+  final IconData icon;
+
+  /// What the pane holds, for search.
+  final List<String> items;
+}
+
+const _categories = [
+  _Category('account', '账户与学校', Icons.account_circle_outlined, '统一身份认证、Canvas',
+      ['统一身份认证', '立即续期', '退出登录', '昵称和头像', 'Canvas', '学校', '作业与课件']),
+  _Category('appearance', '外观与播放', Icons.palette_outlined, '主题、字体、播放器', [
+    '深色模式', '主题色', '系统强调色', '配色风格', '对比度', '字体', '文字大小', '紧凑布局', '减少动画', //
+    '默认倍速', '长按快进倍速', '快进快退步长', '字幕大小', '从上次位置继续', '显示字幕', 'PPT 跟随播放', '快捷键',
+  ]),
+  _Category('assistant', '助手与插件', Icons.auto_awesome_outlined, '模型、Bot、插件', [
+    '模型与服务商', '识图模型', 'Bot 形象与记忆', '运行环境 Node.js', '用量与费用', '定时任务', //
+    '宽屏常驻右侧', '回复气泡', '显示思考过程', '流式输出动画', '对话文字大小', '插件',
+  ]),
+  _Category('transfer', '下载与转写', Icons.download_outlined, '下载速度、语音转写、课件解析', [
+    '并发连接', '同时下载的视频数', '总速度上限', '下载哪个画面', //
+    '语音转写', '转写渠道', '本地模型', '转写完成后删除视频', 'MinerU 课件解析',
+  ]),
+  _Category('knowledge', '知识库', Icons.local_library_outlined, '课程库、Obsidian、Notion',
+      ['Obsidian', 'Notion', '课程库位置', '文件夹命名模板', '技能格式导出']),
+  _Category('notifications', '通知', Icons.notifications_outlined, '新回放、新课次与自动检查', ['自动检查新回放', '立即检查', '提醒']),
+  _Category('diagnostics', '诊断', Icons.monitor_heart_outlined, '后台状态与日志', ['lookd 后台', 'ffmpeg', 'Pi Agent', '后台日志', '助手日志', '重启后台']),
+];
+
+/// The bot's section names (agent/src/operate.mjs) → categories.
+const _sectionAliases = {
+  'account': 'account', 'canvas': 'account', //
+  'appearance': 'appearance', 'player': 'appearance',
+  'assistant': 'assistant', 'models': 'assistant', 'plugins': 'assistant',
+  'downloads': 'transfer', 'transcript': 'transfer', 'courseware': 'transfer',
+  'knowledge': 'knowledge', 'storage': 'knowledge', 'obsidian': 'knowledge', 'notion': 'knowledge',
+  'notifications': 'notifications',
+  'diagnostics': 'diagnostics',
+};
+
+/// Width from which the list and the open category sit side by side.
+const double _twoPaneWidth = 840;
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -38,87 +88,222 @@ class SettingsPage extends StatefulWidget {
 }
 
 class _SettingsPageState extends State<SettingsPage> {
-  Map<String, dynamic> _server = {};
-  final _courseTpl = TextEditingController();
-  final _lectureTpl = TextEditingController();
-  Timer? _ticker;
+  late final _settings = ServerSettings(context.read<AppState>().api);
+  final _query = TextEditingController();
+  String _selected = _categories.first.id;
+  bool _twoPane = true;
 
   @override
   void initState() {
     super.initState();
-    _loadServer();
-    // Keep the "expires in" label fresh.
-    _ticker = Timer.periodic(const Duration(minutes: 1), (_) {
-      if (mounted) setState(() {});
-    });
+    _settings.load().catchError((_) {});
+    SettingsNav.section.addListener(_deepLink);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _deepLink());
   }
 
   @override
   void dispose() {
-    _ticker?.cancel();
-    _courseTpl.dispose();
-    _lectureTpl.dispose();
+    SettingsNav.section.removeListener(_deepLink);
+    _settings.dispose();
+    _query.dispose();
     super.dispose();
   }
 
-  Future<void> _loadServer() async {
-    try {
-      final r = (await context.read<AppState>().api.get('/api/settings') as Map?) ?? {};
-      if (!mounted) return;
-      setState(() => _server = r.cast<String, dynamic>());
-      final tpl = _server['library.templates'];
-      _courseTpl.text = tpl is Map ? '${tpl['course'] ?? '{title}'}' : '{title}';
-      _lectureTpl.text = tpl is Map ? '${tpl['lecture'] ?? '{date} {title}'}' : '{date} {title}';
-    } catch (_) {}
+  void _deepLink() {
+    final s = SettingsNav.section.value;
+    if (s == null || !mounted) return;
+    SettingsNav.section.value = null;
+    final id = _sectionAliases[s];
+    if (id == null) return;
+    Navigator.of(context).popUntil((r) => r.isFirst);
+    _query.clear();
+    _open(id);
   }
 
+  /// Saves a setting; failures show as a snackbar.
   Future<void> _put(String key, Object? value) async {
-    setState(() => _server[key] = value);
     try {
-      final r = await context.read<AppState>().api.put('/api/settings', {key: value}) as Map?;
-      if (r != null && mounted) setState(() => _server = r.cast<String, dynamic>());
+      await _settings.put(key, value);
     } catch (e) {
       if (mounted) showSnack(context, '保存失败：$e');
     }
   }
 
-  num _num(String k, num d) => (_server[k] as num?) ?? d;
+  void _open(String id) {
+    setState(() => _selected = id);
+    if (_twoPane) return;
+    final c = _categories.firstWhere((c) => c.id == id);
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => Scaffold(
+        appBar: AppBar(title: Text(c.title)),
+        body: _pane(c, header: false),
+      ),
+    ));
+  }
 
   @override
   Widget build(BuildContext context) {
-    final compact = context.isCompact;
-    final tt = Theme.of(context).textTheme;
-    final pad = compact ? Space.lg : Space.xl;
     return ReportScreen(
       value: const {'screen': '设置'},
-      child: ListView(padding: EdgeInsets.fromLTRB(pad, compact ? Space.xl : Space.xxl, pad, Space.huge), children: [
-        ContentWidth(
-          max: 800,
-          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Text('设置', style: compact ? tt.headlineMedium : tt.displaySmall),
-            const SizedBox(height: Space.xl),
-            const _AccountSection(),
-            _Section(title: '学校与 Canvas', icon: Icons.school_outlined, children: const [CanvasSettingsEntry()]),
-            _Section(title: '外观', icon: Icons.palette_outlined, children: [const _Appearance()]),
-            _Section(title: '播放', icon: Icons.play_circle_outline_rounded, children: [const _PlayerSettings()]),
-            _Section(title: '助手', icon: Icons.auto_awesome_outlined, children: [const _AssistantSettings()]),
-            _Section(title: '插件', icon: Icons.extension_outlined, children: [const PluginSettingsSection()]),
-            _Section(title: '下载', icon: Icons.download_outlined, children: [_downloads(context)]),
-            _Section(title: '转写', icon: Icons.graphic_eq_rounded, children: [AsrSettings(server: _server, put: _put)]),
-            _Section(
-              title: '课件解析',
-              icon: Icons.description_outlined,
-              leading: ClipRRect(borderRadius: BorderRadius.circular(4), child: Image.asset('assets/brands/mineru.png', width: 18, height: 18)),
-              children: const [MinerUSettings()],
+      child: LayoutBuilder(builder: (context, box) {
+        _twoPane = box.maxWidth >= _twoPaneWidth;
+        if (!_twoPane) return _list(context);
+        final c = _categories.firstWhere((c) => c.id == _selected);
+        return Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          SizedBox(width: box.maxWidth >= 1200 ? 360 : 320, child: _list(context)),
+          Expanded(
+            child: AnimatedSwitcher(
+              duration: context.watch<UiPrefs>().reduceMotion ? Duration.zero : Motion.medium2,
+              switchInCurve: Motion.emphasizedDecelerate,
+              switchOutCurve: Motion.emphasizedAccelerate,
+              transitionBuilder: (child, a) => FadeTransition(
+                opacity: a,
+                child: SlideTransition(position: Tween(begin: const Offset(0, 0.02), end: Offset.zero).animate(a), child: child),
+              ),
+              layoutBuilder: (current, previous) => Stack(alignment: Alignment.topLeft, children: [...previous, ?current]),
+              child: KeyedSubtree(key: ValueKey(c.id), child: _pane(c, header: true)),
             ),
-            _Section(title: '通知与自动刷新', icon: Icons.notifications_outlined, children: [WatchSettings(server: _server, put: _put)]),
-            _Section(title: '课程库', icon: Icons.folder_outlined, children: [_library(context)]),
-            _Section(title: '诊断', icon: Icons.monitor_heart_outlined, children: [const _Diagnostics()]),
-          ]),
-        ),
-      ]),
+          ),
+        ]);
+      }),
     );
   }
+
+  // ---- list pane ----
+
+  Widget _list(BuildContext context) {
+    final compact = context.isCompact;
+    final tt = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
+    final q = _query.text.trim().toLowerCase();
+    final pad = compact ? Space.lg : Space.xl;
+    return ListView(padding: EdgeInsets.fromLTRB(_twoPane ? Space.lg : pad, compact ? Space.xl : Space.xxl, _twoPane ? Space.sm : pad, Space.huge), children: [
+      ContentWidth(
+        max: 720,
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Padding(
+            padding: const EdgeInsets.only(left: Space.sm),
+            child: Text('设置', style: compact ? tt.headlineMedium : tt.headlineLarge),
+          ),
+          const SizedBox(height: Space.lg),
+          SearchBar(
+            controller: _query,
+            hintText: '搜索设置',
+            elevation: const WidgetStatePropertyAll(0),
+            backgroundColor: WidgetStatePropertyAll(cs.surfaceContainerHigh),
+            leading: const Icon(Icons.search_rounded),
+            trailing: [
+              if (q.isNotEmpty) IconButton(tooltip: '清除', onPressed: () => setState(_query.clear), icon: const Icon(Icons.close_rounded)),
+            ],
+            onChanged: (_) => setState(() {}),
+          ),
+          const SizedBox(height: Space.lg),
+          if (q.isEmpty)
+            for (final c in _categories) _CategoryTile(category: c, selected: _twoPane && c.id == _selected, onTap: () => _open(c.id))
+          else
+            ..._results(context, q),
+        ]),
+      ),
+    ]);
+  }
+
+  List<Widget> _results(BuildContext context, String q) {
+    final tt = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
+    final hits = [
+      for (final c in _categories)
+        for (final item in [c.title, ...c.items])
+          if (item.toLowerCase().contains(q)) (c, item),
+    ];
+    if (hits.isEmpty) {
+      return [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: Space.lg, vertical: Space.xl),
+          child: Text('没有和「${_query.text.trim()}」相关的设置', style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
+        ),
+      ];
+    }
+    return [
+      for (final (c, item) in hits)
+        ListTile(
+          shape: const StadiumBorder(),
+          leading: Icon(c.icon, color: cs.onSurfaceVariant),
+          title: Text(item),
+          subtitle: item == c.title ? null : Text(c.title),
+          onTap: () => _open(c.id),
+        ),
+    ];
+  }
+
+  // ---- detail pane ----
+
+  Widget _pane(_Category c, {required bool header}) {
+    final pad = context.isCompact ? Space.lg : Space.xl;
+    return ListenableBuilder(
+      listenable: _settings,
+      builder: (context, _) {
+        final tt = Theme.of(context).textTheme;
+        final cs = Theme.of(context).colorScheme;
+        return ListView(
+          key: PageStorageKey('settings-${c.id}'),
+          padding: EdgeInsets.fromLTRB(header ? Space.lg : pad, header ? Space.xxl : Space.sm, header ? Space.xl : pad, Space.huge),
+          children: [
+            ContentWidth(
+              max: 760,
+              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                if (header) ...[
+                  Padding(
+                    padding: const EdgeInsets.only(left: Space.xs),
+                    child: Text(c.title, style: tt.headlineSmall),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(left: Space.xs, top: Space.xs),
+                    child: Text(c.summary, style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
+                  ),
+                ],
+                ..._sections(context, c.id),
+              ]),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  List<Widget> _sections(BuildContext context, String id) {
+    final server = _settings.values;
+    return switch (id) {
+      'account' => [
+          const SizedBox(height: Space.xl),
+          const _AccountSection(),
+          const SettingsGroup(title: '学校与 Canvas', icon: Icons.school_outlined, children: [CanvasSettingsEntry()]),
+        ],
+      'appearance' => const [
+          SettingsGroup(title: '外观', icon: Icons.palette_outlined, children: [_Appearance()]),
+          SettingsGroup(title: '播放', icon: Icons.play_circle_outline_rounded, children: [_PlayerSettings()]),
+        ],
+      'assistant' => const [
+          SettingsGroup(title: '助手', icon: Icons.auto_awesome_outlined, children: [_AssistantSettings()]),
+          SettingsGroup(title: '插件', icon: Icons.extension_outlined, children: [PluginSettingsSection()]),
+        ],
+      'transfer' => [
+          SettingsGroup(title: '下载', icon: Icons.download_outlined, children: [_downloads(context)]),
+          SettingsGroup(title: '转写', icon: Icons.graphic_eq_rounded, children: [AsrSettings(server: server, put: _put)]),
+          SettingsGroup(
+            title: '课件解析',
+            leading: ClipRRect(borderRadius: BorderRadius.circular(4), child: Image.asset('assets/brands/mineru.png', width: 18, height: 18)),
+            children: const [MinerUSettings()],
+          ),
+        ],
+      'knowledge' => [KnowledgeSettings(settings: _settings)],
+      'notifications' => [
+          SettingsGroup(title: '通知与自动刷新', icon: Icons.notifications_outlined, children: [WatchSettings(server: server, put: _put)]),
+        ],
+      _ => const [SettingsGroup(title: '诊断', icon: Icons.monitor_heart_outlined, children: [_Diagnostics()])],
+    };
+  }
+
+  num _num(String k, num d) => (_settings.values[k] as num?) ?? d;
 
   Widget _downloads(BuildContext context) {
     final tt = Theme.of(context).textTheme;
@@ -126,7 +311,7 @@ class _SettingsPageState extends State<SettingsPage> {
     final conns = _num('download.max_conns', 8).toDouble();
     final par = _num('download.video_parallel', 2).toDouble();
     final limit = _num('download.rate_limit', 0).toInt();
-    final stream = '${_server['download.stream'] ?? ''}';
+    final stream = '${_settings.values['download.stream'] ?? ''}';
     const limits = [(0, '不限'), (2 << 20, '2 MB/s'), (5 << 20, '5 MB/s'), (10 << 20, '10 MB/s'), (20 << 20, '20 MB/s')];
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       _SliderTile(
@@ -137,7 +322,7 @@ class _SettingsPageState extends State<SettingsPage> {
         max: 16,
         divisions: 15,
         label: '${conns.round()} 路',
-        onChanged: (v) => setState(() => _server['download.max_conns'] = v.round()),
+        onChanged: (v) => _settings.set('download.max_conns', v.round()),
         onChangeEnd: (v) => _put('download.max_conns', v.round()),
       ),
       _SliderTile(
@@ -147,7 +332,7 @@ class _SettingsPageState extends State<SettingsPage> {
         max: 4,
         divisions: 3,
         label: '${par.round()} 个',
-        onChanged: (v) => setState(() => _server['download.video_parallel'] = v.round()),
+        onChanged: (v) => _settings.set('download.video_parallel', v.round()),
         onChangeEnd: (v) => _put('download.video_parallel', v.round()),
       ),
       ListTile(
@@ -174,106 +359,47 @@ class _SettingsPageState extends State<SettingsPage> {
       Text('自动：优先屏幕（含 PPT），没有时用第一个画面。', style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
     ]);
   }
-
-  Widget _library(BuildContext context) {
-    final daemon = context.watch<LookdService>();
-    final tt = Theme.of(context).textTheme;
-    final cs = Theme.of(context).colorScheme;
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      ListTile(
-        contentPadding: EdgeInsets.zero,
-        title: const Text('位置'),
-        subtitle: Text(daemon.libraryRoot),
-        trailing: IconButton(tooltip: '打开', onPressed: () => openPath(daemon.libraryRoot), icon: const Icon(Icons.open_in_new_rounded)),
-      ),
-      Text('文件夹命名模板', style: tt.titleSmall),
-      const SizedBox(height: Space.xs),
-      Text('课程可用 {title} {teacher} {term} {id}；课次可用 {date} {title} {sub_id} {lecturer}。只影响之后新建的文件夹。',
-          style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
-      const SizedBox(height: Space.md),
-      Row(children: [
-        Expanded(child: TextField(controller: _courseTpl, decoration: const InputDecoration(labelText: '课程文件夹', isDense: true))),
-        const SizedBox(width: Space.md),
-        Expanded(child: TextField(controller: _lectureTpl, decoration: const InputDecoration(labelText: '课次文件夹', isDense: true))),
-        const SizedBox(width: Space.sm),
-        FilledButton.tonal(
-          onPressed: () async {
-            await _put('library.templates', {'course': _courseTpl.text.trim(), 'lecture': _lectureTpl.text.trim()});
-            if (context.mounted) showSnack(context, '模板已保存');
-          },
-          child: const Text('保存'),
-        ),
-      ]),
-      const SizedBox(height: Space.lg),
-      ListTile(
-        contentPadding: EdgeInsets.zero,
-        leading: const Icon(Icons.ios_share_rounded),
-        title: const Text('导出为 Look-Tongji-Notes 技能格式'),
-        subtitle: const Text('以硬链接生成 raw/<课程>/<节次>/原始数据/ 目录，不额外占空间'),
-        onTap: () => _export(context),
-      ),
-    ]);
-  }
-
-  Future<void> _export(BuildContext context) async {
-    final ctl = TextEditingController();
-    final root = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('导出到技能目录'),
-        content: SizedBox(
-          width: 440,
-          child: TextField(
-            controller: ctl,
-            autofocus: true,
-            decoration: const InputDecoration(labelText: '目标目录（绝对路径）', hintText: '/home/me/Look-Tongji-Notes'),
-          ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('取消')),
-          FilledButton(onPressed: () => Navigator.pop(context, ctl.text.trim()), child: const Text('导出')),
-        ],
-      ),
-    );
-    if (root == null || root.isEmpty || !context.mounted) return;
-    try {
-      final r = await context.read<AppState>().api.post('/api/library/export', {'root': root}) as Map;
-      if (context.mounted) showSnack(context, '已导出 ${r['exported']} 节课');
-    } catch (e) {
-      if (context.mounted) showSnack(context, '导出失败：$e');
-    }
-  }
 }
 
-class _Section extends StatelessWidget {
-  const _Section({required this.title, required this.icon, required this.children, this.leading});
-  final String title;
-  final IconData icon;
+/// A category row. The account row shows who is signed in.
+class _CategoryTile extends StatelessWidget {
+  const _CategoryTile({required this.category, required this.selected, required this.onTap});
+  final _Category category;
+  final bool selected;
+  final VoidCallback onTap;
 
-  /// Replaces [icon], e.g. with a brand mark.
-  final Widget? leading;
-  final List<Widget> children;
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
+    final account = category.id == 'account';
+    final auth = account ? context.watch<AppState>().auth : null;
+    final leading = account
+        ? const UserAvatar(size: 40)
+        : AnimatedContainer(
+            duration: Motion.medium1,
+            curve: Motion.emphasized,
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(color: selected ? cs.surface.withValues(alpha: 0.6) : cs.surfaceContainerHigh, borderRadius: BorderRadius.circular(Corners.md)),
+            child: Icon(category.icon, size: 22, color: selected ? cs.onSecondaryContainer : cs.onSurfaceVariant),
+          );
     return Padding(
-      padding: const EdgeInsets.only(top: Space.xl),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Padding(
-          padding: const EdgeInsets.only(left: Space.xs, bottom: Space.sm),
-          child: Row(children: [
-            leading ?? Icon(icon, size: 18, color: cs.primary),
-            const SizedBox(width: Space.sm),
-            Text(title, style: tt.titleSmall?.copyWith(color: cs.primary)),
-          ]),
+      padding: const EdgeInsets.only(bottom: Space.xxs),
+      child: ListTile(
+        shape: const StadiumBorder(),
+        contentPadding: const EdgeInsets.symmetric(horizontal: Space.md, vertical: Space.xxs),
+        selected: selected,
+        selectedTileColor: cs.secondaryContainer,
+        selectedColor: cs.onSecondaryContainer,
+        leading: leading,
+        title: Text(account ? userDisplayName(context) : category.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+        subtitle: Text(
+          account ? '${auth!.status == 'active' ? '已登录' : '未登录'} · 同济大学 · Canvas' : category.summary,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
         ),
-        Container(
-          padding: const EdgeInsets.fromLTRB(Space.xl, Space.md, Space.xl, Space.lg),
-          decoration: BoxDecoration(color: cs.surfaceContainer, borderRadius: BorderRadius.circular(Corners.xl)),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: children),
-        ),
-      ]),
+        onTap: onTap,
+      ),
     );
   }
 }

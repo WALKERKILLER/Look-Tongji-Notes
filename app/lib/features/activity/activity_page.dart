@@ -9,6 +9,7 @@ import '../../core/format.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/charts.dart';
 import '../../widgets/heatmap.dart';
+import '../../widgets/horizontal_scroller.dart';
 import '../../widgets/states.dart';
 import '../courses/course_page.dart';
 import '../library/note_reader.dart';
@@ -302,7 +303,8 @@ class _ActivityPageState extends State<ActivityPage> with _LiveActivity {
                       final from = DateTime(_year), to = DateTime(_year, 12, 31);
                       final cols = heatWeeks(from, to).length;
                       final cell = ((c.maxWidth - ContributionHeatmap.labelWidth + ContributionHeatmap.gap) / cols - ContributionHeatmap.gap).clamp(9.0, 13.0);
-                      return SingleChildScrollView(
+                      return HorizontalScroller(builder: (c) => SingleChildScrollView(
+                        controller: c,
                         scrollDirection: Axis.horizontal,
                         reverse: _year == _today.year,
                         child: ContributionHeatmap(
@@ -315,7 +317,7 @@ class _ActivityPageState extends State<ActivityPage> with _LiveActivity {
                           tooltip: (day) => d.on(day).tooltip(day),
                           onTap: (day) => showActivityDay(context, day, fetch: widget.fetch),
                         ),
-                      );
+                      ));
                     }),
                     const SizedBox(height: Space.md),
                     const Align(alignment: Alignment.centerRight, child: HeatLegend()),

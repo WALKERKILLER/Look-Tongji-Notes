@@ -10,6 +10,7 @@ import '../../core/models.dart';
 import '../../core/open_path.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/course_visuals.dart';
+import '../../widgets/horizontal_scroller.dart';
 import '../../widgets/report_screen.dart';
 import '../../widgets/states.dart';
 import '../player/player_page.dart';
@@ -143,7 +144,8 @@ class _LibraryPageState extends State<LibraryPage> {
                     backgroundColor: WidgetStatePropertyAll(cs.surfaceContainerHigh),
                   ),
                   const SizedBox(height: Space.md),
-                  SingleChildScrollView(
+                  HorizontalScroller(fade: true, builder: (c) => SingleChildScrollView(
+                    controller: c,
                     scrollDirection: Axis.horizontal,
                     child: Row(children: [
                       // The kinds filter search results; the course filter also applies to the notes below.
@@ -179,7 +181,7 @@ class _LibraryPageState extends State<LibraryPage> {
                           ),
                         ),
                     ]),
-                  ),
+                  )),
                 ]),
               ),
             ),

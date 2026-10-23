@@ -31,6 +31,7 @@ import (
 	"lookstudio/lookd/internal/localasr"
 	"lookstudio/lookd/internal/mineru"
 	"lookstudio/lookd/internal/notify"
+	"lookstudio/lookd/internal/notion"
 	"lookstudio/lookd/internal/server"
 	"lookstudio/lookd/internal/store"
 	"lookstudio/lookd/internal/tongji"
@@ -153,6 +154,8 @@ func run(dataDir, libRoot, addr, node, agentScript string, watchStdin bool) erro
 	go mgr.Run(ctx)
 	srv.Canvas = &canvas.Service{Dir: dataDir, Transport: sess.Transport(), AuthFor: srv.CanvasAuth,
 		Notify: srv.Notes.Add, Publish: bus.Publish}
+	srv.Notion = &notion.Service{Path: filepath.Join(dataDir, "notion.json"), Docs: srv.NotionDocs, Publish: bus.Publish,
+		HC: &http.Client{Timeout: 2 * time.Minute, Transport: sess.Transport()}}
 	go srv.RunWatcher(ctx)
 	go sup.Run(ctx)
 	go func() {

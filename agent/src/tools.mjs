@@ -42,7 +42,7 @@ const GUIDE = {
 	schedule: `日程页按月历和列表显示作业、考试、活动。助手只在原话里出现明确日期（如“10月20日交”“下周三考试”）时才会标记，每条都带原话和录像时间点，可以在聊天卡片里撤销。也可以在日程页手动添加、勾选完成。连接 Canvas（设置 → 学校与 Canvas）后，Canvas 上的作业会自动出现在日程里，点开在 Canvas 查看，只能勾选完成或从日程隐藏。`,
 	notes: `笔记保存为 Markdown 文件（带 YAML 头），位于 课程库/courses/<课程>/<节次>/notes/。助手整理笔记时以字幕为主，遇到重点和不确定处会查看当时的 PPT、搜索已上传的课件来核对，然后保存，标记为 source: agent。笔记在阅读器里打开：左侧目录、正文里的时间戳/PPT/课件引用点开后在右侧显示原声、当时的 PPT 和课件原文。不能看图的对话模型需要在 设置 → 助手 → 识图模型 里选一个能看图的模型。资料库页面可全文搜索。`,
 	models: `设置 → 模型 可添加提供商：内置 40+ 家（OpenAI、Anthropic、DeepSeek、OpenRouter 等，只需填 API Key），或添加 OpenAI/Anthropic 兼容端点（Base URL + 模型 ID）。也可一键导入 Pi CLI（~/.pi/agent）的配置。可选思考强度。`,
-	library: `课程库是一个普通文件夹（默认 ~/LookStudio），README.md 说明了结构，任何 AI 工具都能直接阅读。library.db 是可重建的 SQLite 索引。可导出为 Look Tongji Notes skill 的工作区格式（含时间轴大纲与课件）。`,
+	library: `课程库是一个普通文件夹（默认 ~/LookStudio），README.md 说明了结构，任何 AI 工具都能直接阅读。library.db 是可重建的 SQLite 索引。可导出为 Look Tongji Notes skill 的工作区格式（含时间轴大纲与课件）。设置 → 存储 → Obsidian 可把课程库单向导出到 Obsidian 仓库的子文件夹（标准 Markdown 链接，时间戳变成 lookstudio:// 链接、点击回到 Look Studio；可开启笔记变化后自动导出；在 Obsidian 里改过的文件不会被覆盖，新版本另存为“(Look Studio)”副本）。`,
 };
 
 // ---- groups for on-demand loading ----

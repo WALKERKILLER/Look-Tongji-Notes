@@ -1,4 +1,3 @@
-import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -8,6 +7,8 @@ import '../../core/api.dart';
 import '../../core/plugins.dart';
 import '../../shell.dart';
 import '../../theme/tokens.dart';
+import '../../widgets/horizontal_scroller.dart';
+import '../../widgets/pickers.dart';
 import '../../widgets/states.dart';
 import '../practice/quiz.dart' show askInSheet;
 import 'plugin_views.dart';
@@ -688,13 +689,17 @@ class _Featured extends StatelessWidget {
     if (plugins.length == 1) return SizedBox(height: 220, child: _HeroCard(plugin: plugins.first, onOpen: onOpen));
     return SizedBox(
       height: 220,
-      child: CarouselView.weighted(
-        flexWeights: const [3, 1],
-        itemSnapping: true,
-        backgroundColor: cs.surfaceContainer,
-        shape: RoundedRectangleBorder(borderRadius: Corners.all(Corners.xl)),
-        onTap: (i) => onOpen(plugins[i]),
-        children: [for (final p in plugins) _HeroCard(plugin: p, onOpen: onOpen, inCarousel: true)],
+      child: HorizontalScroller(
+        carousel: true,
+        builder: (c) => CarouselView.weighted(
+          controller: c as CarouselController,
+          flexWeights: const [3, 1],
+          itemSnapping: true,
+          backgroundColor: cs.surfaceContainer,
+          shape: RoundedRectangleBorder(borderRadius: Corners.all(Corners.xl)),
+          onTap: (i) => onOpen(plugins[i]),
+          children: [for (final p in plugins) _HeroCard(plugin: p, onOpen: onOpen, inCarousel: true)],
+        ),
       ),
     );
   }
@@ -877,7 +882,7 @@ class _SourceDialogState extends State<_SourceDialog> {
                       tooltip: '选择文件夹',
                       icon: const Icon(Icons.folder_open_outlined),
                       onPressed: () async {
-                        final dir = await getDirectoryPath();
+                        final dir = await pickDirectory(context, initial: _text.text.trim());
                         if (dir != null) _text.text = dir;
                       },
                     )
@@ -1492,7 +1497,7 @@ class _PluginSettingsFormState extends State<PluginSettingsForm> {
                         tooltip: '选择文件夹',
                         icon: const Icon(Icons.folder_open_outlined),
                         onPressed: () async {
-                          final dir = await getDirectoryPath();
+                          final dir = await pickDirectory(context, initial: _text[key]!.text.trim());
                           if (dir != null) _text[key]!.text = dir;
                         },
                       )

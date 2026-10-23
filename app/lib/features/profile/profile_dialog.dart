@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import '../../core/app_state.dart';
 import '../../core/profile.dart';
 import '../../theme/tokens.dart';
+import '../../widgets/horizontal_scroller.dart';
 import '../../widgets/states.dart';
 import '../../widgets/user_avatar.dart';
 
@@ -395,7 +396,8 @@ Future<String?> showEmojiPicker(BuildContext context, {String initial = ''}) {
               },
             ),
             const SizedBox(height: Space.md),
-            SingleChildScrollView(
+            HorizontalScroller(fade: true, builder: (c) => SingleChildScrollView(
+              controller: c,
               scrollDirection: Axis.horizontal,
               child: Row(children: [
                 for (var i = 0; i < _emojiGroups.length; i++) ...[
@@ -403,7 +405,7 @@ Future<String?> showEmojiPicker(BuildContext context, {String initial = ''}) {
                   const SizedBox(width: Space.xs),
                 ],
               ]),
-            ),
+            )),
             const SizedBox(height: Space.md),
             SizedBox(
               height: 200,

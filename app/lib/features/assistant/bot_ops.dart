@@ -12,6 +12,7 @@ import '../library/note_reader.dart';
 import '../player/lecture_player.dart';
 import '../player/player_page.dart';
 import '../schedule/schedule_widgets.dart';
+import '../settings/settings_page.dart';
 import '../usage/usage_page.dart';
 import 'bot_page.dart';
 
@@ -109,6 +110,8 @@ abstract final class BotOps {
       ShellNav.goTo(tab);
       final day = DateTime.tryParse('${op['day'] ?? ''}');
       if (target == 'schedule' && day != null) context.read<ScheduleFocus>().value = day;
+      final section = op['section'];
+      if (target == 'settings' && section is String) SettingsNav.open(section);
       return;
     }
     void pushTab(int t, Widget page) {

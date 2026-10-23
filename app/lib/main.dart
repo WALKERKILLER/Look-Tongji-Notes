@@ -9,6 +9,7 @@ import 'package:window_manager/window_manager.dart';
 import 'app.dart';
 import 'core/activity_tracker.dart';
 import 'core/app_state.dart';
+import 'core/deep_links.dart';
 import 'core/lookd_service.dart';
 import 'core/plugins.dart';
 import 'core/profile.dart';
@@ -58,4 +59,5 @@ Future<void> main() async {
     ],
     child: const LookApp(),
   ));
+  unawaited(DeepLinks.start());
 }

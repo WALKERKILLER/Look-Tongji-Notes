@@ -13,6 +13,7 @@ import '../../core/plugins.dart';
 import '../../shell.dart';
 import '../../theme/prefs.dart';
 import '../../theme/tokens.dart';
+import '../../widgets/horizontal_scroller.dart';
 import '../../widgets/loading.dart';
 import '../../widgets/states.dart';
 import '../../widgets/user_avatar.dart';
@@ -1269,7 +1270,8 @@ class _SlideStrip extends StatelessWidget {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       SizedBox(
         height: 72,
-        child: ListView.separated(
+        child: HorizontalScroller(fade: true, builder: (c) => ListView.separated(
+          controller: c,
           scrollDirection: Axis.horizontal,
           itemCount: slides.length,
           separatorBuilder: (_, _) => const SizedBox(width: Space.sm),
@@ -1292,7 +1294,7 @@ class _SlideStrip extends StatelessWidget {
               ),
             ),
           ),
-        ),
+        )),
       ),
       if (mode == 'described' || mode == 'unavailable')
         Padding(
@@ -1395,11 +1397,12 @@ class _CodeBlock extends StatelessWidget {
             ),
           ]),
         ),
-        SingleChildScrollView(
+        HorizontalScroller(buttons: false, builder: (c) => SingleChildScrollView(
+          controller: c,
           scrollDirection: Axis.horizontal,
           padding: const EdgeInsets.fromLTRB(Space.md, 0, Space.md, Space.md),
           child: Text(code, style: tt.bodySmall?.copyWith(fontFamily: 'monospace', height: 1.5)),
-        ),
+        )),
       ]),
     );
   }

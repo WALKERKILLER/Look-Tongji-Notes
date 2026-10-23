@@ -40,9 +40,9 @@ type Options struct {
 	Proxy  string // prefix for GitHub release URLs, e.g. a mirror of github.com
 }
 
-// Manager installs and removes the engine and models under Dir.
+// Manager installs and removes the engine and models under Root.
 type Manager struct {
-	Dir      string // <data>/asr
+	Dir      string // <data>/asr: the default root, and where the choice of root is kept
 	Client   *http.Client
 	OS, Arch string
 	Publish  func(Progress)
@@ -50,6 +50,10 @@ type Manager struct {
 	mu     sync.Mutex
 	st     Progress
 	cancel context.CancelFunc
+
+	rootMu     sync.RWMutex
+	root       string
+	rootLoaded bool
 }
 
 func (m *Manager) platform() string {
@@ -66,12 +70,12 @@ func (m *Manager) platform() string {
 // Supported reports whether a prebuilt engine exists for this machine.
 func (m *Manager) Supported() bool { _, ok := engines[m.platform()]; return ok }
 
-func (m *Manager) engineDir() string { return filepath.Join(m.Dir, "engine", "v"+EngineVersion) }
+func (m *Manager) engineDir() string { return filepath.Join(m.Root(), "engine", "v"+EngineVersion) }
 func (m *Manager) modelDir(id string) string {
-	return filepath.Join(m.Dir, "models", id)
+	return filepath.Join(m.Root(), "models", id)
 }
-func (m *Manager) vadDir() string   { return filepath.Join(m.Dir, "vad") }
-func (m *Manager) punctDir() string { return filepath.Join(m.Dir, "punct") }
+func (m *Manager) vadDir() string   { return filepath.Join(m.Root(), "vad") }
+func (m *Manager) punctDir() string { return filepath.Join(m.Root(), "punct") }
 
 const marker = ".complete"
 
@@ -107,10 +111,11 @@ type Status struct {
 	Install   Progress          `json:"install"`
 	Reference map[string]string `json:"reference"`
 	CPUs      int               `json:"cpus"`
+	Location  Location          `json:"location"`
 }
 
 func (m *Manager) Status() Status {
-	st := Status{Supported: m.Supported(), Platform: m.platform(), Sources: Sources, Reference: Reference, CPUs: runtime.NumCPU(),
+	st := Status{Supported: m.Supported(), Platform: m.platform(), Sources: Sources, Reference: Reference, CPUs: runtime.NumCPU(), Location: m.Location(),
 		Engine: map[string]any{"version": EngineVersion, "installed": complete(m.engineDir())}}
 	for _, md := range Models {
 		ms := ModelStatus{Model: md, Size: md.pack.size(), Installed: m.Installed(md.ID),
@@ -400,7 +405,7 @@ func sumFile(p string) string {
 }
 
 func (m *Manager) installEngine(ctx context.Context, a archive, proxy string, tr *tracker) error {
-	root := filepath.Join(m.Dir, "engine")
+	root := filepath.Join(m.Root(), "engine")
 	if err := os.MkdirAll(root, 0o755); err != nil {
 		return err
 	}
