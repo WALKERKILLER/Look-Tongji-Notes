@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -30,7 +31,8 @@ type HTTPError struct {
 	Method, Path string
 	Status       int
 	RetryAfter   time.Duration
-	Edge         bool // answered by Cloudflare, not the WebDAV server
+	Edge         bool   // answered by Cloudflare, not the WebDAV server
+	Reason       string // the server's own words, from a short text answer
 }
 
 var davActions = map[string]string{"PROPFIND": "列出", "MKCOL": "新建文件夹", "GET": "下载", "PUT": "上传", "DELETE": "删除"}
@@ -43,6 +45,9 @@ func (e *HTTPError) Error() string {
 		what := strings.TrimSpace(davActions[e.Method] + " " + strings.Trim(e.Path, "/"))
 		if e.Edge {
 			return fmt.Sprintf("Cloudflare 拦截了同步请求（%s）。请在 Cloudflare 里为这个 WebDAV 域名放行 WebDAV 请求（WAF 或机器人防护规则）", what)
+		}
+		if e.Reason != "" {
+			return fmt.Sprintf("WebDAV 服务器不允许%s（HTTP 403，服务器说明：%s）", what, e.Reason)
 		}
 		return fmt.Sprintf("WebDAV 服务器不允许%s（HTTP 403）。请确认这个账号对同步目录有读取、新建、修改和删除权限", what)
 	case http.StatusTooManyRequests, http.StatusServiceUnavailable:
@@ -105,10 +110,16 @@ func (c *Client) do(ctx context.Context, method, p string, body io.Reader, size 
 	return hc.Do(req)
 }
 
+var tags = regexp.MustCompile(`<[^>]*>|\s+`)
+
 func failed(method, p string, resp *http.Response) error {
-	io.Copy(io.Discard, io.LimitReader(resp.Body, 64<<10))
+	b, _ := io.ReadAll(io.LimitReader(resp.Body, 64<<10))
 	resp.Body.Close()
 	e := &HTTPError{Method: method, Path: p, Status: resp.StatusCode, Edge: edge(resp)}
+	if ct := resp.Header.Get("Content-Type"); !e.Edge && (strings.Contains(ct, "text/plain") || strings.Contains(ct, "xml") || strings.Contains(ct, "json")) {
+		r := []rune(strings.TrimSpace(tags.ReplaceAllString(string(b), " ")))
+		e.Reason = string(r[:min(len(r), 120)])
+	}
 	if s, err := strconv.Atoi(resp.Header.Get("Retry-After")); err == nil {
 		e.RetryAfter = time.Duration(s) * time.Second
 	}
