@@ -2,14 +2,17 @@
 # Packages a built Linux bundle as .tar.gz, .deb, .rpm, Arch .pkg.tar.zst
 # and AppImage. Used by .github/workflows/release.yml; runs locally too.
 #
-#   app/linux/packaging/package.sh <version> <bundle dir> <out dir>
+#   app/linux/packaging/package.sh <version> <bundle dir> <out dir> [formats]
 #
+# formats is a space-separated subset of "tar deb rpm archlinux appimage"
+# (all by default).
 # The bundle must already hold lookd and agent/ (see the workflow). nfpm
 # and linuxdeploy are taken from PATH; a format whose tool is missing is
 # skipped with a warning.
 set -euo pipefail
 
-version=$1 bundle=$(realpath "$2") out=$(realpath -m "$3")
+version=$1 bundle=$(realpath "$2") out=$(realpath -m "$3") formats=${4:-tar deb rpm archlinux appimage}
+want() { case " $formats " in *" $1 "*) return 0 ;; esac; return 1; }
 here=$(dirname "$(realpath "$0")")
 icons=$(realpath "$here/../icons/hicolor")
 mkdir -p "$out"
@@ -24,15 +27,20 @@ esac
 base="look-studio-$version-linux-$arch"
 
 # Plain archive: the bundle plus the desktop entry and icons for a manual install.
-mkdir -p "$work/$base/share/applications" "$work/$base/share/icons"
-cp -a "$bundle/." "$work/$base/"
-cp "$here/cn.lookstudio.look_studio.desktop" "$work/$base/share/applications/"
-cp -a "$icons" "$work/$base/share/icons/"
-tar -C "$work" -czf "$out/$base.tar.gz" "$base"
+if want tar; then
+  mkdir -p "$work/$base/share/applications" "$work/$base/share/icons"
+  cp -a "$bundle/." "$work/$base/"
+  cp "$here/cn.lookstudio.look_studio.desktop" "$work/$base/share/applications/"
+  cp -a "$icons" "$work/$base/share/icons/"
+  tar -C "$work" -czf "$out/$base.tar.gz" "$base"
+fi
 
 # deb / rpm / Arch; nfpm maps a pre-release suffix to each format's rules.
-if command -v nfpm >/dev/null; then
+if ! want deb && ! want rpm && ! want archlinux; then
+  :
+elif command -v nfpm >/dev/null; then
   for fmt in deb rpm archlinux; do
+    want $fmt || continue
     STAGE=$bundle ICONS=$icons PACKAGING=$here VERSION=$version NFPM_ARCH=$nfpm_arch \
       nfpm package --config "$here/nfpm.yaml" --packager "$fmt" --target "$work/" >/dev/null
   done
@@ -49,7 +57,9 @@ fi
 
 # AppImage: the bundle under look-studio/, libmpv and its libraries under
 # usr/lib (deployed by linuxdeploy, which leaves the GTK stack to the host).
-if command -v linuxdeploy >/dev/null; then
+if ! want appimage; then
+  :
+elif command -v linuxdeploy >/dev/null; then
   app="$work/AppDir"
   mkdir -p "$app/look-studio" "$app/usr/lib"
   cp -a "$bundle/." "$app/look-studio/"

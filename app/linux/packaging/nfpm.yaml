@@ -34,7 +34,7 @@ overrides:
   deb:
     depends:
       - libgtk-3-0t64 | libgtk-3-0
-      - libmpv2 | libmpv1
+      - libmpv2
     recommends:
       - ffmpeg
       - nodejs

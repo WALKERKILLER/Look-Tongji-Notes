@@ -51,16 +51,22 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
   linux:
-    name: Linux ${{ matrix.arch }}
+    name: Linux ${{ matrix.arch }} ${{ matrix.kind }}
     needs: prepare
     strategy:
       fail-fast: false
       matrix:
+        # The app links one libmpv soname. deb, rpm, Arch and the plain archive
+        # use the system's libmpv.so.2 (current distros), so they are built on
+        # 24.04; the AppImage carries its own libmpv and is built on 22.04 for
+        # its older glibc.
+        # Flutter publishes no Linux arm64 SDK archive; the master channel
+        # makes the action clone the repository and check out the version tag.
         include:
-          - { arch: x64, runner: ubuntu-22.04, flutter_channel: stable }
-          # Flutter publishes no Linux arm64 SDK archive; the master channel
-          # makes the action clone the repository and check out the version tag.
-          - { arch: arm64, runner: ubuntu-22.04-arm, flutter_channel: master }
+          - { arch: x64, kind: packages, runner: ubuntu-24.04, flutter_channel: stable, formats: "tar deb rpm archlinux" }
+          - { arch: x64, kind: appimage, runner: ubuntu-22.04, flutter_channel: stable, formats: appimage }
+          - { arch: arm64, kind: packages, runner: ubuntu-24.04-arm, flutter_channel: master, formats: "tar deb rpm archlinux" }
+          - { arch: arm64, kind: appimage, runner: ubuntu-22.04-arm, flutter_channel: master, formats: appimage }
     runs-on: ${{ matrix.runner }}
     env:
       VERSION: ${{ needs.prepare.outputs.version }}
@@ -110,11 +116,11 @@ jobs:
           echo "BUNDLE=$bundle" >> "$GITHUB_ENV"
 
       - name: Package
-        run: app/linux/packaging/package.sh "$VERSION" "$BUNDLE" dist
+        run: app/linux/packaging/package.sh "$VERSION" "$BUNDLE" dist "${{ matrix.formats }}"
 
       - uses: actions/upload-artifact@v7
         with:
-          name: look-studio-linux-${{ matrix.arch }}
+          name: look-studio-linux-${{ matrix.arch }}-${{ matrix.kind }}
           path: dist/*
           retention-days: 14
       - name: Attach to the release

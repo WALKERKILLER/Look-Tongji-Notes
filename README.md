@@ -24,7 +24,7 @@ Each `studio-v*` release on the [releases page](https://github.com/WALKERKILLER/
 | Windows x64 | `-setup.exe` (per-user install, no admin rights) and a portable `.zip` |
 | macOS (Apple silicon and Intel) | `.dmg` and `.zip` |
 
-Install `ffmpeg` for transcription and Node.js 22+ for the assistant (or let the app install the assistant's runtime). The deb, rpm and Arch packages depend on GTK 3 and libmpv; the AppImage carries its own libmpv.
+Install `ffmpeg` for transcription and Node.js 22+ for the assistant (or let the app install the assistant's runtime). The deb, rpm and Arch packages and the plain archive need GTK 3, libmpv 2 and glibc 2.39 or newer (Ubuntu 24.04, Debian 13, Fedora 40, Arch and later); the AppImage carries its own libmpv and runs from Ubuntu 22.04 on.
 
 The builds are not code-signed yet. Windows SmartScreen may warn: choose "More info" → "Run anyway". On macOS, open the app once with right-click → Open, or run `xattr -dr com.apple.quarantine "/Applications/Look Studio.app"`.
 
