@@ -24,6 +24,7 @@ import (
 	"lookstudio/lookd/internal/agentenv"
 	"lookstudio/lookd/internal/asr"
 	"lookstudio/lookd/internal/canvas"
+	"lookstudio/lookd/internal/datasync"
 	"lookstudio/lookd/internal/dl"
 	"lookstudio/lookd/internal/events"
 	"lookstudio/lookd/internal/jobs"
@@ -156,6 +157,10 @@ func run(dataDir, libRoot, addr, node, agentScript string, watchStdin bool) erro
 		Notify: srv.Notes.Add, Publish: bus.Publish}
 	srv.Notion = &notion.Service{Path: filepath.Join(dataDir, "notion.json"), Docs: srv.NotionDocs, Publish: bus.Publish,
 		HC: &http.Client{Timeout: 2 * time.Minute, Transport: sess.Transport()}}
+	srv.Data = &datasync.Service{Roots: datasync.Roots{Library: cfg.LibraryRoot, Data: dataDir}, App: server.Version,
+		State: srv.UserState, MergeState: srv.MergeUserState, Changed: srv.DataArrived, Publish: bus.Publish,
+		Seal: tongji.Seal, Unseal: tongji.Unseal}
+	go srv.Data.Run(ctx)
 	go srv.RunWatcher(ctx)
 	go sup.Run(ctx)
 	go func() {

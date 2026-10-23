@@ -23,6 +23,7 @@ import (
 	"lookstudio/lookd/internal/agentenv"
 	"lookstudio/lookd/internal/asr"
 	"lookstudio/lookd/internal/canvas"
+	"lookstudio/lookd/internal/datasync"
 	"lookstudio/lookd/internal/dl"
 	"lookstudio/lookd/internal/events"
 	"lookstudio/lookd/internal/jobs"
@@ -61,6 +62,8 @@ type Server struct {
 	Canvas *canvas.Service
 	// Notion syncs notes and transcripts into a Notion workspace.
 	Notion *notion.Service
+	// Data makes backups and syncs the library over WebDAV.
+	Data *datasync.Service
 
 	syncMu        sync.Mutex
 	lastCourse    time.Time
@@ -283,6 +286,36 @@ func (s *Server) Handler() http.Handler {
 	h("GET /api/lectures/{id}/courseware/text", s.coursewareText)
 	h("GET /api/lectures/{id}/courseware/search", s.searchCourseware)
 	mux.HandleFunc("GET /api/lectures/{id}/slides/{idx}/image", s.slideImage)
+	h("GET /api/storage", s.storage)
+	h("POST /api/storage/clean", s.storageClean)
+	mux.HandleFunc("GET /api/data/export", s.dataExport)
+	h("GET /api/data/estimate", func(http.ResponseWriter, *http.Request) (any, error) { return s.Data.Estimate(), nil })
+	h("POST /api/data/import", s.dataImport)
+	h("GET /api/data/import/{id}", func(_ http.ResponseWriter, r *http.Request) (any, error) {
+		pv, err := s.Data.Inspect(r.PathValue("id"))
+		return pv, dataErr(err)
+	})
+	h("POST /api/data/import/{id}/apply", s.dataRestore)
+	h("DELETE /api/data/import/{id}", func(_ http.ResponseWriter, r *http.Request) (any, error) {
+		s.Data.Discard(r.PathValue("id"))
+		return ok(), nil
+	})
+	h("GET /api/sync", func(http.ResponseWriter, *http.Request) (any, error) { return s.Data.Status(), nil })
+	h("PUT /api/sync", s.syncConfigure)
+	h("POST /api/sync/auto", func(_ http.ResponseWriter, r *http.Request) (any, error) {
+		var in struct {
+			Auto bool `json:"auto"`
+		}
+		if err := decode(r, &in); err != nil {
+			return nil, err
+		}
+		return s.Data.SetAuto(in.Auto), nil
+	})
+	h("POST /api/sync/run", s.syncRun)
+	h("DELETE /api/sync", func(http.ResponseWriter, *http.Request) (any, error) {
+		s.Data.Disconnect()
+		return s.Data.Status(), nil
+	})
 	h("GET /api/mineru", s.mineruStatus)
 	h("PUT /api/mineru", s.putMinerU)
 	h("POST /api/mineru/test", s.testMinerU)

@@ -37,6 +37,7 @@ The app starts lookd ([lookd_service.dart](../app/lib/core/lookd_service.dart) s
 | `lookd/internal/library` | On-disk library layout, courseware search, schedule, timeline, README for AI tools |
 | `lookd/internal/portable` | Converts library Markdown (`look://` links, timestamps, math) to plain Markdown for exports |
 | `lookd/internal/notion` | Notion API client (pacing, retries) and the one-way sync of `library.KnowledgeDocs` with edit detection ([spec 0013](specs/0013-notion-sync.md), [decision 0011](decisions/0011-notion-sync-through-an-internal-integration.md)) |
+| `lookd/internal/datasync` | Backup archives, a WebDAV client and the three-way sync of the library and the assistant's portable data ([spec 0014](specs/0014-data-sync-and-backup.md), [decision 0012](decisions/0012-webdav-sync-with-a-shared-manifest.md)) |
 | `lookd/internal/store` | SQLite schema and FTS index ([schema.sql](../lookd/internal/store/schema.sql)); rebuildable from library files (schedule and activity via their JSON mirrors) |
 | `lookd/internal/events` | SSE event fan-out |
 | `lookd/internal/agent` | Supervises the Node agent host and proxies `/agent/*` |
