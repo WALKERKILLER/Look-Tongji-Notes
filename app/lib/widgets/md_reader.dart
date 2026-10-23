@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../theme/tokens.dart';
 import 'look_markdown.dart';
+import '../l10n/l10n.dart';
 
 /// A heading of a reader document; [section] is the section it opens.
 class MdHeading {
@@ -235,7 +236,7 @@ class ReaderToc extends StatelessWidget {
     if (doc.headings.isEmpty) {
       return Padding(
         padding: const EdgeInsets.all(Space.lg),
-        child: Text('这篇没有小标题', style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
+        child: Text(l10n.readerNoHeadings, style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
       );
     }
     final top = doc.headings.map((h) => h.level).reduce((a, b) => a < b ? a : b);
@@ -330,7 +331,7 @@ class _ReaderSearchBarState extends State<ReaderSearchBar> {
             child: TextField(
               controller: _q,
               autofocus: true,
-              decoration: const InputDecoration(hintText: '在本文中查找', border: InputBorder.none, filled: false, isDense: true),
+              decoration: InputDecoration(hintText: l10n.readerFindHint, border: InputBorder.none, filled: false, isDense: true),
               onChanged: (v) => setState(() {
                 _hits = widget.doc.find(v);
                 _at = 0;
@@ -340,10 +341,10 @@ class _ReaderSearchBarState extends State<ReaderSearchBar> {
             ),
           ),
           if (_q.text.isNotEmpty)
-            Text(_hits.isEmpty ? '无结果' : '${_at + 1}/${_hits.length}', style: TextStyle(color: cs.onSurfaceVariant)),
-          IconButton(tooltip: '上一处', onPressed: _hits.isEmpty ? null : () => _go(-1), icon: const Icon(Icons.keyboard_arrow_up_rounded)),
-          IconButton(tooltip: '下一处', onPressed: _hits.isEmpty ? null : () => _go(1), icon: const Icon(Icons.keyboard_arrow_down_rounded)),
-          IconButton(tooltip: '关闭', onPressed: widget.onClose, icon: const Icon(Icons.close_rounded)),
+            Text(_hits.isEmpty ? l10n.readerNoMatches : '${_at + 1}/${_hits.length}', style: TextStyle(color: cs.onSurfaceVariant)),
+          IconButton(tooltip: l10n.readerPreviousMatch, onPressed: _hits.isEmpty ? null : () => _go(-1), icon: const Icon(Icons.keyboard_arrow_up_rounded)),
+          IconButton(tooltip: l10n.readerNextMatch, onPressed: _hits.isEmpty ? null : () => _go(1), icon: const Icon(Icons.keyboard_arrow_down_rounded)),
+          IconButton(tooltip: l10n.commonClose, onPressed: widget.onClose, icon: const Icon(Icons.close_rounded)),
           const SizedBox(width: Space.xs),
         ]),
       ),

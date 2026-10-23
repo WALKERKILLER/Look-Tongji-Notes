@@ -5,6 +5,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 
 import '../theme/tokens.dart';
+import '../l10n/l10n.dart';
 
 /// Midnight of [d]'s local day.
 DateTime dayOf(DateTime d) => DateTime(d.year, d.month, d.day);
@@ -290,7 +291,7 @@ class _HeatPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    for (final (r, s) in const [(0, '周一'), (2, '周三'), (4, '周五')]) {
+    for (final (r, s) in [(0, l10n.weekdayMon), (2, l10n.weekdayWed), (4, l10n.weekdayFri)]) {
       _text(canvas, s, Offset(0, _rect(0, r).center.dy), center: true);
     }
     // A month label sits over the column holding that month's 1st; the first
@@ -305,7 +306,7 @@ class _HeatPainter extends CustomPainter {
     var last = -3;
     for (final c in months.keys.toList()..sort()) {
       if (c - last < 3) continue;
-      _text(canvas, '${months[c]}月', Offset(_rect(c, 0).left, 0));
+      _text(canvas, l10n.dateMonthOf(months[c]!), Offset(_rect(c, 0).left, 0));
       last = c;
     }
     final radius = Radius.circular(math.min(3, cell / 4));
@@ -386,7 +387,7 @@ class HeatLegend extends StatelessWidget {
     final style = Theme.of(context).textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant);
     return ExcludeSemantics(
       child: Row(mainAxisSize: MainAxisSize.min, children: [
-        Text('少', style: style),
+        Text(l10n.heatmapLess, style: style),
         const SizedBox(width: Space.xs),
         for (final c in heatColors(cs))
           Container(
@@ -396,7 +397,7 @@ class HeatLegend extends StatelessWidget {
             decoration: BoxDecoration(color: c, borderRadius: Corners.all(math.min(3, cell / 4))),
           ),
         const SizedBox(width: Space.xs),
-        Text('多', style: style),
+        Text(l10n.heatmapMore, style: style),
       ]),
     );
   }
@@ -405,9 +406,9 @@ class HeatLegend extends StatelessWidget {
 /// "42 分钟" or "1 小时 5 分".
 String fmtMinutes(num minutes) {
   final m = minutes.round();
-  if (m < 60) return '$m 分钟';
-  return m % 60 == 0 ? '${m ~/ 60} 小时' : '${m ~/ 60} 小时 ${m % 60} 分';
+  if (m < 60) return l10n.durationMinutes(m);
+  return m % 60 == 0 ? l10n.durationHoursOnly(m ~/ 60) : l10n.durationHoursMinutesOf(m ~/ 60, m % 60);
 }
 
 /// "10月14日"
-String fmtMonthDay(DateTime d) => '${d.month}月${d.day}日';
+String fmtMonthDay(DateTime d) => l10n.dateMonthDay(d.month, d.day);

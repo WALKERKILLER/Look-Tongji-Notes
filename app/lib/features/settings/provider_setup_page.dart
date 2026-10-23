@@ -10,9 +10,10 @@ import '../assistant/assistant_controller.dart';
 import 'model_meta.dart';
 import 'models_page.dart';
 import 'provider_presets.dart';
+import '../../l10n/l10n.dart';
 
-const _apiLabels = {
-  'openai-completions': 'OpenAI Chat Completions 兼容',
+final _apiLabels = {
+  'openai-completions': l10n.apiOpenaiCompatible,
   'openai-responses': 'OpenAI Responses',
   'anthropic-messages': 'Anthropic Messages',
   'google-generative-ai': 'Google Gemini',
@@ -107,7 +108,7 @@ class _ProviderSetupPageState extends State<ProviderSetupPage> {
         _chosen['${m['id']}'] = m.cast<String, dynamic>();
       }
     } else {
-      _name = '自定义服务';
+      _name = l10n.providerCustom;
       _advanced = true;
     }
     // Pre-existing preset that was already added: open in edit mode.
@@ -158,7 +159,7 @@ class _ProviderSetupPageState extends State<ProviderSetupPage> {
       );
       setState(() {
         _offered = list;
-        _offeredFrom = '服务商';
+        _offeredFrom = l10n.providerSource;
       });
     } catch (e) {
       setState(() => _modelsError = e is ApiError ? e.message : '$e');
@@ -197,11 +198,11 @@ class _ProviderSetupPageState extends State<ProviderSetupPage> {
     final id = _id.text.trim();
     final key = _key.text.trim();
     if (!_builtin && _chosen.isEmpty) {
-      showSnack(context, '至少选择一个模型');
+      showSnack(context, l10n.providerPickModel);
       return;
     }
     if (_isNew && _needsKey && key.isEmpty && !_configured) {
-      showSnack(context, '请先填写 API Key');
+      showSnack(context, l10n.providerKeyMissing);
       return;
     }
     setState(() {
@@ -238,7 +239,7 @@ class _ProviderSetupPageState extends State<ProviderSetupPage> {
       if (_a.selected == null && models.isNotEmpty) {
         await _a.setPrefs({'provider': id, 'model': models.first['id']});
       }
-      if (mounted) showSnack(context, '已保存 $_name');
+      if (mounted) showSnack(context, l10n.providerSaved(_name));
       if (test && models.isNotEmpty) await _runTest('${models.first['id']}');
     } catch (e) {
       if (mounted) showSnack(context, e is ApiError ? e.message : '$e');
@@ -253,7 +254,7 @@ class _ProviderSetupPageState extends State<ProviderSetupPage> {
       final r = await _a.testProvider(_id.text.trim(), model);
       setState(() {
         _testOk = true;
-        _test = '${r['model']} 响应正常 · ${r['latency_ms']} ms';
+        _test = l10n.providerTestOk(r['model'], r['latency_ms']);
       });
     } catch (e) {
       setState(() {
@@ -268,11 +269,11 @@ class _ProviderSetupPageState extends State<ProviderSetupPage> {
       context: context,
       builder: (context) => AlertDialog(
         icon: const Icon(Icons.delete_outline_rounded),
-        title: Text(_builtin ? '移除 $_name 的密钥？' : '删除 $_name？'),
-        content: Text(_builtin ? '内置服务商仍会保留在目录中，填入密钥即可重新使用。' : '会删除这个服务及其模型配置。'),
+        title: Text(_builtin ? l10n.providerRemoveKeyTitle(_name) : l10n.providerDeleteTitle(_name)),
+        content: Text(_builtin ? l10n.providerRemoveKeyBody : l10n.providerDeleteBody),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('取消')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('删除')),
+          TextButton(onPressed: () => Navigator.pop(context, false), child: Text(l10n.commonCancel)),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: Text(l10n.commonDelete)),
         ],
       ),
     );
@@ -293,9 +294,9 @@ class _ProviderSetupPageState extends State<ProviderSetupPage> {
     final preset = widget.preset ?? presetFor(_id.text.trim());
     return Scaffold(
       appBar: AppBar(
-        title: Text(_isNew ? '添加 $_name' : _name),
+        title: Text(_isNew ? l10n.providerAddTitle(_name) : _name),
         actions: [
-          if (!_isNew) IconButton(tooltip: '删除', onPressed: _remove, icon: const Icon(Icons.delete_outline_rounded)),
+          if (!_isNew) IconButton(tooltip: l10n.commonDelete, onPressed: _remove, icon: const Icon(Icons.delete_outline_rounded)),
           const SizedBox(width: Space.sm),
         ],
       ),
@@ -315,7 +316,7 @@ class _ProviderSetupPageState extends State<ProviderSetupPage> {
                     preset?.blurb.isNotEmpty == true
                         ? preset!.blurb
                         : _builtin
-                            ? 'Pi SDK 内置服务商'
+                            ? l10n.providerBuiltIn
                             : (_apiLabels[_api] ?? _api),
                     style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
                   ),
@@ -325,7 +326,7 @@ class _ProviderSetupPageState extends State<ProviderSetupPage> {
             const SizedBox(height: Space.xl),
             _Step(
               n: 1,
-              title: '连接',
+              title: l10n.commonConnect,
               done: _configured,
               child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                 if (_needsKey)
@@ -335,11 +336,11 @@ class _ProviderSetupPageState extends State<ProviderSetupPage> {
                     onChanged: (_) => setState(() {}),
                     decoration: InputDecoration(
                       labelText: 'API Key',
-                      hintText: _configured ? '已保存（${_registered?['key_hint'] ?? ''}），输入新值以替换' : '粘贴你的密钥',
+                      hintText: _configured ? l10n.providerKeySaved(_registered?['key_hint'] ?? '') : l10n.providerKeyHint,
                       prefixIcon: const Icon(Icons.key_outlined),
                       suffixIcon: Row(mainAxisSize: MainAxisSize.min, children: [
                         IconButton(
-                          tooltip: '粘贴',
+                          tooltip: l10n.commonPaste,
                           onPressed: () async {
                             final d = await Clipboard.getData(Clipboard.kTextPlain);
                             if (d?.text != null) setState(() => _key.text = d!.text!.trim());
@@ -347,7 +348,7 @@ class _ProviderSetupPageState extends State<ProviderSetupPage> {
                           icon: const Icon(Icons.content_paste_rounded),
                         ),
                         IconButton(
-                          tooltip: _showKey ? '隐藏' : '显示',
+                          tooltip: _showKey ? l10n.commonHide : l10n.commonShow,
                           onPressed: () => setState(() => _showKey = !_showKey),
                           icon: Icon(_showKey ? Icons.visibility_off_outlined : Icons.visibility_outlined),
                         ),
@@ -355,14 +356,14 @@ class _ProviderSetupPageState extends State<ProviderSetupPage> {
                     ),
                   )
                 else
-                  Text('本地服务通常不需要密钥。确认服务已在本机启动。', style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
+                  Text(l10n.providerLocalNoKey, style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
                 if (_keyUrl.isNotEmpty)
                   Align(
                     alignment: Alignment.centerLeft,
                     child: TextButton.icon(
                       onPressed: () => openPath(_keyUrl),
                       icon: const Icon(Icons.open_in_new_rounded, size: 16),
-                      label: Text(_needsKey ? '还没有密钥？去 $_name 获取' : '下载 $_name'),
+                      label: Text(_needsKey ? l10n.providerGetKey(_name) : l10n.providerDownloadApp(_name)),
                     ),
                   ),
                 if (!_builtin) ...[
@@ -378,7 +379,7 @@ class _ProviderSetupPageState extends State<ProviderSetupPage> {
                     child: Padding(
                       padding: const EdgeInsets.symmetric(vertical: Space.sm),
                       child: Row(children: [
-                        Text('高级', style: tt.labelLarge?.copyWith(color: cs.primary)),
+                        Text(l10n.commonAdvanced, style: tt.labelLarge?.copyWith(color: cs.primary)),
                         AnimatedRotation(turns: _advanced ? 0.5 : 0, duration: Motion.medium1, child: Icon(Icons.expand_more_rounded, color: cs.primary)),
                       ]),
                     ),
@@ -391,7 +392,7 @@ class _ProviderSetupPageState extends State<ProviderSetupPage> {
                         : Column(children: [
                             DropdownButtonFormField<String>(
                               initialValue: _api,
-                              decoration: const InputDecoration(labelText: '接口协议'),
+                              decoration: InputDecoration(labelText: l10n.providerApi),
                               items: [for (final e in _apiLabels.entries) DropdownMenuItem(value: e.key, child: Text(e.value))],
                               onChanged: (v) => setState(() => _api = v ?? _api),
                             ),
@@ -399,14 +400,14 @@ class _ProviderSetupPageState extends State<ProviderSetupPage> {
                             TextField(
                               controller: _id,
                               enabled: _isNew,
-                              decoration: const InputDecoration(labelText: '服务 ID', helperText: '本地标识，字母数字及 . _ -'),
+                              decoration: InputDecoration(labelText: l10n.providerId, helperText: l10n.providerIdHelper),
                             ),
                           ]),
                   ),
                 ],
               ]),
             ),
-            _Step(n: 2, title: '模型', done: _builtin ? _configured : _chosen.isNotEmpty, child: _builtin ? _builtinModels(context) : _customModels(context)),
+            _Step(n: 2, title: l10n.commonModel, done: _builtin ? _configured : _chosen.isNotEmpty, child: _builtin ? _builtinModels(context) : _customModels(context)),
           ]),
         ),
       ]),
@@ -426,7 +427,7 @@ class _ProviderSetupPageState extends State<ProviderSetupPage> {
               duration: Motion.medium1,
               child: _test == null
                   ? Text(
-                      _builtin ? '保存后会测试一次连接' : '已选 ${_chosen.length} 个模型 · 保存后测试连接',
+                      _builtin ? l10n.providerTestsOnSave : l10n.providerChosenModels(_chosen.length),
                       key: const ValueKey('hint'),
                       style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                     )
@@ -441,7 +442,7 @@ class _ProviderSetupPageState extends State<ProviderSetupPage> {
           FilledButton.icon(
             onPressed: _saving ? null : _save,
             icon: _saving ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.check_rounded),
-            label: Text(_isNew ? '保存并测试' : '保存'),
+            label: Text(_isNew ? l10n.providerSaveAndTest : l10n.commonSave),
           ),
         ]),
       ),
@@ -454,7 +455,7 @@ class _ProviderSetupPageState extends State<ProviderSetupPage> {
     final a = context.watch<AssistantController>();
     final list = _filter(_piModels());
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      Text('Pi SDK 已内置这家的模型目录，填好密钥即可使用。点模型可设为助手默认。', style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+      Text(l10n.providerBuiltInHint, style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
       const SizedBox(height: Space.sm),
       _searchField(context),
       const SizedBox(height: Space.sm),
@@ -470,7 +471,7 @@ class _ProviderSetupPageState extends State<ProviderSetupPage> {
           trailing: Text('${m['id']}' == '${m['name']}' ? '' : '${m['id']}', style: tt.labelSmall?.copyWith(color: cs.outline)),
           onTap: () => a.setPrefs({'provider': _id.text.trim(), 'model': m['id']}),
         ),
-      if (list.length > 80) Text('还有 ${list.length - 80} 个，搜索以缩小范围', style: tt.bodySmall),
+      if (list.length > 80) Text(l10n.providerMoreModels(list.length - 80), style: tt.bodySmall),
     ]);
   }
 
@@ -485,7 +486,7 @@ class _ProviderSetupPageState extends State<ProviderSetupPage> {
         onChanged: (_) => setState(() {}),
         decoration: InputDecoration(
           isDense: true,
-          hintText: '搜索模型',
+          hintText: l10n.modelsSearch,
           prefixIcon: const Icon(Icons.search_rounded, size: 20),
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(Corners.full), borderSide: BorderSide.none),
         ),
@@ -498,7 +499,7 @@ class _ProviderSetupPageState extends State<ProviderSetupPage> {
     final canFetch = !_needsKey || _key.text.trim().isNotEmpty || !_isNew;
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       if (_chosen.isNotEmpty) ...[
-        Text('已选择', style: tt.labelLarge),
+        Text(l10n.providerChosen, style: tt.labelLarge),
         const SizedBox(height: Space.xs),
         Wrap(spacing: Space.xs, runSpacing: Space.xs, children: [
           for (final m in _chosen.values)
@@ -514,33 +515,33 @@ class _ProviderSetupPageState extends State<ProviderSetupPage> {
         FilledButton.tonalIcon(
           onPressed: _loadingModels || !canFetch ? null : _fetchModels,
           icon: _loadingModels ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.cloud_download_outlined, size: 18),
-          label: Text(canFetch ? '从服务商获取模型列表' : '填写密钥后获取模型列表'),
+          label: Text(canFetch ? l10n.providerFetchModels : l10n.providerFetchNeedsKey),
         ),
         if (_catalogId != null)
           OutlinedButton.icon(
             onPressed: _loadingModels ? null : _fromCatalog,
             icon: const Icon(Icons.menu_book_outlined, size: 18),
-            label: const Text('从 models.dev 选择'),
+            label: Text(l10n.providerFromCatalog),
           ),
       ]),
       if (_modelsError != null) ...[
         const SizedBox(height: Space.sm),
         Text(_modelsError!, style: tt.bodySmall?.copyWith(color: cs.error)),
-        if (_catalogId != null) Text('这家服务可能不提供模型列表接口，可以改从 models.dev 目录选择或手动添加。', style: tt.bodySmall),
+        if (_catalogId != null) Text(l10n.providerNoModelList, style: tt.bodySmall),
       ],
       if (offered != null) ...[
         const SizedBox(height: Space.md),
         Row(children: [
           Expanded(child: _searchField(context)),
           const SizedBox(width: Space.sm),
-          Text('${offered.length} 个 · 来自$_offeredFrom', style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant)),
+          Text(l10n.providerOfferedCount(offered.length, _offeredFrom), style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant)),
         ]),
         const SizedBox(height: Space.xs),
         Container(
           constraints: const BoxConstraints(maxHeight: 440),
           decoration: BoxDecoration(color: cs.surfaceContainerLow, borderRadius: BorderRadius.circular(Corners.lg)),
           child: offered.isEmpty
-              ? Padding(padding: const EdgeInsets.all(Space.lg), child: Text('没有匹配的模型', style: tt.bodyMedium))
+              ? Padding(padding: const EdgeInsets.all(Space.lg), child: Text(l10n.providerNoMatch, style: tt.bodyMedium))
               : ListView.builder(
                   shrinkWrap: true,
                   padding: const EdgeInsets.symmetric(vertical: Space.xs),
@@ -553,7 +554,7 @@ class _ProviderSetupPageState extends State<ProviderSetupPage> {
                       value: on,
                       controlAffinity: ListTileControlAffinity.leading,
                       title: Text('${m['id']}', style: tt.bodyMedium),
-                      subtitle: m['known'] == false ? Text('models.dev 未收录', style: tt.labelSmall?.copyWith(color: cs.outline)) : ModelBadges(m: m, dense: true),
+                      subtitle: m['known'] == false ? Text(l10n.providerNotInCatalog, style: tt.labelSmall?.copyWith(color: cs.outline)) : ModelBadges(m: m, dense: true),
                       onChanged: (v) => setState(() => v == true ? _chosen['${m['id']}'] = m : _chosen.remove(m['id'])),
                     );
                   },
@@ -566,14 +567,14 @@ class _ProviderSetupPageState extends State<ProviderSetupPage> {
           child: TextField(
             controller: _manual,
             onSubmitted: (_) => _addManual(),
-            decoration: const InputDecoration(isDense: true, labelText: '手动添加模型 ID', hintText: '例如 deepseek-chat'),
+            decoration: InputDecoration(isDense: true, labelText: l10n.providerManualModel, hintText: l10n.providerManualModelHint),
           ),
         ),
         const SizedBox(width: Space.sm),
         IconButton.filledTonal(onPressed: _addManual, icon: const Icon(Icons.add_rounded)),
       ]),
       const SizedBox(height: Space.xs),
-      Text('价格（美元 / 百万 token）、上下文长度和能力标签来自 models.dev，保存时写入 Pi 的模型配置，用于上下文管理和用量统计。',
+      Text(l10n.providerCatalogNote,
           style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
     ]);
   }

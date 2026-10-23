@@ -7,18 +7,24 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../l10n/l10n.dart';
+
 /// Where the avatar comes from.
 enum AvatarKind { initial, emoji, art, file, url }
 
 /// Outline of the avatar.
 enum AvatarFrame {
-  circle('圆形'),
-  squircle('圆角方'),
-  cookie('曲奇'),
-  flower('花瓣');
+  circle,
+  squircle,
+  cookie,
+  flower;
 
-  const AvatarFrame(this.label);
-  final String label;
+  String get label => switch (this) {
+        circle => l10n.avatarShapeCircle,
+        squircle => l10n.avatarShapeSquircle,
+        cookie => l10n.avatarShapeCookie,
+        flower => l10n.avatarShapePetal,
+      };
 }
 
 /// The local user's display profile: nickname, avatar and home greeting

@@ -7,10 +7,11 @@ import '../../core/app_state.dart';
 import '../../core/format.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/states.dart';
+import '../../l10n/l10n.dart';
 
 const _tokenPage = 'https://mineru.net/apiManage/token';
 
-String _date(DateTime d) => '${d.year}年${d.month}月${d.day}日';
+String _date(DateTime d) => l10n.dateYearMonthDay(d.year, d.month, d.day);
 
 /// MinerU courseware parsing: API token, options and today's page quota.
 /// The token stays sealed in lookd; only its last four characters come back.
@@ -53,7 +54,7 @@ class _MinerUSettingsState extends State<MinerUSettings> {
       final r = (await _api.put('/api/mineru', body) as Map).cast<String, dynamic>();
       if (mounted) setState(() => _st = r);
     } catch (e) {
-      if (mounted) showSnack(context, '保存失败：$e');
+      if (mounted) showSnack(context, l10n.commonSaveFailed(e));
     }
   }
 
@@ -80,7 +81,7 @@ class _MinerUSettingsState extends State<MinerUSettings> {
     try {
       final r = (await _api.post('/api/mineru/test', null, const Duration(seconds: 30)) as Map).cast<String, dynamic>();
       _testOk = r['ok'] == true;
-      _test = _testOk! ? '连接正常' : '${r['error']}';
+      _test = _testOk! ? l10n.commonConnectionOk : '${r['error']}';
     } catch (e) {
       _testOk = false;
       _test = '$e';
@@ -107,7 +108,7 @@ class _MinerUSettingsState extends State<MinerUSettings> {
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Padding(
         padding: const EdgeInsets.symmetric(vertical: Space.sm),
-        child: Text('上传的课件（PDF、PPT、Word、图片）交给 MinerU 解析成 Markdown，保留公式、表格和图片，可以全文阅读，也能让助手引用。',
+        child: Text(l10n.mineruIntro,
             style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant, height: 1.6)),
       ),
       const SizedBox(height: Space.sm),
@@ -123,21 +124,21 @@ class _MinerUSettingsState extends State<MinerUSettings> {
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text('MinerU', style: tt.titleMedium),
                 Text(
-                  configured ? '精准解析 · Token ••••${st['token_tail'] ?? ''}' : '未配置 Token · 使用免登录的轻量解析',
+                  configured ? l10n.mineruPrecise(st['token_tail'] ?? '') : l10n.mineruLite,
                   style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                 ),
               ]),
             ),
             if (configured && !_editing) ...[
-              TextButton(onPressed: _busy ? null : _runTest, child: const Text('测试')),
-              IconButton(tooltip: '更换 Token', onPressed: () => setState(() => _editing = true), icon: const Icon(Icons.edit_outlined)),
+              TextButton(onPressed: _busy ? null : _runTest, child: Text(l10n.commonTest)),
+              IconButton(tooltip: l10n.mineruChangeToken, onPressed: () => setState(() => _editing = true), icon: const Icon(Icons.edit_outlined)),
             ],
           ]),
           if (expAt != null && !_editing)
             Padding(
               padding: const EdgeInsets.only(top: Space.sm, left: 48),
               child: Text(
-                expDays! < 0 ? 'Token 已于 ${_date(expAt)} 过期，请重新生成' : 'Token 有效期至 ${_date(expAt)}${expDays < 14 ? '（还剩 $expDays 天）' : ''}',
+                expDays! < 0 ? l10n.mineruTokenExpired(_date(expAt)) : l10n.mineruTokenExpires(_date(expAt), expDays < 14 ? l10n.mineruTokenDaysLeft(expDays) : ''),
                 style: tt.bodySmall?.copyWith(color: expDays < 14 ? cs.error : cs.onSurfaceVariant),
               ),
             ),
@@ -166,7 +167,7 @@ class _MinerUSettingsState extends State<MinerUSettings> {
                         onSubmitted: (_) => _saveToken(),
                         decoration: InputDecoration(
                           labelText: 'API Token',
-                          hintText: '在 MinerU 官网「API 管理」中创建',
+                          hintText: l10n.mineruTokenHint,
                           border: const OutlineInputBorder(),
                           suffixIcon: IconButton(
                             onPressed: () => setState(() => _obscure = !_obscure),
@@ -179,7 +180,7 @@ class _MinerUSettingsState extends State<MinerUSettings> {
                         TextButton.icon(
                           onPressed: () => launchUrl(Uri.parse(_tokenPage)),
                           icon: const Icon(Icons.open_in_new_rounded, size: 16),
-                          label: const Text('获取 Token'),
+                          label: Text(l10n.mineruGetToken),
                         ),
                         const Spacer(),
                         if (configured) ...[
@@ -191,12 +192,12 @@ class _MinerUSettingsState extends State<MinerUSettings> {
                                     if (mounted) setState(() => _editing = false);
                                   },
                             style: TextButton.styleFrom(foregroundColor: cs.error),
-                            child: const Text('移除'),
+                            child: Text(l10n.commonRemove),
                           ),
-                          TextButton(onPressed: () => setState(() => _editing = false), child: const Text('取消')),
+                          TextButton(onPressed: () => setState(() => _editing = false), child: Text(l10n.commonCancel)),
                         ],
                         const SizedBox(width: Space.xs),
-                        FilledButton(onPressed: _busy ? null : _saveToken, child: const Text('保存')),
+                        FilledButton(onPressed: _busy ? null : _saveToken, child: Text(l10n.commonSave)),
                       ]),
                     ]),
                   )
@@ -208,12 +209,12 @@ class _MinerUSettingsState extends State<MinerUSettings> {
       // Quota
       if (configured) ...[
         Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-          Text('今日额度', style: tt.titleSmall),
+          Text(l10n.mineruQuotaToday, style: tt.titleSmall),
           const Spacer(),
           Text.rich(
             TextSpan(children: [
               TextSpan(text: '$used', style: tt.titleMedium?.copyWith(color: used >= daily ? cs.error : cs.onSurface)),
-              TextSpan(text: ' / $daily 页', style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+              TextSpan(text: l10n.mineruQuotaPages(daily), style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
             ]),
             style: const TextStyle(fontFeatures: [FontFeature.tabularFigures()]),
           ),
@@ -227,22 +228,22 @@ class _MinerUSettingsState extends State<MinerUSettings> {
         ),
         const SizedBox(height: Space.xs),
         Text(
-          '今天解析了 $files 个文件。高优先级额度每天 $daily 页，超出后排队变慢；单文件上限 ${fmtBytes((st['max_bytes'] as num?) ?? 0)}、${st['max_pages'] ?? 200} 页。额度由本机按解析结果统计，以官网为准。',
+          l10n.mineruQuotaBody(files, daily, fmtBytes((st['max_bytes'] as num?) ?? 0), st['max_pages'] ?? 200),
           style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant, height: 1.5),
         ),
         const SizedBox(height: Space.lg),
       ] else ...[
-        Text('轻量解析不需要 Token，但单文件限 10 MB、20 页，输出不含图片。配置 Token 后使用精准解析（每天 1000 页高优先级额度）。',
+        Text(l10n.mineruLiteBody,
             style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant, height: 1.5)),
         const SizedBox(height: Space.lg),
       ],
       // Options
       if (configured) ...[
-        Text('解析模型', style: tt.titleSmall),
+        Text(l10n.mineruModel, style: tt.titleSmall),
         const SizedBox(height: Space.sm),
         SegmentedButton<String>(
-          segments: const [
-            ButtonSegment(value: 'vlm', label: Text('VLM 精准'), icon: Icon(Icons.auto_awesome_outlined)),
+          segments: [
+            ButtonSegment(value: 'vlm', label: Text(l10n.mineruVlm), icon: Icon(Icons.auto_awesome_outlined)),
             ButtonSegment(value: 'pipeline', label: Text('Pipeline'), icon: Icon(Icons.account_tree_outlined)),
           ],
           selected: {'${opts['model'] ?? 'vlm'}'},
@@ -250,27 +251,27 @@ class _MinerUSettingsState extends State<MinerUSettings> {
         ),
         const SizedBox(height: Space.xs),
         Text(
-          opts['model'] == 'pipeline' ? 'Pipeline：传统版面分析，速度快、更稳定，适合排版简单的讲义。' : 'VLM：视觉大模型，公式、表格和复杂版面效果更好，推荐。',
+          opts['model'] == 'pipeline' ? l10n.mineruPipelineHint : l10n.mineruVlmHint,
           style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
         ),
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
-          title: const Text('强制 OCR'),
-          subtitle: const Text('扫描版或文字无法复制的 PDF 打开'),
+          title: Text(l10n.mineruForceOcr),
+          subtitle: Text(l10n.mineruForceOcrHint),
           value: opts['ocr'] == true,
           onChanged: (v) => _put({'options': {...opts, 'ocr': v}}),
         ),
       ],
       SwitchListTile(
         contentPadding: EdgeInsets.zero,
-        title: const Text('上传后自动解析'),
-        subtitle: const Text('关闭后需要在课件卡片上手动点「解析」'),
+        title: Text(l10n.mineruAutoParse),
+        subtitle: Text(l10n.mineruAutoParseHint),
         value: st['auto'] == true,
         onChanged: (v) => _put({'auto': v}),
       ),
       if (recent.isNotEmpty) ...[
         const SizedBox(height: Space.sm),
-        Text('最近解析', style: tt.titleSmall),
+        Text(l10n.mineruRecent, style: tt.titleSmall),
         const SizedBox(height: Space.xs),
         for (final u in recent.take(5))
           Padding(
@@ -281,8 +282,8 @@ class _MinerUSettingsState extends State<MinerUSettings> {
               Expanded(child: Text('${u['file']}', maxLines: 1, overflow: TextOverflow.ellipsis, style: tt.bodySmall)),
               Text(
                 [
-                  if (u['ok'] == true) '${u['pages']} 页',
-                  u['mode'] == 'flash' ? '轻量' : '精准',
+                  if (u['ok'] == true) l10n.commonPages(u['pages']),
+                  u['mode'] == 'flash' ? l10n.mineruModeLite : l10n.mineruModePrecise,
                   fmtRelative(DateTime.fromMillisecondsSinceEpoch(((u['at'] as num?) ?? 0).toInt() * 1000)),
                 ].join(' · '),
                 style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant),

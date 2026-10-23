@@ -8,6 +8,7 @@ import '../../core/models.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/states.dart';
 import 'lecture_player.dart';
+import '../../l10n/l10n.dart';
 
 /// The skill's timeline format: minutes may exceed 59.
 String skillClock(int ms) {
@@ -57,7 +58,7 @@ class _OutlineTabState extends State<OutlineTab> with AutomaticKeepAliveClientMi
     await widget.ctl.generateOutline();
     if (!mounted) return;
     final e = widget.ctl.outlineError;
-    if (e != null) showSnack(context, '大纲生成失败：$e');
+    if (e != null) showSnack(context, l10n.outlineFailed(e));
   }
 
   @override
@@ -72,23 +73,23 @@ class _OutlineTabState extends State<OutlineTab> with AutomaticKeepAliveClientMi
       if (ctl.segments.isEmpty) {
         return EmptyState(
           icon: Icons.view_timeline_outlined,
-          title: '大纲需要文字稿',
-          body: '先转写这节课，助手才能读完内容、按话题分章。',
+          title: l10n.outlineNeedsTranscript,
+          body: l10n.outlineNeedsTranscriptBody,
           action: FilledButton.tonalIcon(
             onPressed: () async {
               await context.read<AppState>().enqueue([ctl.lectureId], ['transcript']);
-              if (context.mounted) showSnack(context, '已加入转写队列');
+              if (context.mounted) showSnack(context, l10n.asrQueued);
             },
             icon: const Icon(Icons.subject_rounded),
-            label: const Text('开始转写'),
+            label: Text(l10n.asrStart),
           ),
         );
       }
       return EmptyState(
         icon: Icons.view_timeline_outlined,
-        title: '给这节课分章',
-        body: ctl.outlineError == null ? '助手读完整份文字稿，按话题切成章节。点章节即可跳转，进度条上也会分段显示。' : '上次没有成功：${ctl.outlineError}',
-        action: FilledButton.icon(onPressed: _generate, icon: const Icon(Icons.auto_awesome_rounded), label: Text(ctl.outlineError == null ? '生成大纲' : '重试')),
+        title: l10n.outlineTitle,
+        body: ctl.outlineError == null ? l10n.outlineBody : l10n.outlineLastError(ctl.outlineError!),
+        action: FilledButton.icon(onPressed: _generate, icon: const Icon(Icons.auto_awesome_rounded), label: Text(ctl.outlineError == null ? l10n.outlineGenerate : l10n.commonRetry)),
       );
     }
 
@@ -98,18 +99,18 @@ class _OutlineTabState extends State<OutlineTab> with AutomaticKeepAliveClientMi
         padding: const EdgeInsets.fromLTRB(Space.lg, Space.sm, Space.xs, 0),
         child: Row(children: [
           Expanded(
-            child: Text(ctl.outlineBusy ? '正在重新分章…' : '${ctl.chapters.length} 章 · ${fmtClock(total)}', style: tt.labelLarge?.copyWith(color: cs.onSurfaceVariant)),
+            child: Text(ctl.outlineBusy ? l10n.outlineRegenerating : l10n.outlineSummary(ctl.chapters.length, fmtClock(total)), style: tt.labelLarge?.copyWith(color: cs.onSurfaceVariant)),
           ),
           MenuAnchor(
             menuChildren: [
-              MenuItemButton(leadingIcon: const Icon(Icons.refresh_rounded), onPressed: ctl.outlineBusy ? null : _generate, child: const Text('重新生成')),
+              MenuItemButton(leadingIcon: const Icon(Icons.refresh_rounded), onPressed: ctl.outlineBusy ? null : _generate, child: Text(l10n.commonRegenerate)),
               MenuItemButton(
                 leadingIcon: const Icon(Icons.copy_rounded),
                 onPressed: () {
-                  Clipboard.setData(ClipboardData(text: ctl.chapters.map((c) => '${skillClock(c.startMs)}-${skillClock(c.endMs)}：${c.title}').join('\n')));
-                  showSnack(context, '已复制大纲');
+                  Clipboard.setData(ClipboardData(text: ctl.chapters.map((c) => l10n.outlineChapterLine(skillClock(c.startMs), skillClock(c.endMs), c.title)).join('\n')));
+                  showSnack(context, l10n.outlineCopied);
                 },
-                child: const Text('复制'),
+                child: Text(l10n.commonCopy),
               ),
               MenuItemButton(
                 leadingIcon: const Icon(Icons.delete_outline_rounded),
@@ -119,17 +120,17 @@ class _OutlineTabState extends State<OutlineTab> with AutomaticKeepAliveClientMi
                         final old = ctl.chapters;
                         await ctl.deleteOutline();
                         if (!context.mounted) return;
-                        showSnack(context, '已删除大纲', action: '撤销', onAction: () async {
+                        showSnack(context, l10n.outlineDeleted, action: l10n.commonUndo, onAction: () async {
                           await ctl.api.put('/api/lectures/${ctl.lectureId}/timeline', {
                             'chapters': [for (final c in old) c.j],
                           });
                           ctl.reloadTimeline();
                         });
                       },
-                child: const Text('删除'),
+                child: Text(l10n.commonDelete),
               ),
             ],
-            builder: (context, m, _) => IconButton(tooltip: '大纲选项', onPressed: () => m.isOpen ? m.close() : m.open(), icon: const Icon(Icons.more_vert_rounded)),
+            builder: (context, m, _) => IconButton(tooltip: l10n.outlineOptions, onPressed: () => m.isOpen ? m.close() : m.open(), icon: const Icon(Icons.more_vert_rounded)),
           ),
         ]),
       ),
@@ -259,7 +260,7 @@ class _ChapterRow extends StatelessWidget {
 
   static String _mins(int ms) {
     final m = (ms / 60000).round();
-    return m < 1 ? '不到 1 分钟' : '$m 分钟';
+    return m < 1 ? l10n.durationUnderMinute : l10n.durationMinutes(m);
   }
 }
 
@@ -285,9 +286,9 @@ class _DraftingState extends State<_Drafting> with SingleTickerProviderStateMixi
     final tt = Theme.of(context).textTheme;
     const widths = [0.72, 0.55, 0.8, 0.62, 0.7, 0.5];
     return ListView(padding: const EdgeInsets.all(Space.lg), children: [
-      Text('正在通读文字稿并分章', style: tt.titleSmall),
+      Text(l10n.outlineWorking, style: tt.titleSmall),
       const SizedBox(height: 2),
-      Text('长课可能需要一两分钟，可以先去看别的。', style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+      Text(l10n.outlineWorkingHint, style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
       const SizedBox(height: Space.xl),
       FadeTransition(
         opacity: Tween(begin: 0.35, end: 0.9).animate(CurvedAnimation(parent: _pulse, curve: Motion.standard)),

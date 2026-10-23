@@ -4,18 +4,20 @@ import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
+import '../l10n/l10n.dart';
 
 /// Asks for a folder with the system's own picker: the GTK or desktop
 /// portal dialog on Linux, the shell dialog on Windows, the open panel on
 /// macOS. Where there is none (Android), it asks for a path instead.
 /// Returns null when cancelled.
-Future<String?> pickDirectory(BuildContext context, {String? initial, String confirm = '选择', String title = '选择文件夹'}) async {
+Future<String?> pickDirectory(BuildContext context, {String? initial, String? confirm, String? title}) async {
+  final confirmLabel = confirm ?? l10n.commonChoose, titleText = title ?? l10n.pickerChooseFolder;
   final start = initial != null && initial.isNotEmpty && Directory(initial).existsSync() ? initial : null;
   // Android's picker answers with content:// addresses, not paths lookd
   // could use.
-  if (Platform.isAndroid) return _askPath(context, initial ?? '', confirm, title);
+  if (Platform.isAndroid) return _askPath(context, initial ?? '', confirmLabel, titleText);
   try {
-    return await getDirectoryPath(initialDirectory: start, confirmButtonText: confirm);
+    return await getDirectoryPath(initialDirectory: start, confirmButtonText: confirmLabel);
   } on UnimplementedError {
     // No native picker on this platform.
   } on MissingPluginException {
@@ -24,17 +26,18 @@ Future<String?> pickDirectory(BuildContext context, {String? initial, String con
     // The picker failed to open (e.g. no portal); ask instead.
   }
   if (!context.mounted) return null;
-  return _askPath(context, initial ?? '', confirm, title);
+  return _askPath(context, initial ?? '', confirmLabel, titleText);
 }
 
 /// Asks where to save a file with the system's save dialog; where there is
 /// none (Android), it asks for a folder and keeps [suggestedName]. The
 /// returned path ends in one of [type]'s extensions.
-Future<String?> pickSavePath(BuildContext context, {required String suggestedName, required XTypeGroup type, String confirm = '保存'}) async {
+Future<String?> pickSavePath(BuildContext context, {required String suggestedName, required XTypeGroup type, String? confirm}) async {
+  final confirmLabel = confirm ?? l10n.commonSave;
   String? path;
   var native = false;
   try {
-    path = (await getSaveLocation(suggestedName: suggestedName, acceptedTypeGroups: [type], confirmButtonText: confirm))?.path;
+    path = (await getSaveLocation(suggestedName: suggestedName, acceptedTypeGroups: [type], confirmButtonText: confirmLabel))?.path;
     native = true;
   } on UnimplementedError {
     // No native dialog.
@@ -45,7 +48,7 @@ Future<String?> pickSavePath(BuildContext context, {required String suggestedNam
   }
   if (!native) {
     if (!context.mounted) return null;
-    final dir = await pickDirectory(context, title: '保存到哪个文件夹', confirm: confirm);
+    final dir = await pickDirectory(context, title: l10n.pickerSaveToFolder, confirm: confirmLabel);
     if (dir != null) path = p.join(dir, suggestedName);
   }
   if (path == null || path.isEmpty) return null;
@@ -65,12 +68,12 @@ Future<String?> _askPath(BuildContext context, String initial, String confirm, S
         child: TextField(
           controller: ctl,
           autofocus: true,
-          decoration: const InputDecoration(labelText: '文件夹路径', border: OutlineInputBorder()),
+          decoration: InputDecoration(labelText: l10n.pickerFolderPath, border: OutlineInputBorder()),
           onSubmitted: (v) => Navigator.pop(c, v.trim().isEmpty ? null : v.trim()),
         ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(c), child: const Text('取消')),
+        TextButton(onPressed: () => Navigator.pop(c), child: Text(l10n.commonCancel)),
         FilledButton(onPressed: () => Navigator.pop(c, ctl.text.trim().isEmpty ? null : ctl.text.trim()), child: Text(confirm)),
       ],
     ),
@@ -99,7 +102,7 @@ class FolderField extends StatelessWidget {
           suffixIcon: Padding(
             padding: const EdgeInsets.only(right: 4),
             child: IconButton(
-              tooltip: '选择文件夹',
+              tooltip: l10n.pickerChooseFolder,
               icon: const Icon(Icons.folder_open_rounded),
               onPressed: () async {
                 final dir = await pickDirectory(context, initial: controller.text.trim(), title: label);

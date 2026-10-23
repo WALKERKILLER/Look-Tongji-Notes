@@ -15,25 +15,26 @@ import '../schedule/schedule_widgets.dart';
 import '../settings/settings_page.dart';
 import '../usage/usage_page.dart';
 import 'bot_page.dart';
+import '../../l10n/l10n.dart';
 
 // The app side of the bot operating the app (details.app of its tools,
 // docs/specs/0007-resident-bot-and-course-agents.md): navigation, the open
 // player and preferences.
 
-const kOpenTargets = <String, String>{
-  'home': '首页',
-  'courses': '课程',
-  'course': '课程',
-  'lecture': '课次',
-  'note': '笔记',
-  'schedule': '日程',
-  'downloads': '下载',
-  'library': '资料库',
-  'tasks': '定时任务',
-  'plugins': '插件',
-  'settings': '设置',
-  'activity': '学习足迹',
-  'usage': '用量',
+final kOpenTargets = <String, String>{
+  'home': l10n.screenHome,
+  'courses': l10n.commonCourses,
+  'course': l10n.commonCourses,
+  'lecture': l10n.commonLecture,
+  'note': l10n.commonNotes,
+  'schedule': l10n.commonSchedule,
+  'downloads': l10n.commonDownload,
+  'library': l10n.screenLibrary,
+  'tasks': l10n.commonScheduledTasks,
+  'plugins': l10n.commonPlugins,
+  'settings': l10n.commonSettings,
+  'activity': l10n.commonActivity,
+  'usage': l10n.commonUsage,
   'bot': 'Bot',
 };
 
@@ -50,14 +51,14 @@ const _tabTargets = {
 
 /// A short label for an operation's chip.
 String appOpLabel(Map<String, dynamic> op) => switch (op['op']) {
-      'open' => '已打开 ${kOpenTargets[op['target']] ?? op['target']}',
+      'open' => l10n.botOpened(kOpenTargets[op['target']] ?? op['target']),
       'player' => switch (op['action']) {
-          'play' => '已继续播放',
-          'pause' => '已暂停播放',
-          'seek' => '已跳转',
-          _ => '已调到 ${op['rate']}×',
+          'play' => l10n.botResumed,
+          'pause' => l10n.botPaused,
+          'seek' => l10n.botSeeked,
+          _ => l10n.botRateSet(op['rate']),
         },
-      _ => '${op['label'] ?? '已完成'}',
+      _ => '${op['label'] ?? l10n.commonDone}',
     };
 
 /// Runs operations and remembers where the user was, for 返回.

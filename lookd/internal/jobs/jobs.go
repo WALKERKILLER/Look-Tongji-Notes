@@ -172,11 +172,12 @@ func (m *Manager) clearRetry(id string) {
 	m.mu.Unlock()
 }
 
-// Bulk pauses every queued or running job, resumes every paused one, or
-// retries every failed one; ids, when given, limit it to those jobs. It
+// Bulk pauses every queued or running job, resumes every paused one,
+// retries every failed one or cancels every unfinished one; ids, when
+// given, limit it to those jobs. It
 // returns how many jobs it changed.
 func (m *Manager) Bulk(ctx context.Context, action string, ids []string) (int, error) {
-	from := map[string][]string{"pause": {"queued", "running"}, "resume": {"paused"}, "retry": {"failed"}}[action]
+	from := map[string][]string{"pause": {"queued", "running"}, "resume": {"paused"}, "retry": {"failed"}, "cancel": {"queued", "running", "paused"}}[action]
 	if from == nil {
 		return 0, fmt.Errorf("未知操作 %s", action)
 	}
@@ -193,9 +194,12 @@ func (m *Manager) Bulk(ctx context.Context, action string, ids []string) (int, e
 		if len(ids) > 0 && !only[j.ID] {
 			continue
 		}
-		if action == "pause" {
+		switch action {
+		case "pause":
 			err = m.Pause(ctx, j.ID)
-		} else {
+		case "cancel":
+			err = m.Cancel(ctx, j.ID)
+		default:
 			err = m.Resume(ctx, j.ID)
 		}
 		if err != nil {

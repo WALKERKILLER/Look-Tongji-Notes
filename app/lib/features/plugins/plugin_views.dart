@@ -12,6 +12,7 @@ import '../../widgets/look_markdown.dart';
 import '../../widgets/states.dart';
 import '../library/note_reader.dart' show openRef;
 import '../practice/quiz.dart' show askInSheet;
+import '../../l10n/l10n.dart';
 
 /// Renders one declarative view. Plugins send data, never UI code; the app
 /// owns every renderer (docs/specs/0004-plugin-platform.md, 视图目录).
@@ -79,7 +80,7 @@ Future<void> runPluginEntry(BuildContext context, PluginEntry e, Map<String, dyn
       }
     }
   } catch (err) {
-    if (context.mounted) showSnack(context, '${e.pluginTitle}：${err is ApiError ? err.message : err}');
+    if (context.mounted) showSnack(context, l10n.pluginError(e.pluginTitle, err is ApiError ? err.message : err));
   }
 }
 
@@ -105,7 +106,7 @@ class ChecklistView extends StatelessWidget {
         Row(children: [
           Icon(Icons.checklist_rounded, size: 18, color: cs.primary),
           const SizedBox(width: Space.sm),
-          Expanded(child: Text('${data['title'] ?? '清单'}', style: tt.titleSmall)),
+          Expanded(child: Text('${data['title'] ?? l10n.pluginViewList}', style: tt.titleSmall)),
           Text('$done / ${items.length}', style: tt.labelMedium?.copyWith(color: cs.onSurfaceVariant)),
         ]),
         const SizedBox(height: Space.sm),
@@ -162,8 +163,8 @@ class _UnknownView extends StatelessWidget {
       child: ExpansionTile(
         shape: const RoundedRectangleBorder(),
         leading: Icon(Icons.widgets_outlined, color: cs.onSurfaceVariant),
-        title: Text('「$kind」视图', style: tt.titleSmall),
-        subtitle: const Text('当前版本的应用还不能显示这种视图，更新应用后即可查看'),
+        title: Text(l10n.pluginViewUnknown(kind), style: tt.titleSmall),
+        subtitle: Text(l10n.pluginViewUnsupported),
         childrenPadding: const EdgeInsets.fromLTRB(Space.lg, 0, Space.lg, Space.lg),
         children: [
           SelectableText(const JsonEncoder.withIndent('  ').convert(data), style: tt.bodySmall?.copyWith(fontFamily: 'monospace'), maxLines: 30),
@@ -204,8 +205,8 @@ class PluginMenuButton extends StatelessWidget {
     final store = context.watch<PluginStore>();
     final groups = [
       ('', store.entries('actions', surface: surface)),
-      if (noteViews) ('换种方式看', store.entries('noteViews')),
-      if (exportScope != null) ('导出', store.entries('exporters', scope: exportScope)),
+      if (noteViews) (l10n.pluginViewAlternative, store.entries('noteViews')),
+      if (exportScope != null) (l10n.commonExport, store.entries('exporters', scope: exportScope)),
     ].where((g) => g.$2.isNotEmpty).toList();
     if (groups.isEmpty) return const SizedBox.shrink();
     final tt = Theme.of(context).textTheme;
@@ -225,7 +226,7 @@ class PluginMenuButton extends StatelessWidget {
         ],
       ],
       builder: (context, c, _) => IconButton(
-        tooltip: '插件',
+        tooltip: l10n.commonPlugins,
         onPressed: () => c.isOpen ? c.close() : c.open(),
         icon: const Icon(Icons.extension_outlined),
       ),

@@ -11,6 +11,7 @@ import '../../widgets/look_markdown.dart' show openPlainLink;
 import '../../widgets/states.dart';
 import '../courses/course_page.dart';
 import '../player/player_page.dart';
+import '../../l10n/l10n.dart';
 
 /// Icon per notification kind (lookd/internal/notify).
 IconData notificationIcon(String kind) => switch (kind) {
@@ -44,7 +45,7 @@ class NotificationBell extends StatelessWidget {
   Widget build(BuildContext context) {
     final unread = context.select<AppState, int>((a) => a.unreadNotifications);
     return IconButton(
-      tooltip: unread > 0 ? '通知（$unread 条未读）' : '通知',
+      tooltip: unread > 0 ? l10n.notificationsTooltip(unread) : l10n.commonNotifications,
       onPressed: () => showNotificationCenter(context),
       icon: Badge.count(
         count: unread,
@@ -74,7 +75,7 @@ Future<void> showNotificationCenter(BuildContext context) {
   return showGeneralDialog(
     context: context,
     barrierDismissible: true,
-    barrierLabel: '关闭通知',
+    barrierLabel: l10n.notificationsClose,
     transitionDuration: Motion.medium4,
     pageBuilder: (c, _, _) => Align(
       alignment: Alignment.centerRight,
@@ -173,22 +174,22 @@ class _NotificationListState extends State<NotificationList> {
           padding: const EdgeInsets.fromLTRB(Space.xl, Space.lg, Space.sm, Space.sm),
           child: Row(
             children: [
-              Expanded(child: Text('通知', style: tt.titleLarge)),
-              if (unread > 0) TextButton(onPressed: () => _read(), child: const Text('全部已读')),
-              if (widget.onClose != null) IconButton(tooltip: '关闭', onPressed: widget.onClose, icon: const Icon(Icons.close_rounded)),
+              Expanded(child: Text(l10n.commonNotifications, style: tt.titleLarge)),
+              if (unread > 0) TextButton(onPressed: () => _read(), child: Text(l10n.notificationsMarkAllRead)),
+              if (widget.onClose != null) IconButton(tooltip: l10n.commonClose, onPressed: widget.onClose, icon: const Icon(Icons.close_rounded)),
             ],
           ),
         ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: Space.xl),
-          child: Text('新回放、新课次、Canvas 作业和公告会出现在这里。Look Studio 打开时在后台自动检查。', style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+          child: Text(l10n.notificationsIntro, style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
         ),
         const SizedBox(height: Space.sm),
         Expanded(
           child: items == null
               ? (_error != null ? ErrorState(error: _error!, onRetry: _load) : const CenteredLoader())
               : items.isEmpty
-              ? const EmptyState(icon: Icons.notifications_none_rounded, title: '暂时没有通知', body: '有新回放或新作业时会第一时间提醒你')
+              ? EmptyState(icon: Icons.notifications_none_rounded, title: l10n.notificationsEmpty, body: l10n.notificationsEmptyBody)
               : ListView.builder(
                   padding: const EdgeInsets.fromLTRB(Space.sm, 0, Space.sm, Space.lg),
                   itemCount: items.length,
@@ -214,7 +215,7 @@ class _NotificationListState extends State<NotificationList> {
                       trailing: read
                           ? null
                           : Semantics(
-                              label: '未读',
+                              label: l10n.notificationsUnread,
                               child: Container(
                                 width: 8,
                                 height: 8,

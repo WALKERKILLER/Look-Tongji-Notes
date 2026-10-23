@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import 'android_bridge.dart';
+import '../l10n/l10n.dart';
 
 // The Android app's Linux workspace: an Ubuntu base system run with proot,
 // where lookd, Node.js and the assistant run as on desktop Linux.
@@ -19,12 +20,12 @@ class WorkspaceMirror {
   final String images, ports, archive;
 }
 
-const workspaceMirrors = [
-  WorkspaceMirror('tuna', '清华大学', 'https://mirrors.tuna.tsinghua.edu.cn/ubuntu-cdimage/ubuntu-base/releases/24.04/release/',
+final workspaceMirrors = [
+  WorkspaceMirror('tuna', l10n.mirrorTuna, 'https://mirrors.tuna.tsinghua.edu.cn/ubuntu-cdimage/ubuntu-base/releases/24.04/release/',
       'http://mirrors.tuna.tsinghua.edu.cn/ubuntu-ports/', 'http://mirrors.tuna.tsinghua.edu.cn/ubuntu/'),
-  WorkspaceMirror('ustc', '中国科学技术大学', 'https://mirrors.ustc.edu.cn/ubuntu-cdimage/ubuntu-base/releases/24.04/release/',
+  WorkspaceMirror('ustc', l10n.mirrorUstc, 'https://mirrors.ustc.edu.cn/ubuntu-cdimage/ubuntu-base/releases/24.04/release/',
       'http://mirrors.ustc.edu.cn/ubuntu-ports/', 'http://mirrors.ustc.edu.cn/ubuntu/'),
-  WorkspaceMirror('official', 'Ubuntu 官方', 'https://cdimage.ubuntu.com/ubuntu-base/releases/24.04/release/',
+  WorkspaceMirror('official', l10n.mirrorUbuntu, 'https://cdimage.ubuntu.com/ubuntu-base/releases/24.04/release/',
       'http://ports.ubuntu.com/ubuntu-ports/', 'http://archive.ubuntu.com/ubuntu/'),
 ];
 
@@ -119,11 +120,11 @@ class Workspace extends ChangeNotifier {
     final staging = Directory('$rootfs.part');
     try {
       await _download(Uri.parse(mirror.images + name), archive);
-      _report(const WorkspaceProgress('解压 Ubuntu 基础系统'));
+      _report(WorkspaceProgress(l10n.workspaceStepUnpack));
       if (staging.existsSync()) await staging.delete(recursive: true);
       final total = await archive.length();
-      await _unpack(archive.path, staging.path, _sums[_arch]!, (n) => _report(WorkspaceProgress('解压 Ubuntu 基础系统', done: n, total: total)));
-      _report(const WorkspaceProgress('配置工作区'));
+      await _unpack(archive.path, staging.path, _sums[_arch]!, (n) => _report(WorkspaceProgress(l10n.workspaceStepUnpack, done: n, total: total)));
+      _report(WorkspaceProgress(l10n.workspaceStepConfigure));
       final old = Directory(rootfs);
       if (old.existsSync()) await old.delete(recursive: true);
       await staging.rename(rootfs);
@@ -141,11 +142,11 @@ class Workspace extends ChangeNotifier {
   }
 
   Future<void> _download(Uri url, File dest) async {
-    _report(const WorkspaceProgress('下载 Ubuntu 基础系统'));
+    _report(WorkspaceProgress(l10n.workspaceStepDownload));
     final client = http.Client();
     try {
       final res = await client.send(http.Request('GET', url)).timeout(const Duration(seconds: 30));
-      if (res.statusCode != 200) throw '下载失败（HTTP ${res.statusCode}），可以换一个镜像再试';
+      if (res.statusCode != 200) throw l10n.workspaceDownloadHttpError(res.statusCode);
       final total = res.contentLength ?? 0;
       final sink = dest.openWrite();
       var n = 0;
@@ -153,15 +154,15 @@ class Workspace extends ChangeNotifier {
         await for (final chunk in res.stream.timeout(const Duration(seconds: 60))) {
           sink.add(chunk);
           n += chunk.length;
-          _report(WorkspaceProgress('下载 Ubuntu 基础系统', done: n, total: total));
+          _report(WorkspaceProgress(l10n.workspaceStepDownload, done: n, total: total));
         }
       } finally {
         await sink.close();
       }
     } on TimeoutException {
-      throw '下载超时，请检查网络或换一个镜像';
+      throw l10n.workspaceDownloadTimeout;
     } on SocketException catch (e) {
-      throw '无法连接镜像站：${e.message}';
+      throw l10n.workspaceMirrorUnreachable(e.message);
     } finally {
       client.close();
     }
@@ -178,7 +179,7 @@ class Workspace extends ChangeNotifier {
     });
     if (await p.exitCode != 0) {
       final msg = err.toString().trim();
-      throw msg.contains('checksum') ? '下载的文件校验失败，请重试' : '解压失败：$msg';
+      throw msg.contains('checksum') ? l10n.workspaceChecksumFailed : l10n.workspaceUnpackFailed(msg);
     }
   }
 
@@ -273,15 +274,15 @@ class Workspace extends ChangeNotifier {
     if (busy) return;
     busy = true;
     error = null;
-    _report(const WorkspaceProgress('安装 ffmpeg'));
+    _report(WorkspaceProgress(l10n.workspaceInstallFfmpeg));
     try {
       final code = await run(
         'export DEBIAN_FRONTEND=noninteractive; apt-get update && apt-get install -y --no-install-recommends ffmpeg ca-certificates',
         onLine: onLine,
       );
-      if (code != 0) throw 'apt-get 退出码 $code';
+      if (code != 0) throw l10n.workspaceAptExit(code);
     } catch (e) {
-      error = '安装 ffmpeg 失败：$e';
+      error = l10n.workspaceFfmpegFailed(e);
       rethrow;
     } finally {
       busy = false;

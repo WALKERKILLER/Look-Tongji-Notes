@@ -10,6 +10,7 @@ import '../../core/api.dart';
 import '../../core/app_state.dart';
 import '../../core/models.dart';
 import '../../theme/prefs.dart';
+import '../../l10n/l10n.dart';
 
 /// One video source: a remote stream or the downloaded file.
 class Source {
@@ -138,9 +139,9 @@ class LecturePlayer extends ChangeNotifier implements PlayerHandle {
         for (final s in media!.streams) Source(label: s.label, uri: s.url, headers: media!.headers),
       ];
       if (media!.localPath.isNotEmpty) {
-        sources.insert(0, Source(label: localLabel.isEmpty ? '本地' : localLabel, uri: Uri.file(media!.localPath).toString(), local: true));
+        sources.insert(0, Source(label: localLabel.isEmpty ? l10n.commonLocal : localLabel, uri: Uri.file(media!.localPath).toString(), local: true));
       }
-      if (sources.isEmpty) throw StateError('这节课没有可播放的视频');
+      if (sources.isEmpty) throw StateError(l10n.playerNoVideo);
       sourceIdx = 0;
       if (media!.duration > 0) duration = Duration(seconds: media!.duration);
       loading = false;

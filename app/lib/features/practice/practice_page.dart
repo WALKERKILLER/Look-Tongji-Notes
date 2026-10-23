@@ -13,6 +13,7 @@ import '../../widgets/look_markdown.dart';
 import '../../widgets/states.dart';
 import '../library/note_reader.dart' show openRef;
 import 'quiz.dart';
+import '../../l10n/l10n.dart';
 
 /// Loads or saves practice data; a seam for widget tests.
 typedef QuizFetch = Future<dynamic> Function(String method, String path, [Object? body]);
@@ -109,7 +110,7 @@ class _PracticePageState extends State<PracticePage> {
       final best = (r as Map)['best'];
       if (mounted && best is Map) setState(() => _best = QuizScore(best));
     } catch (e) {
-      if (mounted) showSnack(context, '成绩没有保存：$e');
+      if (mounted) showSnack(context, l10n.practiceScoreNotSaved(e));
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -119,13 +120,10 @@ class _PracticePageState extends State<PracticePage> {
     final q = _quiz!;
     final x = q.questions[_current];
     final a = _answers[_current]!;
-    String opt(int i) => '${String.fromCharCode(65 + i)}「${x.options[i].text}」';
+    String opt(int i) => l10n.practiceOption(String.fromCharCode(65 + i), x.options[i].text);
     askInSheet(
       context,
-      '讲解练习「${q.title}」第 ${_pos + 1} 题：${x.stem}\n'
-      '选项：${[for (var i = 0; i < x.options.length; i++) opt(i)].join('；')}\n'
-      '我选了 ${opt(a)}，正确答案是 ${opt(x.answer)}。${a == x.answer ? '请讲讲背后的原理，帮我巩固。' : '请解释为什么错，以及我可能混淆了什么。'}'
-      '${x.ref.isEmpty ? '' : '出处：${x.ref}'}',
+      l10n.promptExplainQuestion(q.title, _pos + 1, x.stem, [for (var i = 0; i < x.options.length; i++) opt(i)].join(l10n.practiceOptionSeparator), opt(a), opt(x.answer), a == x.answer ? l10n.practiceAskWhyRight : l10n.practiceAskWhyWrong, x.ref.isEmpty ? '' : l10n.practiceSourceRef(x.ref)),
     );
   }
 
@@ -168,7 +166,7 @@ class _PracticePageState extends State<PracticePage> {
         saving: _saving,
         retake: widget.only != null,
         onRetryWrong: (wrong) => Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => PracticePage(quizId: q.id, only: wrong, fetch: widget.fetch))),
-        onMore: () => askInSheet(context, '根据我在练习「${q.title}」（id ${q.id}）中做错的题，针对这些知识点再出一组练习题。'),
+        onMore: () => askInSheet(context, l10n.promptRetryWrong(q.title, q.id)),
         onReview: (i) => setState(() {
           _reviewing = true;
           _pos = _order.indexOf(i);
@@ -203,8 +201,8 @@ class _PracticePageState extends State<PracticePage> {
         onKeyEvent: _key,
         child: Scaffold(
           appBar: AppBar(
-            leading: IconButton(tooltip: '关闭', onPressed: () => Navigator.maybePop(context), icon: const Icon(Icons.close_rounded)),
-            title: Text(q == null ? '练习' : (widget.only != null ? '重做错题 · ${q.title}' : q.title), maxLines: 1, overflow: TextOverflow.ellipsis),
+            leading: IconButton(tooltip: l10n.commonClose, onPressed: () => Navigator.maybePop(context), icon: const Icon(Icons.close_rounded)),
+            title: Text(q == null ? l10n.commonPractice : (widget.only != null ? l10n.practiceRetryTitle(q.title) : q.title), maxLines: 1, overflow: TextOverflow.ellipsis),
             actions: [
               if (q != null && !_done)
                 Padding(
@@ -282,7 +280,7 @@ class _QuestionView extends StatelessWidget {
           padding: context.isCompact ? Space.pageCompact : Space.page,
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             Row(children: [
-              Text('第 $number 题', style: tt.labelLarge?.copyWith(color: cs.primary)),
+              Text(l10n.practiceQuestionNumber(number), style: tt.labelLarge?.copyWith(color: cs.primary)),
               if (x.topic.isNotEmpty) ...[
                 const SizedBox(width: Space.sm),
                 Container(
@@ -326,27 +324,27 @@ class _QuestionView extends StatelessWidget {
                           Expanded(child: LookMarkdown(x.hint, style: tt.bodyMedium, lectureId: quiz.lectureId, onRef: (r) => openRef(context, r, lectureId: quiz.lectureId))),
                         ]),
                       )
-                    : TextButton.icon(onPressed: onHint, icon: const Icon(Icons.lightbulb_outline_rounded, size: 18), label: const Text('提示')),
+                    : TextButton.icon(onPressed: onHint, icon: const Icon(Icons.lightbulb_outline_rounded, size: 18), label: Text(l10n.practiceHint)),
               ),
             const SizedBox(height: Space.lg),
             Row(children: [
               if (answered) ...[
-                TextButton.icon(onPressed: onExplain, icon: const Icon(Icons.forum_outlined, size: 18), label: const Text('讲解')),
+                TextButton.icon(onPressed: onExplain, icon: const Icon(Icons.forum_outlined, size: 18), label: Text(l10n.practiceExplain)),
                 if (ref != null)
                   TextButton.icon(
                     onPressed: () => openRef(context, ref, lectureId: quiz.lectureId),
                     icon: const Icon(Icons.travel_explore_rounded, size: 18),
-                    label: const Text('查看出处'),
+                    label: Text(l10n.practiceSource),
                   ),
               ],
               const Spacer(),
-              if (onPrev != null) IconButton(tooltip: '上一题', onPressed: onPrev, icon: const Icon(Icons.arrow_back_rounded)),
+              if (onPrev != null) IconButton(tooltip: l10n.practicePrevious, onPressed: onPrev, icon: const Icon(Icons.arrow_back_rounded)),
               const SizedBox(width: Space.xs),
               if (reviewing && !last) ...[
-                OutlinedButton(onPressed: onSummary, child: const Text('返回总结')),
+                OutlinedButton(onPressed: onSummary, child: Text(l10n.practiceBackToSummary)),
                 const SizedBox(width: Space.sm),
               ],
-              FilledButton(onPressed: answered ? onNext : null, child: Text(last ? (reviewing ? '返回总结' : '完成') : '下一题')),
+              FilledButton(onPressed: answered ? onNext : null, child: Text(last ? (reviewing ? l10n.practiceBackToSummary : l10n.commonFinished) : l10n.practiceNext)),
             ]),
           ]),
         ),
@@ -387,14 +385,14 @@ class OptionRow extends StatelessWidget {
         ),
     };
     final note = switch (state) {
-      OptionState.correct => '正确答案',
-      OptionState.wrong => '你的选择',
+      OptionState.correct => l10n.practiceCorrectAnswer,
+      OptionState.wrong => l10n.practiceYourChoice,
       _ => null,
     };
     final revealed = state != OptionState.open;
     return Semantics(
       button: onTap != null,
-      label: '选项 $letter${note == null ? '' : '，$note'}',
+      label: l10n.practiceOptionLabel(letter, note == null ? '' : l10n.practiceOptionNote(note)),
       child: Material(
         color: bg,
         shape: RoundedRectangleBorder(borderRadius: Corners.all(Corners.lg), side: BorderSide(color: border)),
@@ -459,12 +457,12 @@ class _Summary extends StatelessWidget {
     final correct = order.length - wrong.length;
     final topics = <String, (int, int)>{}; // topic → (right, total)
     for (final i in order) {
-      final t = qs[i].topic.isEmpty ? '其他' : qs[i].topic;
+      final t = qs[i].topic.isEmpty ? l10n.commonOther : qs[i].topic;
       final (r, n) = topics[t] ?? (0, 0);
       topics[t] = (r + (answers[i] == qs[i].answer ? 1 : 0), n + 1);
     }
     final secs = elapsed.inSeconds;
-    final time = secs < 60 ? '$secs 秒' : '${fmtMinutes(secs ~/ 60)}${secs % 60 == 0 ? '' : ' ${secs % 60} 秒'}';
+    final time = secs < 60 ? l10n.durationSeconds(secs) : '${fmtMinutes(secs ~/ 60)}${secs % 60 == 0 ? '' : l10n.practiceSecondsSuffix(secs % 60)}';
     final figs = const [FontFeature.tabularFigures()];
 
     return ListView(padding: const EdgeInsets.fromLTRB(0, Space.xxl, 0, Space.xxxl), children: [
@@ -473,35 +471,35 @@ class _Summary extends StatelessWidget {
         child: Padding(
           padding: context.isCompact ? Space.pageCompact : Space.page,
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Text(retake ? '重做完成' : '练习完成', style: tt.titleMedium?.copyWith(color: cs.onSurfaceVariant)),
+            Text(retake ? l10n.practiceRetryDone : l10n.practiceDone, style: tt.titleMedium?.copyWith(color: cs.onSurfaceVariant)),
             const SizedBox(height: Space.sm),
             Text.rich(
               TextSpan(children: [
                 TextSpan(text: '$correct', style: tt.displayMedium?.copyWith(fontFeatures: figs, color: cs.onSurface)),
                 TextSpan(text: ' / ${order.length}', style: tt.headlineSmall?.copyWith(fontFeatures: figs, color: cs.onSurfaceVariant)),
               ]),
-              semanticsLabel: '答对 $correct 题，共 ${order.length} 题',
+              semanticsLabel: l10n.practiceScoreSemantics(correct, order.length),
             ),
             const SizedBox(height: Space.xs),
             Text(
               [
-                '正确率 ${(correct * 100 / math.max(1, order.length)).round()}%',
-                '用时 $time',
-                if (saving) '正在保存' else if (best != null) '最好成绩 ${best!.label}',
+                l10n.practiceAccuracy((correct * 100 / math.max(1, order.length)).round()),
+                l10n.practiceTime(time),
+                if (saving) l10n.commonSavingShort else if (best != null) l10n.practiceBest(best!.label),
               ].join(' · '),
               style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant, fontFeatures: figs),
             ),
             const SizedBox(height: Space.xl),
             Wrap(spacing: Space.sm, runSpacing: Space.sm, children: [
               if (wrong.isNotEmpty) ...[
-                OutlinedButton.icon(onPressed: () => onRetryWrong(wrong), icon: const Icon(Icons.replay_rounded), label: Text('重做错题 ${wrong.length}')),
-                if (!retake) OutlinedButton.icon(onPressed: onMore, icon: const Icon(Icons.auto_awesome_outlined), label: const Text('再出一组（针对错题）')),
+                OutlinedButton.icon(onPressed: () => onRetryWrong(wrong), icon: const Icon(Icons.replay_rounded), label: Text(l10n.practiceRetryWrong(wrong.length))),
+                if (!retake) OutlinedButton.icon(onPressed: onMore, icon: const Icon(Icons.auto_awesome_outlined), label: Text(l10n.practiceMoreOnWrong)),
               ],
-              FilledButton(onPressed: () => Navigator.maybePop(context), child: const Text('完成')),
+              FilledButton(onPressed: () => Navigator.maybePop(context), child: Text(l10n.commonFinished)),
             ]),
             if (topics.length > 1) ...[
               const SizedBox(height: Space.xxl),
-              Text('按知识点', style: tt.titleSmall),
+              Text(l10n.practiceByTopic, style: tt.titleSmall),
               const SizedBox(height: Space.sm),
               for (final MapEntry(key: t, value: (r, n)) in topics.entries)
                 Padding(
@@ -515,14 +513,14 @@ class _Summary extends StatelessWidget {
                 ),
             ],
             const SizedBox(height: Space.xl),
-            Text('逐题回顾', style: tt.titleSmall),
+            Text(l10n.practiceReview, style: tt.titleSmall),
             const SizedBox(height: Space.xs),
             for (final (n, i) in order.indexed)
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: answers[i] == qs[i].answer
-                    ? Icon(Icons.check_circle_outline_rounded, color: cs.primary, semanticLabel: '答对')
-                    : Icon(Icons.cancel_outlined, color: cs.error, semanticLabel: answers[i] == null ? '未作答' : '答错'),
+                    ? Icon(Icons.check_circle_outline_rounded, color: cs.primary, semanticLabel: l10n.practiceCorrect)
+                    : Icon(Icons.cancel_outlined, color: cs.error, semanticLabel: answers[i] == null ? l10n.practiceUnanswered : l10n.practiceWrong),
                 title: Text('${n + 1}. ${_plain(qs[i].stem)}', maxLines: 2, overflow: TextOverflow.ellipsis),
                 trailing: const Icon(Icons.chevron_right_rounded),
                 onTap: () => onReview(i),

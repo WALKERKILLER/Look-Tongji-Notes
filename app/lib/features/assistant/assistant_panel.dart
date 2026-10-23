@@ -28,6 +28,7 @@ import '../practice/quiz.dart';
 import '../schedule/schedule_widgets.dart';
 import '../settings/model_meta.dart';
 import '../settings/models_page.dart';
+import 'thinking_control.dart';
 import '../settings/provider_presets.dart';
 import '../usage/usage_page.dart';
 import 'assistant_controller.dart';
@@ -36,51 +37,52 @@ import 'bot_ops.dart';
 import 'bot_page.dart';
 import 'bot_widgets.dart';
 import 'runtime_setup.dart';
+import '../../l10n/l10n.dart';
 
-const _toolLabels = {
-  'app_guide': ('查阅功能说明', Icons.menu_book_outlined),
-  'current_context': ('读取当前界面', Icons.visibility_outlined),
-  'list_courses': ('查看课程', Icons.school_outlined),
-  'list_lectures': ('查看课次', Icons.event_note_outlined),
-  'read_transcript': ('阅读文字稿', Icons.subject_rounded),
-  'lecture_info': ('查看课次详情', Icons.info_outline_rounded),
-  'search_library': ('搜索课程库', Icons.manage_search_rounded),
-  'list_notes': ('查看笔记', Icons.notes_rounded),
-  'read_note': ('阅读笔记', Icons.description_outlined),
-  'save_note': ('保存笔记', Icons.save_outlined),
-  'suggest_actions': ('准备操作', Icons.touch_app_outlined),
-  'find_tools': ('加载工具', Icons.extension_outlined),
-  'mark_schedule': ('标记日程', Icons.event_available_outlined),
-  'list_schedule': ('查看日程', Icons.event_note_outlined),
-  'update_schedule': ('修改日程', Icons.edit_calendar_outlined),
-  'read_timeline': ('读取大纲', Icons.view_timeline_outlined),
-  'generate_timeline': ('生成大纲', Icons.view_timeline_outlined),
-  'save_timeline': ('保存大纲', Icons.view_timeline_outlined),
-  'list_courseware': ('查看课件', Icons.folder_open_outlined),
-  'read_courseware': ('阅读课件', Icons.article_outlined),
-  'search_courseware': ('搜索课件', Icons.plagiarism_outlined),
-  'view_slides': ('查看 PPT', Icons.slideshow_outlined),
-  'view_images': ('查看插图', Icons.image_outlined),
-  'create_quiz': ('生成练习', Icons.quiz_outlined),
-  'list_quizzes': ('查看练习', Icons.quiz_outlined),
-  'read_quiz_results': ('查看作答', Icons.fact_check_outlined),
-  'open_page': ('打开页面', Icons.open_in_new_rounded),
-  'player': ('控制播放', Icons.smart_display_outlined),
-  'read_settings': ('读取设置', Icons.tune_rounded),
-  'change_settings': ('调整设置', Icons.tune_rounded),
-  'manage_downloads': ('管理下载', Icons.downloading_rounded),
-  'download': ('准备下载', Icons.download_outlined),
-  'delete_files': ('准备删除文件', Icons.delete_sweep_outlined),
-  'manage_course': ('整理课程', Icons.school_outlined),
-  'sync_courses': ('同步课程', Icons.sync_rounded),
-  'propose_task': ('准备定时任务', Icons.schedule_rounded),
-  'toggle_plugin': ('准备开关插件', Icons.extension_outlined),
-  'memory_list': ('翻看记忆', Icons.psychology_alt_outlined),
-  'memory_read': ('回想', Icons.psychology_alt_outlined),
-  'memory_write': ('记下来', Icons.edit_note_rounded),
-  'memory_edit': ('改记忆', Icons.edit_note_rounded),
-  'memory_append': ('记下来', Icons.edit_note_rounded),
-  'memory_delete': ('忘掉', Icons.auto_delete_outlined),
+final _toolLabels = {
+  'app_guide': (l10n.toolHelp, Icons.menu_book_outlined),
+  'current_context': (l10n.toolCurrentContext, Icons.visibility_outlined),
+  'list_courses': (l10n.toolListCourses, Icons.school_outlined),
+  'list_lectures': (l10n.toolListLectures, Icons.event_note_outlined),
+  'read_transcript': (l10n.toolReadTranscript, Icons.subject_rounded),
+  'lecture_info': (l10n.toolLectureDetail, Icons.info_outline_rounded),
+  'search_library': (l10n.toolSearchLibrary, Icons.manage_search_rounded),
+  'list_notes': (l10n.toolListNotes, Icons.notes_rounded),
+  'read_note': (l10n.toolReadNote, Icons.description_outlined),
+  'save_note': (l10n.toolSaveNote, Icons.save_outlined),
+  'suggest_actions': (l10n.toolPrepare, Icons.touch_app_outlined),
+  'find_tools': (l10n.toolFindTools, Icons.extension_outlined),
+  'mark_schedule': (l10n.toolMarkSchedule, Icons.event_available_outlined),
+  'list_schedule': (l10n.toolListSchedule, Icons.event_note_outlined),
+  'update_schedule': (l10n.toolEditSchedule, Icons.edit_calendar_outlined),
+  'read_timeline': (l10n.toolReadOutline, Icons.view_timeline_outlined),
+  'generate_timeline': (l10n.outlineGenerate, Icons.view_timeline_outlined),
+  'save_timeline': (l10n.toolSaveOutline, Icons.view_timeline_outlined),
+  'list_courseware': (l10n.toolListCourseware, Icons.folder_open_outlined),
+  'read_courseware': (l10n.toolReadCourseware, Icons.article_outlined),
+  'search_courseware': (l10n.toolSearchCourseware, Icons.plagiarism_outlined),
+  'view_slides': (l10n.toolListSlides, Icons.slideshow_outlined),
+  'view_images': (l10n.toolViewImage, Icons.image_outlined),
+  'create_quiz': (l10n.toolCreateQuiz, Icons.quiz_outlined),
+  'list_quizzes': (l10n.toolListQuizzes, Icons.quiz_outlined),
+  'read_quiz_results': (l10n.toolReadAttempts, Icons.fact_check_outlined),
+  'open_page': (l10n.toolOpenPage, Icons.open_in_new_rounded),
+  'player': (l10n.toolControlPlayer, Icons.smart_display_outlined),
+  'read_settings': (l10n.toolReadSettings, Icons.tune_rounded),
+  'change_settings': (l10n.toolChangeSettings, Icons.tune_rounded),
+  'manage_downloads': (l10n.toolManageDownloads, Icons.downloading_rounded),
+  'download': (l10n.toolPrepareDownload, Icons.download_outlined),
+  'delete_files': (l10n.toolPrepareDelete, Icons.delete_sweep_outlined),
+  'manage_course': (l10n.toolOrganizeCourses, Icons.school_outlined),
+  'sync_courses': (l10n.toolSyncCourses, Icons.sync_rounded),
+  'propose_task': (l10n.toolPrepareTask, Icons.schedule_rounded),
+  'toggle_plugin': (l10n.toolPreparePlugin, Icons.extension_outlined),
+  'memory_list': (l10n.toolListMemory, Icons.psychology_alt_outlined),
+  'memory_read': (l10n.toolRecall, Icons.psychology_alt_outlined),
+  'memory_write': (l10n.toolRemember, Icons.edit_note_rounded),
+  'memory_edit': (l10n.toolEditMemory, Icons.edit_note_rounded),
+  'memory_append': (l10n.toolRemember, Icons.edit_note_rounded),
+  'memory_delete': (l10n.toolForget, Icons.auto_delete_outlined),
 };
 
 /// Opens the assistant: docks it on wide windows, full screen on phones.
@@ -203,32 +205,32 @@ class _AssistantPanelState extends State<AssistantPanel> {
           leaveFullscreenPanel();
           root.push(MaterialPageRoute(builder: (_) => PlayerPage(lectureId: lectureId, startMs: (secs ?? 0) * 1000)));
         } else {
-          showSnack(context, '这个时间点没有对应的课次');
+          showSnack(context, l10n.playerNoLectureAtTime);
         }
       case 'open_lecture':
-        if (lectureId.isEmpty) return showSnack(context, '没有指明要打开哪一节课');
+        if (lectureId.isEmpty) return showSnack(context, l10n.botNoLecture);
         leaveFullscreenPanel();
         root.push(MaterialPageRoute(builder: (_) => PlayerPage(lectureId: lectureId, startMs: secs == null ? null : secs * 1000)));
       case 'open_course':
-        if (courseId.isEmpty) return showSnack(context, '没有指明要打开哪门课');
+        if (courseId.isEmpty) return showSnack(context, l10n.botNoCourse);
         leaveFullscreenPanel();
         if (widget.embedded) root.maybePop();
         ShellNav.push(Tabs.courses, CoursePage(courseId: courseId));
       case 'open_note':
         final id = '${act['note_id'] ?? ''}';
-        if (id.isEmpty) return showSnack(context, '没有指明要打开哪篇笔记');
+        if (id.isEmpty) return showSnack(context, l10n.botNoNote);
         leaveFullscreenPanel();
         if (widget.embedded) root.maybePop();
         ShellNav.push(Tabs.library, NotePage(noteId: id));
       case 'download':
-        if (lectureId.isEmpty) return showSnack(context, '没有指明要下载哪一节课');
+        if (lectureId.isEmpty) return showSnack(context, l10n.botNoDownload);
         showDownloadSheet(context, [lectureId], kinds: [for (final k in (act['kinds'] as List?) ?? const []) '$k']);
       case 'open_schedule':
         leaveFullscreenPanel();
         if (widget.embedded) root.maybePop();
         ShellNav.goTo(Tabs.schedule);
       default:
-        showSnack(context, '这个版本还不支持该操作');
+        showSnack(context, l10n.botUnsupported);
     }
   }
 
@@ -296,7 +298,7 @@ class _AssistantPanelState extends State<AssistantPanel> {
               style: const ButtonStyle(visualDensity: VisualDensity.compact, tapTargetSize: MaterialTapTargetSize.shrinkWrap),
               segments: [
                 ButtonSegment(value: 'bot', label: Text(a.botName, maxLines: 1, overflow: TextOverflow.ellipsis)),
-                const ButtonSegment(value: 'sessions', label: Text('会话')),
+                ButtonSegment(value: 'sessions', label: Text(l10n.chatSessions)),
               ],
               selected: {a.view},
               onSelectionChanged: a.busy
@@ -308,10 +310,10 @@ class _AssistantPanelState extends State<AssistantPanel> {
             ),
           ),
           const Spacer(),
-          if (!isBot) IconButton(tooltip: '新会话', onPressed: a.busy ? null : a.newChat, icon: const Icon(Icons.add_comment_outlined)),
+          if (!isBot) IconButton(tooltip: l10n.chatNewSession, onPressed: a.busy ? null : a.newChat, icon: const Icon(Icons.add_comment_outlined)),
           if (!widget.embedded)
           IconButton(
-            tooltip: widget.docked ? '收起' : '关闭',
+            tooltip: widget.docked ? l10n.commonCollapse : l10n.commonClose,
             onPressed: () {
               if (widget.docked) {
                 context.read<UiPrefs>().update((p) => p.assistantDocked = false);
@@ -326,7 +328,7 @@ class _AssistantPanelState extends State<AssistantPanel> {
         Row(children: [
           if (!isBot)
             IconButton(
-              tooltip: '全部会话',
+              tooltip: l10n.chatAllSessions,
               isSelected: _history,
               visualDensity: VisualDensity.compact,
               onPressed: () {
@@ -343,7 +345,7 @@ class _AssistantPanelState extends State<AssistantPanel> {
                 padding: const EdgeInsets.only(right: Space.sm),
                 child: Chip(
                   avatar: Icon(Icons.school_outlined, size: 16, color: cs.onSecondaryContainer),
-                  label: Text(course.title.isEmpty ? '课程助手' : course.title, overflow: TextOverflow.ellipsis),
+                  label: Text(course.title.isEmpty ? l10n.courseAssistant : course.title, overflow: TextOverflow.ellipsis),
                   backgroundColor: cs.secondaryContainer,
                   labelStyle: tt.labelMedium?.copyWith(color: cs.onSecondaryContainer),
                   side: BorderSide.none,
@@ -370,7 +372,7 @@ class _AssistantPanelState extends State<AssistantPanel> {
         Padding(
           padding: const EdgeInsets.fromLTRB(Space.lg, Space.md, Space.sm, Space.sm),
           child: Row(children: [
-            Expanded(child: Text('全部会话', style: tt.titleSmall)),
+            Expanded(child: Text(l10n.chatAllSessions, style: tt.titleSmall)),
             IconButton(onPressed: () => setState(() => _history = false), icon: const Icon(Icons.close_rounded)),
           ]),
         ),
@@ -386,18 +388,18 @@ class _AssistantPanelState extends State<AssistantPanel> {
     final groups = <String, List<ChatSession>>{};
     for (final s in a.sessions.where((s) => s.kind != 'bot')) {
       final g = switch (s.kind) {
-        'course' => s.course.isEmpty ? '课程助手' : s.course,
-        'task' => '定时任务',
-        _ => '其他对话',
+        'course' => s.course.isEmpty ? l10n.courseAssistant : s.course,
+        'task' => l10n.commonScheduledTasks,
+        _ => l10n.chatOtherSessions,
       };
       groups.putIfAbsent(g, () => []).add(s);
     }
     final order = [
-      ...groups.keys.where((k) => k != '其他对话' && k != '定时任务'),
-      if (groups.containsKey('其他对话')) '其他对话',
-      if (groups.containsKey('定时任务')) '定时任务',
+      ...groups.keys.where((k) => k != l10n.chatOtherSessions && k != l10n.commonScheduledTasks),
+      if (groups.containsKey(l10n.chatOtherSessions)) l10n.chatOtherSessions,
+      if (groups.containsKey(l10n.commonScheduledTasks)) l10n.commonScheduledTasks,
     ];
-    if (order.isEmpty) return Center(child: Text('还没有会话', style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant)));
+    if (order.isEmpty) return Center(child: Text(l10n.chatNoSessions, style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant)));
     return ListView(
       padding: const EdgeInsets.symmetric(horizontal: Space.sm),
       children: [
@@ -420,10 +422,10 @@ class _AssistantPanelState extends State<AssistantPanel> {
       selectedTileColor: cs.secondaryContainer,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Corners.full)),
       title: Text(s.title, maxLines: 1, overflow: TextOverflow.ellipsis),
-      subtitle: Text('${fmtRelative(s.modified)} · ${s.messages} 条'),
+      subtitle: Text(l10n.chatSessionMeta(fmtRelative(s.modified), s.messages)),
       trailing: IconButton(
         icon: const Icon(Icons.delete_outline_rounded, size: 20),
-        tooltip: '删除',
+        tooltip: l10n.commonDelete,
         onPressed: () => a.deleteSession(s.id),
       ),
       onTap: () {
@@ -435,10 +437,10 @@ class _AssistantPanelState extends State<AssistantPanel> {
 
   Widget _body(BuildContext context, AssistantController a) {
     if (!a.ready) {
-      if (a.agentState != 'disabled' && a.agentState != 'crashed') return const CenteredLoader(label: '正在启动助手');
+      if (a.agentState != 'disabled' && a.agentState != 'crashed') return CenteredLoader(label: l10n.assistantStarting);
       final cs = Theme.of(context).colorScheme;
       return ListView(padding: const EdgeInsets.all(Space.lg), children: [
-        Text('助手没有启动', style: Theme.of(context).textTheme.titleMedium),
+        Text(l10n.assistantNotStarted, style: Theme.of(context).textTheme.titleMedium),
         if (a.agentError.isNotEmpty) ...[
           const SizedBox(height: Space.xs),
           Text(a.agentError, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
@@ -450,12 +452,12 @@ class _AssistantPanelState extends State<AssistantPanel> {
     if (a.models != null && a.selected == null) {
       return EmptyState(
         icon: Icons.key_outlined,
-        title: '先配置一个模型',
-        body: '助手通过 Pi SDK 调用你自己的模型服务。填入 API Key，或导入 Pi CLI 的配置。',
+        title: l10n.assistantSetupModel,
+        body: l10n.assistantSetupModelBody,
         action: FilledButton.icon(
           onPressed: () => Navigator.of(context, rootNavigator: true).push(MaterialPageRoute(builder: (_) => const ModelsPage())),
           icon: const Icon(Icons.tune_rounded),
-          label: const Text('配置模型'),
+          label: Text(l10n.assistantSetupModelAction),
         ),
       );
     }
@@ -492,25 +494,25 @@ class _AssistantPanelState extends State<AssistantPanel> {
     final course = a.pendingCourse ?? a.course;
     final suggestions = isBot
         ? [
-            if (inPlayer) '把播放速度调到 1.5 倍',
-            if ((screen['course_id'] ?? '').isNotEmpty) '下载这门课最近三节的视频和转写',
-            '把界面字号调大一点',
-            '记住：我更喜欢先给结论的简短回答',
-            '每周日晚上帮我复习本周的课',
-            '暂停所有下载',
+            if (inPlayer) l10n.suggestSpeed,
+            if ((screen['course_id'] ?? '').isNotEmpty) l10n.suggestDownloadRecent,
+            l10n.suggestBiggerText,
+            l10n.suggestRemember,
+            l10n.suggestWeeklyReview,
+            l10n.suggestPauseDownloads,
           ]
         : [
-            if (inPlayer) ...['总结这节课到目前为止讲了什么', '把这节课整理成一份复习笔记', '刚才提到的概念在哪些课里出现过？'],
-            if (!inPlayer && course != null) ...['这门课最近几节讲了什么？', '帮我挑出还没看的课', '出一组题考考我这门课的重点'],
-            '这个 App 能帮我做什么？',
-            '最近有哪些课还没看？',
-            '在我的课程库里搜索“期中”',
+            if (inPlayer) ...[l10n.suggestSummarizeLecture, l10n.suggestReviewNotes, l10n.suggestConceptElsewhere],
+            if (!inPlayer && course != null) ...[l10n.suggestCourseRecent, l10n.suggestUnwatched, l10n.suggestQuizCourse],
+            l10n.suggestWhatCanYouDo,
+            l10n.suggestRecentUnwatched,
+            l10n.suggestSearchMidterm,
           ];
     final (title, body) = isBot
-        ? ('我是 ${a.botName}', '我会记住你告诉我的事，也能替你在应用里动手：调设置、整理课程、管理下载、安排定时任务。下载和删除这类操作会先给你一张卡片确认。')
+        ? (l10n.botIntroTitle(a.botName), l10n.botIntroBody)
         : course != null
-            ? ('${course.title.isEmpty ? '课程' : '《${course.title}》'}助手', '这个会话只围绕这门课：讲解、找知识点、整理笔记、出题。关于你的偏好来自 ${a.botName} 的记忆。')
-            : ('有什么可以帮你？', '我能读取课表、文字稿和笔记，帮你整理内容、定位知识点。下载由你点按钮决定。');
+            ? (l10n.courseAssistantTitle(course.title.isEmpty ? l10n.commonCourses : l10n.courseTitleQuoted(course.title)), l10n.courseAssistantIntro(a.botName))
+            : (l10n.chatWelcomeTitle, l10n.chatWelcomeBody);
     return ListView(padding: const EdgeInsets.all(Space.xl), children: [
       const SizedBox(height: Space.lg),
       Center(
@@ -540,7 +542,7 @@ class _AssistantPanelState extends State<AssistantPanel> {
           child: FilledButton.tonalIcon(
             onPressed: () => a.openCourseAgent(screen['course_id']!, screen['course'] ?? '', fresh: true),
             icon: const Icon(Icons.school_outlined, size: 18),
-            label: Text('改为「${screen['course'] ?? '当前课程'}」的课程助手', overflow: TextOverflow.ellipsis),
+            label: Text(l10n.chatSwitchCourse(screen['course'] ?? l10n.chatCurrentCourse), overflow: TextOverflow.ellipsis),
           ),
         ),
       ],
@@ -575,7 +577,7 @@ class _AssistantPanelState extends State<AssistantPanel> {
     final tt = Theme.of(context).textTheme;
     final screen = context.watch<ScreenContext>().value;
     final player = context.watch<PlayerHub>().value;
-    final ctxLabel = player != null ? '正在播放 · 助手可见当前进度' : '当前：${screen['course'] ?? screen['screen'] ?? ''}';
+    final ctxLabel = player != null ? l10n.chatContextPlaying : l10n.chatContextScreen(screen['course'] ?? screen['screen'] ?? '');
     return Padding(
       padding: const EdgeInsets.fromLTRB(Space.md, Space.xs, Space.md, Space.md),
       child: Container(
@@ -607,8 +609,8 @@ class _AssistantPanelState extends State<AssistantPanel> {
                   minLines: 1,
                   maxLines: 6,
                   textInputAction: TextInputAction.newline,
-                  decoration: const InputDecoration(
-                    hintText: '问点什么… (Shift+Enter 换行)',
+                  decoration: InputDecoration(
+                    hintText: l10n.chatInputHint,
                     border: InputBorder.none,
                     enabledBorder: InputBorder.none,
                     focusedBorder: InputBorder.none,
@@ -626,10 +628,10 @@ class _AssistantPanelState extends State<AssistantPanel> {
                 duration: Motion.short4,
                 transitionBuilder: (c, an) => ScaleTransition(scale: an, child: c),
                 child: a.busy
-                    ? IconButton.filledTonal(key: const ValueKey('stop'), tooltip: '停止', onPressed: a.stop, icon: const Icon(Icons.stop_rounded))
+                    ? IconButton.filledTonal(key: const ValueKey('stop'), tooltip: l10n.commonStop, onPressed: a.stop, icon: const Icon(Icons.stop_rounded))
                     : IconButton.filled(
                         key: const ValueKey('send'),
-                        tooltip: '发送 (Enter)',
+                        tooltip: l10n.chatSend,
                         onPressed: _input.text.trim().isEmpty ? null : _send,
                         icon: const Icon(Icons.arrow_upward_rounded),
                       ),
@@ -669,18 +671,18 @@ class _PlusMenu extends StatelessWidget {
         MenuItemButton(
           leadingIcon: const Icon(Icons.explore_outlined, size: 20),
           onPressed: store.ready ? () => openPlugins(context) : null,
-          child: const Text('发现插件'),
+          child: Text(l10n.pluginsDiscover),
         ),
         MenuItemButton(
           leadingIcon: const Icon(Icons.extension_outlined, size: 20),
           onPressed: store.ready ? () => openPlugins(context, installed: true) : null,
-          child: Text('管理插件', style: tt.bodyMedium),
+          child: Text(l10n.pluginsManage, style: tt.bodyMedium),
         ),
       ],
       builder: (context, c, _) => Padding(
         padding: const EdgeInsets.only(right: Space.xs, bottom: 2),
         child: IconButton(
-          tooltip: '更多功能',
+          tooltip: l10n.chatMoreTools,
           visualDensity: VisualDensity.compact,
           onPressed: () => c.isOpen ? c.close() : c.open(),
           icon: const Icon(Icons.add_circle_outline_rounded),
@@ -719,7 +721,7 @@ class _ModeChips extends StatelessWidget {
                     selected: true,
                     showCheckmark: false,
                     visualDensity: VisualDensity.compact,
-                    deleteButtonTooltipMessage: '关闭',
+                    deleteButtonTooltipMessage: l10n.commonClose,
                     onDeleted: () => runPluginEntry(context, e, context_),
                   ),
               ]),
@@ -755,29 +757,42 @@ class _ModelChip extends StatelessWidget {
           ),
         if (sel?['reasoning'] == true) ...[
           const Divider(),
-          SubmenuButton(
-            leadingIcon: const Icon(Icons.psychology_outlined, size: 18),
-            menuChildren: [
-              for (final (k, l) in const [('off', '关闭'), ('minimal', '最少'), ('low', '低'), ('medium', '中'), ('high', '高'), ('xhigh', '最高')])
-                MenuItemButton(
-                  leadingIcon: Icon(a.thinking == k ? Icons.check_rounded : null, size: 18),
-                  onPressed: () => a.setPrefs({'thinking': k}),
-                  child: Text(l),
+          if (context.isCompact)
+            MenuItemButton(
+              leadingIcon: const Icon(Icons.psychology_outlined, size: 18),
+              trailingIcon: Text(thinkingLabel(a.thinking), style: Theme.of(context).textTheme.labelLarge?.copyWith(color: cs.primary)),
+              onPressed: () => showThinkingSheet(context, a),
+              child: Text(l10n.thinkingTitle),
+            )
+          else
+            SubmenuButton(
+              leadingIcon: const Icon(Icons.psychology_outlined, size: 18),
+              trailingIcon: Text(thinkingLabel(a.thinking), style: Theme.of(context).textTheme.labelLarge?.copyWith(color: cs.primary)),
+              menuChildren: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(Space.lg, Space.md, Space.lg, Space.md),
+                  child: SizedBox(
+                    width: 300,
+                    child: ListenableBuilder(
+                      listenable: a,
+                      builder: (context, _) => ThinkingControl(value: a.thinking, onChanged: (k) => a.setPrefs({'thinking': k})),
+                    ),
+                  ),
                 ),
-            ],
-            child: const Text('思考强度'),
-          ),
+              ],
+              child: Text(l10n.thinkingTitle),
+            ),
         ],
         const Divider(),
         MenuItemButton(
           leadingIcon: const Icon(Icons.search_rounded, size: 18),
           onPressed: () => showModelPicker(context),
-          child: const Text('搜索全部模型…'),
+          child: Text(l10n.modelsSearchAll),
         ),
         MenuItemButton(
           leadingIcon: const Icon(Icons.tune_rounded, size: 18),
           onPressed: () => Navigator.of(context, rootNavigator: true).push(MaterialPageRoute(builder: (_) => const ModelsPage())),
-          child: const Text('模型设置…'),
+          child: Text(l10n.modelsSettings),
         ),
       ],
       builder: (context, m, _) => ActionChip(
@@ -817,25 +832,24 @@ class _ContextMeter extends StatelessWidget {
         Padding(
           padding: const EdgeInsets.fromLTRB(Space.lg, Space.md, Space.lg, Space.sm),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('上下文 ${fmtTokens(used)} / ${fmtTokens(window)}（${pct.round()}%）', style: tt.titleSmall),
+            Text(l10n.contextUsage(fmtTokens(used), fmtTokens(window), pct.round()), style: tt.titleSmall),
             const SizedBox(height: 4),
-            Text('本对话累计 输入 ${fmtTokens((tokens['input'] as num?) ?? 0)} · 输出 ${fmtTokens((tokens['output'] as num?) ?? 0)}'
-                '${((tokens['cacheRead'] as num?) ?? 0) > 0 ? ' · 缓存命中 ${fmtTokens(tokens['cacheRead'] as num)}' : ''}',
+            Text(l10n.contextTokens(fmtTokens((tokens['input'] as num?) ?? 0), fmtTokens((tokens['output'] as num?) ?? 0), ((tokens['cacheRead'] as num?) ?? 0) > 0 ? l10n.contextCacheHit(fmtTokens(tokens['cacheRead'] as num)) : ''),
                 style: tt.bodySmall),
-            if (cost > 0) Text('估算费用 \$${cost.toStringAsFixed(4)}', style: tt.bodySmall),
+            if (cost > 0) Text(l10n.contextCost(cost.toStringAsFixed(4)), style: tt.bodySmall),
             const SizedBox(height: 4),
-            Text('接近上限时 Pi 会自动压缩较早的对话。', style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+            Text(l10n.contextCompactHint, style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
           ]),
         ),
         MenuItemButton(
           leadingIcon: const Icon(Icons.compress_rounded, size: 18),
           onPressed: a.busy || a.compacting ? null : a.compact,
-          child: const Text('立即压缩上下文'),
+          child: Text(l10n.contextCompactNow),
         ),
         MenuItemButton(
           leadingIcon: const Icon(Icons.insights_outlined, size: 18),
           onPressed: () => Navigator.of(context, rootNavigator: true).push(MaterialPageRoute(builder: (_) => const UsagePage())),
-          child: const Text('查看用量'),
+          child: Text(l10n.usageView),
         ),
         MenuItemButton(
           leadingIcon: const Icon(Icons.schedule_rounded, size: 18),
@@ -844,11 +858,11 @@ class _ContextMeter extends StatelessWidget {
             Navigator.of(context, rootNavigator: true).popUntil((r) => r.isFirst);
             ShellNav.goTo(Tabs.tasks);
           },
-          child: const Text('定时任务'),
+          child: Text(l10n.commonScheduledTasks),
         ),
       ],
       builder: (context, m, _) => IconButton(
-        tooltip: '上下文用量 ${pct.round()}%',
+        tooltip: l10n.contextUsageTooltip(pct.round()),
         onPressed: () => m.isOpen ? m.close() : m.open(),
         icon: a.compacting
             ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2.5))
@@ -988,7 +1002,7 @@ class _AssistantTurn extends StatelessWidget {
         child: Row(children: [
           const ExpressiveLoader(size: 22),
           const SizedBox(width: Space.sm),
-          Text(msg.status ?? '正在思考…', style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+          Text(msg.status ?? l10n.chatThinking, style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
         ]),
       ));
     }
@@ -1042,8 +1056,8 @@ Widget _appChip(BuildContext context, ChatBlock b, Map<String, dynamic> op) {
     label: appOpLabel(op),
     icon: icon,
     done: op['undone'] == true,
-    actionLabel: op['op'] == 'open' ? '返回' : '撤销',
-    doneLabel: op['op'] == 'open' ? '已返回' : '已撤销',
+    actionLabel: op['op'] == 'open' ? l10n.commonBack : l10n.commonUndo,
+    doneLabel: op['op'] == 'open' ? l10n.toolReturned : l10n.commonUndone,
     onAction: op['op'] == 'open'
         ? (BotOps.canGoBackFrom(op) ? () async => BotOps.back() : null)
         : undoable
@@ -1071,15 +1085,15 @@ class _Footer extends StatelessWidget {
         IconButton(
           visualDensity: VisualDensity.compact,
           iconSize: 16,
-          tooltip: '复制',
+          tooltip: l10n.commonCopy,
           onPressed: () {
             Clipboard.setData(ClipboardData(text: text));
-            showSnack(context, '已复制');
+            showSnack(context, l10n.commonCopied);
           },
           icon: const Icon(Icons.copy_rounded),
         ),
       if (onRetry != null)
-        IconButton(visualDensity: VisualDensity.compact, iconSize: 16, tooltip: '重新生成', onPressed: onRetry, icon: const Icon(Icons.refresh_rounded)),
+        IconButton(visualDensity: VisualDensity.compact, iconSize: 16, tooltip: l10n.commonRegenerate, onPressed: onRetry, icon: const Icon(Icons.refresh_rounded)),
       const SizedBox(width: Space.xs),
       Flexible(child: Text(meta, style: tt.labelSmall?.copyWith(color: cs.outline), overflow: TextOverflow.ellipsis)),
     ]);
@@ -1117,7 +1131,7 @@ class _ThinkingBlockState extends State<_ThinkingBlock> {
             child: Row(mainAxisSize: MainAxisSize.min, children: [
               widget.live ? const ExpressiveLoader(size: 16) : Icon(Icons.psychology_outlined, size: 16, color: cs.onSurfaceVariant),
               const SizedBox(width: Space.sm),
-              Text(widget.live ? '思考中' : '思考过程', style: tt.labelMedium?.copyWith(color: cs.onSurfaceVariant)),
+              Text(widget.live ? l10n.chatThinkingNow : l10n.chatThinkingProcess, style: tt.labelMedium?.copyWith(color: cs.onSurfaceVariant)),
               const SizedBox(width: 4),
               AnimatedRotation(
                 turns: open ? 0.5 : 0,
@@ -1201,12 +1215,12 @@ class _ToolCardState extends State<_ToolCard> {
                 decoration: BoxDecoration(color: cs.surfaceContainerHigh, borderRadius: BorderRadius.circular(Corners.md)),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   if (args.isNotEmpty && args != '{}') ...[
-                    Text('参数', style: tt.labelSmall?.copyWith(color: cs.primary)),
+                    Text(l10n.toolArgs, style: tt.labelSmall?.copyWith(color: cs.primary)),
                     Text(args, style: tt.bodySmall?.copyWith(fontFamily: 'monospace')),
                     const SizedBox(height: Space.sm),
                   ],
                   if (b.result.isNotEmpty) ...[
-                    Text('结果', style: tt.labelSmall?.copyWith(color: cs.primary)),
+                    Text(l10n.toolResult, style: tt.labelSmall?.copyWith(color: cs.primary)),
                     Text(b.result, style: tt.bodySmall?.copyWith(fontFamily: 'monospace'), maxLines: 30, overflow: TextOverflow.fade),
                   ],
                 ]),
@@ -1234,7 +1248,7 @@ class _OutlineCard extends StatelessWidget {
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(Space.lg, Space.xs, Space.lg, Space.sm),
-          child: Text('大纲 · ${chapters.length} 个章节', style: tt.labelLarge?.copyWith(color: cs.primary)),
+          child: Text(l10n.chatOutlineChapters(chapters.length), style: tt.labelLarge?.copyWith(color: cs.primary)),
         ),
         for (final c in chapters.whereType<Map>())
           InkWell(
@@ -1276,7 +1290,7 @@ class _SlideStrip extends StatelessWidget {
           itemCount: slides.length,
           separatorBuilder: (_, _) => const SizedBox(width: Space.sm),
           itemBuilder: (context, i) => Tooltip(
-            message: 'PPT 第 ${slides[i]} 张',
+            message: l10n.chatSlideRef(slides[i]),
             child: InkWell(
               borderRadius: BorderRadius.circular(Corners.md),
               onTap: () => openRef(context, SlideRef(lectureId, slides[i]), lectureId: lectureId),
@@ -1299,7 +1313,7 @@ class _SlideStrip extends StatelessWidget {
       if (mode == 'described' || mode == 'unavailable')
         Padding(
           padding: const EdgeInsets.only(top: Space.xs),
-          child: Text(mode == 'described' ? '由识图模型转写给助手' : '当前模型不能看图，可在 设置 → 助手 → 识图模型 中设置',
+          child: Text(mode == 'described' ? l10n.chatVisionTranscribed : l10n.chatVisionUnavailable,
               style: tt.labelSmall?.copyWith(color: mode == 'unavailable' ? cs.error : cs.onSurfaceVariant)),
         ),
     ]);
@@ -1328,8 +1342,8 @@ class _NoteCard extends StatelessWidget {
             const SizedBox(width: Space.md),
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('${note['title'] ?? '笔记'}', maxLines: 2, overflow: TextOverflow.ellipsis, style: tt.titleSmall?.copyWith(color: cs.onSecondaryContainer)),
-                Text('已保存到课程库 · 点击阅读', style: tt.bodySmall?.copyWith(color: cs.onSecondaryContainer.withValues(alpha: 0.8))),
+                Text('${note['title'] ?? l10n.commonNotes}', maxLines: 2, overflow: TextOverflow.ellipsis, style: tt.titleSmall?.copyWith(color: cs.onSecondaryContainer)),
+                Text(l10n.chatSavedToLibrary, style: tt.bodySmall?.copyWith(color: cs.onSecondaryContainer.withValues(alpha: 0.8))),
               ]),
             ),
             Icon(Icons.arrow_forward_rounded, color: cs.onSecondaryContainer),
@@ -1391,7 +1405,7 @@ class _CodeBlock extends StatelessWidget {
               iconSize: 16,
               onPressed: () {
                 Clipboard.setData(ClipboardData(text: code));
-                showSnack(context, '已复制代码');
+                showSnack(context, l10n.chatCodeCopied);
               },
               icon: const Icon(Icons.copy_rounded),
             ),

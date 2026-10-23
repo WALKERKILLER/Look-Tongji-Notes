@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../../theme/tokens.dart';
+import '../../l10n/l10n.dart';
 
 /// One measure on the board; shorter bars are always better.
 class BenchMetric {
@@ -75,7 +76,7 @@ class _AsrBenchBoardState extends State<AsrBenchBoard> {
                 showSelectedIcon: false,
                 segments: [
                   for (var i = 0; i < widget.metrics.length; i++)
-                    ButtonSegment(value: i, label: Text(wide ? '按${widget.metrics[i].label}' : widget.metrics[i].label)),
+                    ButtonSegment(value: i, label: Text(wide ? l10n.benchSortBy(widget.metrics[i].label) : widget.metrics[i].label)),
                 ],
                 selected: {_sort},
                 onSelectionChanged: (s) => setState(() => _sort = s.first),
@@ -111,7 +112,7 @@ class _AsrBenchBoardState extends State<AsrBenchBoard> {
             const SizedBox(height: Space.sm),
             for (final m in shown)
               Text(
-                '${widget.metrics[m].label}：${widget.metrics[m].source}',
+                l10n.benchMetricSource(widget.metrics[m].label, widget.metrics[m].source),
                 style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant, height: 1.5),
               ),
           ],
@@ -127,13 +128,13 @@ class _AsrBenchBoardState extends State<AsrBenchBoard> {
     final hover = r.id == _hover;
     final summary = [
       for (var m = 0; m < widget.metrics.length; m++)
-        '${widget.metrics[m].label} ${r.values[m] == null ? '未测' : widget.metrics[m].format(r.values[m]!)}',
-    ].join('，');
+        '${widget.metrics[m].label} ${r.values[m] == null ? l10n.benchUntested : widget.metrics[m].format(r.values[m]!)}',
+    ].join(l10n.listComma);
     final valueStyle = tt.labelSmall?.copyWith(color: cs.onSurface, fontFeatures: const [FontFeature.tabularFigures()]);
     return Semantics(
       button: widget.onSelect != null,
       selected: sel,
-      label: '${r.name}，$summary',
+      label: l10n.benchRowLabel(r.name, summary),
       excludeSemantics: true,
       child: Tooltip(
         message: '${r.name}\n$summary',
@@ -184,7 +185,7 @@ class _AsrBenchBoardState extends State<AsrBenchBoard> {
                         child: LayoutBuilder(
                           builder: (context, c) {
                             final v = r.values[m];
-                            final label = v == null ? '未测' : widget.metrics[m].format(v);
+                            final label = v == null ? l10n.benchUntested : widget.metrics[m].format(v);
                             final lw = (TextPainter(
                               text: TextSpan(text: label, style: valueStyle),
                               textDirection: TextDirection.ltr,

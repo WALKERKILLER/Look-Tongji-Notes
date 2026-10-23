@@ -3,15 +3,21 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:gpt_markdown/gpt_markdown.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../l10n/l10n.dart';
 
 enum ContrastLevel {
-  standard(0, '标准'),
-  medium(0.5, '中'),
-  high(1, '高');
+  standard(0),
+  medium(0.5),
+  high(1);
 
-  const ContrastLevel(this.value, this.label);
+  const ContrastLevel(this.value);
   final double value;
-  final String label;
+
+  String get label => switch (this) {
+        standard => l10n.levelStandard,
+        medium => l10n.levelMedium,
+        high => l10n.levelHigh,
+      };
 }
 
 /// User-tunable presentation preferences (kept on device, not in the library).
@@ -135,32 +141,32 @@ class UiPrefs extends ChangeNotifier {
 }
 
 /// Curated seed colors shown in the appearance picker.
-const kSeedPalette = <(String, Color)>[
-  ('同济蓝', Color(0xFF3F6CB4)),
-  ('黛青', Color(0xFF2E6E6A)),
-  ('松绿', Color(0xFF4F7A3A)),
-  ('琥珀', Color(0xFFB0782A)),
-  ('朱砂', Color(0xFFB4443A)),
-  ('海棠', Color(0xFFB0507A)),
-  ('藤紫', Color(0xFF6E5AA8)),
-  ('石墨', Color(0xFF5D6670)),
+final kSeedPalette = <(String, Color)>[
+  (l10n.colorTongjiBlue, Color(0xFF3F6CB4)),
+  (l10n.colorIndigo, Color(0xFF2E6E6A)),
+  (l10n.colorPine, Color(0xFF4F7A3A)),
+  (l10n.colorAmber, Color(0xFFB0782A)),
+  (l10n.colorCinnabar, Color(0xFFB4443A)),
+  (l10n.colorBegonia, Color(0xFFB0507A)),
+  (l10n.colorWisteria, Color(0xFF6E5AA8)),
+  (l10n.colorGraphite, Color(0xFF5D6670)),
 ];
 
-const kVariantLabels = <DynamicSchemeVariant, String>{
-  DynamicSchemeVariant.tonalSpot: '柔和',
-  DynamicSchemeVariant.neutral: '中性',
-  DynamicSchemeVariant.vibrant: '鲜明',
-  DynamicSchemeVariant.expressive: '表现',
-  DynamicSchemeVariant.fidelity: '忠实',
-  DynamicSchemeVariant.content: '内容',
-  DynamicSchemeVariant.monochrome: '单色',
+final kVariantLabels = <DynamicSchemeVariant, String>{
+  DynamicSchemeVariant.tonalSpot: l10n.schemeTonalSpot,
+  DynamicSchemeVariant.neutral: l10n.schemeNeutral,
+  DynamicSchemeVariant.vibrant: l10n.schemeVibrant,
+  DynamicSchemeVariant.expressive: l10n.schemeExpressive,
+  DynamicSchemeVariant.fidelity: l10n.schemeFidelity,
+  DynamicSchemeVariant.content: l10n.schemeContent,
+  DynamicSchemeVariant.monochrome: l10n.schemeMonochrome,
 };
 
 /// Font families offered in settings (null = system default).
-const kFontChoices = <(String, String?)>[
-  ('系统默认', null),
-  ('鸿蒙黑体', 'HarmonyOS Sans SC'),
-  ('思源黑体', 'Noto Sans CJK SC'),
-  ('霞鹜文楷', 'LXGW WenKai'),
-  ('Inter + 系统中文', 'Inter'),
+final kFontChoices = <(String, String?)>[
+  (l10n.fontSystem, null),
+  (l10n.fontHarmonySans, 'HarmonyOS Sans SC'),
+  (l10n.fontSourceHanSans, 'Noto Sans CJK SC'),
+  (l10n.fontLxgwWenKai, 'LXGW WenKai'),
+  (l10n.fontInterWithSystem, 'Inter'),
 ];

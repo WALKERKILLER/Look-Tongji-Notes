@@ -10,6 +10,7 @@ import '../../theme/tokens.dart';
 import '../../widgets/look_markdown.dart';
 import '../../widgets/states.dart';
 import 'settings_common.dart';
+import '../../l10n/l10n.dart';
 
 // Notion sync of the library: connect an internal integration, pick the
 // page it lives under, sync. Contract: docs/specs/0013-notion-sync.md
@@ -21,13 +22,13 @@ Map<String, dynamic> _map(Object? v) => v is Map ? v.cast<String, dynamic>() : <
 
 /// One line for the Notion status, also used by the settings tile.
 String notionSummary(Map<String, dynamic> st) {
-  if (st['connected'] != true) return '同步到你的 Notion 工作区';
-  if (st['running'] == true) return '正在同步…';
+  if (st['connected'] != true) return l10n.notionSubtitle;
+  if (st['running'] == true) return l10n.commonSyncing;
   final parent = _map(st['parent']);
-  if (parent.isEmpty) return '已连接 · 还没选同步位置';
+  if (parent.isEmpty) return l10n.notionNoParent;
   final err = '${_map(st['last'])['error'] ?? ''}';
   if (err.isNotEmpty) return err;
-  return '${parent['title']} · ${st['pages'] ?? 0} 个页面${st['auto'] == true ? ' · 自动' : ''}';
+  return l10n.notionStatus(parent['title'], st['pages'] ?? 0, st['auto'] == true ? l10n.commonAutoSuffix : '');
 }
 
 class NotionPage extends StatefulWidget {
@@ -122,11 +123,11 @@ class _NotionPageState extends State<NotionPage> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
-        title: const Text('断开 Notion？'),
-        content: const Text('会删除本机保存的令牌和同步记录。已经同步到 Notion 的页面会留在那里；之后重新连接时会新建一份。'),
+        title: Text(l10n.notionDisconnectTitle),
+        content: Text(l10n.notionDisconnectBody),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('取消')),
-          FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('断开')),
+          TextButton(onPressed: () => Navigator.pop(c, false), child: Text(l10n.commonCancel)),
+          FilledButton(onPressed: () => Navigator.pop(c, true), child: Text(l10n.commonDisconnect)),
         ],
       ),
     );
@@ -146,11 +147,11 @@ class _NotionPageState extends State<NotionPage> {
       final ok = await showDialog<bool>(
         context: context,
         builder: (c) => AlertDialog(
-          title: const Text('换一个同步位置？'),
-          content: const Text('之后会在新页面下重新创建课程库。原来同步过去的页面留在原处，不再更新。'),
+          title: Text(l10n.notionChangeParentTitle),
+          content: Text(l10n.notionChangeParentBody),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('取消')),
-            FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('更换')),
+            TextButton(onPressed: () => Navigator.pop(c, false), child: Text(l10n.commonCancel)),
+            FilledButton(onPressed: () => Navigator.pop(c, true), child: Text(l10n.commonChange)),
           ],
         ),
       );
@@ -175,8 +176,8 @@ class _NotionPageState extends State<NotionPage> {
         mark: const BrandMark(notionLogo, size: 56, mono: true),
         title: 'Notion',
         on: connected,
-        status: connected ? '已连接到 ${'${bot['workspace'] ?? ''}'.isEmpty ? '工作区' : bot['workspace']}' : '未连接',
-        body: '把课程库同步到 Notion 的一个页面下：每门课、每节课一个页面，下面是笔记和转写稿。只写入 Look Studio 创建的页面；在 Notion 里改过的页面不会被覆盖。',
+        status: connected ? l10n.notionConnectedTo('${bot['workspace'] ?? ''}'.isEmpty ? l10n.notionWorkspace : bot['workspace']) : l10n.commonNotConnected,
+        body: l10n.notionBody,
       ),
       if (connected) ..._connected(context, st) else ..._connectForm(context),
     ]);
@@ -188,19 +189,19 @@ class _NotionPageState extends State<NotionPage> {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
     return [
-      SettingsGroup(title: '创建集成', children: [
+      SettingsGroup(title: l10n.notionCreateIntegration, children: [
         const SizedBox(height: Space.xs),
-        const SettingsSteps([
-          '在 Notion 的「集成」页新建一个 Internal 集成，名称填 Look Studio，选择要同步到的工作区',
-          '在「功能」里保留读取、更新和插入内容，其余可以关闭',
-          '复制「Internal Integration Secret」，粘贴到下面',
+        SettingsSteps([
+          l10n.notionStep1,
+          l10n.notionStep2,
+          l10n.notionStep3,
         ]),
         Align(
           alignment: Alignment.centerLeft,
           child: TextButton.icon(
             onPressed: () => openPlainLink(context, _integrationsUrl),
             icon: const Icon(Icons.open_in_new_rounded, size: 18),
-            label: const Text('打开 Notion 集成页'),
+            label: Text(l10n.notionOpenIntegrations),
           ),
         ),
         const SizedBox(height: Space.md),
@@ -212,13 +213,13 @@ class _NotionPageState extends State<NotionPage> {
           onChanged: (_) => setState(() => _connectError = null),
           onSubmitted: (_) => _token.text.trim().isEmpty || _busy ? null : _connect(),
           decoration: InputDecoration(
-            labelText: '集成密钥',
+            labelText: l10n.notionSecret,
             hintText: 'ntn_…',
             border: const OutlineInputBorder(),
             errorText: _connectError,
-            helperText: '用本机密钥加密保存，只用来访问你授权给集成的页面',
+            helperText: l10n.notionSecretHelper,
             suffixIcon: IconButton(
-              tooltip: _obscure ? '显示' : '隐藏',
+              tooltip: _obscure ? l10n.commonShow : l10n.commonHide,
               onPressed: () => setState(() => _obscure = !_obscure),
               icon: Icon(_obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined),
             ),
@@ -229,13 +230,13 @@ class _NotionPageState extends State<NotionPage> {
           FilledButton.icon(
             onPressed: _busy || _token.text.trim().isEmpty ? null : _connect,
             icon: _busy ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2.5)) : const Icon(Icons.link_rounded),
-            label: Text(_busy ? '正在连接' : '连接'),
+            label: Text(_busy ? l10n.commonConnecting : l10n.commonConnect),
           ),
         ]),
       ]),
       Padding(
         padding: const EdgeInsets.fromLTRB(Space.xs, Space.lg, Space.xs, 0),
-        child: Text('连接后，还要在 Notion 里把一个页面分享给这个集成，课程库会建在那个页面下面。',
+        child: Text(l10n.notionShareHint,
             style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
       ),
     ];
@@ -250,26 +251,26 @@ class _NotionPageState extends State<NotionPage> {
     final bot = _map(st['bot']);
     final root = '${st['root_url'] ?? ''}';
     return [
-      SettingsGroup(title: '同步位置', children: [
+      SettingsGroup(title: l10n.notionParent, children: [
         if (parent.isEmpty) ...[
           const SizedBox(height: Space.xs),
-          const SettingsSteps([
-            '在 Notion 打开想放课程库的页面',
-            '点右上角「···」→「连接」，选择你的集成',
-            '回到这里选择这个页面',
+          SettingsSteps([
+            l10n.notionParentStep1,
+            l10n.notionParentStep2,
+            l10n.notionParentStep3,
           ]),
           const SizedBox(height: Space.md),
           Align(
             alignment: Alignment.centerLeft,
-            child: FilledButton.tonalIcon(onPressed: _busy ? null : _pickParent, icon: const Icon(Icons.add_link_rounded), label: const Text('选择页面')),
+            child: FilledButton.tonalIcon(onPressed: _busy ? null : _pickParent, icon: const Icon(Icons.add_link_rounded), label: Text(l10n.notionChoosePage)),
           ),
         ] else ...[
           ListTile(
             contentPadding: EdgeInsets.zero,
             leading: _PageIcon(icon: '${parent['icon'] ?? ''}'),
             title: Text('${parent['title']}'),
-            subtitle: const Text('课程库在这个页面下的「Look Studio 课程库」里'),
-            trailing: TextButton(onPressed: _busy || st['running'] == true ? null : _pickParent, child: const Text('更换')),
+            subtitle: Text(l10n.notionParentHint),
+            trailing: TextButton(onPressed: _busy || st['running'] == true ? null : _pickParent, child: Text(l10n.commonChange)),
           ),
           if (root.startsWith('https://'))
             Align(
@@ -277,28 +278,28 @@ class _NotionPageState extends State<NotionPage> {
               child: TextButton.icon(
                 onPressed: () => openPlainLink(context, root),
                 icon: const Icon(Icons.open_in_new_rounded, size: 18),
-                label: const Text('在 Notion 中打开'),
+                label: Text(l10n.notionOpenInNotion),
               ),
             ),
         ],
       ]),
       if (parent.isNotEmpty) _syncGroup(context, st),
-      SettingsGroup(title: '连接', children: [
+      SettingsGroup(title: l10n.commonConnect, children: [
         ListTile(
           contentPadding: EdgeInsets.zero,
           leading: const Icon(Icons.key_outlined),
-          title: Text('${bot['name'] ?? '集成'}'.isEmpty ? '集成' : '${bot['name']}'),
-          subtitle: Text('集成密钥 ••••${st['token_last4'] ?? ''}'),
+          title: Text('${bot['name'] ?? l10n.notionIntegration}'.isEmpty ? l10n.notionIntegration : '${bot['name']}'),
+          subtitle: Text(l10n.notionSecretTail(st['token_last4'] ?? '')),
           trailing: TextButton(
             onPressed: _busy ? null : _disconnect,
             style: TextButton.styleFrom(foregroundColor: cs.error),
-            child: const Text('断开'),
+            child: Text(l10n.commonDisconnect),
           ),
         ),
       ]),
       Padding(
         padding: const EdgeInsets.fromLTRB(Space.xs, Space.lg, Space.xs, 0),
-        child: Text('Notion 里的时间戳显示为文字，图片和课件不上传；需要跳回课堂时刻可以用 Obsidian 导出。',
+        child: Text(l10n.notionLimits,
             style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
       ),
     ];
@@ -315,11 +316,11 @@ class _NotionPageState extends State<NotionPage> {
     final errors = jsonList(last['errors']).map((e) => '$e').toList();
     final err = '${last['error'] ?? ''}';
     final at = (last['at'] as num?)?.toInt() ?? 0;
-    return SettingsGroup(title: '同步', children: [
+    return SettingsGroup(title: l10n.commonSync, children: [
       SwitchListTile(
         contentPadding: EdgeInsets.zero,
-        title: const Text('笔记变化后自动同步'),
-        subtitle: const Text('保存或删除笔记约 1 分钟后，只同步改动的页面'),
+        title: Text(l10n.notionAutoSync),
+        subtitle: Text(l10n.notionAutoSyncHint),
         value: st['auto'] == true,
         onChanged: _busy ? null : (v) => _do('PUT', '/api/notion', {'auto': v}),
       ),
@@ -334,7 +335,7 @@ class _NotionPageState extends State<NotionPage> {
                 child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                   LinearProgressIndicator(value: total > 0 ? done / total : null, borderRadius: BorderRadius.circular(Corners.full)),
                   const SizedBox(height: Space.sm),
-                  Text(total > 0 ? '正在同步 $done / $total' : '正在检查', style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+                  Text(total > 0 ? l10n.commonSyncProgress(done, total) : l10n.commonChecking, style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
                 ]),
               )
             : at == 0
@@ -347,21 +348,21 @@ class _NotionPageState extends State<NotionPage> {
       if (!running && conflicts.isNotEmpty)
         _Issues(
           icon: Icons.edit_note_rounded,
-          title: '${conflicts.length} 个页面在 Notion 里改过，保留了你的版本',
+          title: l10n.notionConflicts(conflicts.length),
           items: conflicts,
         ),
-      if (!running && errors.isNotEmpty) _Issues(icon: Icons.error_outline_rounded, title: '${errors.length} 个页面没有同步成功', items: errors, error: true),
+      if (!running && errors.isNotEmpty) _Issues(icon: Icons.error_outline_rounded, title: l10n.notionErrors(errors.length), items: errors, error: true),
       Wrap(spacing: Space.sm, runSpacing: Space.sm, children: [
         FilledButton.icon(
           onPressed: running || _busy ? null : () => _do('POST', '/api/notion/sync', {'full': false}),
           icon: const Icon(Icons.sync_rounded),
-          label: Text(at == 0 ? '开始同步' : '立即同步'),
+          label: Text(at == 0 ? l10n.commonStartSync : l10n.commonSyncNow),
         ),
         Tooltip(
-          message: '逐页确认还在，补建在 Notion 里删掉的页面；页面多时较慢',
+          message: l10n.notionFullCheckHint,
           child: OutlinedButton(
             onPressed: running || _busy || at == 0 ? null : () => _do('POST', '/api/notion/sync', {'full': true}),
-            child: const Text('完整检查'),
+            child: Text(l10n.notionFullCheck),
           ),
         ),
       ]),
@@ -381,17 +382,17 @@ class _LastSync extends StatelessWidget {
     final tt = Theme.of(context).textTheme;
     int n(String k) => (last[k] as num?)?.toInt() ?? 0;
     final counts = [
-      if (n('created') > 0) '新建 ${n('created')}',
-      if (n('updated') > 0) '更新 ${n('updated')}',
-      if (n('trashed') > 0) '移到废纸篓 ${n('trashed')}',
-      '未变 ${n('unchanged')}',
+      if (n('created') > 0) l10n.syncCreated(n('created')),
+      if (n('updated') > 0) l10n.syncUpdated(n('updated')),
+      if (n('trashed') > 0) l10n.syncTrashed(n('trashed')),
+      l10n.syncUnchanged(n('unchanged')),
     ];
     return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Icon(error.isEmpty ? Icons.check_circle_outline_rounded : Icons.error_outline_rounded, size: 20, color: error.isEmpty ? cs.primary : cs.error),
       const SizedBox(width: Space.md),
       Expanded(
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('上次同步 ${fmtRelative(DateTime.fromMillisecondsSinceEpoch(at))}', style: tt.bodyMedium),
+          Text(l10n.commonLastSynced(fmtRelative(DateTime.fromMillisecondsSinceEpoch(at))), style: tt.bodyMedium),
           Text(error.isEmpty ? counts.join(' · ') : error, style: tt.bodySmall?.copyWith(color: error.isEmpty ? cs.onSurfaceVariant : cs.error)),
         ]),
       ),
@@ -431,7 +432,7 @@ class _Issues extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(vertical: Space.xxs),
                 child: Text(s, style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
               ),
-            if (items.length > 50) Text('还有 ${items.length - 50} 项', style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+            if (items.length > 50) Text(l10n.notionMoreItems(items.length - 50), style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
           ],
         ),
       ),
@@ -510,17 +511,17 @@ class _PagePickerState extends State<_PagePicker> {
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(Space.xl, 0, Space.xl, Space.xs),
-          child: Text('选择同步位置', style: tt.titleLarge),
+          child: Text(l10n.notionChooseParent, style: tt.titleLarge),
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(Space.xl, 0, Space.xl, Space.md),
-          child: Text('这里只列出分享给集成的页面。也可以粘贴页面链接。', style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+          child: Text(l10n.notionChooseParentHint, style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
         ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: Space.lg),
           child: SearchBar(
             controller: _q,
-            hintText: '搜索页面或粘贴链接',
+            hintText: l10n.notionSearchHint,
             elevation: const WidgetStatePropertyAll(0),
             backgroundColor: WidgetStatePropertyAll(cs.surfaceContainerHighest),
             leading: const Icon(Icons.search_rounded),
@@ -542,7 +543,7 @@ class _PagePickerState extends State<_PagePicker> {
                         ListTile(
                           shape: const StadiumBorder(),
                           leading: const Icon(Icons.link_rounded),
-                          title: const Text('使用这个链接'),
+                          title: Text(l10n.notionUseLink),
                           subtitle: Text(q, maxLines: 1, overflow: TextOverflow.ellipsis),
                           onTap: () => Navigator.pop(context, q),
                         ),
@@ -550,19 +551,19 @@ class _PagePickerState extends State<_PagePicker> {
                         ListTile(
                           shape: const StadiumBorder(),
                           leading: _PageIcon(icon: '${p['icon'] ?? ''}'),
-                          title: Text('${p['title']}'.isEmpty ? '无标题' : '${p['title']}'),
+                          title: Text('${p['title']}'.isEmpty ? l10n.commonUntitled : '${p['title']}'),
                           onTap: () => Navigator.pop(context, '${p['id']}'),
                         ),
                       if (pages.isEmpty && !_link.hasMatch(q))
                         Padding(
                           padding: const EdgeInsets.all(Space.xl),
                           child: Column(children: [
-                            Text(q.isEmpty ? '集成还没有可用的页面' : '没有找到「$q」', style: tt.titleSmall),
+                            Text(q.isEmpty ? l10n.notionNoPages : l10n.notionNoMatch(q), style: tt.titleSmall),
                             const SizedBox(height: Space.sm),
-                            Text('在 Notion 打开目标页面，点右上角「···」→「连接」，选择你的集成，然后刷新。',
+                            Text(l10n.notionShareSteps,
                                 textAlign: TextAlign.center, style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
                             const SizedBox(height: Space.md),
-                            TextButton.icon(onPressed: _search, icon: const Icon(Icons.refresh_rounded, size: 18), label: const Text('刷新')),
+                            TextButton.icon(onPressed: _search, icon: const Icon(Icons.refresh_rounded, size: 18), label: Text(l10n.commonRefresh)),
                           ]),
                         ),
                     ]),

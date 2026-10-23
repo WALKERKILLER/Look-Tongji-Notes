@@ -9,6 +9,7 @@ import '../../theme/tokens.dart';
 import '../../widgets/pickers.dart';
 import '../../widgets/states.dart';
 import 'settings_common.dart';
+import '../../l10n/l10n.dart';
 
 /// One-way export of the library into an Obsidian vault
 /// (`POST /api/library/obsidian`, settings `obsidian.*`).
@@ -51,7 +52,7 @@ class _ObsidianPageState extends State<ObsidianPage> {
   }
 
   Future<void> _pick() async {
-    final dir = await pickDirectory(context, initial: _vault.text.trim(), title: 'Obsidian 仓库');
+    final dir = await pickDirectory(context, initial: _vault.text.trim(), title: l10n.obsidianVault);
     if (dir == null || !mounted) return;
     _vault.text = dir;
     await _saveAndTell();
@@ -68,16 +69,16 @@ class _ObsidianPageState extends State<ObsidianPage> {
   Future<void> _saveAndTell({bool quiet = false}) async {
     try {
       await _save(_vault.text.trim(), _folder.text.trim());
-      if (!quiet && mounted) showSnack(context, '已保存');
+      if (!quiet && mounted) showSnack(context, l10n.commonSaved);
     } catch (e) {
-      if (mounted) showSnack(context, '保存失败：$e');
+      if (mounted) showSnack(context, l10n.commonSaveFailed(e));
     }
   }
 
   Future<void> _export() async {
     final vault = _vault.text.trim(), folder = _folder.text.trim();
     if (vault.isEmpty) {
-      showSnack(context, '先选择 Obsidian 仓库文件夹');
+      showSnack(context, l10n.obsidianChooseVaultFirst);
       return;
     }
     setState(() => _busy = true);
@@ -88,12 +89,12 @@ class _ObsidianPageState extends State<ObsidianPage> {
       final r = await api.post('/api/library/obsidian', {'vault': vault, 'folder': folder}, const Duration(minutes: 5)) as Map;
       if (!mounted) return;
       final conflicts = (r['conflicts'] as List?)?.length ?? 0;
-      final parts = ['已导出：新写入 ${r['written']}，未变 ${r['unchanged']}，清理 ${r['removed']}'];
-      if (conflicts > 0) parts.add('$conflicts 个文件在 Obsidian 中改过，已保留你的版本（笔记的新版本另存为“(Look Studio)”副本）');
-      if (r['vault'] != true) parts.add('目标文件夹不是 Obsidian 仓库（没有 .obsidian），仍已导出');
-      showSnack(context, parts.join('；'));
+      final parts = [l10n.obsidianExported(r['written'], r['unchanged'], r['removed'])];
+      if (conflicts > 0) parts.add(l10n.obsidianConflicts(conflicts));
+      if (r['vault'] != true) parts.add(l10n.obsidianNotVault);
+      showSnack(context, parts.join(l10n.listSemicolon));
     } catch (e) {
-      if (mounted) showSnack(context, '导出失败：$e');
+      if (mounted) showSnack(context, l10n.commonExportFailed(e));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -121,9 +122,9 @@ class _ObsidianPageState extends State<ObsidianPage> {
         // Optional; xdg-mime alone is enough on most desktops.
       }
       if (!mounted) return;
-      showSnack(context, r.exitCode == 0 ? '已注册：点击 lookstudio:// 链接会打开 Look Studio' : '已写入 $name，但 xdg-mime 失败：${r.stderr}');
+      showSnack(context, r.exitCode == 0 ? l10n.linkRegistered : l10n.linkRegisterPartial(name, r.stderr));
     } catch (e) {
-      if (mounted) showSnack(context, '注册失败：$e');
+      if (mounted) showSnack(context, l10n.linkRegisterFailed(e));
     }
   }
 
@@ -142,41 +143,41 @@ class _ObsidianPageState extends State<ObsidianPage> {
             mark: const BrandMark('assets/brands/obsidian.svg', size: 56),
             title: 'Obsidian',
             on: vault.isNotEmpty,
-            status: vault.isEmpty ? '未设置仓库' : '导出到 ${p.basename(vault)}${auto ? ' · 自动' : ''}',
-            body: '把课程库单向导出到 Obsidian 仓库的一个文件夹：总的“课程库”页，每门课一个文件夹，里面分“笔记”（按节次，含引用的 PPT 和课件）和“转写稿”。点击时间戳会回到 Look Studio；在 Obsidian 里改过的文件不会被覆盖。',
+            status: vault.isEmpty ? l10n.obsidianNoVault : l10n.obsidianStatus(p.basename(vault), auto ? l10n.commonAutoSuffix : ''),
+            body: l10n.obsidianBody,
           ),
-          SettingsGroup(title: '位置', children: [
+          SettingsGroup(title: l10n.commonLocation, children: [
             const SizedBox(height: Space.sm),
             TextField(
               controller: _vault,
               decoration: InputDecoration(
-                labelText: 'Obsidian 仓库',
+                labelText: l10n.obsidianVault,
                 hintText: '/home/me/Notes',
                 border: const OutlineInputBorder(),
-                suffixIcon: IconButton(tooltip: '选择文件夹', onPressed: _pick, icon: const Icon(Icons.folder_open_rounded)),
+                suffixIcon: IconButton(tooltip: l10n.pickerChooseFolder, onPressed: _pick, icon: const Icon(Icons.folder_open_rounded)),
               ),
               onSubmitted: (_) => _saveAndTell(quiet: true),
             ),
             const SizedBox(height: Space.md),
             TextField(
               controller: _folder,
-              decoration: const InputDecoration(labelText: '仓库内的文件夹', hintText: 'LookStudio', border: OutlineInputBorder(), helperText: '只写入这个文件夹，仓库里的其他笔记不受影响'),
+              decoration: InputDecoration(labelText: l10n.obsidianFolder, hintText: 'LookStudio', border: OutlineInputBorder(), helperText: l10n.obsidianFolderHelper),
               onSubmitted: (_) => _saveAndTell(quiet: true),
             ),
             const SizedBox(height: Space.sm),
-            Align(alignment: Alignment.centerRight, child: TextButton(onPressed: _saveAndTell, child: const Text('保存位置'))),
+            Align(alignment: Alignment.centerRight, child: TextButton(onPressed: _saveAndTell, child: Text(l10n.obsidianSaveLocation))),
           ]),
-          SettingsGroup(title: '导出', children: [
+          SettingsGroup(title: l10n.commonExport, children: [
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
-              title: const Text('笔记变化后自动导出'),
-              subtitle: const Text('保存或删除笔记后几秒内刷新'),
+              title: Text(l10n.obsidianAutoExport),
+              subtitle: Text(l10n.obsidianAutoExportHint),
               value: auto,
               onChanged: (on) async {
                 try {
                   await widget.settings.put('obsidian.auto', on);
                 } catch (e) {
-                  if (context.mounted) showSnack(context, '保存失败：$e');
+                  if (context.mounted) showSnack(context, l10n.commonSaveFailed(e));
                 }
               },
             ),
@@ -185,18 +186,18 @@ class _ObsidianPageState extends State<ObsidianPage> {
               FilledButton.icon(
                 onPressed: _busy ? null : _export,
                 icon: _busy ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2.5)) : const Icon(Icons.ios_share_rounded),
-                label: Text(_busy ? '正在导出' : '立即导出'),
+                label: Text(_busy ? l10n.commonExporting : l10n.commonExportNow),
               ),
             ]),
           ]),
           if (Platform.isLinux)
-            SettingsGroup(title: '回到 Look Studio', children: [
-              Text('导出的时间戳和课次链接是 lookstudio:// 链接。注册后，在 Obsidian 里点击会打开对应的课和时刻。',
+            SettingsGroup(title: l10n.obsidianBackLinks, children: [
+              Text(l10n.obsidianBackLinksBody,
                   style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
               const SizedBox(height: Space.md),
               Align(
                 alignment: Alignment.centerLeft,
-                child: OutlinedButton.icon(onPressed: _registerLinks, icon: const Icon(Icons.link_rounded), label: const Text('注册 lookstudio:// 链接')),
+                child: OutlinedButton.icon(onPressed: _registerLinks, icon: const Icon(Icons.link_rounded), label: Text(l10n.linkRegister)),
               ),
             ]),
         ]);

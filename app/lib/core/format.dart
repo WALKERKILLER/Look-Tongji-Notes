@@ -1,3 +1,4 @@
+import '../l10n/l10n.dart';
 String fmtBytes(num b) {
   if (b < 1024) return '${b.toInt()} B';
   const units = ['KB', 'MB', 'GB', 'TB'];
@@ -25,11 +26,11 @@ String fmtDuration(int seconds) {
   if (seconds <= 0) return '';
   final h = seconds ~/ 3600;
   final m = (seconds % 3600) ~/ 60;
-  if (h > 0) return m > 0 ? '$h 小时 $m 分' : '$h 小时';
-  return '$m 分钟';
+  if (h > 0) return m > 0 ? l10n.durationHoursMinutes(h, m) : l10n.durationHours(h);
+  return l10n.durationMinutes(m);
 }
 
-const _weekdays = ['一', '二', '三', '四', '五', '六', '日'];
+final _weekdays = [l10n.weekdayShort1, l10n.weekdayShort2, l10n.weekdayShort3, l10n.weekdayShort4, l10n.weekdayShort5, l10n.weekdayShort6, l10n.weekdayShort7];
 
 String fmtLectureDate(DateTime? d) {
   if (d == null) return '';
@@ -38,37 +39,37 @@ String fmtLectureDate(DateTime? d) {
   final day = DateTime(d.year, d.month, d.day);
   final diff = today.difference(day).inDays;
   final hm = '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
-  if (diff == 0) return '今天 $hm';
-  if (diff == 1) return '昨天 $hm';
-  if (diff == -1) return '明天 $hm';
-  final wd = '周${_weekdays[d.weekday - 1]}';
-  if (d.year == now.year) return '${d.month}月${d.day}日 $wd';
-  return '${d.year}年${d.month}月${d.day}日';
+  if (diff == 0) return l10n.timeToday(hm);
+  if (diff == 1) return l10n.timeYesterday(hm);
+  if (diff == -1) return l10n.timeTomorrow(hm);
+  final wd = l10n.weekdayName(_weekdays[d.weekday - 1]);
+  if (d.year == now.year) return l10n.dateMonthDayWeekday(d.month, d.day, wd);
+  return l10n.dateYearMonthDay(d.year, d.month, d.day);
 }
 
 String fmtRelative(DateTime t) {
   final d = DateTime.now().difference(t);
-  if (d.inSeconds < 60) return '刚刚';
-  if (d.inMinutes < 60) return '${d.inMinutes} 分钟前';
-  if (d.inHours < 24) return '${d.inHours} 小时前';
-  if (d.inDays < 30) return '${d.inDays} 天前';
-  return '${t.month}月${t.day}日';
+  if (d.inSeconds < 60) return l10n.timeJustNow;
+  if (d.inMinutes < 60) return l10n.timeMinutesAgo(d.inMinutes);
+  if (d.inHours < 24) return l10n.timeHoursAgo(d.inHours);
+  if (d.inDays < 30) return l10n.timeDaysAgo(d.inDays);
+  return l10n.dateMonthDay(t.month, t.day);
 }
 
 String fmtUntil(DateTime t) {
   final d = t.difference(DateTime.now());
-  if (d.isNegative) return '已过期';
-  if (d.inHours >= 24) return '${d.inDays} 天 ${d.inHours % 24} 小时';
-  if (d.inMinutes >= 60) return '${d.inHours} 小时 ${d.inMinutes % 60} 分';
-  return '${d.inMinutes} 分钟';
+  if (d.isNegative) return l10n.timeExpired;
+  if (d.inHours >= 24) return l10n.durationDaysHours(d.inDays, d.inHours % 24);
+  if (d.inMinutes >= 60) return l10n.durationHoursMinutesShort(d.inHours, d.inMinutes % 60);
+  return l10n.durationMinutesLong(d.inMinutes);
 }
 
 /// Time of day, `14:05:30`.
 String fmtClockTime(DateTime t) => '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}:${t.second.toString().padLeft(2, '0')}';
 
-const kindLabels = {'video': '视频', 'slides': 'PPT', 'courseware': '课件', 'transcript': '转写', 'audio': '音频', 'parse': '课件解析'};
+final kindLabels = {'video': l10n.assetVideo, 'slides': 'PPT', 'courseware': l10n.assetCourseware, 'transcript': l10n.assetTranscript, 'audio': l10n.assetAudio, 'parse': l10n.assetParse};
 
-const weekdayNames = _weekdays;
+final weekdayNames = _weekdays;
 
 /// Compact count for statistics: 0, 980, 12.3K, 4.5M.
 String fmtCompact(num n) {
@@ -87,10 +88,10 @@ String fmtUsd(num v) {
   return '\$${v.toStringAsFixed(0)}';
 }
 
-const kWeekdays = ['一', '二', '三', '四', '五', '六', '日'];
+final kWeekdays = [l10n.weekdayShort1, l10n.weekdayShort2, l10n.weekdayShort3, l10n.weekdayShort4, l10n.weekdayShort5, l10n.weekdayShort6, l10n.weekdayShort7];
 
 /// "10月14日 周二"
-String fmtDayLabel(DateTime d) => '${d.month}月${d.day}日 周${kWeekdays[d.weekday - 1]}';
+String fmtDayLabel(DateTime d) => l10n.dateMonthDayWeek(d.month, d.day, kWeekdays[d.weekday - 1]);
 
 /// Local calendar day as YYYY-MM-DD.
 String fmtIsoDay(DateTime d) =>

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../core/api.dart';
 import '../theme/tokens.dart';
 import 'loading.dart';
+import '../l10n/l10n.dart';
 
 class CenteredLoader extends StatelessWidget {
   const CenteredLoader({super.key, this.label});
@@ -63,9 +64,9 @@ class ErrorState extends StatelessWidget {
   @override
   Widget build(BuildContext context) => EmptyState(
         icon: Icons.cloud_off_rounded,
-        title: error is ApiError && (error as ApiError).status == 401 ? '登录已失效' : '没能加载',
+        title: error is ApiError && (error as ApiError).status == 401 ? l10n.stateSessionExpired : l10n.stateLoadFailed,
         body: error.toString(),
-        action: onRetry == null ? null : FilledButton.tonalIcon(onPressed: onRetry, icon: const Icon(Icons.refresh_rounded), label: const Text('重试')),
+        action: onRetry == null ? null : FilledButton.tonalIcon(onPressed: onRetry, icon: const Icon(Icons.refresh_rounded), label: Text(l10n.commonRetry)),
       );
 }
 

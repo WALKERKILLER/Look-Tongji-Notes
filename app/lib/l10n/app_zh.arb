@@ -1,0 +1,3872 @@
+{
+  "@@locale": "zh",
+  "appTitle": "Look Studio",
+  "levelStandard": "标准",
+  "levelMedium": "中",
+  "levelHigh": "高",
+  "colorTongjiBlue": "同济蓝",
+  "colorIndigo": "黛青",
+  "colorPine": "松绿",
+  "colorAmber": "琥珀",
+  "colorCinnabar": "朱砂",
+  "colorBegonia": "海棠",
+  "colorWisteria": "藤紫",
+  "colorGraphite": "石墨",
+  "schemeTonalSpot": "柔和",
+  "schemeNeutral": "中性",
+  "schemeVibrant": "鲜明",
+  "schemeExpressive": "表现",
+  "schemeFidelity": "忠实",
+  "schemeContent": "内容",
+  "schemeMonochrome": "单色",
+  "fontSystem": "系统默认",
+  "fontHarmonySans": "鸿蒙黑体",
+  "fontSourceHanSans": "思源黑体",
+  "fontLxgwWenKai": "霞鹜文楷",
+  "fontInterWithSystem": "Inter + 系统中文",
+  "durationHoursMinutes": "{h} 小时 {m} 分",
+  "@durationHoursMinutes": {
+    "placeholders": {
+      "h": {},
+      "m": {}
+    }
+  },
+  "durationHours": "{h} 小时",
+  "@durationHours": {
+    "placeholders": {
+      "h": {}
+    }
+  },
+  "durationMinutes": "{m} 分钟",
+  "@durationMinutes": {
+    "placeholders": {
+      "m": {}
+    }
+  },
+  "weekdayShort1": "一",
+  "weekdayShort2": "二",
+  "weekdayShort3": "三",
+  "weekdayShort4": "四",
+  "weekdayShort5": "五",
+  "weekdayShort6": "六",
+  "weekdayShort7": "日",
+  "timeToday": "今天 {hm}",
+  "@timeToday": {
+    "placeholders": {
+      "hm": {}
+    }
+  },
+  "timeYesterday": "昨天 {hm}",
+  "@timeYesterday": {
+    "placeholders": {
+      "hm": {}
+    }
+  },
+  "timeTomorrow": "明天 {hm}",
+  "@timeTomorrow": {
+    "placeholders": {
+      "hm": {}
+    }
+  },
+  "weekdayName": "周{value}",
+  "@weekdayName": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "dateMonthDayWeekday": "{month}月{day}日 {wd}",
+  "@dateMonthDayWeekday": {
+    "placeholders": {
+      "month": {},
+      "day": {},
+      "wd": {}
+    }
+  },
+  "dateYearMonthDay": "{year}年{month}月{day}日",
+  "@dateYearMonthDay": {
+    "placeholders": {
+      "year": {},
+      "month": {},
+      "day": {}
+    }
+  },
+  "timeJustNow": "刚刚",
+  "timeMinutesAgo": "{inMinutes} 分钟前",
+  "@timeMinutesAgo": {
+    "placeholders": {
+      "inMinutes": {}
+    }
+  },
+  "timeHoursAgo": "{inHours} 小时前",
+  "@timeHoursAgo": {
+    "placeholders": {
+      "inHours": {}
+    }
+  },
+  "timeDaysAgo": "{inDays} 天前",
+  "@timeDaysAgo": {
+    "placeholders": {
+      "inDays": {}
+    }
+  },
+  "dateMonthDay": "{month}月{day}日",
+  "@dateMonthDay": {
+    "placeholders": {
+      "month": {},
+      "day": {}
+    }
+  },
+  "timeExpired": "已过期",
+  "durationDaysHours": "{inDays} 天 {value} 小时",
+  "@durationDaysHours": {
+    "placeholders": {
+      "inDays": {},
+      "value": {}
+    }
+  },
+  "durationHoursMinutesShort": "{inHours} 小时 {value} 分",
+  "@durationHoursMinutesShort": {
+    "placeholders": {
+      "inHours": {},
+      "value": {}
+    }
+  },
+  "durationMinutesLong": "{inMinutes} 分钟",
+  "@durationMinutesLong": {
+    "placeholders": {
+      "inMinutes": {}
+    }
+  },
+  "assetVideo": "视频",
+  "assetCourseware": "课件",
+  "assetTranscript": "转写",
+  "assetAudio": "音频",
+  "assetParse": "课件解析",
+  "dateMonthDayWeek": "{month}月{day}日 周{value}",
+  "@dateMonthDayWeek": {
+    "placeholders": {
+      "month": {},
+      "day": {},
+      "value": {}
+    }
+  },
+  "screenHome": "首页",
+  "termAutumn": "{y} 秋",
+  "@termAutumn": {
+    "placeholders": {
+      "y": {}
+    }
+  },
+  "termSpring": "{value} 春",
+  "@termSpring": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "avatarShapeCircle": "圆形",
+  "avatarShapeSquircle": "圆角方",
+  "avatarShapeCookie": "曲奇",
+  "avatarShapePetal": "花瓣",
+  "pluginContextLine": "{value}：{value2}",
+  "@pluginContextLine": {
+    "placeholders": {
+      "value": {},
+      "value2": {}
+    }
+  },
+  "commonNotes": "笔记",
+  "pluginCategoryVisualize": "可视化",
+  "pluginCategoryReview": "复习",
+  "pluginCategoryProgramming": "编程",
+  "pluginCategoryConnector": "连接器",
+  "pluginCategoryTutor": "学习方式",
+  "commonAssignments": "作业",
+  "backgroundJobs": "正在处理 {active} 个下载或转写任务",
+  "@backgroundJobs": {
+    "placeholders": {
+      "active": {}
+    }
+  },
+  "backgroundSyncing": "正在同步数据",
+  "daemonNotFound": "找不到后台服务 lookd。开发环境请先构建：cd lookd && go build -o bin/lookd ./cmd/lookd",
+  "daemonCannotReadAppDir": "无法读取应用目录：{e}",
+  "@daemonCannotReadAppDir": {
+    "placeholders": {
+      "e": {}
+    }
+  },
+  "daemonCannotStart": "无法启动后台服务：{e}",
+  "@daemonCannotStart": {
+    "placeholders": {
+      "e": {}
+    }
+  },
+  "daemonKeepsExiting": "后台服务反复退出（退出码 {code}），可以重新启动再试。",
+  "@daemonKeepsExiting": {
+    "placeholders": {
+      "code": {}
+    }
+  },
+  "mirrorTuna": "清华大学",
+  "mirrorUstc": "中国科学技术大学",
+  "mirrorUbuntu": "Ubuntu 官方",
+  "workspaceStepUnpack": "解压 Ubuntu 基础系统",
+  "workspaceStepConfigure": "配置工作区",
+  "workspaceStepDownload": "下载 Ubuntu 基础系统",
+  "workspaceDownloadHttpError": "下载失败（HTTP {statusCode}），可以换一个镜像再试",
+  "@workspaceDownloadHttpError": {
+    "placeholders": {
+      "statusCode": {}
+    }
+  },
+  "workspaceDownloadTimeout": "下载超时，请检查网络或换一个镜像",
+  "workspaceMirrorUnreachable": "无法连接镜像站：{message}",
+  "@workspaceMirrorUnreachable": {
+    "placeholders": {
+      "message": {}
+    }
+  },
+  "workspaceChecksumFailed": "下载的文件校验失败，请重试",
+  "workspaceUnpackFailed": "解压失败：{msg}",
+  "@workspaceUnpackFailed": {
+    "placeholders": {
+      "msg": {}
+    }
+  },
+  "workspaceInstallFfmpeg": "安装 ffmpeg",
+  "workspaceAptExit": "apt-get 退出码 {code}",
+  "@workspaceAptExit": {
+    "placeholders": {
+      "code": {}
+    }
+  },
+  "workspaceFfmpegFailed": "安装 ffmpeg 失败：{e}",
+  "@workspaceFfmpegFailed": {
+    "placeholders": {
+      "e": {}
+    }
+  },
+  "commonLoading": "加载中",
+  "courseDownloadedKind": "已下载{label}",
+  "@courseDownloadedKind": {
+    "placeholders": {
+      "label": {}
+    }
+  },
+  "stateSessionExpired": "登录已失效",
+  "stateLoadFailed": "无法加载",
+  "commonRetry": "重试",
+  "readerNoHeadings": "这篇没有小标题",
+  "readerFindHint": "在本文中查找",
+  "readerNoMatches": "无结果",
+  "readerPreviousMatch": "上一处",
+  "readerNextMatch": "下一处",
+  "commonClose": "关闭",
+  "chartTotal": "合计",
+  "dateMonth": "{month}月",
+  "@dateMonth": {
+    "placeholders": {
+      "month": {}
+    }
+  },
+  "weekdayMon": "周一",
+  "weekdayWed": "周三",
+  "weekdayFri": "周五",
+  "dateMonthOf": "{value}月",
+  "@dateMonthOf": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "heatmapLess": "少",
+  "heatmapMore": "多",
+  "durationHoursOnly": "{value} 小时",
+  "@durationHoursOnly": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "durationHoursMinutesOf": "{value} 小时 {value2} 分",
+  "@durationHoursMinutesOf": {
+    "placeholders": {
+      "value": {},
+      "value2": {}
+    }
+  },
+  "linkNotInLibrary": "这个文件不在课程库里",
+  "linkCannotOpenFile": "无法打开 {value}",
+  "@linkCannotOpenFile": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "linkCannotOpen": "这个链接无法打开",
+  "markdownImageUnavailable": "图片不可用",
+  "timestampOpenLecture": "打开对应课次并跳到这里",
+  "timestampSeek": "跳到这里播放",
+  "scrollLeft": "向左滚动",
+  "scrollRight": "向右滚动",
+  "commonChoose": "选择",
+  "pickerChooseFolder": "选择文件夹",
+  "commonSave": "保存",
+  "pickerSaveToFolder": "保存到哪个文件夹",
+  "pickerFolderPath": "文件夹路径",
+  "commonCancel": "取消",
+  "loginHeadline": "课堂录像，\n变成你的知识库。",
+  "loginFeatureDownload": "高速下载录像、PPT 与课件，断点续传",
+  "loginFeatureTranscribe": "自动转写，按时间轴全文检索",
+  "loginFeatureAssistant": "常驻助手帮你梳理每一节课",
+  "loginMissingCredentials": "请输入学号和密码",
+  "loginSignInAgain": "重新登录",
+  "loginSignIn": "登录",
+  "loginWithTongji": "使用同济大学统一身份认证",
+  "loginStudentId": "学号 / 工号",
+  "commonPassword": "密码",
+  "commonShowPassword": "显示密码",
+  "commonHidePassword": "隐藏密码",
+  "loginCaptcha": "验证码",
+  "loginStaySignedIn": "保持登录",
+  "loginStaySignedInHint": "令牌到期前自动续期，密码加密保存在本机",
+  "loginPrivacy": "账号只用于登录 look.tongji.edu.cn，凭据仅保存在本机。",
+  "homeGreetingNight": "夜深了",
+  "homeGreetingMorning": "早上好",
+  "homeGreetingNoon": "中午好",
+  "homeGreetingAfternoon": "下午好",
+  "homeGreetingEvening": "晚上好",
+  "homeUpNext": "接下来",
+  "commonSchedule": "日程",
+  "commonActivity": "学习足迹",
+  "homeStatistics": "统计",
+  "homeContinueWatching": "继续观看",
+  "homeDownloading": "正在下载",
+  "commonAll": "全部",
+  "commonCourses": "课程",
+  "homeThisTermCourses": "本学期课程",
+  "homeAllCourses": "全部课程",
+  "commonLibrary": "课程库",
+  "homeGreeting": "{greeting}，",
+  "@homeGreeting": {
+    "placeholders": {
+      "greeting": {}
+    }
+  },
+  "profileEdit": "编辑个人资料",
+  "homeNextQuote": "换一句",
+  "homeStatLecturesSaved": "节已存本地",
+  "homeStatStorage": "占用空间",
+  "homeStatSegments": "句转写",
+  "homeStatNotes": "篇笔记",
+  "listSeparator": "、",
+  "courseLectureCount": "{lectureTotal} 节",
+  "@courseLectureCount": {
+    "placeholders": {
+      "lectureTotal": {}
+    }
+  },
+  "coursesSync": "从平台同步",
+  "coursesSearchHint": "搜索课程或老师",
+  "coursesAllTerms": "全部学期",
+  "coursesHiddenCount": "已隐藏 {hiddenCount}",
+  "@coursesHiddenCount": {
+    "placeholders": {
+      "hiddenCount": {}
+    }
+  },
+  "coursesSyncing": "正在同步课程",
+  "coursesEmptyTerm": "这个学期没有课程",
+  "coursesNoMatch": "没有匹配“{text}”的课程",
+  "@coursesNoMatch": {
+    "placeholders": {
+      "text": {}
+    }
+  },
+  "coursesUnpin": "取消置顶",
+  "coursesPin": "置顶",
+  "commonRename": "重命名",
+  "coursesColor": "课程颜色",
+  "coursesUnhide": "取消隐藏",
+  "commonHide": "隐藏",
+  "coursesRenameTitle": "重命名课程",
+  "coursesOriginalName": "原名：{rawTitle}",
+  "@coursesOriginalName": {
+    "placeholders": {
+      "rawTitle": {}
+    }
+  },
+  "coursesDisplayName": "显示名称",
+  "coursesDisplayNameHelper": "留空则使用原名，不影响本地文件夹",
+  "downloadVideoHint": "多路分段并发下载，可断点续传",
+  "assetSlides": "PPT 截图",
+  "downloadSlidesHint": "按时间戳命名，可与视频同步",
+  "assetAsr": "语音转写",
+  "downloadAsrHint": "必剪 / 剪映免费识别，分段并行，带时间戳",
+  "downloadQueued": "已加入 {length} 个任务",
+  "@downloadQueued": {
+    "placeholders": {
+      "length": {}
+    }
+  },
+  "downloadQueueFailed": "加入失败：{e}",
+  "@downloadQueueFailed": {
+    "placeholders": {
+      "e": {}
+    }
+  },
+  "downloadThisLecture": "下载这节课",
+  "downloadLectures": "下载 {count} 节课",
+  "@downloadLectures": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "downloadSavedToLibrary": "文件保存在课程库里，按课程与日期整理",
+  "downloadNeedsFfmpeg": "需要安装 ffmpeg",
+  "downloadNoCourseware": "平台不提供课件。在播放器的「资料 → 课件」里上传，MinerU 会解析成可检索的文字。",
+  "downloadDeleteVideoAfterAsr": "已开启「转写完成后删除视频」：视频会在文字稿生成后被删除",
+  "downloadDeleteLocalVideoAfterAsr": "已开启「转写完成后删除视频」：本地已有的视频会在转写完成后删除",
+  "downloadChooseContent": "选择要下载的内容",
+  "downloadStart": "开始下载",
+  "courseUnscheduled": "未排期",
+  "dateYearMonth": "{year}年{month}月",
+  "@dateYearMonth": {
+    "placeholders": {
+      "year": {},
+      "month": {}
+    }
+  },
+  "screenCourse": "课程详情",
+  "courseSelectedCount": "已选 {length} 节",
+  "@courseSelectedCount": {
+    "placeholders": {
+      "length": {}
+    }
+  },
+  "commonDeselectAll": "取消全选",
+  "commonSelectAll": "全选",
+  "courseAssistant": "课程助手",
+  "courseRefreshSchedule": "刷新课表",
+  "commonMore": "更多",
+  "courseLoadingSchedule": "正在读取课表",
+  "courseLectureTotal": "{length} 节课",
+  "@courseLectureTotal": {
+    "placeholders": {
+      "length": {}
+    }
+  },
+  "courseNewestFirst": "最新在前",
+  "courseOldestFirst": "第一节在前",
+  "courseBatchDownload": "批量下载",
+  "courseDownloadSelected": "下载 {length} 节",
+  "@courseDownloadSelected": {
+    "placeholders": {
+      "length": {}
+    }
+  },
+  "courseStatLectures": "{lectures} 节",
+  "@courseStatLectures": {
+    "placeholders": {
+      "lectures": {}
+    }
+  },
+  "courseStatLocal": "本地 {local} 节",
+  "@courseStatLocal": {
+    "placeholders": {
+      "local": {}
+    }
+  },
+  "courseProgress": "学习进度 {value}%",
+  "@courseProgress": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "courseContinue": "继续学习",
+  "courseStart": "开始学习",
+  "lectureOrdinal": "第 {ordinal} 节",
+  "@lectureOrdinal": {
+    "placeholders": {
+      "ordinal": {}
+    }
+  },
+  "lectureNotStarted": "未开始",
+  "lectureNoReplay": "暂无回放",
+  "commonDownload": "下载",
+  "commonPlay": "播放",
+  "playerSeekToast": "{value}{s} 秒",
+  "@playerSeekToast": {
+    "placeholders": {
+      "value": {},
+      "s": {}
+    }
+  },
+  "playerVolumeToast": "音量 {value}%",
+  "@playerVolumeToast": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "playerSpeedToast": "倍速 {value}",
+  "@playerSpeedToast": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "playerBoosting": "{value} 快进中",
+  "@playerBoosting": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "commonBack": "返回",
+  "playerCollapsePanel": "收起侧栏",
+  "playerExpandPanel": "展开侧栏",
+  "playerLocalSuffix": "（本地）",
+  "playerPip": "画中画",
+  "playerSeekBack": "后退 {seekStepSec} 秒 (←)",
+  "@playerSeekBack": {
+    "placeholders": {
+      "seekStepSec": {}
+    }
+  },
+  "playerSeekForward": "前进 {seekStepSec} 秒 (→)",
+  "@playerSeekForward": {
+    "placeholders": {
+      "seekStepSec": {}
+    }
+  },
+  "playerSpeedTooltip": "倍速 ([ / ])",
+  "playerSubtitlesTooltip": "字幕 (C)",
+  "playerBookmarkTooltip": "添加书签 (B)",
+  "playerBookmarkAdded": "已添加书签 {value}",
+  "@playerBookmarkAdded": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "playerExitFullscreen": "退出全屏 (F)",
+  "playerFullscreen": "全屏 (F)",
+  "playerMute": "静音 (M)",
+  "playerResumedFrom": "已从 {value} 继续",
+  "@playerResumedFrom": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "playerStartOver": "从头播放",
+  "playerPauseTooltip": "暂停 (空格)",
+  "playerPlayTooltip": "播放 (空格)",
+  "playerError": "播放出错",
+  "playerReload": "重新加载",
+  "playerNoLectureAtTime": "这个时间点没有对应的课次",
+  "playerPreparing": "正在准备播放",
+  "screenPlayer": "播放器",
+  "outlineFailed": "大纲生成失败：{e}",
+  "@outlineFailed": {
+    "placeholders": {
+      "e": {}
+    }
+  },
+  "outlineNeedsTranscript": "大纲需要文字稿",
+  "outlineNeedsTranscriptBody": "先转写这节课，助手才能读完内容、按话题分章。",
+  "asrQueued": "已加入转写队列",
+  "asrStart": "开始转写",
+  "outlineTitle": "给这节课分章",
+  "outlineBody": "助手读完整份文字稿，按话题切成章节。点章节即可跳转，进度条上也会分段显示。",
+  "outlineLastError": "上次没有成功：{outlineError}",
+  "@outlineLastError": {
+    "placeholders": {
+      "outlineError": {}
+    }
+  },
+  "outlineGenerate": "生成大纲",
+  "outlineRegenerating": "正在重新分章…",
+  "outlineSummary": "{length} 章 · {value}",
+  "@outlineSummary": {
+    "placeholders": {
+      "length": {},
+      "value": {}
+    }
+  },
+  "commonRegenerate": "重新生成",
+  "outlineCopied": "已复制大纲",
+  "commonCopy": "复制",
+  "outlineDeleted": "已删除大纲",
+  "commonUndo": "撤销",
+  "commonDelete": "删除",
+  "outlineOptions": "大纲选项",
+  "durationUnderMinute": "不到 1 分钟",
+  "outlineWorking": "正在通读文字稿并分章",
+  "outlineWorkingHint": "长课可能需要一两分钟，可以先去看别的。",
+  "commonLocal": "本地",
+  "playerNoVideo": "这节课没有可播放的视频",
+  "commonOutline": "大纲",
+  "commonTranscript": "文字稿",
+  "panelMaterials": "资料",
+  "commonAssistant": "助手",
+  "panelSlidesCount": "PPT 截图 {length}",
+  "@panelSlidesCount": {
+    "placeholders": {
+      "length": {}
+    }
+  },
+  "panelCoursewareCount": "课件 {length}",
+  "@panelCoursewareCount": {
+    "placeholders": {
+      "length": {}
+    }
+  },
+  "slidesEmpty": "这节课没有 PPT 截图",
+  "slidesEmptyBody": "平台只在老师投屏时生成截图",
+  "slidesPageOnly": "仅换页",
+  "slidesFollow": "跟随播放",
+  "slidesDownload": "下载 PPT",
+  "slidesIndex": "第 {idx} 张",
+  "@slidesIndex": {
+    "placeholders": {
+      "idx": {}
+    }
+  },
+  "slidesPosition": "{value} / {length} · 从 {value2} 播放",
+  "@slidesPosition": {
+    "placeholders": {
+      "value": {},
+      "length": {},
+      "value2": {}
+    }
+  },
+  "transcriptEmpty": "还没有文字稿",
+  "transcriptEmptyBody": "转写会提取音频并生成带时间戳的文字，之后可以搜索、做字幕，也能让助手整理笔记。",
+  "asrQueuedShowLater": "已加入转写队列，完成后自动显示",
+  "transcriptFindHint": "在文字稿中查找",
+  "transcriptMatches": "{length} 处",
+  "@transcriptMatches": {
+    "placeholders": {
+      "length": {}
+    }
+  },
+  "transcriptFollowOn": "跟随播放：开",
+  "transcriptFollowOff": "跟随播放：关",
+  "transcriptCopied": "已复制全文",
+  "transcriptCopyAll": "复制全文",
+  "promptNotes": "请为这节课整理一份完整的学习笔记并保存：以字幕为主，找出重点和不确定的地方，对照当时的 PPT 和已上传的课件核实，公式用 LaTeX，要点附时间戳。",
+  "panelAskNotes": "让助手整理笔记",
+  "panelQuizMore": "出题练习…",
+  "promptSummarizeRecent": "用几句话概括我刚才看的这一段（当前播放位置前 5 分钟）讲了什么。",
+  "panelSummarizeRecent": "概括刚才这段",
+  "commonBookmarks": "书签",
+  "panelCurrentPosition": "当前位置",
+  "bookmarksHint": "按 B 键或点播放器上的书签按钮标记重点",
+  "commonNew": "新建",
+  "notesHint": "笔记以 Markdown 文件保存在课程库中，助手也能读取",
+  "commonPractice": "练习",
+  "panelQuiz": "出题",
+  "panelQuizHint": "让助手根据这节课出一组选择题，每题附解析和出处",
+  "downloadsClearTitle": "清除已完成的任务",
+  "downloadsClearBody": "任务记录会被清除。已下载的文件默认保留在课程库中。",
+  "downloadsClearAlsoFiles": "同时删除已下载的文件",
+  "downloadsClearAlsoFilesHint": "视频、PPT、课件和文字稿会从磁盘移除，不可恢复",
+  "downloadsClearAndDelete": "清除并删除文件",
+  "downloadsClearRecords": "清除记录",
+  "downloadsClearedFreed": "已清除，释放 {value}",
+  "@downloadsClearedFreed": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "downloadsCleared": "已清除任务记录",
+  "downloadsClearFailed": "清除失败：{e}",
+  "@downloadsClearFailed": {
+    "placeholders": {
+      "e": {}
+    }
+  },
+  "downloadsRunningSummary": "{running} 个任务进行中 · {value}",
+  "@downloadsRunningSummary": {
+    "placeholders": {
+      "running": {},
+      "value": {}
+    }
+  },
+  "downloadsNoneRunning": "没有进行中的任务",
+  "downloadsWaiting": "{length} 个任务等待中",
+  "@downloadsWaiting": {
+    "placeholders": {
+      "length": {}
+    }
+  },
+  "commonTasks": "任务",
+  "commonTasksCount": "任务 {length}",
+  "@commonTasksCount": {
+    "placeholders": {
+      "length": {}
+    }
+  },
+  "commonDownloaded": "已下载",
+  "downloadsPauseAll": "全部暂停",
+  "downloadsResumeAll": "全部继续",
+  "downloadsClearDone": "清除已完成",
+  "screenDownloads": "下载管理",
+  "downloadsEmpty": "还没有下载",
+  "downloadsEmptyBody": "在课程里选择课次，点下载按钮。视频、PPT、课件和文字稿会按课程整理到课程库。",
+  "downloadsSectionActive": "进行中",
+  "commonFailed": "失败",
+  "downloadsRetryAll": "全部重试",
+  "commonDone": "已完成",
+  "downloadsBulkDone": "{value} {n} 个任务",
+  "@downloadsBulkDone": {
+    "placeholders": {
+      "value": {},
+      "n": {}
+    }
+  },
+  "commonPaused": "已暂停",
+  "downloadsResumed": "已继续",
+  "downloadsRetried": "已重试",
+  "commonActionFailed": "操作失败：{e}",
+  "@commonActionFailed": {
+    "placeholders": {
+      "e": {}
+    }
+  },
+  "downloadsDeleteFilesTitle": "删除文件？",
+  "downloadsDeleteFilesBody": "将从磁盘删除{what}，不可恢复。需要时可以重新下载。",
+  "@downloadsDeleteFilesBody": {
+    "placeholders": {
+      "what": {}
+    }
+  },
+  "downloadsDeletedFreed": "已删除，释放 {value}",
+  "@downloadsDeletedFreed": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "commonDeleteFailed": "删除失败：{e}",
+  "@commonDeleteFailed": {
+    "placeholders": {
+      "e": {}
+    }
+  },
+  "downloadsLocalEmpty": "本地还没有文件",
+  "downloadsLocalEmptyBody": "下载完成的视频、PPT、课件和文字稿会出现在这里。",
+  "downloadsDeleteKindFiles": "删除{value}文件",
+  "@downloadsDeleteKindFiles": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "downloadsLectureKind": "这节课的{value}（{value2}）",
+  "@downloadsLectureKind": {
+    "placeholders": {
+      "value": {},
+      "value2": {}
+    }
+  },
+  "commonShowInFolder": "在文件夹中显示",
+  "downloadsLectureAllFiles": "这节课的全部文件（{value}）",
+  "@downloadsLectureAllFiles": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "downloadsDeleteAllFiles": "删除全部文件",
+  "commonCannotOpenFolder": "无法打开文件夹",
+  "downloadsStateRunning": "下载中",
+  "downloadsStateRetrying": "网络中断，{value} 自动重试",
+  "@downloadsStateRetrying": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "commonQueued": "排队中",
+  "commonCancelled": "已取消",
+  "downloadsConnections": "{conns} 路并发",
+  "@downloadsConnections": {
+    "placeholders": {
+      "conns": {}
+    }
+  },
+  "commonPause": "暂停",
+  "commonResume": "继续",
+  "downloadsRemoveRecordOnly": "仅移除记录",
+  "downloadsJobFiles": "「{title}」的{value}文件{value2}",
+  "@downloadsJobFiles": {
+    "placeholders": {
+      "title": {},
+      "value": {},
+      "value2": {}
+    }
+  },
+  "downloadsSizeSuffix": "（{value}）",
+  "@downloadsSizeSuffix": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "downloadsDeleteRecordAndFiles": "删除记录和文件",
+  "noteUntitled": "未命名笔记",
+  "noteSaved": "笔记已保存",
+  "commonSaveFailed": "保存失败：{e}",
+  "@commonSaveFailed": {
+    "placeholders": {
+      "e": {}
+    }
+  },
+  "commonTitle": "标题",
+  "commonEdit": "编辑",
+  "commonPreview": "预览",
+  "noteEditorHint": "支持 Markdown。{value}内容保存在课程库的 notes 文件夹。",
+  "@noteEditorHint": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "noteEditorHintTimestamp": "点“插入时间”记录当前播放位置，",
+  "noteInsertTime": "插入时间",
+  "noteUnsaved": "未保存",
+  "searchFailed": "搜索失败：{e}",
+  "@searchFailed": {
+    "placeholders": {
+      "e": {}
+    }
+  },
+  "screenLibrary": "资料库",
+  "libraryWriteNote": "写笔记",
+  "librarySearchTitle": "全文搜索所有文字稿与笔记",
+  "librarySearchHint": "例如：傅里叶变换、期中、作业",
+  "libraryAllCourses": "所有课程",
+  "librarySearchEmpty": "没有找到“{value}”",
+  "@librarySearchEmpty": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "librarySearchEmptyBody": "只有转写过的课和笔记可以被搜索。",
+  "librarySearchCount": "{length} 条结果",
+  "@librarySearchCount": {
+    "placeholders": {
+      "length": {}
+    }
+  },
+  "libraryNotesCount": "笔记 · {length}",
+  "@libraryNotesCount": {
+    "placeholders": {
+      "length": {}
+    }
+  },
+  "libraryNotesEmptyHint": "在播放器里边看边记，或让助手根据文字稿整理笔记。",
+  "libraryNotesEmpty": "这门课还没有笔记。",
+  "commonUncategorized": "未归类",
+  "libraryStatLocal": "节课在本地",
+  "libraryStatSegments": "句文字稿",
+  "libraryLayoutHint": "每节课一个文件夹：video.mp4、slides/、courseware/、transcript.md/.srt、lecture.json。根目录的 README.md 说明了结构，方便 AI 工具直接阅读；library.db 是可重建的索引。",
+  "commonOpenFolder": "打开文件夹",
+  "libraryReindexed": "已重建索引，{value} 节课",
+  "@libraryReindexed": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "libraryReindexFailed": "重建失败：{e}",
+  "@libraryReindexFailed": {
+    "placeholders": {
+      "e": {}
+    }
+  },
+  "libraryReindex": "从文件重建索引",
+  "noteDeleteTitle": "删除这篇笔记？",
+  "noteDeleteBody": "笔记文件会从课程库中删除。",
+  "noteNew": "新笔记",
+  "commonFind": "查找",
+  "commonContents": "目录",
+  "noteOpenLecture": "打开对应课次",
+  "noteCopiedMarkdown": "已复制 Markdown",
+  "noteCopyMarkdown": "复制 Markdown",
+  "noteUpdated": "· {value}更新",
+  "@noteUpdated": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "noteByAssistant": "助手整理",
+  "noteMine": "我的笔记",
+  "noteSlideRef": "PPT 第 {slideIdx} 张 · {value}",
+  "@noteSlideRef": {
+    "placeholders": {
+      "slideIdx": {},
+      "value": {}
+    }
+  },
+  "noteAudioRef": "课堂原声 · {value}",
+  "@noteAudioRef": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "noteSlideAt": "当时的 PPT · 第 {idx} 张，{value} 起",
+  "@noteSlideAt": {
+    "placeholders": {
+      "idx": {},
+      "value": {}
+    }
+  },
+  "notePlayFrom": "从 {value} 播放",
+  "@notePlayFrom": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "noteNoTranscriptHere": "这段没有文字稿",
+  "coursewareGone": "课件已不存在",
+  "coursewareNotParsed": "这个课件还没有解析",
+  "coursewareReadFailed": "读取失败：HTTP {statusCode}",
+  "@coursewareReadFailed": {
+    "placeholders": {
+      "statusCode": {}
+    }
+  },
+  "readerFullscreen": "全屏阅读",
+  "coursewareParsedBy": "MinerU 解析{value}",
+  "@coursewareParsedBy": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "coursewarePages": " · {pages} 页",
+  "@coursewarePages": {
+    "placeholders": {
+      "pages": {}
+    }
+  },
+  "readerOpen": "在阅读器中打开",
+  "chatNew": "新对话",
+  "modelNone": "未选择模型",
+  "modelsImported": "导入了 {value} 个服务商、{value2} 个密钥",
+  "@modelsImported": {
+    "placeholders": {
+      "value": {},
+      "value2": {}
+    }
+  },
+  "botDefaultName": "小 Look",
+  "chatOpenFailed": "无法打开对话：{e}",
+  "@chatOpenFailed": {
+    "placeholders": {
+      "e": {}
+    }
+  },
+  "scheduleDaily": "每天 {value}",
+  "@scheduleDaily": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "scheduleWorkdays": "工作日 {value}",
+  "@scheduleWorkdays": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "scheduleWeekly": "每周{value} {value2}",
+  "@scheduleWeekly": {
+    "placeholders": {
+      "value": {},
+      "value2": {}
+    }
+  },
+  "scheduleOnce": "一次",
+  "scheduleOnceAt": "{month}月{day}日 {value}（一次）",
+  "@scheduleOnceAt": {
+    "placeholders": {
+      "month": {},
+      "day": {},
+      "value": {}
+    }
+  },
+  "commonToday": "今天",
+  "commonTomorrow": "明天",
+  "commonYesterday": "昨天",
+  "commonFinished": "完成",
+  "runCostLimit": "超出费用上限",
+  "runAborted": "已中止",
+  "runMissed": "已错过",
+  "tasksBusy": "助手正在回复，请稍后再查看",
+  "tasksSubtitle": "按计划在新对话里复盘、出题、汇总截止事项",
+  "tasksCount": "{length} 个任务",
+  "@tasksCount": {
+    "placeholders": {
+      "length": {}
+    }
+  },
+  "commonAllEnabled": "全部启用",
+  "tasksEnabledCount": "{length} 个启用",
+  "@tasksEnabledCount": {
+    "placeholders": {
+      "length": {}
+    }
+  },
+  "tasksNextUp": "下一个「{value}」{value2}",
+  "@tasksNextUp": {
+    "placeholders": {
+      "value": {},
+      "value2": {}
+    }
+  },
+  "tasksNew": "新建任务",
+  "commonScheduledTasks": "定时任务",
+  "tasksRuns": "运行记录",
+  "tasksRunsEmpty": "任务运行后，结果会按时间出现在这里",
+  "tasksRunsNoMatch": "没有符合条件的运行",
+  "tasksWorkdays": "工作日",
+  "commonRunning": "运行中",
+  "commonEnabled": "已启用",
+  "tasksRunningNow": "正在运行",
+  "tasksNoNextRun": "没有下次运行",
+  "tasksNextRun": "下次 {value}",
+  "@tasksNextRun": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "tasksNotFound": "任务不存在",
+  "tasksDeleteTitle": "删除任务？",
+  "tasksDeleteBody": "以后不会再运行。已经生成的对话、笔记和练习会保留，运行记录仍可在「运行记录」里查看。",
+  "commonEnable": "启用",
+  "tasksStarted": "已开始运行",
+  "tasksRunNow": "立即运行",
+  "tasksNextRunLabel": "下次运行",
+  "commonNone": "无",
+  "tasksLastResult": "上次结果",
+  "tasksNeverRun": "还没运行",
+  "tasksCostLimitCatchUp": "单次上限 · 补跑",
+  "tasksCostLimit": "单次上限",
+  "tasksReadOnly": "只读：结果写在总结里，不改动课程库",
+  "tasksAllowed": "允许：{value}",
+  "@tasksAllowed": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "tasksPrompt": "任务内容",
+  "tasksRecentRuns": "最近 {length} 次",
+  "@tasksRecentRuns": {
+    "placeholders": {
+      "length": {}
+    }
+  },
+  "tasksNoRunsYet": "还没有运行过。可以点「立即运行」先试一次。",
+  "durationSeconds": "{secs} 秒",
+  "@durationSeconds": {
+    "placeholders": {
+      "secs": {}
+    }
+  },
+  "durationMinutesSeconds": "{value} 分 {value2} 秒",
+  "@durationMinutesSeconds": {
+    "placeholders": {
+      "value": {},
+      "value2": {}
+    }
+  },
+  "tasksManualSuffix": " · 手动",
+  "tasksDeletedTask": "已删除的任务",
+  "tasksDeletedSuffix": "（已删除）",
+  "commonNewBadge": "新",
+  "tasksIntroTitle": "让助手按计划替你做事",
+  "tasksIntroBody": "每次运行都会开一个新对话，结果可在「运行记录」里查看。任务只在 Look Studio 打开时执行；错过的时间可以在 12 小时内启动时补跑。",
+  "tasksFromBlank": "从空白开始",
+  "tasksWriteNotes": "保存笔记与大纲",
+  "tasksWriteSchedule": "标记与修改日程",
+  "tasksWriteQuizzes": "创建练习",
+  "taskTemplateReviewName": "每晚复盘今天的课",
+  "taskTemplateReviewPrompt": "看看今天有哪些课的转写已经完成，为每节课写一份简明的复盘笔记并保存：核心概念、关键公式与例题、老师强调的要点，附时间戳。没有新课就简单说明。",
+  "taskTemplateQuizName": "每周一出一组复习题",
+  "taskTemplateQuizPrompt": "回顾上周转写过的课程，为每门课出一组 10 道中等难度的选择题并保存为练习，重点覆盖上周的新内容。",
+  "taskTemplateDeadlinesName": "每天早上汇总近期截止",
+  "taskTemplateDeadlinesPrompt": "列出今天起 7 天内的作业、考试和截止事项，按日期排序，提醒最紧急的两件；如果有已经过期但没完成的也指出来。",
+  "tasksNewTitle": "新建定时任务",
+  "tasksEditTitle": "编辑定时任务",
+  "commonName": "名称",
+  "tasksPromptLabel": "让助手做什么",
+  "commonTime": "时间",
+  "commonDaily": "每天",
+  "commonWeekly": "每周",
+  "tasksAllowLabel": "允许它",
+  "tasksAllowHint": "运行时只允许勾选的写入；都不选则只读，结果写在总结里。任务读到的转写稿、课件等资料不能让它做别的修改。",
+  "tasksLimits": "限制",
+  "tasksCostLimitLabel": "单次费用上限",
+  "tasksCostLimitHelper": "超过后中止这次运行（按模型价格估算）",
+  "tasksCatchUp": "错过时补跑",
+  "tasksCatchUpHint": "应用在计划时间未运行时，12 小时内启动会补跑一次",
+  "tasksRunReason": "：{value}",
+  "@tasksRunReason": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "tasksRunNotice": "定时任务「{value}」{label}{why}",
+  "@tasksRunNotice": {
+    "placeholders": {
+      "value": {},
+      "label": {},
+      "why": {}
+    }
+  },
+  "commonView": "查看",
+  "runtimeReady": "运行环境已就绪",
+  "runtimeInstallTitle": "安装助手运行环境",
+  "runtimeIntro": "助手运行在 Node.js 上，并使用 Pi SDK。缺少的部分会安装到 Look Studio 的数据目录，不改动系统；安装包会按官方发布的 SHA-256 校验。",
+  "runtimeReadFailed": "无法读取运行环境：{error}",
+  "@runtimeReadFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "runtimeSourceManaged": "应用内安装",
+  "runtimeSourceSystem": "系统",
+  "runtimeNodeMissing": "未找到可用的 Node.js 22+",
+  "runtimeDeps": "助手依赖（Pi SDK）",
+  "commonInstalled": "已安装",
+  "commonNotInstalled": "未安装",
+  "runtimeInstallDeps": "安装依赖",
+  "runtimeStartAssistant": "启动助手",
+  "runtimeStarting": "正在启动…",
+  "runtimeStartsAfterInstall": "安装完成后自动启动",
+  "commonMirror": "下载源",
+  "runtimeMirrorChina": "国内镜像",
+  "runtimeMirrorOfficial": "官方源",
+  "runtimeInstallLog": "安装日志",
+  "runtimeRecheck": "重新检查",
+  "runtimeInstalling": "正在安装",
+  "runtimeInstall": "开始安装",
+  "commonLecture": "课次",
+  "commonPlugins": "插件",
+  "commonSettings": "设置",
+  "commonUsage": "用量",
+  "botOpened": "已打开 {value}",
+  "@botOpened": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "botResumed": "已继续播放",
+  "botPaused": "已暂停播放",
+  "botSeeked": "已跳转",
+  "botRateSet": "已调到 {value}×",
+  "@botRateSet": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "commonUndone": "已撤销",
+  "proposalApplied": "已应用",
+  "proposalIgnored": "已忽略",
+  "proposalExpired": "已过期，请让助手重新生成",
+  "proposalFailed": "执行失败",
+  "proposalPending": "等你确认",
+  "commonIgnore": "忽略",
+  "commonApply": "应用",
+  "memoryAboutYou": "关于你",
+  "memoryPreferences": "偏好",
+  "memoryRoutines": "做法",
+  "commonOther": "其他",
+  "botSectionLook": "形象",
+  "botName": "名字",
+  "commonColor": "颜色",
+  "botSectionPersona": "相处方式",
+  "botPersonaHint": "比如：说话轻松一点，先给结论；复习时多出几道题考我。",
+  "botSectionMemory": "记忆",
+  "memoryAdd": "添加记忆",
+  "memoryConsolidating": "正在沉淀",
+  "memoryConsolidateNow": "立即沉淀",
+  "memoryIntro": "{botName} 会把你说过的、反复用到的做法整理成记忆文件，每次对话都会带上「关于你」和「偏好」。这些文件只保存在本机，不会记下密码、证件号、银行卡号、手机号和密钥。",
+  "@memoryIntro": {
+    "placeholders": {
+      "botName": {}
+    }
+  },
+  "memoryReadFailed": "读取记忆失败：{value}",
+  "@memoryReadFailed": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "memoryRuns": "沉淀记录",
+  "memoryRunsEmpty": "还没有沉淀过。对话结束两分钟后会自动整理。",
+  "memoryAuto": "自动沉淀",
+  "memoryAutoHint": "对话停下两分钟、或攒够六轮后，在后台整理记忆",
+  "memoryFromCourses": "从课程会话中学习",
+  "memoryFromCoursesHint": "课程助手里的对话也参与沉淀",
+  "botRestartTitle": "重新开始对话？",
+  "botRestartBody": "{botName} 的对话会从头开始，记忆保留。",
+  "@botRestartBody": {
+    "placeholders": {
+      "botName": {}
+    }
+  },
+  "botRestart": "重新开始",
+  "botRestartChat": "重新开始对话",
+  "botMoodLabel": "{botName}，{value}",
+  "@botMoodLabel": {
+    "placeholders": {
+      "botName": {},
+      "value": {}
+    }
+  },
+  "memoryEmptyShort": "还没有记忆",
+  "memoryCount": "记得 {length} 件事",
+  "@memoryCount": {
+    "placeholders": {
+      "length": {}
+    }
+  },
+  "memoryWorking": "正在整理记忆",
+  "memoryLastRun": "上次沉淀 {value}",
+  "@memoryLastRun": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "memoryWhen": "适用：{when}",
+  "@memoryWhen": {
+    "placeholders": {
+      "when": {}
+    }
+  },
+  "memoryDeleteTitle": "删除这条记忆？",
+  "memoryDeleteBody": "「{title}」会被忘掉，之后的对话不再用到。",
+  "@memoryDeleteBody": {
+    "placeholders": {
+      "title": {}
+    }
+  },
+  "memoryEmpty": "还没有记忆。和 {name} 聊聊你的专业、学习习惯，或者直接说「记住……」。",
+  "@memoryEmpty": {
+    "placeholders": {
+      "name": {}
+    }
+  },
+  "memoryRunChanged": "整理了 {length} 处",
+  "@memoryRunChanged": {
+    "placeholders": {
+      "length": {}
+    }
+  },
+  "memoryRunUnfinished": "没有完成",
+  "memoryRunNothing": "没有需要记的",
+  "memoryRunScope": "{value} 个对话 {value2} 轮",
+  "@memoryRunScope": {
+    "placeholders": {
+      "value": {},
+      "value2": {}
+    }
+  },
+  "memoryUpdated": "更新",
+  "memoryAppended": "追加",
+  "memoryFileNameInvalid": "名称只能用小写字母、数字、- 和 _",
+  "memoryFileName": "文件名",
+  "memoryFileHint": "---\ntitle: 标题\ndescription: 一句话说明\n---\n内容",
+  "commonSaving": "保存中…",
+  "botMoodIdle": "在这儿",
+  "botMoodListening": "在听",
+  "botMoodThinking": "在想",
+  "botMoodWorking": "在做事",
+  "botMoodTalking": "在说",
+  "botMoodHappy": "完成了",
+  "botMoodConfused": "出了点问题",
+  "botMoodDreaming": "在整理记忆",
+  "botMoodNotify": "有卡片等你确认",
+  "botAccessoryAntenna": "天线",
+  "botAccessoryCatEars": "猫耳",
+  "botAccessorySprout": "豆芽",
+  "botAccessoryBunnyEars": "兔耳",
+  "botAccessoryFeelers": "触角",
+  "botAccessoryHeadphones": "耳机",
+  "botAccessoryDrop": "水滴",
+  "botAccessoryGhost": "小幽灵",
+  "commonFollowTheme": "跟随主题",
+  "toolHelp": "查阅功能说明",
+  "toolCurrentContext": "读取当前界面",
+  "toolListCourses": "查看课程",
+  "toolListLectures": "查看课次",
+  "toolReadTranscript": "阅读文字稿",
+  "toolLectureDetail": "查看课次详情",
+  "toolSearchLibrary": "搜索课程库",
+  "toolListNotes": "查看笔记",
+  "toolReadNote": "阅读笔记",
+  "toolSaveNote": "保存笔记",
+  "toolPrepare": "准备操作",
+  "toolFindTools": "加载工具",
+  "toolMarkSchedule": "标记日程",
+  "toolListSchedule": "查看日程",
+  "toolEditSchedule": "修改日程",
+  "toolReadOutline": "读取大纲",
+  "toolSaveOutline": "保存大纲",
+  "toolListCourseware": "查看课件",
+  "toolReadCourseware": "阅读课件",
+  "toolSearchCourseware": "搜索课件",
+  "toolListSlides": "查看 PPT",
+  "toolViewImage": "查看插图",
+  "toolCreateQuiz": "生成练习",
+  "toolListQuizzes": "查看练习",
+  "toolReadAttempts": "查看作答",
+  "toolOpenPage": "打开页面",
+  "toolControlPlayer": "控制播放",
+  "toolReadSettings": "读取设置",
+  "toolChangeSettings": "调整设置",
+  "toolManageDownloads": "管理下载",
+  "toolPrepareDownload": "准备下载",
+  "toolPrepareDelete": "准备删除文件",
+  "toolOrganizeCourses": "整理课程",
+  "toolSyncCourses": "同步课程",
+  "toolPrepareTask": "准备定时任务",
+  "toolPreparePlugin": "准备开关插件",
+  "toolListMemory": "翻看记忆",
+  "toolRecall": "回想",
+  "toolRemember": "记下来",
+  "toolEditMemory": "改记忆",
+  "toolForget": "忘掉",
+  "botNoLecture": "没有指明要打开哪一节课",
+  "botNoCourse": "没有指明要打开哪门课",
+  "botNoNote": "没有指明要打开哪篇笔记",
+  "botNoDownload": "没有指明要下载哪一节课",
+  "botUnsupported": "这个版本还不支持该操作",
+  "chatSessions": "会话",
+  "chatNewSession": "新会话",
+  "commonCollapse": "收起",
+  "chatAllSessions": "全部会话",
+  "chatOtherSessions": "其他对话",
+  "chatNoSessions": "还没有会话",
+  "chatSessionMeta": "{value} · {messages} 条",
+  "@chatSessionMeta": {
+    "placeholders": {
+      "value": {},
+      "messages": {}
+    }
+  },
+  "assistantStarting": "正在启动助手",
+  "assistantNotStarted": "助手没有启动",
+  "assistantSetupModel": "先配置一个模型",
+  "assistantSetupModelBody": "助手通过 Pi SDK 调用你自己的模型服务。填入 API Key，或导入 Pi CLI 的配置。",
+  "assistantSetupModelAction": "配置模型",
+  "suggestSpeed": "把播放速度调到 1.5 倍",
+  "suggestDownloadRecent": "下载这门课最近三节的视频和转写",
+  "suggestBiggerText": "把界面字号调大一点",
+  "suggestRemember": "记住：我更喜欢先给结论的简短回答",
+  "suggestWeeklyReview": "每周日晚上帮我复习本周的课",
+  "suggestPauseDownloads": "暂停所有下载",
+  "suggestSummarizeLecture": "总结这节课到目前为止讲了什么",
+  "suggestReviewNotes": "把这节课整理成一份复习笔记",
+  "suggestConceptElsewhere": "刚才提到的概念在哪些课里出现过？",
+  "suggestCourseRecent": "这门课最近几节讲了什么？",
+  "suggestUnwatched": "帮我挑出还没看的课",
+  "suggestQuizCourse": "出一组题考考我这门课的重点",
+  "suggestWhatCanYouDo": "这个 App 能帮我做什么？",
+  "suggestRecentUnwatched": "最近有哪些课还没看？",
+  "suggestSearchMidterm": "在我的课程库里搜索「期中」",
+  "botIntroTitle": "我是 {botName}",
+  "@botIntroTitle": {
+    "placeholders": {
+      "botName": {}
+    }
+  },
+  "botIntroBody": "我会记住你告诉我的事，也能替你在应用里动手：调设置、整理课程、管理下载、安排定时任务。下载和删除这类操作会先给你一张卡片确认。",
+  "courseAssistantTitle": "{value}助手",
+  "@courseAssistantTitle": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "courseTitleQuoted": "《{title}》",
+  "@courseTitleQuoted": {
+    "placeholders": {
+      "title": {}
+    }
+  },
+  "courseAssistantIntro": "这个会话只围绕这门课：讲解、找知识点、整理笔记、出题。关于你的偏好来自 {botName} 的记忆。",
+  "@courseAssistantIntro": {
+    "placeholders": {
+      "botName": {}
+    }
+  },
+  "chatWelcomeTitle": "有什么可以帮你？",
+  "chatWelcomeBody": "我能读取课表、文字稿和笔记，帮你整理内容、定位知识点。下载由你点按钮决定。",
+  "chatSwitchCourse": "改为「{value}」的课程助手",
+  "@chatSwitchCourse": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "chatCurrentCourse": "当前课程",
+  "chatContextPlaying": "正在播放 · 助手可见当前进度",
+  "chatContextScreen": "当前：{value}",
+  "@chatContextScreen": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "chatInputHint": "问点什么…（Shift+Enter 换行）",
+  "commonStop": "停止",
+  "chatSend": "发送 (Enter)",
+  "pluginsDiscover": "发现插件",
+  "pluginsManage": "管理插件",
+  "chatMoreTools": "更多功能",
+  "thinkingTitle": "思考强度",
+  "modelsSearchAll": "搜索全部模型…",
+  "modelsSettings": "模型设置…",
+  "contextUsage": "上下文 {value} / {value2}（{value3}%）",
+  "@contextUsage": {
+    "placeholders": {
+      "value": {},
+      "value2": {},
+      "value3": {}
+    }
+  },
+  "contextTokens": "本对话累计 输入 {value} · 输出 {value2}{value3}",
+  "@contextTokens": {
+    "placeholders": {
+      "value": {},
+      "value2": {},
+      "value3": {}
+    }
+  },
+  "contextCost": "估算费用 ${cost}",
+  "@contextCost": {
+    "placeholders": {
+      "cost": {}
+    }
+  },
+  "contextCompactHint": "接近上限时 Pi 会自动压缩较早的对话。",
+  "contextCompactNow": "立即压缩上下文",
+  "usageView": "查看用量",
+  "contextUsageTooltip": "上下文用量 {value}%",
+  "@contextUsageTooltip": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "chatThinking": "正在思考…",
+  "toolReturned": "已返回",
+  "commonCopied": "已复制",
+  "chatThinkingNow": "思考中",
+  "chatThinkingProcess": "思考过程",
+  "toolArgs": "参数",
+  "toolResult": "结果",
+  "chatOutlineChapters": "大纲 · {length} 个章节",
+  "@chatOutlineChapters": {
+    "placeholders": {
+      "length": {}
+    }
+  },
+  "chatSlideRef": "PPT 第 {value} 张",
+  "@chatSlideRef": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "chatVisionTranscribed": "由识图模型转写给助手",
+  "chatVisionUnavailable": "当前模型不能看图，可以在「设置 → 助手 → 识图模型」里设置",
+  "chatSavedToLibrary": "已保存到课程库 · 点击阅读",
+  "chatCodeCopied": "已复制代码",
+  "thinkingMinimal": "最少",
+  "thinkingLow": "低",
+  "thinkingMax": "最高",
+  "thinkingHintOff": "直接回答，不做额外推理",
+  "thinkingHintMinimal": "只做最少的推理，回复最快",
+  "thinkingHintLow": "简单推理，适合日常问答",
+  "thinkingHintMedium": "兼顾速度与深度",
+  "thinkingHintHigh": "推理更充分，等待更久",
+  "thinkingHintMax": "尽可能深入，最慢，花费也最多",
+  "thinkingSheetBody": "更强的思考回答更周全，也更慢、更费 token。",
+  "commonModel": "模型",
+  "modelsImportPi": "导入 Pi CLI 配置",
+  "modelsCatalogUpdated": "已更新 models.dev 目录",
+  "modelsUpdateCatalog": "更新 models.dev 目录",
+  "modelsAddProvider": "添加服务商",
+  "modelsAssistantNotStarted": "助手还没启动",
+  "modelsAssistantNotStartedBody": "启动后才能读取 Pi SDK 的模型注册表",
+  "modelsConfigError": "配置文件有误：{value}",
+  "@modelsConfigError": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "modelsProviders": "已添加的服务商",
+  "commonAdd": "添加",
+  "modelsNoProviders": "还没有服务商。点「添加服务商」，从 30 多家预设或 models.dev 目录里选择。",
+  "modelsStepProvider": "选择服务商",
+  "modelsStepProviderHint": "30+ 预设，或 models.dev 收录的 200 多家",
+  "modelsStepKey": "填入 API Key",
+  "modelsStepKeyHint": "只保存在本机，可一键测试连接",
+  "modelsStepModels": "挑选模型",
+  "modelsStepModelsHint": "从服务商拉取模型列表，自动补全价格和上下文长度",
+  "modelsOnboardingTitle": "给助手接上一个模型",
+  "commonGetStarted": "开始",
+  "modelsCurrent": "助手正在使用",
+  "commonChange": "更换",
+  "modelsPersona": "附加指令（可选）",
+  "modelsPersonaHint": "例如：回答尽量简短；术语保留英文并附中文解释",
+  "modelsPersonaSaved": "已保存附加指令",
+  "modelsAutoTitle": "自动为对话命名",
+  "commonInUse": "使用中",
+  "modelsAvailableCount": "{available} 个可用模型",
+  "@modelsAvailableCount": {
+    "placeholders": {
+      "available": {}
+    }
+  },
+  "modelsNoKey": "未填写密钥",
+  "commonCustom": "自定义",
+  "commonBuiltIn": "内置",
+  "modelsSearch": "搜索模型",
+  "modelsNoneAvailable": "没有可用的模型",
+  "regionChina": "国内",
+  "regionGlobal": "海外",
+  "providerDeepseekBlurb": "深度求索，性价比高的推理与对话模型",
+  "providerSiliconflow": "硅基流动",
+  "providerSiliconflowBlurb": "聚合 Qwen、DeepSeek、GLM 等开源模型",
+  "providerBailian": "阿里云百炼",
+  "providerBailianBlurb": "通义千问 Qwen 全系列",
+  "providerZhipu": "智谱 BigModel",
+  "providerZhipuBlurb": "GLM 系列",
+  "providerMoonshot": "Kimi 月之暗面",
+  "providerMoonshotBlurb": "长上下文的 Kimi 模型",
+  "providerVolcengine": "火山方舟 · 豆包",
+  "providerVolcengineBlurb": "字节跳动豆包大模型",
+  "providerMinimaxBlurb": "稀宇科技 MiniMax 模型",
+  "providerHunyuan": "腾讯混元",
+  "providerHunyuanBlurb": "腾讯混元大模型",
+  "providerQianfan": "百度千帆",
+  "providerQianfanBlurb": "文心 ERNIE 系列",
+  "providerStepfun": "阶跃星辰",
+  "providerStepfunBlurb": "Step 系列多模态模型",
+  "providerMimo": "小米 MiMo",
+  "providerMimoBlurb": "小米 MiMo 推理模型",
+  "providerModelscope": "魔搭 ModelScope",
+  "providerModelscopeBlurb": "每日免费额度的开源模型推理",
+  "providerPayAsYouGoBlurb": "按量付费的模型聚合平台",
+  "providerOneKeyBlurb": "一个 Key 调用多家模型",
+  "providerPpio": "PPIO 派欧云",
+  "providerPpioBlurb": "分布式云上的开源模型 API",
+  "providerOpenaiBlurb": "GPT 系列",
+  "providerAnthropicBlurb": "Claude 系列",
+  "providerGoogleBlurb": "Gemini 系列，AI Studio 密钥",
+  "providerOpenrouterBlurb": "数百个模型的统一入口",
+  "providerXaiBlurb": "Grok 系列",
+  "providerGroqBlurb": "LPU 极速推理",
+  "providerFreeTrialBlurb": "免费试用额度",
+  "providerPerplexityBlurb": "联网搜索的 Sonar 模型",
+  "providerOllamaBlurb": "在本机运行开源模型",
+  "providerLmstudioBlurb": "图形化的本地模型服务",
+  "modelTagReasoning": "思考",
+  "modelTagVision": "识图",
+  "modelTagContext": "{value} 上下文",
+  "@modelTagContext": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "modelTagOutput": "输出 {value}",
+  "@modelTagOutput": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "modelTagFree": "免费",
+  "modelTagDeprecated": "已弃用",
+  "apiOpenaiCompatible": "OpenAI Chat Completions 兼容",
+  "providerCustom": "自定义服务",
+  "providerSource": "服务商",
+  "providerPickModel": "至少选择一个模型",
+  "providerKeyMissing": "请先填写 API Key",
+  "providerSaved": "已保存 {name}",
+  "@providerSaved": {
+    "placeholders": {
+      "name": {}
+    }
+  },
+  "providerTestOk": "{value} 响应正常 · {value2} ms",
+  "@providerTestOk": {
+    "placeholders": {
+      "value": {},
+      "value2": {}
+    }
+  },
+  "providerRemoveKeyTitle": "移除 {name} 的密钥？",
+  "@providerRemoveKeyTitle": {
+    "placeholders": {
+      "name": {}
+    }
+  },
+  "providerDeleteTitle": "删除 {name}？",
+  "@providerDeleteTitle": {
+    "placeholders": {
+      "name": {}
+    }
+  },
+  "providerRemoveKeyBody": "内置服务商仍会保留在目录中，填入密钥即可重新使用。",
+  "providerDeleteBody": "会删除这个服务及其模型配置。",
+  "providerAddTitle": "添加 {name}",
+  "@providerAddTitle": {
+    "placeholders": {
+      "name": {}
+    }
+  },
+  "providerBuiltIn": "Pi SDK 内置服务商",
+  "commonConnect": "连接",
+  "providerKeySaved": "已保存（{value}），输入新值以替换",
+  "@providerKeySaved": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "providerKeyHint": "粘贴你的密钥",
+  "commonPaste": "粘贴",
+  "commonShow": "显示",
+  "providerLocalNoKey": "本地服务通常不需要密钥。确认服务已在本机启动。",
+  "providerGetKey": "还没有密钥？去 {name} 获取",
+  "@providerGetKey": {
+    "placeholders": {
+      "name": {}
+    }
+  },
+  "providerDownloadApp": "下载 {name}",
+  "@providerDownloadApp": {
+    "placeholders": {
+      "name": {}
+    }
+  },
+  "commonAdvanced": "高级",
+  "providerApi": "接口协议",
+  "providerId": "服务 ID",
+  "providerIdHelper": "本地标识，字母数字及 . _ -",
+  "providerTestsOnSave": "保存后会测试一次连接",
+  "providerChosenModels": "已选 {length} 个模型 · 保存后测试连接",
+  "@providerChosenModels": {
+    "placeholders": {
+      "length": {}
+    }
+  },
+  "providerSaveAndTest": "保存并测试",
+  "providerBuiltInHint": "Pi SDK 已内置这家的模型目录，填好密钥即可使用。点模型可设为助手默认。",
+  "providerMoreModels": "还有 {value} 个，搜索以缩小范围",
+  "@providerMoreModels": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "providerChosen": "已选择",
+  "providerFetchModels": "从服务商获取模型列表",
+  "providerFetchNeedsKey": "填写密钥后获取模型列表",
+  "providerFromCatalog": "从 models.dev 选择",
+  "providerNoModelList": "这家服务可能不提供模型列表接口，可以改从 models.dev 目录选择或手动添加。",
+  "providerOfferedCount": "{length} 个 · 来自{offeredFrom}",
+  "@providerOfferedCount": {
+    "placeholders": {
+      "length": {},
+      "offeredFrom": {}
+    }
+  },
+  "providerNoMatch": "没有匹配的模型",
+  "providerNotInCatalog": "models.dev 未收录",
+  "providerManualModel": "手动添加模型 ID",
+  "providerManualModelHint": "例如 deepseek-chat",
+  "providerCatalogNote": "价格（美元 / 百万 token）、上下文长度和能力标签来自 models.dev，保存时写入 Pi 的模型配置，用于上下文管理和用量统计。",
+  "addProviderSearchHint": "搜索服务商，例如 硅基、qwen、groq",
+  "addProviderLoadingCatalog": "没有匹配的预设，正在加载 models.dev 目录…",
+  "addProviderNoMatch": "没有找到“{q}”。可以用下方「自定义服务」手动填写。",
+  "@addProviderNoMatch": {
+    "placeholders": {
+      "q": {}
+    }
+  },
+  "addProviderCatalog": "models.dev 目录",
+  "addProviderMatches": "{length} 个匹配",
+  "@addProviderMatches": {
+    "placeholders": {
+      "length": {}
+    }
+  },
+  "addProviderCatalogEntry": "{value} 个模型 · {value2}",
+  "@addProviderCatalogEntry": {
+    "placeholders": {
+      "value": {},
+      "value2": {}
+    }
+  },
+  "addProviderNotFound": "找不到？",
+  "addProviderCompatibleHint": "任何兼容 OpenAI / Anthropic / Gemini 接口的地址，包括中转和自建服务",
+  "addProviderCatalogError": "models.dev 目录暂时不可用：{catalogError}",
+  "@addProviderCatalogError": {
+    "placeholders": {
+      "catalogError": {}
+    }
+  },
+  "addProviderCatalogLoading": "正在加载 models.dev 目录…",
+  "addProviderSearchesMore": "搜索时还会在 models.dev 收录的另外 {moreCount} 家服务商中查找。",
+  "@addProviderSearchesMore": {
+    "placeholders": {
+      "moreCount": {}
+    }
+  },
+  "addProviderCompatible": "兼容接口",
+  "addProviderBuiltInKeyOnly": "Pi SDK 内置，只需密钥",
+  "asrChannelSlots": "{value} {value2} 段",
+  "@asrChannelSlots": {
+    "placeholders": {
+      "value": {},
+      "value2": {}
+    }
+  },
+  "asrPerChannelLimits": "每个渠道有各自的并发上限",
+  "asrChannelLimits": "渠道上限：{value}；调高不一定更快，容易触发限流",
+  "@asrChannelLimits": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "asrIntro": "长音频会切成 20 分钟的段，分给下面的渠道识别；某个渠道被限流时自动冷却，由其他渠道接手。已识别的段会保留，重试时只补缺失的部分。",
+  "asrLocalEnabled": "本地识别已启用",
+  "asrTryLocal": "免费渠道限流太厉害？改用本地模型",
+  "asrLocalUnlimited": "{value} · 不受额度限制",
+  "@asrLocalUnlimited": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "asrLocalHint": "下载一个识别模型到本机，看对比图选适合你电脑的那个",
+  "asrDistribution": "分配方式",
+  "asrBalanced": "均衡",
+  "asrPrefer": "优先{value}",
+  "@asrPrefer": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "asrConcurrency": "同时识别的段数",
+  "asrSegments": "{value} 段",
+  "@asrSegments": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "asrDeleteVideo": "转写完成后删除视频",
+  "asrDeleteVideoHint": "只保留文字稿、PPT 和课件，视频文件在转写成功后立即删除，节省磁盘空间。在线播放不受影响。",
+  "asrReady": "就绪",
+  "asrBusy": "识别中 {value} 段",
+  "@asrBusy": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "asrCooling": "冷却至 {value}",
+  "@asrCooling": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "asrQuotaFull": "额度已满",
+  "commonDisabled": "已停用",
+  "asrQuotaUsage": "12 小时内 {value} / {value2}",
+  "@asrQuotaUsage": {
+    "placeholders": {
+      "value": {},
+      "value2": {}
+    }
+  },
+  "asrOkSegments": "成功 {value} 段",
+  "@asrOkSegments": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "asrFailedSegments": "失败 {value} 段",
+  "@asrFailedSegments": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "commonLastUsed": "上次 {value}",
+  "@commonLastUsed": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "asrRecent": "最近识别记录",
+  "asrRecentSummary": "最近 {length} 次 · 失败 {fails} 次",
+  "@asrRecentSummary": {
+    "placeholders": {
+      "length": {},
+      "fails": {}
+    }
+  },
+  "asrEventLine": "{value}  {value2} · 第 {value3} 段 · {value4}音频 · 用时 {value5} 秒",
+  "@asrEventLine": {
+    "placeholders": {
+      "value": {},
+      "value2": {},
+      "value3": {},
+      "value4": {},
+      "value5": {}
+    }
+  },
+  "commonConnectionOk": "连接正常",
+  "mineruIntro": "上传的课件（PDF、PPT、Word、图片）交给 MinerU 解析成 Markdown，保留公式、表格和图片，可以全文阅读，也能让助手引用。",
+  "mineruPrecise": "精准解析 · Token ••••{value}",
+  "@mineruPrecise": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "mineruLite": "未配置 Token · 使用免登录的轻量解析",
+  "commonTest": "测试",
+  "mineruChangeToken": "更换 Token",
+  "mineruTokenExpired": "Token 已于 {value} 过期，请重新生成",
+  "@mineruTokenExpired": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "mineruTokenExpires": "Token 有效期至 {value}{value2}",
+  "@mineruTokenExpires": {
+    "placeholders": {
+      "value": {},
+      "value2": {}
+    }
+  },
+  "mineruTokenDaysLeft": "（还剩 {expDays} 天）",
+  "@mineruTokenDaysLeft": {
+    "placeholders": {
+      "expDays": {}
+    }
+  },
+  "mineruTokenHint": "在 MinerU 官网「API 管理」中创建",
+  "mineruGetToken": "获取 Token",
+  "commonRemove": "移除",
+  "mineruQuotaToday": "今日额度",
+  "mineruQuotaPages": " / {daily} 页",
+  "@mineruQuotaPages": {
+    "placeholders": {
+      "daily": {}
+    }
+  },
+  "mineruQuotaBody": "今天解析了 {files} 个文件。高优先级额度每天 {daily} 页，超出后排队变慢；单文件上限 {value}、{value2} 页。额度由本机按解析结果统计，以官网为准。",
+  "@mineruQuotaBody": {
+    "placeholders": {
+      "files": {},
+      "daily": {},
+      "value": {},
+      "value2": {}
+    }
+  },
+  "mineruLiteBody": "轻量解析不需要 Token，但单文件限 10 MB、20 页，输出不含图片。配置 Token 后使用精准解析（每天 1000 页高优先级额度）。",
+  "mineruModel": "解析模型",
+  "mineruVlm": "VLM 精准",
+  "mineruPipelineHint": "Pipeline：传统版面分析，速度快、更稳定，适合排版简单的讲义。",
+  "mineruVlmHint": "VLM：视觉大模型，公式、表格和复杂版面效果更好，推荐。",
+  "mineruForceOcr": "强制 OCR",
+  "mineruForceOcrHint": "扫描版或文字无法复制的 PDF 打开",
+  "mineruAutoParse": "上传后自动解析",
+  "mineruAutoParseHint": "关闭后需要在课件卡片上手动点「解析」",
+  "mineruRecent": "最近解析",
+  "commonPages": "{value} 页",
+  "@commonPages": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "mineruModeLite": "轻量",
+  "mineruModePrecise": "精准",
+  "benchSortBy": "按{label}",
+  "@benchSortBy": {
+    "placeholders": {
+      "label": {}
+    }
+  },
+  "benchMetricSource": "{label}：{source}",
+  "@benchMetricSource": {
+    "placeholders": {
+      "label": {},
+      "source": {}
+    }
+  },
+  "benchUntested": "未测",
+  "listComma": "，",
+  "benchRowLabel": "{name}，{summary}",
+  "@benchRowLabel": {
+    "placeholders": {
+      "name": {},
+      "summary": {}
+    }
+  },
+  "asrModelRecommended": "推荐",
+  "asrModelFastest": "最快",
+  "asrModelAccurate": "最准",
+  "benchCer": "错字率",
+  "benchLowerIsBetter": "越短越准",
+  "benchCerSource": "WenetSpeech 会议测试集（最接近课堂录音）的字错误率，取自各模型的论文；来源不同，相差 1% 以内可视为持平",
+  "benchTime": "转写用时",
+  "benchTimeHint": "一节 90 分钟的课",
+  "benchMinutes": "{value} 分钟",
+  "@benchMinutes": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "benchTimeSource": "在 {value} 上实测（{value2}，含加载模型），你的设备会有不同",
+  "@benchTimeSource": {
+    "placeholders": {
+      "value": {},
+      "value2": {}
+    }
+  },
+  "benchReferenceMachine": "参考机器",
+  "benchMemory": "内存",
+  "benchMemoryHint": "识别时的峰值",
+  "benchMemorySource": "同一次实测的进程峰值内存",
+  "asrModelDeleteTitle": "删除 {value}？",
+  "@asrModelDeleteTitle": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "asrModelDeleteBody": "会释放 {value} 空间。已经转写好的文字稿不受影响，之后可以重新下载。",
+  "@asrModelDeleteBody": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "asrModelLocation": "模型存储位置",
+  "asrModelLocationChanged": "之后下载的模型会保存到新位置",
+  "asrLocalTitle": "本地识别模型",
+  "asrUnsupportedTitle": "本机暂不支持",
+  "asrUnsupportedBody": "本地识别引擎没有提供 {value} 的预编译版本，转写会继续使用免费云端渠道。",
+  "@asrUnsupportedBody": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "asrHowToChoose": "怎么选",
+  "asrHowToChooseBody": "三项都是越短越好。点一行可以在下面看到详情。没有特别需求就选带 ★ 的推荐模型。",
+  "asrStorage": "存储位置",
+  "asrSource": "下载来源",
+  "asrSourceVerify": "所有文件都会按目录里记录的 SHA-256 校验，来源被篡改或版本不一致时会直接报错，不会装上。中断后再次下载会从断点继续。",
+  "asrCustomLocation": "自定义位置",
+  "asrDefaultLocation": "默认位置",
+  "asrUsedSpace": "已用 {value}",
+  "@asrUsedSpace": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "asrFreeSpace": "磁盘剩余 {value}",
+  "@asrFreeSpace": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "asrLowSpace": "这块磁盘剩余空间不多，模型可能下载不完。可以换到空间更大的磁盘。",
+  "asrChangeLocation": "更改位置",
+  "commonOpenInFileManager": "在文件管理器中打开",
+  "asrResetLocation": "恢复默认",
+  "asrLocationAfterDownload": "下载完成后才能更改位置",
+  "asrMoveTitle": "把已下载的模型一起移过去？",
+  "asrMoveBody": "移动：{value} 的引擎和模型会搬到新位置，旧位置随后清空。跨磁盘时需要复制一会儿，期间不能转写。",
+  "@asrMoveBody": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "asrChangeOnlyBody": "只更改位置：旧文件留在原处，之后下载到新位置；新位置里已有的模型会直接可用。",
+  "asrChangeOnly": "只更改位置",
+  "asrMove": "移动",
+  "asrMoving": "正在移动模型",
+  "asrMovingBody": "移动完成前本地识别暂停，云端渠道照常转写。可以离开这个页面。",
+  "asrUsingModel": "正在使用 {value}",
+  "@asrUsingModel": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "asrUsingModelBody": "转写会交给本机模型，不受限流和额度影响；开着的云端渠道也会并行分担一部分。想让音频完全不离开本机，在「设置 → 转写」里关掉云端渠道。",
+  "asrDownloadingModel": "正在下载 {value}",
+  "@asrDownloadingModel": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "asrDownloadingModelBody": "下载完成后会自动启用。可以离开这个页面，进度会在后台继续。",
+  "asrLocalHeroTitle": "在本机识别",
+  "asrLocalHeroBody": "下载一个语音识别模型到本机，转写不再受免费云端渠道的限流和额度影响，音频也不会离开本机。",
+  "commonDownloadSize": "下载 {value}",
+  "@commonDownloadSize": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "asrModelMemory": "内存约 {value}",
+  "@asrModelMemory": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "asrModelSpeed": "90 分钟课约 {value} 分钟",
+  "@asrModelSpeed": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "asrModelCer": "错字率 {value}%",
+  "@asrModelCer": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "asrModelPunctuated": "自带标点",
+  "asrModelAutoPunctuation": "自动补标点",
+  "asrModelCerSource": "错字率来源：{value}",
+  "@asrModelCerSource": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "commonLicense": "许可：{value}",
+  "@commonLicense": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "asrModelOriginal": "原始模型",
+  "asrModelDownloadFailed": "下载失败：{value}",
+  "@asrModelDownloadFailed": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "asrModelResume": "继续下载",
+  "asrModelDownload": "下载 {value}{value2}",
+  "@asrModelDownload": {
+    "placeholders": {
+      "value": {},
+      "value2": {}
+    }
+  },
+  "asrModelIncludesEngine": "（含引擎等）",
+  "commonDisable": "停用",
+  "asrModelUse": "使用这个模型",
+  "commonTimeLeft": "还需 {value}",
+  "@commonTimeLeft": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "asrSourceHfMirror": "无需任何配置。hf-mirror.com 是社区维护的 Hugging Face 镜像，国内大多数网络可以直连，目录里的全部模型都能从这里下载。",
+  "asrSourceModelscope": "无需账号或 Token，公开模型直接下载。魔搭上目前只有 Qwen3-ASR 0.6B 和语音检测模型有与原版逐字节相同的副本（社区用户上传），选它们时走魔搭；其余文件自动改用 HF-Mirror，下载时会提示。",
+  "asrSourceHuggingface": "官方源，文件最全，但国内通常需要代理。Look Studio 的后台服务会使用系统的 HTTPS_PROXY 环境变量。",
+  "asrSourceCustom": "适合学校、实验室或自建的 Hugging Face 兼容镜像。填写地址模板，'{'repo'}' 会换成模型仓库名，'{'file'}' 换成文件路径，例如 https://hf-mirror.com/'{'repo'}'/resolve/main/'{'file'}'。",
+  "asrSourceTemplate": "地址模板",
+  "asrEngineSource": "识别引擎（GitHub）",
+  "asrEngineSourceBody": "第一次下载时会从 GitHub Releases 取 sherpa-onnx 识别引擎（约 25 MB）。GitHub 很慢时，可以填一个 GitHub 下载加速服务的前缀，实际地址为「前缀 + 原始地址」，同样会校验 SHA-256。",
+  "asrEngineProxy": "加速前缀（可选）",
+  "asrThreads": "识别线程",
+  "asrThreadCount": "{value} 线程",
+  "@asrThreadCount": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "asrThreadsHint": "线程越多越快，但转写时设备会更忙、更费电。本机有 {cpus} 个逻辑核心，默认用一半（最多 4 个）。",
+  "@asrThreadsHint": {
+    "placeholders": {
+      "cpus": {}
+    }
+  },
+  "watchCheckStarted": "已开始检查，有变化会马上通知你",
+  "watchTitle": "后台自动检查新回放和新课次",
+  "watchBody": "刚下课的课每 10 分钟查一次回放，之后逐渐放缓；其他课程每 6 小时同步一次；已连接的 Canvas 每 15 分钟同步作业和公告。有变化时立即提醒，课程页也会自动刷新。",
+  "watchAwaiting": "正在等待 {awaiting} 节课的回放",
+  "@watchAwaiting": {
+    "placeholders": {
+      "awaiting": {}
+    }
+  },
+  "watchNoneAwaiting": "没有等待中的回放",
+  "watchNextCheck": "下次检查 {value}",
+  "@watchNextCheck": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "watchLastError": "最近一次检查失败：{err}",
+  "@watchLastError": {
+    "placeholders": {
+      "err": {}
+    }
+  },
+  "watchCheckNow": "立即检查",
+  "obsidianVault": "Obsidian 仓库",
+  "commonSaved": "已保存",
+  "obsidianChooseVaultFirst": "先选择 Obsidian 仓库文件夹",
+  "obsidianExported": "已导出：新写入 {value}，未变 {value2}，清理 {value3}",
+  "@obsidianExported": {
+    "placeholders": {
+      "value": {},
+      "value2": {},
+      "value3": {}
+    }
+  },
+  "obsidianConflicts": "{conflicts} 个文件在 Obsidian 中改过，已保留你的版本（笔记的新版本另存为「(Look Studio)」副本）",
+  "@obsidianConflicts": {
+    "placeholders": {
+      "conflicts": {}
+    }
+  },
+  "obsidianNotVault": "目标文件夹不是 Obsidian 仓库（没有 .obsidian），仍已导出",
+  "listSemicolon": "；",
+  "commonExportFailed": "导出失败：{e}",
+  "@commonExportFailed": {
+    "placeholders": {
+      "e": {}
+    }
+  },
+  "linkRegistered": "已注册：点击 lookstudio:// 链接会打开 Look Studio",
+  "linkRegisterPartial": "已写入 {name}，但 xdg-mime 失败：{stderr}",
+  "@linkRegisterPartial": {
+    "placeholders": {
+      "name": {},
+      "stderr": {}
+    }
+  },
+  "linkRegisterFailed": "注册失败：{e}",
+  "@linkRegisterFailed": {
+    "placeholders": {
+      "e": {}
+    }
+  },
+  "obsidianNoVault": "未设置仓库",
+  "obsidianStatus": "导出到 {value}{value2}",
+  "@obsidianStatus": {
+    "placeholders": {
+      "value": {},
+      "value2": {}
+    }
+  },
+  "commonAutoSuffix": " · 自动",
+  "obsidianBody": "把课程库单向导出到 Obsidian 仓库的一个文件夹：总的「课程库」页，每门课一个文件夹，里面分「笔记」（按节次，含引用的 PPT 和课件）和「转写稿」。点击时间戳会回到 Look Studio；在 Obsidian 里改过的文件不会被覆盖。",
+  "commonLocation": "位置",
+  "obsidianFolder": "仓库内的文件夹",
+  "obsidianFolderHelper": "只写入这个文件夹，仓库里的其他笔记不受影响",
+  "obsidianSaveLocation": "保存位置",
+  "commonExport": "导出",
+  "obsidianAutoExport": "笔记变化后自动导出",
+  "obsidianAutoExportHint": "保存或删除笔记后几秒内刷新",
+  "commonExporting": "正在导出",
+  "commonExportNow": "立即导出",
+  "obsidianBackLinks": "回到 Look Studio",
+  "obsidianBackLinksBody": "导出的时间戳和课次链接是 lookstudio:// 链接。注册后，在 Obsidian 里点击会打开对应的课和时刻。",
+  "linkRegister": "注册 lookstudio:// 链接",
+  "notionSubtitle": "同步到你的 Notion 工作区",
+  "commonSyncing": "正在同步…",
+  "notionNoParent": "已连接 · 还没选同步位置",
+  "notionStatus": "{value} · {value2} 个页面{value3}",
+  "@notionStatus": {
+    "placeholders": {
+      "value": {},
+      "value2": {},
+      "value3": {}
+    }
+  },
+  "notionDisconnectTitle": "断开 Notion？",
+  "notionDisconnectBody": "会删除本机保存的令牌和同步记录。已经同步到 Notion 的页面会留在那里；之后重新连接时会新建一份。",
+  "commonDisconnect": "断开",
+  "notionChangeParentTitle": "换一个同步位置？",
+  "notionChangeParentBody": "之后会在新页面下重新创建课程库。原来同步过去的页面留在原处，不再更新。",
+  "notionConnectedTo": "已连接到 {value}",
+  "@notionConnectedTo": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "notionWorkspace": "工作区",
+  "commonNotConnected": "未连接",
+  "notionBody": "把课程库同步到 Notion 的一个页面下：每门课、每节课一个页面，下面是笔记和转写稿。只写入 Look Studio 创建的页面；在 Notion 里改过的页面不会被覆盖。",
+  "notionCreateIntegration": "创建集成",
+  "notionStep1": "在 Notion 的「集成」页新建一个 Internal 集成，名称填 Look Studio，选择要同步到的工作区",
+  "notionStep2": "在「功能」里保留读取、更新和插入内容，其余可以关闭",
+  "notionStep3": "复制「Internal Integration Secret」，粘贴到下面",
+  "notionOpenIntegrations": "打开 Notion 集成页",
+  "notionSecret": "集成密钥",
+  "notionSecretHelper": "用本机密钥加密保存，只用来访问你授权给集成的页面",
+  "commonConnecting": "正在连接",
+  "notionShareHint": "连接后，还要在 Notion 里把一个页面分享给这个集成，课程库会建在那个页面下面。",
+  "notionParent": "同步位置",
+  "notionParentStep1": "在 Notion 打开想放课程库的页面",
+  "notionParentStep2": "点右上角「···」→「连接」，选择你的集成",
+  "notionParentStep3": "回到这里选择这个页面",
+  "notionChoosePage": "选择页面",
+  "notionParentHint": "课程库在这个页面下的「Look Studio 课程库」里",
+  "notionOpenInNotion": "在 Notion 中打开",
+  "notionIntegration": "集成",
+  "notionSecretTail": "集成密钥 ••••{value}",
+  "@notionSecretTail": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "notionLimits": "Notion 里的时间戳显示为文字，图片和课件不上传；需要跳回课堂时刻可以用 Obsidian 导出。",
+  "commonSync": "同步",
+  "notionAutoSync": "笔记变化后自动同步",
+  "notionAutoSyncHint": "保存或删除笔记约 1 分钟后，只同步改动的页面",
+  "commonSyncProgress": "正在同步 {done} / {total}",
+  "@commonSyncProgress": {
+    "placeholders": {
+      "done": {},
+      "total": {}
+    }
+  },
+  "commonChecking": "正在检查",
+  "notionConflicts": "{length} 个页面在 Notion 里改过，保留了你的版本",
+  "@notionConflicts": {
+    "placeholders": {
+      "length": {}
+    }
+  },
+  "notionErrors": "{length} 个页面没有同步成功",
+  "@notionErrors": {
+    "placeholders": {
+      "length": {}
+    }
+  },
+  "commonStartSync": "开始同步",
+  "commonSyncNow": "立即同步",
+  "notionFullCheckHint": "逐页确认还在，补建在 Notion 里删掉的页面；页面多时较慢",
+  "notionFullCheck": "完整检查",
+  "syncCreated": "新建 {value}",
+  "@syncCreated": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "syncUpdated": "更新 {value}",
+  "@syncUpdated": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "syncTrashed": "移到废纸篓 {value}",
+  "@syncTrashed": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "syncUnchanged": "未变 {value}",
+  "@syncUnchanged": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "commonLastSynced": "上次同步 {value}",
+  "@commonLastSynced": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "notionMoreItems": "还有 {value} 项",
+  "@notionMoreItems": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "notionChooseParent": "选择同步位置",
+  "notionChooseParentHint": "这里只列出分享给集成的页面。也可以粘贴页面链接。",
+  "notionSearchHint": "搜索页面或粘贴链接",
+  "notionUseLink": "使用这个链接",
+  "commonUntitled": "无标题",
+  "notionNoPages": "集成还没有可用的页面",
+  "notionNoMatch": "没有找到「{q}」",
+  "@notionNoMatch": {
+    "placeholders": {
+      "q": {}
+    }
+  },
+  "notionShareSteps": "在 Notion 打开目标页面，点右上角「···」→「连接」，选择你的集成，然后刷新。",
+  "commonRefresh": "刷新",
+  "knowledgeConnectApps": "连接到笔记应用",
+  "knowledgeObsidianSubtitle": "导出到本地仓库，时间戳可点回 Look Studio",
+  "knowledgeAutoExportSuffix": " · 自动导出",
+  "commonOpen": "打开",
+  "knowledgeFolderTemplates": "文件夹命名模板",
+  "knowledgeFolderTemplatesHint": "课程可用 '{'title'}' '{'teacher'}' '{'term'}' '{'id'}'；课次可用 '{'date'}' '{'title'}' '{'sub_id'}' '{'lecturer'}'。只影响之后新建的文件夹。",
+  "knowledgeCourseFolder": "课程文件夹",
+  "knowledgeLectureFolder": "课次文件夹",
+  "knowledgeTemplatesSaved": "模板已保存",
+  "knowledgeSkillExport": "导出为 Look-Tongji-Notes 技能格式",
+  "knowledgeSkillExportHint": "以硬链接生成 raw/<课程>/<节次>/原始数据/ 目录，不额外占空间",
+  "knowledgeSkillExportAction": "导出到技能目录",
+  "knowledgeTargetFolder": "目标文件夹",
+  "knowledgeTargetFolderHelper": "Look-Tongji-Notes 技能所在的文件夹",
+  "knowledgeExported": "已导出 {value} 节课",
+  "@knowledgeExported": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "commonConnected": "已连接",
+  "webdavAccount": "账号",
+  "webdavAppPassword": "应用密码",
+  "webdavJianguoyun": "坚果云",
+  "webdavJianguoyunHint": "账号是坚果云登录邮箱；在网页版「账户信息 → 安全选项 → 第三方应用管理」添加应用，得到应用密码",
+  "webdavJianguoyunUser": "坚果云账号（邮箱）",
+  "webdavNextcloudHint": "地址形如 https://域名/remote.php/dav/files/用户名/；在「个人设置 → 安全」创建应用密码",
+  "webdavAlistHint": "地址形如 http://主机:5244/dav/，账号和密码用 AList 的用户",
+  "webdavOtherHint": "填写服务商提供的 WebDAV 地址、账号和密码",
+  "webdavSubtitle": "用坚果云、Nextcloud 等网盘在设备间同步",
+  "webdavNeverSynced": "还没同步过",
+  "webdavSyncedAgo": "{value}同步",
+  "@webdavSyncedAgo": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "webdavStopTitle": "停止同步？",
+  "webdavStopBody": "会删除本机保存的 WebDAV 账号和同步记录。网盘和本机上的文件都会保留；之后重新设置时会按文件内容重新比对。",
+  "webdavStop": "停止同步",
+  "webdavTitle": "WebDAV 同步",
+  "webdavConnectedTo": "已连接 {host}",
+  "@webdavConnectedTo": {
+    "placeholders": {
+      "host": {}
+    }
+  },
+  "commonNotSet": "未设置",
+  "webdavBody": "在电脑、手机之间同步课程库和助手对话：笔记、转写稿、PPT 截图、题目与学习记录、播放进度和书签。每台设备只上传改动过的文件；两边都改过的文件保留较新的一份，另一份放进冲突文件夹。",
+  "webdavPrivacy": "登录状态、模型密钥和本机设置不会上传，每台设备分别登录。同步目录里的文件按原样保存，不做加密，请使用可信的网盘。",
+  "webdavEditAccount": "修改账号",
+  "webdavConnect": "连接网盘",
+  "webdavServer": "服务器地址",
+  "webdavKeepPassword": "留空则沿用已保存的密码",
+  "webdavPasswordSealed": "用本机密钥加密保存",
+  "webdavFolder": "同步目录",
+  "webdavFolderHelper": "在网盘里新建，所有设备填同一个",
+  "commonAutoSync": "自动同步",
+  "webdavAutoHint": "打开应用时、每 30 分钟，以及笔记改动约 2 分钟后",
+  "webdavMedia": "同步视频与录音",
+  "webdavMediaHint": "文件很大，会占用较多网盘空间和流量；不同步时可以在其他设备上重新下载",
+  "webdavConnectAndSync": "连接并同步",
+  "webdavSyncing": "正在同步",
+  "webdavConflicts": "{value} 个文件在两台设备上都改过，保留了较新的版本，另一份在冲突文件夹里",
+  "@webdavConflicts": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "webdavErrors": "{length} 个文件没有同步成功：{first}",
+  "@webdavErrors": {
+    "placeholders": {
+      "length": {},
+      "first": {}
+    }
+  },
+  "webdavMediaTitle": "视频与录音",
+  "webdavMediaOn": "一起同步",
+  "webdavMediaOff": "不同步，在其他设备上重新下载",
+  "commonModify": "修改",
+  "syncUploaded": "上传 {value}",
+  "@syncUploaded": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "syncDeleted": "删除 {value}",
+  "@syncDeleted": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "syncInSync": "两边已经一致",
+  "backupTypeLabel": "Look Studio 备份",
+  "backupFileName": "LookStudio-备份-{year}{value}{value2}.zip",
+  "@backupFileName": {
+    "placeholders": {
+      "year": {},
+      "value": {},
+      "value2": {}
+    }
+  },
+  "backupSaved": "备份已保存（{value}）",
+  "@backupSaved": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "backupNotSaved": "没有保存备份",
+  "backupExportFailed": "导出失败：{err}",
+  "@backupExportFailed": {
+    "placeholders": {
+      "err": {}
+    }
+  },
+  "commonFilePickerFailed": "无法打开文件选择器：{message}",
+  "@commonFilePickerFailed": {
+    "placeholders": {
+      "message": {}
+    }
+  },
+  "backupReading": "正在读取备份",
+  "backupRestoring": "正在恢复",
+  "backupNothingToRestore": "没有需要恢复的文件，本机已是最新",
+  "backupRestored": "已恢复 {value} 个文件（{value2}）",
+  "@backupRestored": {
+    "placeholders": {
+      "value": {},
+      "value2": {}
+    }
+  },
+  "backupViewReplaced": "查看被替换的文件",
+  "backupRestoreFailed": "恢复失败：{e}",
+  "@backupRestoreFailed": {
+    "placeholders": {
+      "e": {}
+    }
+  },
+  "storageCleanSyncTitle": "清空同步冲突与回收站？",
+  "storageCleanSyncBody": "其中是同步时被替换或在其他设备上删除的文件副本，清空后无法找回。",
+  "commonEmpty": "清空",
+  "storageFreed": "已释放 {value}",
+  "@storageFreed": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "storageCleanFailed": "清理失败：{e}",
+  "@storageCleanFailed": {
+    "placeholders": {
+      "e": {}
+    }
+  },
+  "dataSyncTitle": "多端同步",
+  "backupTitle": "备份与恢复",
+  "backupIntro": "把课程库和助手对话打包成一个 zip，换电脑或重装时恢复。登录状态和密钥不在备份里。",
+  "backupIncludeMedia": "包含视频与录音",
+  "backupNoMedia": "课程库里还没有视频",
+  "backupMediaSize": "{value} 个文件，另需 {value2}",
+  "@backupMediaSize": {
+    "placeholders": {
+      "value": {},
+      "value2": {}
+    }
+  },
+  "backupExport": "导出备份",
+  "backupExportSize": "导出备份 · 约 {value}",
+  "@backupExportSize": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "backupRestoreFrom": "从备份恢复",
+  "backupRestore": "恢复备份",
+  "backupPreviewMeta": "{value} {value2}:{value3} 导出{value4} · {value5} 个文件 · {value6}",
+  "@backupPreviewMeta": {
+    "placeholders": {
+      "value": {},
+      "value2": {},
+      "value3": {},
+      "value4": {},
+      "value5": {},
+      "value6": {}
+    }
+  },
+  "restoreNew": "本机没有",
+  "restoreNewer": "备份里的较新",
+  "restoreOlder": "本机的较新",
+  "restoreSame": "相同",
+  "restoreSkipped": "不会恢复（密钥或无效路径）",
+  "restoreMerge": "合并",
+  "restoreOverwrite": "以备份为准",
+  "restoreMergeHint": "补上本机没有的文件，更新较旧的文件；本机较新的文件保持不变。",
+  "restoreOverwriteHint": "所有文件换成备份里的版本；被替换的较新文件会移到课程库的 .sync-conflicts 文件夹。",
+  "commonRestore": "恢复",
+  "storageTitle": "存储空间",
+  "storageCache": "转写缓存与未完成下载",
+  "storageCacheCleanable": "可释放 {value} · 进行中和暂停的任务会保留",
+  "@storageCacheCleanable": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "storageCacheEmpty": "没有可清理的缓存",
+  "commonClean": "清理",
+  "storageCleaningCache": "正在清理缓存",
+  "storageSync": "同步冲突与回收站",
+  "storageSyncSize": "{value} · 同步时替换或删除的文件副本",
+  "@storageSyncSize": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "storageNoFiles": "没有文件",
+  "storageEmptying": "正在清空",
+  "storageCompact": "整理索引",
+  "storageCompactHint": "合并写入日志、回收空闲空间，让搜索和列表更快",
+  "storageCompactAction": "整理",
+  "storageCompacting": "正在整理索引",
+  "storageModels": "本地语音模型",
+  "storageAssistant": "助手对话、记忆与插件",
+  "storageRuntime": "助手运行环境（Node.js 与依赖）",
+  "diagDaemon": "后台服务",
+  "diagDaemonDetail": "版本 {value} · 端口 {port}",
+  "@diagDaemonDetail": {
+    "placeholders": {
+      "value": {},
+      "port": {}
+    }
+  },
+  "diagNotStarted": "没有启动",
+  "commonStarting": "正在启动",
+  "diagWorkspace": "Linux 工作区",
+  "diagFfmpegOk": "转写可用",
+  "diagFfmpegMissingWorkspace": "未安装，转写需要它",
+  "diagFfmpegMissing": "未找到，请用系统的包管理器安装后重启后台",
+  "diagAgentRunningNode": "运行中 · Node.js {value}",
+  "@diagAgentRunningNode": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "diagAgentNotRunning": "没有运行",
+  "diagSetupRuntime": "设置运行环境",
+  "diagReportLine": "{title}：{detail}",
+  "@diagReportLine": {
+    "placeholders": {
+      "title": {},
+      "detail": {}
+    }
+  },
+  "diagReportLibrary": "课程库：{value}",
+  "@diagReportLibrary": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "diagWorkspaceSuffix": " · Linux 工作区",
+  "diagCopied": "已复制诊断信息",
+  "diagStatus": "运行状态",
+  "diagLogs": "日志",
+  "diagDaemonLog": "后台日志",
+  "diagAgentLog": "助手日志",
+  "diagMaintenance": "维护",
+  "diagRestart": "重启后台服务",
+  "diagRestartHint": "后台没有响应时使用；下载和转写会在重启后继续",
+  "diagRestartAction": "重启",
+  "diagIssues": "{issues} 项需要处理",
+  "@diagIssues": {
+    "placeholders": {
+      "issues": {}
+    }
+  },
+  "diagAllGood": "一切正常",
+  "diagCopy": "复制诊断信息",
+  "diagOk": "正常",
+  "commonNeedsAttention": "需要处理",
+  "diagChecking": "检查中",
+  "commonCopyPath": "复制路径",
+  "commonPathCopied": "已复制路径",
+  "diagLogEmpty": "暂无记录",
+  "diagLogLines": "{length} 行",
+  "@diagLogLines": {
+    "placeholders": {
+      "length": {}
+    }
+  },
+  "diagLogRecent": "最近 {length} 行",
+  "@diagLogRecent": {
+    "placeholders": {
+      "length": {}
+    }
+  },
+  "commonCopyAll": "复制全部",
+  "diagLogCopied": "已复制日志",
+  "diagLogNothing": "后台还没有写下任何记录",
+  "settingsAccount": "账户与学校",
+  "settingsAccountHint": "统一身份认证、Canvas",
+  "authTongji": "统一身份认证",
+  "authRenewNow": "立即续期",
+  "authSignOut": "退出登录",
+  "settingsProfileKeyword": "昵称和头像",
+  "commonSchool": "学校",
+  "settingsCanvasKeyword": "作业与课件",
+  "settingsAppearance": "外观与播放",
+  "settingsAppearanceHint": "主题、字体、播放器",
+  "settingsDarkMode": "深色模式",
+  "settingsThemeColor": "主题色",
+  "settingsSystemAccent": "系统强调色",
+  "settingsSchemeStyle": "配色风格",
+  "settingsContrast": "对比度",
+  "settingsFont": "字体",
+  "settingsTextSize": "文字大小",
+  "settingsCompact": "紧凑布局",
+  "settingsReduceMotion": "减少动画",
+  "settingsDefaultSpeed": "默认倍速",
+  "settingsBoostSpeed": "长按快进倍速",
+  "settingsSeekStepKeyword": "快进快退步长",
+  "settingsSubtitleSize": "字幕大小",
+  "settingsResume": "从上次位置继续",
+  "settingsShowSubtitles": "显示字幕",
+  "settingsSlidesFollow": "PPT 跟随播放",
+  "settingsShortcuts": "快捷键",
+  "settingsAssistant": "助手与插件",
+  "settingsAssistantHint": "模型、Bot、插件",
+  "settingsModels": "模型与服务商",
+  "settingsVisionModel": "识图模型",
+  "settingsBotKeyword": "Bot 形象与记忆",
+  "settingsRuntimeKeyword": "运行环境 Node.js",
+  "settingsUsage": "用量与费用",
+  "settingsDockKeyword": "宽屏常驻右侧",
+  "settingsBubblesKeyword": "回复气泡",
+  "settingsShowThinking": "显示思考过程",
+  "settingsStreamAnimation": "流式输出动画",
+  "settingsChatTextSize": "对话文字大小",
+  "settingsTransfer": "下载与转写",
+  "settingsTransferHint": "下载速度、语音转写、课件解析",
+  "settingsConnectionsKeyword": "并发连接",
+  "settingsVideoParallel": "同时下载的视频数",
+  "settingsRateLimit": "总速度上限",
+  "settingsStream": "下载哪个画面",
+  "settingsAsrChannels": "转写渠道",
+  "settingsLocalModels": "本地模型",
+  "settingsMineru": "MinerU 课件解析",
+  "settingsKnowledge": "知识库",
+  "settingsKnowledgeHint": "课程库、Obsidian、Notion",
+  "settingsLibraryLocation": "课程库位置",
+  "settingsSkillExport": "技能格式导出",
+  "settingsData": "数据与同步",
+  "settingsDataHint": "WebDAV 同步、备份恢复、存储空间",
+  "settingsSyncMedia": "同步视频",
+  "settingsCleanCache": "清理缓存",
+  "commonNotifications": "通知",
+  "settingsNotificationsHint": "新回放、新课次与自动检查",
+  "settingsWatchKeyword": "自动检查新回放",
+  "settingsRemindersKeyword": "提醒",
+  "settingsDiagnostics": "诊断",
+  "settingsDiagnosticsHint": "后台状态与日志",
+  "settingsDaemonKeyword": "后台服务",
+  "settingsRestartKeyword": "重启后台服务",
+  "settingsSearch": "搜索设置",
+  "commonClear": "清除",
+  "settingsNoMatch": "没有和「{value}」相关的设置",
+  "@settingsNoMatch": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "settingsSchoolCanvas": "学校与 Canvas",
+  "settingsAppearanceGroup": "外观",
+  "settingsWatchGroup": "通知与自动刷新",
+  "commonUnlimited": "不限",
+  "settingsConnections": "单个视频的并发连接",
+  "settingsConnectionsHint": "分段并行下载，支持断点续传；校园网瓶颈时增加连接帮助有限",
+  "settingsConnectionsValue": "{value} 路",
+  "@settingsConnectionsValue": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "settingsVideoParallelValue": "{value} 个",
+  "@settingsVideoParallelValue": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "commonAuto": "自动",
+  "streamScreen": "屏幕",
+  "streamTeacher": "教师",
+  "streamStudent": "学生",
+  "settingsStreamHint": "自动：优先屏幕（含 PPT），没有时用第一个画面。",
+  "settingsAccountSummary": "{value} · 同济大学 · Canvas",
+  "@settingsAccountSummary": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "authSignedIn": "已登录",
+  "authSignedOut": "未登录",
+  "authRenewing": "正在续期…",
+  "authNeedsSignIn": "需要重新登录",
+  "authMethodPassword": "密码登录",
+  "authMethodSso": "统一认证静默续期",
+  "authMethodSavedPassword": "已保存的密码续期",
+  "authMethodRestored": "从本地会话恢复",
+  "profileEditTooltip": "编辑昵称和头像",
+  "schoolTongji": "同济大学",
+  "authExpires": "凭证 {value}后到期，会在到期前自动续期",
+  "@authExpires": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "authLastRenewed": "上次续期 {value}（{method}）",
+  "@authLastRenewed": {
+    "placeholders": {
+      "value": {},
+      "method": {}
+    }
+  },
+  "authPasswordSaved": "已在本机加密保存密码，统一认证失效时用于自动登录",
+  "authPasswordNotSaved": "未保存密码：统一认证会话失效后需要手动登录",
+  "authRenewed": "已续期",
+  "authRenewFailed": "续期失败：{e}",
+  "@authRenewFailed": {
+    "placeholders": {
+      "e": {}
+    }
+  },
+  "authSignOutTitle": "退出登录？",
+  "authSignOutBody": "会清除本机保存的会话和密码。已下载的文件不受影响。",
+  "authSignOutAction": "退出",
+  "themeSystem": "跟随系统",
+  "themeLight": "浅色",
+  "themeDark": "深色",
+  "settingsUseSystemAccent": "使用系统强调色",
+  "settingsUseSystemAccentHint": "从系统主题取色生成配色",
+  "settingsBoostSpeedHint": "长按画面或按住 → 键临时加速",
+  "settingsSeekStep": "快进 / 快退步长",
+  "commonSecondsValue": "{seekStepSec} 秒",
+  "@commonSecondsValue": {
+    "placeholders": {
+      "seekStepSec": {}
+    }
+  },
+  "settingsShowSubtitlesHint": "有文字稿时显示字幕",
+  "settingsSlidesFollowHint": "PPT 跟随播放进度",
+  "settingsShortcutsBody": "快捷键：空格 播放/暂停 · ←/→ 快退/快进 · ↑/↓ 音量 · [ ] 倍速 · F 全屏 · C 字幕 · B 书签 · P 侧栏 · M 静音",
+  "commonNotConfigured": "未配置",
+  "settingsBotHint": "常驻 bot 的形象、记忆与学习方式",
+  "settingsRuntime": "运行环境",
+  "settingsRuntimeReady": "Node.js 与 Pi SDK 已就绪",
+  "settingsRuntimeMissing": "助手未运行 · 检查或安装 Node.js 与 Pi SDK",
+  "settingsUsageHint": "按模型、用途和对话查看 token 与估算费用",
+  "settingsTasksHint": "让助手按计划复盘、出题、汇总截止事项",
+  "settingsDock": "宽屏时常驻在右侧",
+  "settingsBubbles": "回复使用气泡",
+  "streamFade": "淡入",
+  "streamBlur": "模糊显现",
+  "streamTypewriter": "打字机",
+  "streamWave": "波浪",
+  "visionNative": "当前模型可以直接看 PPT 和插图{value}",
+  "@visionNative": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "visionNativeFallback": "；换成纯文本模型时使用 {vision}",
+  "@visionNativeFallback": {
+    "placeholders": {
+      "vision": {}
+    }
+  },
+  "visionNeeded": "当前模型不能看图。选一个识图模型，助手写笔记时才能核对 PPT 和课件插图",
+  "visionUsing": "{vision} · 为纯文本模型转写 PPT 和插图",
+  "@visionUsing": {
+    "placeholders": {
+      "vision": {}
+    }
+  },
+  "visionUnavailable": "{vision} 不可用（检查服务商密钥）",
+  "@visionUnavailable": {
+    "placeholders": {
+      "vision": {}
+    }
+  },
+  "visionBody": "只用来把 PPT 和课件插图转写成文字，交给不能看图的对话模型。结果按图片缓存，同一张图只识别一次。",
+  "visionNone": "不使用",
+  "visionNoModels": "已配置的服务商里没有支持图片输入的模型。",
+  "commonImage": "图片",
+  "profileImageFailed": "无法使用这张图片：{e}",
+  "@profileImageFailed": {
+    "placeholders": {
+      "e": {}
+    }
+  },
+  "profilePickEmoji": "选择表情",
+  "profileFromFile": "从图片文件…",
+  "profileFromUrl": "输入图片链接…",
+  "profileFromQq": "使用 QQ 头像…",
+  "profileRandomShape": "随机生成图形",
+  "profileResetInitial": "重置为首字",
+  "profileTitle": "个人资料",
+  "profileLocalOnly": "昵称和头像只保存在本机",
+  "profileNickname": "昵称",
+  "profileNicknameHelper": "留空则显示「{fallback}」",
+  "@profileNicknameHelper": {
+    "placeholders": {
+      "fallback": {}
+    }
+  },
+  "profileInspiration": "灵感",
+  "profileTapToUse": "点一下换上",
+  "profileShuffle": "换一批",
+  "profileShape": "轮廓",
+  "profileBackground": "底色",
+  "profileShowQuote": "首页显示一言",
+  "profileShowQuoteHint": "欢迎语下方展示一句文学、诗词或哲思",
+  "profileChangeAvatar": "更换头像",
+  "profileBackgroundIndex": "底色 {index}",
+  "@profileBackgroundIndex": {
+    "placeholders": {
+      "index": {}
+    }
+  },
+  "profileUseQq": "使用 QQ 头像",
+  "profileImageUrl": "图片链接",
+  "profileQqNumber": "QQ 号",
+  "profileImageAddress": "图片地址",
+  "profileQqHint": "5–12 位数字",
+  "profileQqInvalid": "请输入 5–12 位 QQ 号",
+  "profileUrlInvalid": "需要 http(s) 链接",
+  "profileQqNote": "头像从 QQ 公开头像服务加载，需要联网",
+  "commonUse": "使用",
+  "emojiStudy": "学习",
+  "emojiFaces": "表情",
+  "emojiAnimals": "动物",
+  "emojiNature": "自然",
+  "emojiFood": "食物",
+  "emojiHobbies": "爱好",
+  "profileEmojiHint": "输入或粘贴任意表情",
+  "scheduleNoTodos": "没有待办",
+  "scheduleOpenTodos": "{open} 项待办",
+  "@scheduleOpenTodos": {
+    "placeholders": {
+      "open": {}
+    }
+  },
+  "scheduleOverdue": "{overdue} 项已逾期",
+  "@scheduleOverdue": {
+    "placeholders": {
+      "overdue": {}
+    }
+  },
+  "scheduleTodos": "待办",
+  "scheduleEmpty": "还没有日程",
+  "scheduleEmptyBody": "老师在课上说到带日期的作业、考试或活动时，助手可以把它标记进来，并附上原话和录像时间点。也可以自己添加。",
+  "scheduleAdd": "添加日程",
+  "schedulePrevWeek": "上一周",
+  "schedulePrevMonth": "上个月",
+  "scheduleNextWeek": "下一周",
+  "scheduleNextMonth": "下个月",
+  "scheduleExpandMonth": "展开月历",
+  "scheduleCollapseMonth": "收起月历",
+  "scheduleDayLabel": "{month}月{day}日{value}",
+  "@scheduleDayLabel": {
+    "placeholders": {
+      "month": {},
+      "day": {},
+      "value": {}
+    }
+  },
+  "scheduleDayItems": "，{length} 项日程",
+  "@scheduleDayItems": {
+    "placeholders": {
+      "length": {}
+    }
+  },
+  "scheduleOverdueHeader": "已逾期",
+  "scheduleDayEmpty": "这天没有安排",
+  "scheduleKindExam": "考试",
+  "scheduleKindEvent": "活动",
+  "scheduleKindDeadline": "截止",
+  "commonDayAfterTomorrow": "后天",
+  "scheduleOverdueDays": "逾期 {value} 天",
+  "@scheduleOverdueDays": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "scheduleDaysLeft": "还有 {diff} 天",
+  "@scheduleDaysLeft": {
+    "placeholders": {
+      "diff": {}
+    }
+  },
+  "commonUpdateFailed": "更新失败：{e}",
+  "@commonUpdateFailed": {
+    "placeholders": {
+      "e": {}
+    }
+  },
+  "scheduleRemovedNotice": "{value}「{title}」",
+  "@scheduleRemovedNotice": {
+    "placeholders": {
+      "value": {},
+      "title": {}
+    }
+  },
+  "scheduleHiddenFromSchedule": "已从日程隐藏",
+  "commonDeleted": "已删除",
+  "scheduleOpenInCanvas": "在 Canvas 打开",
+  "scheduleHide": "从日程隐藏",
+  "scheduleJumpToSource": "跳到老师提到的地方",
+  "scheduleNew": "新建日程",
+  "scheduleEdit": "编辑日程",
+  "scheduleTitleHint": "例如：实验二报告",
+  "dateYearMonthDayWeek": "{year}年{month}月{day}日 周{value}",
+  "@dateYearMonthDayWeek": {
+    "placeholders": {
+      "year": {},
+      "month": {},
+      "day": {},
+      "value": {}
+    }
+  },
+  "scheduleDueDate": "截止日期",
+  "scheduleAllDay": "全天",
+  "scheduleNoCourse": "不关联课程",
+  "scheduleNote": "备注",
+  "scheduleNoteHint": "要求、提交方式…",
+  "scheduleAlreadyAdded": "日程里已有",
+  "scheduleMarkUndone": "标为未完成",
+  "coursewareUploadFailed": "{value} 上传失败：{e}",
+  "@coursewareUploadFailed": {
+    "placeholders": {
+      "value": {},
+      "e": {}
+    }
+  },
+  "coursewareUploadedParsing": "已上传 {ok} 个文件，正在用 MinerU 解析",
+  "@coursewareUploadedParsing": {
+    "placeholders": {
+      "ok": {}
+    }
+  },
+  "coursewareUploaded": "已上传 {ok} 个文件",
+  "@coursewareUploaded": {
+    "placeholders": {
+      "ok": {}
+    }
+  },
+  "coursewareUploadTitle": "上传这节课的课件",
+  "coursewareUploadBody": "Look 不提供课件。把老师发的 PDF、PPT、Word 传上来，MinerU 会把它解析成文字，可以全文阅读，助手也能引用。",
+  "commonChooseFiles": "选择文件",
+  "coursewareParsing": "正在解析…",
+  "commonFilesCount": "{length} 个文件",
+  "@commonFilesCount": {
+    "placeholders": {
+      "length": {}
+    }
+  },
+  "commonUpload": "上传",
+  "coursewareParsed": "已解析{value}",
+  "@coursewareParsed": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "coursewarePagesSuffix": " {pages} 页",
+  "@coursewarePagesSuffix": {
+    "placeholders": {
+      "pages": {}
+    }
+  },
+  "coursewareParseFailed": "解析失败",
+  "coursewareParseQueued": "等待解析",
+  "coursewareNotParsedState": "未解析",
+  "coursewareParseQueuedToast": "已加入解析队列",
+  "coursewareParseTooltip": "用 MinerU 解析",
+  "coursewareDeleteTitle": "删除课件？",
+  "coursewareDeleteBody": "「{name}」和它的解析结果会从课程库中删除。",
+  "@coursewareDeleteBody": {
+    "placeholders": {
+      "name": {}
+    }
+  },
+  "coursewareReadParsed": "阅读解析结果",
+  "coursewareOpenOriginal": "打开原文件",
+  "coursewareReparse": "重新解析",
+  "coursewareParse": "解析",
+  "usagePurposeChat": "对话",
+  "usagePurposeTest": "连接测试",
+  "usagePurposeMemory": "记忆沉淀",
+  "range7Days": "7 天",
+  "range30Days": "30 天",
+  "range90Days": "90 天",
+  "rangeThisYear": "今年",
+  "commonNoData": "没有数据",
+  "usageEmpty": "这段时间没有用量",
+  "usageEmptyBody": "和助手对话、生成大纲或识图后，这里会按天统计 token 和估算费用。",
+  "usageDaily": "每日用量",
+  "usageBreakdown": "明细",
+  "usageRecentCalls": "最近调用",
+  "usageCallsInRange": "{label}内的调用",
+  "@usageCallsInRange": {
+    "placeholders": {
+      "label": {}
+    }
+  },
+  "usageCost": "费用",
+  "usageChart": "图表",
+  "usageTable": "表格",
+  "usagePurpose": "用途",
+  "usageEstimatedCost": "估算费用",
+  "usageInput": "输入",
+  "usageCacheHit": "缓存命中",
+  "usageOutput": "输出",
+  "usageChartSemantics": "每日{value}柱状图，可切换为表格查看",
+  "@usageChartSemantics": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "usageTokens": "token 用量",
+  "commonNoRecords": "没有记录",
+  "usageDeletedChat": "已删除的对话",
+  "usageCalls": "{value} 次",
+  "@usageCalls": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "usageInputTokens": "输入 {value}",
+  "@usageInputTokens": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "usageLastYear": "去年同期",
+  "usagePreviousDays": "前 {days} 天",
+  "@usagePreviousDays": {
+    "placeholders": {
+      "days": {}
+    }
+  },
+  "usageNoneIn": "{span}无用量",
+  "@usageNoneIn": {
+    "placeholders": {
+      "span": {}
+    }
+  },
+  "usageSameAs": "与{span}持平",
+  "@usageSameAs": {
+    "placeholders": {
+      "span": {}
+    }
+  },
+  "usageCompare": "比{span}{value} {value2}%",
+  "@usageCompare": {
+    "placeholders": {
+      "span": {},
+      "value": {},
+      "value2": {}
+    }
+  },
+  "usageInputOutput": "输入 {value} · 输出 {value2}",
+  "@usageInputOutput": {
+    "placeholders": {
+      "value": {},
+      "value2": {}
+    }
+  },
+  "usageCallCount": "调用次数",
+  "usageFailedCalls": "失败 {value} 次",
+  "@usageFailedCalls": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "usageCacheRate": "缓存命中率",
+  "usageCacheTokens": "命中 {value} tokens",
+  "@usageCacheTokens": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "commonDate": "日期",
+  "usageCachedSuffix": "（缓存 {value}）",
+  "@usageCachedSuffix": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "usageFirstToken": "首字 {value}s",
+  "@usageFirstToken": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "usageNoCalls": "没有调用记录",
+  "activityWatching": "看课",
+  "activityReading": "阅读",
+  "activityNone": "没有学习记录",
+  "activityStudyTime": "学习 {value}",
+  "@activityStudyTime": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "activityQuizzes": "练习 {quizzes} 组",
+  "@activityQuizzes": {
+    "placeholders": {
+      "quizzes": {}
+    }
+  },
+  "activityAsks": "提问 {asks} 次",
+  "@activityAsks": {
+    "placeholders": {
+      "asks": {}
+    }
+  },
+  "activityNotes": "笔记 {value} 篇",
+  "@activityNotes": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "activityDayLabel": "{value}，{value2}",
+  "@activityDayLabel": {
+    "placeholders": {
+      "value": {},
+      "value2": {}
+    }
+  },
+  "activityHasRecord": "有学习记录",
+  "activityNoStudy": "没有学习",
+  "activityThisWeek": "本周",
+  "commonDays": "{current} 天",
+  "@commonDays": {
+    "placeholders": {
+      "current": {}
+    }
+  },
+  "activityStreak": "连续学习",
+  "activityLongestDays": "{longest} 天",
+  "@activityLongestDays": {
+    "placeholders": {
+      "longest": {}
+    }
+  },
+  "activityLongestStreak": "最长连续",
+  "activityEmpty": "开始看课或做题后，这里会记录你的学习足迹",
+  "activityDuration": "学习时长",
+  "activityDaysCount": "学习天数",
+  "activityActiveDays": "{activeDays} 天",
+  "@activityActiveDays": {
+    "placeholders": {
+      "activeDays": {}
+    }
+  },
+  "activityCurrentStreak": "当前连续",
+  "activityYear": "{year} 年",
+  "@activityYear": {
+    "placeholders": {
+      "year": {}
+    }
+  },
+  "activityByKind": "按类型",
+  "activityByCourse": "按课程",
+  "activityByCourseEmpty": "还没有按课程记录的学习时间",
+  "activityStatsTitle": "学习统计",
+  "activityPrevYear": "上一年",
+  "activityNextYear": "下一年",
+  "activityDaySummary": "完成练习 {quizzes} 组 · 向助手提问 {asks} 次 · 新建笔记 {notes} 篇",
+  "@activityDaySummary": {
+    "placeholders": {
+      "quizzes": {},
+      "asks": {},
+      "notes": {}
+    }
+  },
+  "activityQuizzesDone": "完成练习 {quizzes} 组",
+  "@activityQuizzesDone": {
+    "placeholders": {
+      "quizzes": {}
+    }
+  },
+  "activityNotesCreated": "新建笔记 {notesCreated} 篇",
+  "@activityNotesCreated": {
+    "placeholders": {
+      "notesCreated": {}
+    }
+  },
+  "activityNotesEdited": "编辑笔记 {notesEdited} 篇",
+  "@activityNotesEdited": {
+    "placeholders": {
+      "notesEdited": {}
+    }
+  },
+  "activityTranscripts": "完成转写 {transcripts} 节",
+  "@activityTranscripts": {
+    "placeholders": {
+      "transcripts": {}
+    }
+  },
+  "activityUntimed": "没有计时的学习",
+  "activityDayEmpty": "这天没有学习记录",
+  "activityTranscriptsHeader": "完成转写",
+  "practiceScoreNotSaved": "成绩没有保存：{e}",
+  "@practiceScoreNotSaved": {
+    "placeholders": {
+      "e": {}
+    }
+  },
+  "practiceOption": "{value}「{text}」",
+  "@practiceOption": {
+    "placeholders": {
+      "value": {},
+      "text": {}
+    }
+  },
+  "promptExplainQuestion": "讲解练习「{title}」第 {value} 题：{stem}\n选项：{value2}\n我选了 {value3}，正确答案是 {value4}。{value5}{value6}",
+  "@promptExplainQuestion": {
+    "placeholders": {
+      "title": {},
+      "value": {},
+      "stem": {},
+      "value2": {},
+      "value3": {},
+      "value4": {},
+      "value5": {},
+      "value6": {}
+    }
+  },
+  "promptRetryWrong": "根据我在练习「{title}」（id {id}）中做错的题，针对这些知识点再出一组练习题。",
+  "@promptRetryWrong": {
+    "placeholders": {
+      "title": {},
+      "id": {}
+    }
+  },
+  "practiceRetryTitle": "重做错题 · {title}",
+  "@practiceRetryTitle": {
+    "placeholders": {
+      "title": {}
+    }
+  },
+  "practiceQuestionNumber": "第 {number} 题",
+  "@practiceQuestionNumber": {
+    "placeholders": {
+      "number": {}
+    }
+  },
+  "practiceHint": "提示",
+  "practiceExplain": "讲解",
+  "practiceSource": "查看出处",
+  "practicePrevious": "上一题",
+  "practiceBackToSummary": "返回总结",
+  "practiceNext": "下一题",
+  "practiceCorrectAnswer": "正确答案",
+  "practiceYourChoice": "你的选择",
+  "practiceOptionLabel": "选项 {letter}{value}",
+  "@practiceOptionLabel": {
+    "placeholders": {
+      "letter": {},
+      "value": {}
+    }
+  },
+  "practiceOptionNote": "，{note}",
+  "@practiceOptionNote": {
+    "placeholders": {
+      "note": {}
+    }
+  },
+  "practiceSecondsSuffix": " {value} 秒",
+  "@practiceSecondsSuffix": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "practiceRetryDone": "重做完成",
+  "practiceDone": "练习完成",
+  "practiceScoreSemantics": "答对 {correct} 题，共 {length} 题",
+  "@practiceScoreSemantics": {
+    "placeholders": {
+      "correct": {},
+      "length": {}
+    }
+  },
+  "practiceAccuracy": "正确率 {value}%",
+  "@practiceAccuracy": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "practiceTime": "用时 {time}",
+  "@practiceTime": {
+    "placeholders": {
+      "time": {}
+    }
+  },
+  "commonSavingShort": "正在保存",
+  "practiceBest": "最好成绩 {label}",
+  "@practiceBest": {
+    "placeholders": {
+      "label": {}
+    }
+  },
+  "practiceRetryWrong": "重做错题 {length}",
+  "@practiceRetryWrong": {
+    "placeholders": {
+      "length": {}
+    }
+  },
+  "practiceMoreOnWrong": "再出一组（针对错题）",
+  "practiceByTopic": "按知识点",
+  "practiceReview": "逐题回顾",
+  "practiceCorrect": "答对",
+  "practiceUnanswered": "未作答",
+  "practiceWrong": "答错",
+  "quizCount": "{count} 题",
+  "@quizCount": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "quizEasy": "简单",
+  "quizHard": "困难",
+  "quizMedium": "中等",
+  "quizAssistantBusy": "助手正在回复，请稍后再试",
+  "quizAssistantNotReady": "助手还没有就绪",
+  "quizNone": "还没有练习",
+  "quizBestAttempts": "最好 {label} · 练过 {attempts} 次",
+  "@quizBestAttempts": {
+    "placeholders": {
+      "label": {},
+      "attempts": {}
+    }
+  },
+  "quizStart": "开始练习",
+  "quizAgain": "再练一次",
+  "promptCreateQuiz": "请为这节课（lecture_id {lectureId}）出 {count} 道{value}难度的选择题，保存为练习{value2}。",
+  "@promptCreateQuiz": {
+    "placeholders": {
+      "lectureId": {},
+      "count": {},
+      "value": {},
+      "value2": {}
+    }
+  },
+  "quizCreateTitle": "出题练习",
+  "quizCreateHint": "助手会先读完字幕并核对 PPT 与课件，每道题都附出处和解析。",
+  "quizSize": "题量",
+  "quizQuestions": "{n} 题",
+  "@quizQuestions": {
+    "placeholders": {
+      "n": {}
+    }
+  },
+  "quizDifficulty": "难度",
+  "quizFocus": "侧重（可选）",
+  "quizFocusHint": "例如：卷积的性质、例题的解法",
+  "quizCreate": "让助手出题",
+  "pluginError": "{pluginTitle}：{value}",
+  "@pluginError": {
+    "placeholders": {
+      "pluginTitle": {},
+      "value": {}
+    }
+  },
+  "pluginViewList": "清单",
+  "pluginViewUnknown": "「{kind}」视图",
+  "@pluginViewUnknown": {
+    "placeholders": {
+      "kind": {}
+    }
+  },
+  "pluginViewUnsupported": "当前版本的应用还不能显示这种视图，更新应用后即可查看",
+  "pluginViewAlternative": "换种方式看",
+  "pluginSlotNoteToolbar": "笔记工具栏",
+  "pluginSlotLectureMenu": "课次菜单",
+  "pluginSlotCourseMenu": "课程菜单",
+  "pluginSlotScheduleItem": "日程条目",
+  "pluginSlotAssignment": "作业页",
+  "pluginSlotComposer": "输入框的「+」菜单",
+  "pluginsAllowThirdPartyTitle": "允许第三方插件？",
+  "pluginsAllowThirdPartyBody": "第三方插件不是 Look Studio 发布的，与助手运行在同一进程中。只安装你信任的作者的插件；每次安装前都会列出它需要的权限。",
+  "commonAllow": "允许",
+  "pluginsInstalled": "已安装的插件",
+  "pluginsAfterAssistant": "助手启动后可用",
+  "pluginsNoneInstalled": "还没有安装插件",
+  "pluginsEnabledSummary": "{on} 个已启用{value}",
+  "@pluginsEnabledSummary": {
+    "placeholders": {
+      "on": {},
+      "value": {}
+    }
+  },
+  "pluginsAttentionSuffix": " · {attention} 个需要处理",
+  "@pluginsAttentionSuffix": {
+    "placeholders": {
+      "attention": {}
+    }
+  },
+  "pluginsTagline": "引导式提问、思维导图、闪卡复习……让助手学会新本事",
+  "pluginsNeedAssistant": "插件在助手里运行，助手启动后就能浏览和管理插件。",
+  "pluginsSubtitle": "让助手学会新本事：换一种方式讲题、把笔记画成导图、连接你常用的工具",
+  "pluginsInstalledCount": "{n} 个已安装",
+  "@pluginsInstalledCount": {
+    "placeholders": {
+      "n": {}
+    }
+  },
+  "pluginsEnabledCount": "{on} 个启用",
+  "@pluginsEnabledCount": {
+    "placeholders": {
+      "on": {}
+    }
+  },
+  "pluginsAttentionCount": "{attention} 个需要处理",
+  "@pluginsAttentionCount": {
+    "placeholders": {
+      "attention": {}
+    }
+  },
+  "pluginsUpdatesCount": "{updates} 个可更新",
+  "@pluginsUpdatesCount": {
+    "placeholders": {
+      "updates": {}
+    }
+  },
+  "pluginsDiscoverTab": "发现",
+  "pluginsInstalledTab": "已安装 {n}",
+  "@pluginsInstalledTab": {
+    "placeholders": {
+      "n": {}
+    }
+  },
+  "pluginsOtherSource": "其他来源",
+  "pluginsSearch": "搜索插件",
+  "pluginsCatalogErrors": "有 {length} 个插件目录无法加载",
+  "@pluginsCatalogErrors": {
+    "placeholders": {
+      "length": {}
+    }
+  },
+  "pluginsNoMatch": "没有找到插件",
+  "pluginsNoMatchBody": "换个关键词，或在「来源」里添加更多插件目录",
+  "pluginsOfficial": "Look Studio 官方",
+  "pluginsMoreHint": "想要更多？允许第三方插件后，可以添加社区的插件目录，或从文件夹、npm、Git 安装。安装前都会列出它需要的权限。",
+  "pluginsEmptyBody": "在「发现」里挑几个：换一种方式讲题、把笔记画成导图、连接你常用的工具。",
+  "pluginsGoDiscover": "去发现",
+  "pluginsAllowThirdParty": "允许第三方插件",
+  "pluginsCatalogs": "插件目录…",
+  "pluginsInstallFrom": "从文件夹、npm 或 Git 安装…",
+  "pluginsSources": "插件来源",
+  "pluginsSourcesTab": "来源",
+  "pluginsNeedsGrant": "需要授权",
+  "pluginsErrored": "出错",
+  "pluginsUpdatable": "可更新",
+  "pluginsFeatured": "精选",
+  "commonInstall": "安装",
+  "pluginsInstallOther": "从其他来源安装",
+  "commonFolder": "文件夹",
+  "pluginsPinnedVersion": "需要写明固定版本",
+  "commonNext": "下一步",
+  "pluginsCatalog": "插件目录",
+  "pluginsBundled": "随应用提供",
+  "pluginsLoadFailed": "加载失败：{value}",
+  "@pluginsLoadFailed": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "pluginsCatalogHint": "owner/repo 或 https://…/look-catalog.json",
+  "pluginsFetching": "正在获取插件…",
+  "pluginsFetchFailed": "无法获取插件：{value}",
+  "@pluginsFetchFailed": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "pluginsInstalling": "正在安装…",
+  "pluginsInstalledLoadFailed": "已安装，但加载失败：{value}",
+  "@pluginsInstalledLoadFailed": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "pluginsInstalledToast": "已安装「{value}」",
+  "@pluginsInstalledToast": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "pluginsInstallFailed": "安装失败：{value}",
+  "@pluginsInstallFailed": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "pluginsInstallTitle": "安装「{value}」？",
+  "@pluginsInstallTitle": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "pluginsUpdateTitle": "更新「{value}」？",
+  "@pluginsUpdateTitle": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "pluginsCurrentVersion": "当前 v{value}",
+  "@pluginsCurrentVersion": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "pluginsThirdPartyWarning": "第三方插件，来源：{value}。它与助手运行在同一进程中，请确认你信任作者。",
+  "@pluginsThirdPartyWarning": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "pluginsNoPermissions": "不需要额外权限",
+  "pluginsWillBeAble": "它将可以",
+  "pluginsNewPermissions": "新增",
+  "pluginsContribAlternative": "笔记的「换种方式看」",
+  "pluginsContribExport": "{value}导出菜单",
+  "@pluginsContribExport": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "pluginsContribPage": "插件页面",
+  "pluginsVersionAvailable": "v{value} 可用",
+  "@pluginsVersionAvailable": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "pluginsReviewGrant": "查看并授权",
+  "commonUninstall": "卸载",
+  "pluginsHomepage": "主页",
+  "pluginsTryAsking": "试试这样问",
+  "pluginsTryAfterEnable": "启用后可以这样问",
+  "pluginsCapabilities": "助手获得的能力",
+  "pluginsAppearsIn": "会出现在",
+  "pluginsPermissions": "权限",
+  "pluginsGuidanceOnly": "只在对话中提供指导与工具",
+  "pluginsSettingsSaved": "设置已保存",
+  "pluginsSource": "来源：{value}",
+  "@pluginsSource": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "pluginsUninstallTitle": "卸载「{value}」？",
+  "@pluginsUninstallTitle": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "pluginsUninstallBody": "插件保存的数据会一起删除。已经生成的笔记、练习等内容不受影响。",
+  "pluginsSettingRequired": "请输入{value}",
+  "@pluginsSettingRequired": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "pluginsSettingText": "文字",
+  "pluginsSettingNumber": "数字",
+  "pluginsSettingRange": "应在 {value}–{value2} 之间",
+  "@pluginsSettingRange": {
+    "placeholders": {
+      "value": {},
+      "value2": {}
+    }
+  },
+  "pluginsSaveSettings": "保存设置",
+  "notificationsTooltip": "通知（{unread} 条未读）",
+  "@notificationsTooltip": {
+    "placeholders": {
+      "unread": {}
+    }
+  },
+  "notificationsClose": "关闭通知",
+  "notificationsMarkAllRead": "全部已读",
+  "notificationsIntro": "新回放、新课次、Canvas 作业和公告会出现在这里。Look Studio 打开时在后台自动检查。",
+  "notificationsEmpty": "暂时没有通知",
+  "notificationsEmptyBody": "有新回放或新作业时会第一时间提醒你",
+  "notificationsUnread": "未读",
+  "schoolEmblem": "{name}校徽",
+  "@schoolEmblem": {
+    "placeholders": {
+      "name": {}
+    }
+  },
+  "schoolOther": "其他学校",
+  "canvasConnected": "已连接 Canvas，正在同步课程和作业",
+  "canvasDisconnectTitle": "断开 Canvas？",
+  "canvasDisconnectBody": "日程里的 Canvas 作业和课程关联会一起移除，已下载的课件保留。{value}",
+  "@canvasDisconnectBody": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "canvasRevokesToken": "Look Studio 创建的访问令牌也会被撤销。",
+  "canvasConnectTitle": "连接你学校的 Canvas",
+  "canvasConnectBody": "作业会进入日程，截止前一天提醒你；课件可以直接下载到对应课程的文件夹。Look Studio 只读取，不会提交或修改任何内容。",
+  "canvasUrl": "Canvas 地址",
+  "canvasSignInMethod": "登录方式",
+  "canvasAccessToken": "访问令牌",
+  "canvasFudanId": "复旦 UIS 学号",
+  "canvasFudanPassword": "UIS 密码",
+  "canvasFudanPasswordHelper": "用本机密钥加密保存，只用来登录复旦 UIS",
+  "canvasNeedsTongji": "需要先在 Look Studio 登录同济统一身份认证。",
+  "canvasTongjiTitle": "沿用 Look Studio 的同济登录",
+  "canvasFudanTitle": "用复旦 UIS 登录 Canvas",
+  "canvasTongjiBody": "不在 Canvas 账户里创建任何东西。Canvas 的登录过期时，会用和 Look 相同的方式自动续上：先静默单点登录，必要时用你记住的密码。",
+  "canvasFudanBody": "不在 Canvas 账户里创建任何东西。Canvas 的登录过期时，会用保存的 UIS 账号自动重新登录。",
+  "canvasAutoTokenTitle": "由 Look Studio 创建并自动续期",
+  "canvasAutoTokenBody": "通过统一身份认证在你的 Canvas 账户里新建一个 90 天的访问令牌，到期前 14 天自动换新，断开时撤销",
+  "canvasManualToken": "手动获取令牌",
+  "canvasTokenStep1": "打开 Canvas，进入「账户 → 设置」",
+  "canvasTokenStep2": "在「已批准的集成」下点「新建访问许可证」，用途填 Look Studio；过期日期可以留空",
+  "canvasTokenStep3": "复制生成的令牌（只显示一次），粘贴到下面",
+  "canvasOpenSettings": "打开 Canvas 设置页",
+  "canvasTokenHelper": "加密保存在本机，界面上只显示末 4 位。令牌到期或被撤销时会提醒你重新粘贴",
+  "canvasSessionAuth": "统一身份认证会话 · 过期自动续上",
+  "canvasTokenTail": "访问令牌 ····{value}",
+  "@canvasTokenTail": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "canvasAutoRenew": "自动续期",
+  "canvasTokenExpires": "{value}到期 {value2}",
+  "@canvasTokenExpires": {
+    "placeholders": {
+      "value": {},
+      "value2": {}
+    }
+  },
+  "canvasCurrentToken": "当前令牌",
+  "canvasConnectedAs": "已连接为 {value}",
+  "@canvasConnectedAs": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "canvasNotSynced": "还没有同步",
+  "canvasSyncInterval": "每 15 分钟自动同步",
+  "canvasSummary": "{length} 门课程 · {open} 项作业待交",
+  "@canvasSummary": {
+    "placeholders": {
+      "length": {},
+      "open": {}
+    }
+  },
+  "canvasChangeMethod": "更改登录方式",
+  "canvasCourseLinks": "课程关联",
+  "canvasCourseLinksBody": "作业按关联的 Look 课程归类，课件会下载到那门课的文件夹。同名课程会自动关联。",
+  "canvasLoadingCourses": "正在读取课程…",
+  "canvasNoCourses": "这个学期在 Canvas 上没有课程",
+  "canvasLookReplay": "Look 录播",
+  "canvasAnySite": "任意 Canvas 站点，用访问令牌",
+  "canvasNoLink": "不关联",
+  "canvasAutoNoMatch": "自动：未找到同名课程",
+  "canvasAutoMatch": "自动：{title}",
+  "@canvasAutoMatch": {
+    "placeholders": {
+      "title": {}
+    }
+  },
+  "canvasOpenAssignments": "{open} 项作业待交",
+  "@canvasOpenAssignments": {
+    "placeholders": {
+      "open": {}
+    }
+  },
+  "canvasNoOpenAssignments": "没有待交作业",
+  "canvasLinkCourse": "关联到 Look 课程",
+  "canvasAutoLink": "自动匹配同名课程",
+  "canvasSchoolConnected": "{value} Canvas 已连接",
+  "@canvasSchoolConnected": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "canvasConnect": "连接 Canvas",
+  "canvasEntryHint": "同济、复旦或其他学校的 Canvas：作业进日程，课件下载到课程文件夹",
+  "dateMonthDayTime": "{month}月{day}日 {value}:{value2}",
+  "@dateMonthDayTime": {
+    "placeholders": {
+      "month": {},
+      "day": {},
+      "value": {},
+      "value2": {}
+    }
+  },
+  "assignmentGradedScore": "已批改 · {value} 分",
+  "@assignmentGradedScore": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "assignmentGraded": "已批改",
+  "assignmentMissing": "已截止 · 未提交",
+  "assignmentTimeLeft": "还剩 {value}",
+  "@assignmentTimeLeft": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "assignmentNoDue": "没有截止时间",
+  "assignmentOpenCount": "{length} 项待交",
+  "@assignmentOpenCount": {
+    "placeholders": {
+      "length": {}
+    }
+  },
+  "assignmentDue": "截止 {value} · {label}",
+  "@assignmentDue": {
+    "placeholders": {
+      "value": {},
+      "label": {}
+    }
+  },
+  "canvasAssignmentsTab": "作业 {length}",
+  "@canvasAssignmentsTab": {
+    "placeholders": {
+      "length": {}
+    }
+  },
+  "canvasAnnouncementsTab": "公告 {length}",
+  "@canvasAnnouncementsTab": {
+    "placeholders": {
+      "length": {}
+    }
+  },
+  "canvasSavedToCourse": "已保存到课程文件夹",
+  "commonDownloadFailed": "下载失败：{e}",
+  "@commonDownloadFailed": {
+    "placeholders": {
+      "e": {}
+    }
+  },
+  "canvasAnnouncement": "公告",
+  "canvasNoAssignments": "没有作业",
+  "canvasNoAssignmentsBody": "老师在 Canvas 上布置作业后，会出现在这里和日程里。",
+  "assignmentDueShort": "截止 {value}",
+  "@assignmentDueShort": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "assignmentPoints": "{pts} 分",
+  "@assignmentPoints": {
+    "placeholders": {
+      "pts": {}
+    }
+  },
+  "canvasLoadingFiles": "正在读取 Canvas 课件",
+  "canvasNoFiles": "没有可见的课件",
+  "canvasNoFilesBody": "这门课的文件页和单元里都没有你能下载的文件。",
+  "canvasFileUpdated": "{month}月{day}日更新",
+  "@canvasFileUpdated": {
+    "placeholders": {
+      "month": {},
+      "day": {}
+    }
+  },
+  "canvasFileLocked": "老师已锁定",
+  "canvasDownloadToCourse": "下载到课程文件夹",
+  "canvasNoAnnouncements": "最近 30 天没有公告",
+  "workspaceTitle": "准备 Linux 工作区",
+  "workspaceBody": "Look Studio 在手机上运行一个精简的 Ubuntu 环境，下载、转写、同步和助手都在里面工作，和电脑版一样。首次需要下载约 30 MB，安装后占用约 140 MB，只保存在本应用内。",
+  "workspacePreparing": "正在准备",
+  "workspaceStart": "开始准备",
+  "workspaceUninstallNote": "需要联网。卸载应用会删除工作区和其中的课程库；可以先在「设置 → 数据与同步」导出备份。",
+  "workspaceConnecting": "正在连接镜像…",
+  "workspaceFfmpegInstalled": "已安装 ffmpeg。",
+  "navCourses": "课程列表",
+  "navTasks": "定时",
+  "shellProfileTooltip": "{value} · 个人资料",
+  "@shellProfileTooltip": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "shellSessionExpired": "登录已过期，自动续期没有成功。点这里重新登录。",
+  "appDaemonFailed": "后台服务无法启动",
+  "appRestart": "重新启动",
+  "homeDate": "{month}月{day}日 · 周{wd}",
+  "@homeDate": {
+    "placeholders": {
+      "month": {},
+      "day": {},
+      "wd": {}
+    }
+  },
+  "quizFocusAll": "，覆盖整节课的重点",
+  "quizFocusOn": "，侧重：{focus}",
+  "@quizFocusOn": {
+    "placeholders": {
+      "focus": {}
+    }
+  },
+  "practiceAskWhyRight": "请讲讲背后的原理，帮我巩固。",
+  "practiceAskWhyWrong": "请解释为什么错，以及我可能混淆了什么。",
+  "practiceSourceRef": "出处：{ref}",
+  "@practiceSourceRef": {
+    "placeholders": {
+      "ref": {}
+    }
+  },
+  "practiceOptionSeparator": "；",
+  "backupFromDevice": "自 {device}",
+  "@backupFromDevice": {
+    "placeholders": {
+      "device": {}
+    }
+  },
+  "contextCacheHit": " · 缓存命中 {value}",
+  "@contextCacheHit": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "noteEmptyPreview": "_（空）_",
+  "outlineChapterLine": "{start}-{end}：{title}",
+  "@outlineChapterLine": {
+    "placeholders": {
+      "start": {},
+      "end": {},
+      "title": {}
+    }
+  },
+  "downloadsSelectJobs": "选择任务",
+  "downloadsSelectedCount": "已选 {n} 项",
+  "@downloadsSelectedCount": {
+    "placeholders": {
+      "n": {}
+    }
+  },
+  "downloadsExitSelection": "退出选择",
+  "downloadsSelectNone": "全不选",
+  "downloadsCancelTitle": "取消 {n} 个下载？",
+  "@downloadsCancelTitle": {
+    "placeholders": {
+      "n": {}
+    }
+  },
+  "downloadsCancelBody": "已下载的部分会保留，之后在课程里重新下载会从断点继续。",
+  "downloadsCancelConfirm": "取消下载",
+  "downloadsKeep": "保留下载",
+  "downloadsPercent": "{value}%",
+  "@downloadsPercent": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "downloadsSizeProgress": "{done} / {total}",
+  "@downloadsSizeProgress": {
+    "placeholders": {
+      "done": {},
+      "total": {}
+    }
+  },
+  "downloadsPausedSummary": "{n} 个任务已暂停",
+  "@downloadsPausedSummary": {
+    "placeholders": {
+      "n": {}
+    }
+  }
+}

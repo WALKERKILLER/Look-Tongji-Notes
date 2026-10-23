@@ -12,13 +12,14 @@ import '../../core/open_path.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/states.dart';
 import '../library/note_reader.dart';
+import '../../l10n/l10n.dart';
 
 const kCoursewareExts = ['pdf', 'ppt', 'pptx', 'doc', 'docx', 'xls', 'xlsx', 'png', 'jpg', 'jpeg', 'webp'];
 
 /// Lets the user pick documents and uploads them to a lecture. lookd queues
 /// MinerU parsing when automatic parsing is on.
 Future<int> pickAndUploadCourseware(BuildContext context, String lectureId) async {
-  final files = await openFiles(acceptedTypeGroups: const [XTypeGroup(label: '课件', extensions: kCoursewareExts)]);
+  final files = await openFiles(acceptedTypeGroups: [XTypeGroup(label: l10n.assetCourseware, extensions: kCoursewareExts)]);
   if (files.isEmpty || !context.mounted) return 0;
   final api = context.read<AppState>().api;
   var ok = 0;
@@ -30,10 +31,10 @@ Future<int> pickAndUploadCourseware(BuildContext context, String lectureId) asyn
       ok++;
       queued = queued || (r is Map && r['parse_queued'] == true);
     } catch (e) {
-      if (context.mounted) showSnack(context, '${p.basename(f.path)} 上传失败：$e');
+      if (context.mounted) showSnack(context, l10n.coursewareUploadFailed(p.basename(f.path), e));
     }
   }
-  if (ok > 0 && context.mounted) showSnack(context, queued ? '已上传 $ok 个文件，正在用 MinerU 解析' : '已上传 $ok 个文件');
+  if (ok > 0 && context.mounted) showSnack(context, queued ? l10n.coursewareUploadedParsing(ok) : l10n.coursewareUploaded(ok));
   return ok;
 }
 
@@ -85,14 +86,14 @@ class CoursewareList extends StatelessWidget {
     if (files.isEmpty) {
       return EmptyState(
         icon: Icons.upload_file_rounded,
-        title: '上传这节课的课件',
-        body: 'Look 不提供课件。把老师发的 PDF、PPT、Word 传上来，MinerU 会把它解析成文字，可以全文阅读，助手也能引用。',
+        title: l10n.coursewareUploadTitle,
+        body: l10n.coursewareUploadBody,
         action: FilledButton.tonalIcon(
           onPressed: () async {
             if (await pickAndUploadCourseware(context, lectureId) > 0) onChanged();
           },
           icon: const Icon(Icons.add_rounded),
-          label: const Text('选择文件'),
+          label: Text(l10n.commonChooseFiles),
         ),
       );
     }
@@ -101,14 +102,14 @@ class CoursewareList extends StatelessWidget {
     return ListView(padding: const EdgeInsets.fromLTRB(Space.md, Space.sm, Space.md, Space.xxl), children: [
       Row(children: [
         Expanded(
-          child: Text(parsing ? job.stage.isEmpty ? '正在解析…' : job.stage : '${files.length} 个文件', style: tt.labelLarge?.copyWith(color: cs.onSurfaceVariant)),
+          child: Text(parsing ? job.stage.isEmpty ? l10n.coursewareParsing : job.stage : l10n.commonFilesCount(files.length), style: tt.labelLarge?.copyWith(color: cs.onSurfaceVariant)),
         ),
         TextButton.icon(
           onPressed: () async {
             if (await pickAndUploadCourseware(context, lectureId) > 0) onChanged();
           },
           icon: const Icon(Icons.upload_rounded, size: 18),
-          label: const Text('上传'),
+          label: Text(l10n.commonUpload),
         ),
       ]),
       if (parsing) Padding(padding: const EdgeInsets.only(bottom: Space.sm), child: LinearProgressIndicator(value: job.progress > 0 ? job.progress : null, borderRadius: BorderRadius.circular(2))),
@@ -130,13 +131,13 @@ class _FileCard extends StatelessWidget {
     final tt = Theme.of(context).textTheme;
     final app = context.read<AppState>();
     final (status, color) = switch (file.parseState) {
-      'done' => ('已解析${file.pages > 0 ? ' ${file.pages} 页' : ''}', cs.primary),
-      'failed' => ('解析失败', cs.error),
-      _ => (parsing ? '等待解析' : '未解析', cs.onSurfaceVariant),
+      'done' => (l10n.coursewareParsed(file.pages > 0 ? l10n.coursewarePagesSuffix(file.pages) : ''), cs.primary),
+      'failed' => (l10n.coursewareParseFailed, cs.error),
+      _ => (parsing ? l10n.coursewareParseQueued : l10n.coursewareNotParsedState, cs.onSurfaceVariant),
     };
     Future<void> parse() async {
       await app.enqueue([lectureId], ['parse']);
-      if (context.mounted) showSnack(context, '已加入解析队列');
+      if (context.mounted) showSnack(context, l10n.coursewareParseQueuedToast);
     }
 
     return Material(
@@ -166,9 +167,9 @@ class _FileCard extends StatelessWidget {
                   Text(file.parseError, maxLines: 2, overflow: TextOverflow.ellipsis, style: tt.bodySmall?.copyWith(color: cs.error)),
               ]),
             ),
-            if (!file.parsed && !parsing) IconButton(tooltip: '用 MinerU 解析', onPressed: parse, icon: const Icon(Icons.document_scanner_outlined)),
+            if (!file.parsed && !parsing) IconButton(tooltip: l10n.coursewareParseTooltip, onPressed: parse, icon: const Icon(Icons.document_scanner_outlined)),
             PopupMenuButton<String>(
-              tooltip: '更多',
+              tooltip: l10n.commonMore,
               onSelected: (v) async {
                 switch (v) {
                   case 'read':
@@ -181,11 +182,11 @@ class _FileCard extends StatelessWidget {
                     final yes = await showDialog<bool>(
                       context: context,
                       builder: (c) => AlertDialog(
-                        title: const Text('删除课件？'),
-                        content: Text('「${file.name}」和它的解析结果会从课程库中删除。'),
+                        title: Text(l10n.coursewareDeleteTitle),
+                        content: Text(l10n.coursewareDeleteBody(file.name)),
                         actions: [
-                          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('取消')),
-                          FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('删除')),
+                          TextButton(onPressed: () => Navigator.pop(c, false), child: Text(l10n.commonCancel)),
+                          FilledButton(onPressed: () => Navigator.pop(c, true), child: Text(l10n.commonDelete)),
                         ],
                       ),
                     );
@@ -196,10 +197,10 @@ class _FileCard extends StatelessWidget {
                 }
               },
               itemBuilder: (_) => [
-                if (file.parsed) const PopupMenuItem(value: 'read', child: Text('阅读解析结果')),
-                const PopupMenuItem(value: 'open', child: Text('打开原文件')),
-                if (!parsing) PopupMenuItem(value: 'parse', child: Text(file.parsed ? '重新解析' : '解析')),
-                const PopupMenuItem(value: 'delete', child: Text('删除')),
+                if (file.parsed) PopupMenuItem(value: 'read', child: Text(l10n.coursewareReadParsed)),
+                PopupMenuItem(value: 'open', child: Text(l10n.coursewareOpenOriginal)),
+                if (!parsing) PopupMenuItem(value: 'parse', child: Text(file.parsed ? l10n.coursewareReparse : l10n.coursewareParse)),
+                PopupMenuItem(value: 'delete', child: Text(l10n.commonDelete)),
               ],
             ),
           ]),

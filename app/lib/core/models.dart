@@ -1,3 +1,4 @@
+import '../l10n/l10n.dart';
 // Plain data classes mirroring lookd JSON.
 
 int _i(dynamic v) => v is int ? v : (v is num ? v.toInt() : int.tryParse('$v') ?? 0);
@@ -45,7 +46,7 @@ class Course {
   String get termLabel {
     if (term.length != 5) return term;
     final y = int.tryParse(term.substring(0, 4)) ?? 0;
-    return term.endsWith('1') ? '$y 秋' : '${y + 1} 春';
+    return term.endsWith('1') ? l10n.termAutumn(y) : l10n.termSpring(y + 1);
   }
 }
 

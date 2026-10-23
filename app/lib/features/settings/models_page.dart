@@ -3,15 +3,14 @@ import 'package:provider/provider.dart';
 
 import '../../core/api.dart';
 import '../../theme/tokens.dart';
-import '../../widgets/horizontal_scroller.dart';
 import '../../widgets/states.dart';
 import '../assistant/assistant_controller.dart';
+import '../assistant/thinking_control.dart';
 import 'add_provider_page.dart';
 import 'model_meta.dart';
 import 'provider_presets.dart';
 import 'provider_setup_page.dart';
-
-const kThinkingLevels = [('off', '关闭'), ('minimal', '最少'), ('low', '低'), ('medium', '中'), ('high', '高'), ('xhigh', '最高')];
+import '../../l10n/l10n.dart';
 
 List<Map<String, dynamic>> providersOf(Map<String, dynamic>? models) =>
     jsonList(models?['providers']).whereType<Map>().map((e) => e.cast<String, dynamic>()).toList();
@@ -43,7 +42,7 @@ class _ModelsPageState extends State<ModelsPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('模型'),
+        title: Text(l10n.commonModel),
         actions: [
           MenuAnchor(
             menuChildren: [
@@ -58,28 +57,28 @@ class _ModelsPageState extends State<ModelsPage> {
                       if (context.mounted) showSnack(context, '$e');
                     }
                   },
-                  child: const Text('导入 Pi CLI 配置'),
+                  child: Text(l10n.modelsImportPi),
                 ),
               MenuItemButton(
                 leadingIcon: const Icon(Icons.cloud_sync_outlined),
                 onPressed: () async {
                   try {
                     await a.catalogProviders(refresh: true);
-                    if (context.mounted) showSnack(context, '已更新 models.dev 目录');
+                    if (context.mounted) showSnack(context, l10n.modelsCatalogUpdated);
                   } catch (e) {
                     if (context.mounted) showSnack(context, '$e');
                   }
                 },
-                child: const Text('更新 models.dev 目录'),
+                child: Text(l10n.modelsUpdateCatalog),
               ),
             ],
             builder: (context, c, _) => IconButton(onPressed: () => c.isOpen ? c.close() : c.open(), icon: const Icon(Icons.more_vert_rounded)),
           ),
         ],
       ),
-      floatingActionButton: m == null ? null : FloatingActionButton.extended(onPressed: _add, icon: const Icon(Icons.add_rounded), label: const Text('添加服务商')),
+      floatingActionButton: m == null ? null : FloatingActionButton.extended(onPressed: _add, icon: const Icon(Icons.add_rounded), label: Text(l10n.modelsAddProvider)),
       body: !a.ready
-          ? const EmptyState(icon: Icons.smart_toy_outlined, title: '助手还没启动', body: '启动后才能读取 Pi SDK 的模型注册表')
+          ? EmptyState(icon: Icons.smart_toy_outlined, title: l10n.modelsAssistantNotStarted, body: l10n.modelsAssistantNotStartedBody)
           : m == null
               ? (a.modelsError != null ? ErrorState(error: a.modelsError!, onRetry: a.loadModels) : const CenteredLoader())
               : ListView(padding: const EdgeInsets.fromLTRB(Space.lg, Space.sm, Space.lg, 120), children: [
@@ -93,20 +92,20 @@ class _ModelsPageState extends State<ModelsPage> {
                           color: cs.errorContainer,
                           child: Padding(
                             padding: const EdgeInsets.all(Space.lg),
-                            child: Text('配置文件有误：${m['error']}', style: TextStyle(color: cs.onErrorContainer)),
+                            child: Text(l10n.modelsConfigError(m['error']), style: TextStyle(color: cs.onErrorContainer)),
                           ),
                         ),
                       ],
                       const SizedBox(height: Space.xl),
                       Row(children: [
-                        Expanded(child: Text('已添加的服务商', style: tt.titleMedium)),
-                        TextButton.icon(onPressed: _add, icon: const Icon(Icons.add_rounded, size: 18), label: const Text('添加')),
+                        Expanded(child: Text(l10n.modelsProviders, style: tt.titleMedium)),
+                        TextButton.icon(onPressed: _add, icon: const Icon(Icons.add_rounded, size: 18), label: Text(l10n.commonAdd)),
                       ]),
                       const SizedBox(height: Space.sm),
                       if (mine.isEmpty)
                         Padding(
                           padding: const EdgeInsets.symmetric(vertical: Space.lg),
-                          child: Text('还没有服务商。点“添加服务商”，从 30 多家预设或 models.dev 目录里选择。',
+                          child: Text(l10n.modelsNoProviders,
                               style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
                         ),
                       for (final p in mine)
@@ -128,16 +127,16 @@ class _Onboarding extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
-    const steps = [
-      (Icons.storefront_outlined, '选择服务商', '30+ 预设，或 models.dev 收录的 200 多家'),
-      (Icons.key_outlined, '填入 API Key', '只保存在本机，可一键测试连接'),
-      (Icons.checklist_rounded, '挑选模型', '从服务商拉取模型列表，自动补全价格和上下文长度'),
+    final steps = [
+      (Icons.storefront_outlined, l10n.modelsStepProvider, l10n.modelsStepProviderHint),
+      (Icons.key_outlined, l10n.modelsStepKey, l10n.modelsStepKeyHint),
+      (Icons.checklist_rounded, l10n.modelsStepModels, l10n.modelsStepModelsHint),
     ];
     return Container(
       padding: const EdgeInsets.all(Space.xl),
       decoration: BoxDecoration(color: cs.primaryContainer, borderRadius: BorderRadius.circular(Corners.xlIncreased)),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('给助手接上一个模型', style: tt.headlineSmall?.copyWith(color: cs.onPrimaryContainer)),
+        Text(l10n.modelsOnboardingTitle, style: tt.headlineSmall?.copyWith(color: cs.onPrimaryContainer)),
         const SizedBox(height: Space.lg),
         for (var i = 0; i < steps.length; i++)
           Padding(
@@ -156,7 +155,7 @@ class _Onboarding extends StatelessWidget {
             ]),
           ),
         const SizedBox(height: Space.sm),
-        FilledButton.icon(onPressed: onStart, icon: const Icon(Icons.arrow_forward_rounded), label: const Text('开始')),
+        FilledButton.icon(onPressed: onStart, icon: const Icon(Icons.arrow_forward_rounded), label: Text(l10n.commonGetStarted)),
       ]),
     );
   }
@@ -187,64 +186,57 @@ class _CurrentCardState extends State<_CurrentCard> {
     final info = a.selectedModelInfo ?? const {};
     final prefs = (a.models?['prefs'] as Map?) ?? const {};
     final providerName = providersOf(a.models).firstWhere((p) => p['id'] == sel['provider'], orElse: () => {'name': sel['provider']})['name'];
-    return Container(
-      padding: const EdgeInsets.all(Space.xl),
-      decoration: BoxDecoration(color: cs.primaryContainer, borderRadius: BorderRadius.circular(Corners.xlIncreased)),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          ProviderLogo(providerId: '${sel['provider']}', name: '$providerName', size: 52),
-          const SizedBox(width: Space.lg),
-          Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('助手正在使用', style: tt.labelMedium?.copyWith(color: cs.onPrimaryContainer.withValues(alpha: 0.8))),
-              Text('${info['name'] ?? sel['model']}', style: tt.titleLarge?.copyWith(color: cs.onPrimaryContainer), maxLines: 1, overflow: TextOverflow.ellipsis),
-              Text('$providerName · ${sel['model']}', style: tt.bodySmall?.copyWith(color: cs.onPrimaryContainer.withValues(alpha: 0.75)), maxLines: 1, overflow: TextOverflow.ellipsis),
-            ]),
-          ),
-          FilledButton.tonal(onPressed: () => showModelPicker(context), child: const Text('更换')),
-        ]),
-        if (info.isNotEmpty) ...[const SizedBox(height: Space.md), ModelBadges(m: info)],
-        if (sel['reasoning'] == true) ...[
+    // A Material, not a Container, so the switch row's ink shows on it.
+    return Material(
+      color: cs.primaryContainer,
+      borderRadius: BorderRadius.circular(Corners.xlIncreased),
+      child: Padding(
+        padding: const EdgeInsets.all(Space.xl),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            ProviderLogo(providerId: '${sel['provider']}', name: '$providerName', size: 52),
+            const SizedBox(width: Space.lg),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(l10n.modelsCurrent, style: tt.labelMedium?.copyWith(color: cs.onPrimaryContainer.withValues(alpha: 0.8))),
+                Text('${info['name'] ?? sel['model']}', style: tt.titleLarge?.copyWith(color: cs.onPrimaryContainer), maxLines: 1, overflow: TextOverflow.ellipsis),
+                Text('$providerName · ${sel['model']}', style: tt.bodySmall?.copyWith(color: cs.onPrimaryContainer.withValues(alpha: 0.75)), maxLines: 1, overflow: TextOverflow.ellipsis),
+              ]),
+            ),
+            FilledButton.tonal(onPressed: () => showModelPicker(context), child: Text(l10n.commonChange)),
+          ]),
+          if (info.isNotEmpty) ...[const SizedBox(height: Space.md), ModelBadges(m: info)],
+          if (sel['reasoning'] == true) ...[
+            const SizedBox(height: Space.xl),
+            ThinkingControl(value: a.thinking, onContainer: true, onChanged: (k) => a.setPrefs({'thinking': k})),
+          ],
           const SizedBox(height: Space.lg),
-          Text('思考强度', style: tt.labelLarge?.copyWith(color: cs.onPrimaryContainer)),
-          const SizedBox(height: Space.sm),
-          HorizontalScroller(fade: true, builder: (c) => SingleChildScrollView(
-            controller: c,
-            scrollDirection: Axis.horizontal,
-            child: SegmentedButton<String>(
-              showSelectedIcon: false,
-              segments: [for (final (k, l) in kThinkingLevels) ButtonSegment(value: k, label: Text(l))],
-              selected: {a.thinking},
-              onSelectionChanged: (s) => a.setPrefs({'thinking': s.first}),
-            ),
-          )),
-        ],
-        const SizedBox(height: Space.lg),
-        TextField(
-          controller: _persona,
-          minLines: 1,
-          maxLines: 4,
-          decoration: InputDecoration(
-            labelText: '附加指令（可选）',
-            hintText: '例如：回答尽量简短；术语保留英文并附中文解释',
-            fillColor: cs.surface.withValues(alpha: 0.7),
-            suffixIcon: IconButton(
-              tooltip: '保存',
-              icon: const Icon(Icons.check_rounded),
-              onPressed: () async {
-                await a.setPrefs({'persona': _persona.text.trim()});
-                if (context.mounted) showSnack(context, '已保存附加指令');
-              },
+          TextField(
+            controller: _persona,
+            minLines: 1,
+            maxLines: 4,
+            decoration: InputDecoration(
+              labelText: l10n.modelsPersona,
+              hintText: l10n.modelsPersonaHint,
+              fillColor: cs.surface.withValues(alpha: 0.7),
+              suffixIcon: IconButton(
+                tooltip: l10n.commonSave,
+                icon: const Icon(Icons.check_rounded),
+                onPressed: () async {
+                  await a.setPrefs({'persona': _persona.text.trim()});
+                  if (context.mounted) showSnack(context, l10n.modelsPersonaSaved);
+                },
+              ),
             ),
           ),
-        ),
-        SwitchListTile(
-          contentPadding: EdgeInsets.zero,
-          value: prefs['autoTitle'] != false,
-          onChanged: (v) => a.setPrefs({'autoTitle': v}),
-          title: Text('自动为对话命名', style: TextStyle(color: cs.onPrimaryContainer)),
-        ),
-      ]),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            value: prefs['autoTitle'] != false,
+            onChanged: (v) => a.setPrefs({'autoTitle': v}),
+            title: Text(l10n.modelsAutoTitle, style: TextStyle(color: cs.onPrimaryContainer)),
+          ),
+        ]),
+      ),
     );
   }
 }
@@ -280,15 +272,15 @@ class _ProviderTile extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                       decoration: BoxDecoration(color: cs.primary, borderRadius: BorderRadius.circular(Corners.full)),
-                      child: Text('使用中', style: tt.labelSmall?.copyWith(color: cs.onPrimary)),
+                      child: Text(l10n.commonInUse, style: tt.labelSmall?.copyWith(color: cs.onPrimary)),
                     ),
                   ],
                 ]),
                 Text(
                   [
-                    p['configured'] == true ? '$available 个可用模型' : '未填写密钥',
+                    p['configured'] == true ? l10n.modelsAvailableCount(available) : l10n.modelsNoKey,
                     if ('${p['key_hint']}'.isNotEmpty) '${p['key_hint']}',
-                    if (p['custom'] == true) '自定义' else '内置',
+                    if (p['custom'] == true) l10n.commonCustom else l10n.commonBuiltIn,
                   ].join(' · '),
                   style: tt.bodySmall?.copyWith(color: p['configured'] == true ? cs.onSurfaceVariant : cs.error),
                 ),
@@ -353,7 +345,7 @@ class _ModelPickerState extends State<_ModelPicker> {
           child: SearchBar(
             controller: _q,
             autoFocus: true,
-            hintText: '搜索模型',
+            hintText: l10n.modelsSearch,
             leading: const Icon(Icons.search_rounded),
             onChanged: (_) => setState(() {}),
             elevation: const WidgetStatePropertyAll(0),
@@ -362,7 +354,7 @@ class _ModelPickerState extends State<_ModelPicker> {
         ),
         Expanded(
           child: groups.isEmpty
-              ? Center(child: Text('没有可用的模型', style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant)))
+              ? Center(child: Text(l10n.modelsNoneAvailable, style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant)))
               : ListView(controller: scroll, padding: const EdgeInsets.fromLTRB(Space.md, 0, Space.md, Space.xl), children: [
                   for (final (p, ms) in groups) ...[
                     Padding(

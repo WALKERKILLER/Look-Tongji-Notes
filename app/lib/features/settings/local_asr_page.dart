@@ -12,6 +12,7 @@ import '../../widgets/look_markdown.dart' show openPlainLink;
 import '../../widgets/pickers.dart';
 import '../../widgets/states.dart';
 import 'asr_bench.dart';
+import '../../l10n/l10n.dart';
 
 typedef _J = Map<String, dynamic>;
 
@@ -23,23 +24,23 @@ double lectureMinutes(Map<String, dynamic> model) => ((_map(model['measured'])['
 
 String _gb(num mb) => mb >= 1024 ? '${(mb / 1024).toStringAsFixed(1)} GB' : '${mb.round()} MB';
 
-const _tagLabels = {'recommended': '推荐', 'fast': '最快', 'accurate': '最准'};
+final _tagLabels = {'recommended': l10n.asrModelRecommended, 'fast': l10n.asrModelFastest, 'accurate': l10n.asrModelAccurate};
 
 /// The benchmark metrics shown on the board, in board order.
 List<BenchMetric> benchMetrics(Map<String, dynamic> reference) => [
   BenchMetric(
-    label: '错字率',
-    hint: '越短越准',
+    label: l10n.benchCer,
+    hint: l10n.benchLowerIsBetter,
     format: (v) => '${v.toStringAsFixed(1)}%',
-    source: 'WenetSpeech 会议测试集（最接近课堂录音）的字错误率，取自各模型的论文；来源不同，相差 1% 以内可视为持平',
+    source: l10n.benchCerSource,
   ),
   BenchMetric(
-    label: '转写用时',
-    hint: '一节 90 分钟的课',
-    format: (v) => '${v < 10 ? v.toStringAsFixed(1) : v.round()} 分钟',
-    source: '在 ${reference['machine'] ?? '参考机器'} 上实测（${reference['clip'] ?? ''}，含加载模型），你的电脑会有不同',
+    label: l10n.benchTime,
+    hint: l10n.benchTimeHint,
+    format: (v) => l10n.benchMinutes(v < 10 ? v.toStringAsFixed(1) : v.round()),
+    source: l10n.benchTimeSource(reference['machine'] ?? l10n.benchReferenceMachine, reference['clip'] ?? ''),
   ),
-  BenchMetric(label: '内存', hint: '识别时的峰值', format: (v) => '${v.toStringAsFixed(1)} GB', source: '同一次实测的进程峰值内存'),
+  BenchMetric(label: l10n.benchMemory, hint: l10n.benchMemoryHint, format: (v) => '${v.toStringAsFixed(1)} GB', source: l10n.benchMemorySource),
 ];
 
 List<BenchRow> benchRows(List<Map<String, dynamic>> models) => [
@@ -47,7 +48,7 @@ List<BenchRow> benchRows(List<Map<String, dynamic>> models) => [
     BenchRow(
       id: '${m['id']}',
       name: '${m['name']}',
-      tag: jsonList(m['tags']).contains('recommended') ? '推荐' : null,
+      tag: jsonList(m['tags']).contains('recommended') ? l10n.asrModelRecommended : null,
       values: [
         (_map(m['bench'])['cer'] as num?)?.toDouble(),
         lectureMinutes(m) > 0 ? lectureMinutes(m) : null,
@@ -131,7 +132,7 @@ class _LocalAsrPageState extends State<LocalAsrPage> {
       await _call('PUT', '/api/settings', {key: value});
       await _load();
     } catch (e) {
-      if (mounted) showSnack(context, '保存失败：$e');
+      if (mounted) showSnack(context, l10n.commonSaveFailed(e));
     }
   }
 
@@ -149,11 +150,11 @@ class _LocalAsrPageState extends State<LocalAsrPage> {
       context: context,
       builder: (c) => AlertDialog(
         icon: const Icon(Icons.delete_outline_rounded),
-        title: Text('删除 ${m['name']}？'),
-        content: Text('会释放 ${fmtBytes(m['size'] as num)} 空间。已经转写好的文字稿不受影响，之后可以重新下载。'),
+        title: Text(l10n.asrModelDeleteTitle(m['name'])),
+        content: Text(l10n.asrModelDeleteBody(fmtBytes(m['size'] as num))),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('取消')),
-          FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('删除')),
+          TextButton(onPressed: () => Navigator.pop(c, false), child: Text(l10n.commonCancel)),
+          FilledButton(onPressed: () => Navigator.pop(c, true), child: Text(l10n.commonDelete)),
         ],
       ),
     );
@@ -176,7 +177,7 @@ class _LocalAsrPageState extends State<LocalAsrPage> {
   /// downloaded ones should move along. [dir] skips the picker (恢复默认).
   Future<void> _relocate(_J loc, {String? dir}) async {
     final current = '${loc['dir'] ?? ''}';
-    dir ??= await pickDirectory(context, initial: current, title: '模型存储位置');
+    dir ??= await pickDirectory(context, initial: current, title: l10n.asrModelLocation);
     if (dir == null || dir == current || !mounted) return;
     var move = false;
     final used = (loc['used'] as num?) ?? 0;
@@ -191,7 +192,7 @@ class _LocalAsrPageState extends State<LocalAsrPage> {
     try {
       final st = _map(await _call('PUT', '/api/asr/local/location', {'dir': dir, 'move': move}));
       if (mounted) setState(() => _st = {...?_st, 'status': st});
-      if (!move && mounted) showSnack(context, '之后下载的模型会保存到新位置');
+      if (!move && mounted) showSnack(context, l10n.asrModelLocationChanged);
     } catch (e) {
       if (mounted) showSnack(context, '$e');
     }
@@ -201,7 +202,7 @@ class _LocalAsrPageState extends State<LocalAsrPage> {
   Widget build(BuildContext context) {
     final st = _st;
     return Scaffold(
-      appBar: AppBar(title: const Text('本地识别模型')),
+      appBar: AppBar(title: Text(l10n.asrLocalTitle)),
       body: st == null ? (_error != null ? ErrorState(error: _error!, onRetry: _load) : const CenteredLoader()) : _body(context, st),
     );
   }
@@ -211,7 +212,7 @@ class _LocalAsrPageState extends State<LocalAsrPage> {
     final cs = Theme.of(context).colorScheme;
     final status = _map(st['status']);
     if (status['supported'] != true) {
-      return EmptyState(icon: Icons.memory_rounded, title: '这台电脑暂不支持', body: '本地识别引擎没有提供 ${status['platform']} 的预编译版本，转写会继续使用免费云端渠道。');
+      return EmptyState(icon: Icons.memory_rounded, title: l10n.asrUnsupportedTitle, body: l10n.asrUnsupportedBody(status['platform']));
     }
     final models = _maps(status['models']);
     final install = _map(status['install']);
@@ -227,9 +228,9 @@ class _LocalAsrPageState extends State<LocalAsrPage> {
             children: [
               _Hero(active: models.where((m) => m['id'] == active).firstOrNull, install: install, models: models),
               const SizedBox(height: Space.xl),
-              Text('怎么选', style: tt.titleMedium),
+              Text(l10n.asrHowToChoose, style: tt.titleMedium),
               const SizedBox(height: Space.xs),
-              Text('三项都是越短越好。点一行可以在下面看到详情。没有特别需求就选带 ★ 的推荐模型。', style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
+              Text(l10n.asrHowToChooseBody, style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
               const SizedBox(height: Space.md),
               Card.outlined(
                 margin: EdgeInsets.zero,
@@ -245,7 +246,7 @@ class _LocalAsrPageState extends State<LocalAsrPage> {
                 ),
               ),
               const SizedBox(height: Space.xl),
-              Text('模型', style: tt.titleMedium),
+              Text(l10n.commonModel, style: tt.titleMedium),
               const SizedBox(height: Space.sm),
               for (final m in models)
                 Padding(
@@ -266,7 +267,7 @@ class _LocalAsrPageState extends State<LocalAsrPage> {
                   ),
                 ),
               const SizedBox(height: Space.xl),
-              Text('存储位置', style: tt.titleMedium),
+              Text(l10n.asrStorage, style: tt.titleMedium),
               const SizedBox(height: Space.sm),
               _Storage(
                 loc: _map(status['location']),
@@ -275,10 +276,10 @@ class _LocalAsrPageState extends State<LocalAsrPage> {
                 onReset: () => _relocate(_map(status['location']), dir: '${_map(status['location'])['default']}'),
               ),
               const SizedBox(height: Space.xl),
-              Text('下载来源', style: tt.titleMedium),
+              Text(l10n.asrSource, style: tt.titleMedium),
               const SizedBox(height: Space.xs),
               Text(
-                '所有文件都会按目录里记录的 SHA-256 校验，来源被篡改或版本不一致时会直接报错，不会装上。中断后再次下载会从断点继续。',
+                l10n.asrSourceVerify,
                 style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
               ),
               const SizedBox(height: Space.sm),
@@ -342,7 +343,7 @@ class _Storage extends StatelessWidget {
             const SizedBox(width: Space.lg),
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(custom ? '自定义位置' : '默认位置', style: tt.labelLarge?.copyWith(color: cs.primary)),
+                Text(custom ? l10n.asrCustomLocation : l10n.asrDefaultLocation, style: tt.labelLarge?.copyWith(color: cs.primary)),
                 const SizedBox(height: Space.xxs),
                 Tooltip(
                   message: dir,
@@ -352,8 +353,8 @@ class _Storage extends StatelessWidget {
                 const SizedBox(height: Space.xs),
                 Text(
                   [
-                    '已用 ${fmtBytes(used)}',
-                    if (free >= 0) '磁盘剩余 ${fmtBytes(free)}',
+                    l10n.asrUsedSpace(fmtBytes(used)),
+                    if (free >= 0) l10n.asrFreeSpace(fmtBytes(free)),
                   ].join(' · '),
                   style: tt.bodySmall?.copyWith(color: low ? cs.error : cs.onSurfaceVariant, fontFeatures: const [FontFeature.tabularFigures()]),
                 ),
@@ -362,7 +363,7 @@ class _Storage extends StatelessWidget {
           ]),
           if (low && !moving) ...[
             const SizedBox(height: Space.md),
-            Text('这块磁盘剩余空间不多，模型可能下载不完。可以换到空间更大的磁盘。', style: tt.bodySmall?.copyWith(color: cs.error)),
+            Text(l10n.asrLowSpace, style: tt.bodySmall?.copyWith(color: cs.error)),
           ],
           if (moving) ...[
             const SizedBox(height: Space.lg),
@@ -380,19 +381,19 @@ class _Storage extends StatelessWidget {
               FilledButton.tonalIcon(
                 onPressed: running ? null : onChange,
                 icon: const Icon(Icons.drive_file_move_outline, size: 18),
-                label: const Text('更改位置'),
+                label: Text(l10n.asrChangeLocation),
               ),
               TextButton.icon(
                 onPressed: dir.isEmpty ? null : () => openPath(dir),
                 icon: const Icon(Icons.open_in_new_rounded, size: 18),
-                label: const Text('在文件管理器中打开'),
+                label: Text(l10n.commonOpenInFileManager),
               ),
             ],
-            if (custom) TextButton(onPressed: running ? null : onReset, child: const Text('恢复默认')),
+            if (custom) TextButton(onPressed: running ? null : onReset, child: Text(l10n.asrResetLocation)),
           ]),
           if (running && !moving) ...[
             const SizedBox(height: Space.xs),
-            Text('下载完成后才能更改位置', style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+            Text(l10n.asrLocationAfterDownload, style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
           ],
         ]),
       ),
@@ -413,7 +414,7 @@ class _MoveDialog extends StatelessWidget {
     final tt = Theme.of(context).textTheme;
     return AlertDialog(
       icon: const Icon(Icons.drive_file_move_outline),
-      title: const Text('把已下载的模型一起移过去？'),
+      title: Text(l10n.asrMoveTitle),
       content: SizedBox(
         width: 440,
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -423,17 +424,17 @@ class _MoveDialog extends StatelessWidget {
             child: Text(to, style: tt.bodyMedium),
           ),
           const SizedBox(height: Space.lg),
-          Text('移动：${fmtBytes(used)} 的引擎和模型会搬到新位置，旧位置随后清空。跨磁盘时需要复制一会儿，期间不能转写。',
+          Text(l10n.asrMoveBody(fmtBytes(used)),
               style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
           const SizedBox(height: Space.sm),
-          Text('只更改位置：旧文件留在原处，之后下载到新位置；新位置里已有的模型会直接可用。',
+          Text(l10n.asrChangeOnlyBody,
               style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
         ]),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('取消')),
-        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('只更改位置')),
-        FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('移动')),
+        TextButton(onPressed: () => Navigator.pop(context), child: Text(l10n.commonCancel)),
+        TextButton(onPressed: () => Navigator.pop(context, false), child: Text(l10n.asrChangeOnly)),
+        FilledButton(onPressed: () => Navigator.pop(context, true), child: Text(l10n.asrMove)),
       ],
     );
   }
@@ -453,12 +454,12 @@ class _Hero extends StatelessWidget {
     final name = running ? models.where((m) => m['id'] == install['model']).firstOrNull : null;
     final moving = running && '${install['model'] ?? ''}'.isEmpty;
     final (icon, title, body) = moving
-        ? (Icons.drive_file_move_outline, '正在移动模型', '移动完成前本地识别暂停，云端渠道照常转写。可以离开这个页面。')
+        ? (Icons.drive_file_move_outline, l10n.asrMoving, l10n.asrMovingBody)
         : active != null
-        ? (Icons.offline_bolt_rounded, '正在使用 ${active!['name']}', '转写会交给本机模型，不受限流和额度影响；开着的云端渠道也会并行分担一部分。想让音频完全不离开电脑，在“设置 → 转写”里关掉云端渠道。')
+        ? (Icons.offline_bolt_rounded, l10n.asrUsingModel(active!['name']), l10n.asrUsingModelBody)
         : running
-        ? (Icons.downloading_rounded, '正在下载 ${name?['name'] ?? '模型'}', '下载完成后会自动启用。可以离开这个页面，进度会在后台继续。')
-        : (Icons.computer_rounded, '在本机识别', '下载一个语音识别模型到这台电脑，转写不再受免费云端渠道的限流和额度影响，音频也不会离开电脑。');
+        ? (Icons.downloading_rounded, l10n.asrDownloadingModel(name?['name'] ?? l10n.commonModel), l10n.asrDownloadingModelBody)
+        : (Icons.computer_rounded, l10n.asrLocalHeroTitle, l10n.asrLocalHeroBody);
     return Container(
       padding: const EdgeInsets.all(Space.xl),
       decoration: BoxDecoration(
@@ -539,10 +540,10 @@ class _ModelCard extends StatelessWidget {
     final running = install?['state'] == 'running';
     final failed = install?['state'] == 'failed';
     final facts = [
-      '下载 ${fmtBytes(size)}',
-      if ((measured['peak_mb'] as num? ?? 0) > 0) '内存约 ${_gb(measured['peak_mb'] as num)}',
-      if (mins > 0) '90 分钟课约 ${mins < 10 ? mins.toStringAsFixed(1) : mins.round()} 分钟',
-      '错字率 ${bench['cer']}%',
+      l10n.commonDownloadSize(fmtBytes(size)),
+      if ((measured['peak_mb'] as num? ?? 0) > 0) l10n.asrModelMemory(_gb(measured['peak_mb'] as num)),
+      if (mins > 0) l10n.asrModelSpeed(mins < 10 ? mins.toStringAsFixed(1) : mins.round()),
+      l10n.asrModelCer(bench['cer']),
     ];
     return AnimatedContainer(
       duration: Motion.medium1,
@@ -570,12 +571,12 @@ class _ModelCard extends StatelessWidget {
                     Text('${m['name']}', style: tt.titleMedium),
                     for (final t in jsonList(m['tags']))
                       if (_tagLabels[t] != null) _Tag(_tagLabels[t]!, strong: t == 'recommended'),
-                    if (active) const _Tag('使用中', strong: true) else if (installed) const _Tag('已下载'),
+                    if (active) _Tag(l10n.commonInUse, strong: true) else if (installed) _Tag(l10n.commonDownloaded),
                   ],
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '${m['org']} · ${m['langs']} · ${m['punct'] == true ? '自带标点' : '自动补标点'}',
+                  '${m['org']} · ${m['langs']} · ${m['punct'] == true ? l10n.asrModelPunctuated : l10n.asrModelAutoPunctuation}',
                   style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                 ),
                 const SizedBox(height: Space.sm),
@@ -600,17 +601,17 @@ class _ModelCard extends StatelessWidget {
                                   TextButton.icon(
                                     onPressed: () => openPlainLink(context, '${bench['source_url']}'),
                                     icon: const Icon(Icons.article_outlined, size: 18),
-                                    label: Text('错字率来源：${bench['source']}'),
+                                    label: Text(l10n.asrModelCerSource(bench['source'])),
                                   ),
                                   TextButton.icon(
                                     onPressed: () => openPlainLink(context, '${m['license_url']}'),
                                     icon: const Icon(Icons.gavel_rounded, size: 18),
-                                    label: Text('许可：${m['license']}'),
+                                    label: Text(l10n.commonLicense(m['license'])),
                                   ),
                                   TextButton.icon(
                                     onPressed: () => openPlainLink(context, '${m['upstream']}'),
                                     icon: const Icon(Icons.open_in_new_rounded, size: 18),
-                                    label: const Text('原始模型'),
+                                    label: Text(l10n.asrModelOriginal),
                                   ),
                                 ],
                               ),
@@ -622,29 +623,29 @@ class _ModelCard extends StatelessWidget {
                 if (running) ...[const SizedBox(height: Space.sm), _Progress(p: install!)],
                 if (failed) ...[
                   const SizedBox(height: Space.sm),
-                  Text('下载失败：${install!['error']}', style: tt.bodySmall?.copyWith(color: cs.error)),
+                  Text(l10n.asrModelDownloadFailed(install!['error']), style: tt.bodySmall?.copyWith(color: cs.error)),
                 ],
                 const SizedBox(height: Space.sm),
                 Row(
                   children: [
                     const Spacer(),
                     if (running)
-                      OutlinedButton(onPressed: onCancel, child: const Text('暂停'))
+                      OutlinedButton(onPressed: onCancel, child: Text(l10n.commonPause))
                     else if (!installed)
                       FilledButton.icon(
                         onPressed: busy ? null : onInstall,
                         icon: const Icon(Icons.download_rounded),
                         label: Text(
-                          failed || install?['state'] == 'canceled' ? '继续下载' : '下载 ${fmtBytes(size + extra)}${extra > 0 ? '（含引擎等）' : ''}',
+                          failed || install?['state'] == 'canceled' ? l10n.asrModelResume : l10n.asrModelDownload(fmtBytes(size + extra), extra > 0 ? l10n.asrModelIncludesEngine : ''),
                         ),
                       )
                     else ...[
-                      TextButton(onPressed: onRemove, child: const Text('删除')),
+                      TextButton(onPressed: onRemove, child: Text(l10n.commonDelete)),
                       const SizedBox(width: Space.sm),
                       if (active)
-                        OutlinedButton(onPressed: onStop, child: const Text('停用'))
+                        OutlinedButton(onPressed: onStop, child: Text(l10n.commonDisable))
                       else
-                        FilledButton.tonal(onPressed: onUse, child: const Text('使用这个模型')),
+                        FilledButton.tonal(onPressed: onUse, child: Text(l10n.asrModelUse)),
                     ],
                   ],
                 ),
@@ -679,7 +680,7 @@ class _Progress extends StatelessWidget {
             '${p['step'] ?? ''}',
             if (total > 0) '${fmtBytes(done)} / ${fmtBytes(total)}',
             if (speed > 0) fmtSpeed(speed),
-            if (left != null) '还需 ${fmtDuration(left)}',
+            if (left != null) l10n.commonTimeLeft(fmtDuration(left)),
           ].where((s) => s.isNotEmpty).join(' · '),
           style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant, fontFeatures: const [FontFeature.tabularFigures()]),
         ),
@@ -705,11 +706,11 @@ class _Sources extends StatelessWidget {
   final TextEditingController custom, proxy;
   final ValueChanged<String> onSource, onCustom, onProxy;
 
-  static const _guides = {
-    'hf-mirror': '无需任何配置。hf-mirror.com 是社区维护的 Hugging Face 镜像，国内大多数网络可以直连，目录里的全部模型都能从这里下载。',
-    'modelscope': '无需账号或 Token，公开模型直接下载。魔搭上目前只有 Qwen3-ASR 0.6B 和语音检测模型有与原版逐字节相同的副本（社区用户上传），选它们时走魔搭；其余文件自动改用 HF-Mirror，下载时会提示。',
-    'huggingface': '官方源，文件最全，但国内通常需要代理。Look Studio 的后台服务会使用系统的 HTTPS_PROXY 环境变量。',
-    'custom': '适合学校、实验室或自建的 Hugging Face 兼容镜像。填写地址模板，{repo} 会换成模型仓库名，{file} 换成文件路径，例如 https://hf-mirror.com/{repo}/resolve/main/{file}。',
+  static final _guides = {
+    'hf-mirror': l10n.asrSourceHfMirror,
+    'modelscope': l10n.asrSourceModelscope,
+    'huggingface': l10n.asrSourceHuggingface,
+    'custom': l10n.asrSourceCustom,
   };
 
   @override
@@ -744,9 +745,9 @@ class _Sources extends StatelessWidget {
                 padding: const EdgeInsets.only(left: Space.lg, top: Space.sm),
                 child: TextField(
                   controller: custom,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     border: OutlineInputBorder(),
-                    labelText: '地址模板',
+                    labelText: l10n.asrSourceTemplate,
                     hintText: 'https://example.org/{repo}/resolve/main/{file}',
                   ),
                   onSubmitted: onCustom,
@@ -758,16 +759,16 @@ class _Sources extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text('识别引擎（GitHub）', style: tt.titleSmall),
+                  Text(l10n.asrEngineSource, style: tt.titleSmall),
                   const SizedBox(height: Space.xs),
                   Text(
-                    '第一次下载时会从 GitHub Releases 取 sherpa-onnx 识别引擎（约 25 MB）。GitHub 很慢时，可以填一个 GitHub 下载加速服务的前缀，实际地址为“前缀 + 原始地址”，同样会校验 SHA-256。',
+                    l10n.asrEngineSourceBody,
                     style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant, height: 1.5),
                   ),
                   const SizedBox(height: Space.sm),
                   TextField(
                     controller: proxy,
-                    decoration: const InputDecoration(border: OutlineInputBorder(), labelText: '加速前缀（可选）', hintText: 'https://…/'),
+                    decoration: InputDecoration(border: OutlineInputBorder(), labelText: l10n.asrEngineProxy, hintText: 'https://…/'),
                     onSubmitted: onProxy,
                     onTapOutside: (_) => onProxy(proxy.text),
                   ),
@@ -803,11 +804,11 @@ class _ThreadsState extends State<_Threads> {
       children: [
         Row(
           children: [
-            Expanded(child: Text('识别线程', style: tt.titleMedium)),
-            Text('$value 线程', style: tt.labelLarge?.copyWith(color: cs.primary)),
+            Expanded(child: Text(l10n.asrThreads, style: tt.titleMedium)),
+            Text(l10n.asrThreadCount(value), style: tt.labelLarge?.copyWith(color: cs.primary)),
           ],
         ),
-        Text('线程越多越快，但转写时电脑会更忙、更费电。这台电脑有 $cpus 个逻辑核心，默认用一半（最多 4 个）。', style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+        Text(l10n.asrThreadsHint(cpus), style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
         Slider(
           value: value.clamp(1, max).toDouble(),
           min: 1,

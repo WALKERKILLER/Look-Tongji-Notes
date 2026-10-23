@@ -1,13 +1,11 @@
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:gpt_markdown/gpt_markdown.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/api.dart';
 import '../../core/app_state.dart';
 import '../../core/format.dart';
-import '../../core/lookd_service.dart';
 import '../../core/profile.dart';
 import '../../theme/prefs.dart';
 import '../../theme/tokens.dart';
@@ -17,7 +15,6 @@ import '../../widgets/user_avatar.dart';
 import '../assistant/assistant_controller.dart';
 import '../plugins/plugins_page.dart';
 import '../profile/profile_dialog.dart';
-import '../setup/workspace_setup_page.dart';
 import '../../shell.dart';
 import '../assistant/bot_avatar.dart';
 import '../assistant/bot_page.dart';
@@ -26,11 +23,13 @@ import '../usage/usage_page.dart';
 import '../canvas/canvas_page.dart';
 import 'asr_settings.dart';
 import 'data_settings.dart';
+import 'diagnostics.dart';
 import 'knowledge_settings.dart';
 import 'mineru_settings.dart';
 import 'models_page.dart';
 import 'settings_common.dart';
 import 'watch_settings.dart';
+import '../../l10n/l10n.dart';
 
 /// Opens a settings category from elsewhere (the bot's `open_page settings`).
 abstract final class SettingsNav {
@@ -48,28 +47,28 @@ class _Category {
   final List<String> items;
 }
 
-const _categories = [
-  _Category('account', '账户与学校', Icons.account_circle_outlined, '统一身份认证、Canvas',
-      ['统一身份认证', '立即续期', '退出登录', '昵称和头像', 'Canvas', '学校', '作业与课件']),
-  _Category('appearance', '外观与播放', Icons.palette_outlined, '主题、字体、播放器', [
-    '深色模式', '主题色', '系统强调色', '配色风格', '对比度', '字体', '文字大小', '紧凑布局', '减少动画', //
-    '默认倍速', '长按快进倍速', '快进快退步长', '字幕大小', '从上次位置继续', '显示字幕', 'PPT 跟随播放', '快捷键',
+final _categories = [
+  _Category('account', l10n.settingsAccount, Icons.account_circle_outlined, l10n.settingsAccountHint,
+      [l10n.authTongji, l10n.authRenewNow, l10n.authSignOut, l10n.settingsProfileKeyword, 'Canvas', l10n.commonSchool, l10n.settingsCanvasKeyword]),
+  _Category('appearance', l10n.settingsAppearance, Icons.palette_outlined, l10n.settingsAppearanceHint, [
+    l10n.settingsDarkMode, l10n.settingsThemeColor, l10n.settingsSystemAccent, l10n.settingsSchemeStyle, l10n.settingsContrast, l10n.settingsFont, l10n.settingsTextSize, l10n.settingsCompact, l10n.settingsReduceMotion, //
+    l10n.settingsDefaultSpeed, l10n.settingsBoostSpeed, l10n.settingsSeekStepKeyword, l10n.settingsSubtitleSize, l10n.settingsResume, l10n.settingsShowSubtitles, l10n.settingsSlidesFollow, l10n.settingsShortcuts,
   ]),
-  _Category('assistant', '助手与插件', Icons.auto_awesome_outlined, '模型、Bot、插件', [
-    '模型与服务商', '识图模型', 'Bot 形象与记忆', '运行环境 Node.js', '用量与费用', '定时任务', //
-    '宽屏常驻右侧', '回复气泡', '显示思考过程', '流式输出动画', '对话文字大小', '插件',
+  _Category('assistant', l10n.settingsAssistant, Icons.auto_awesome_outlined, l10n.settingsAssistantHint, [
+    l10n.settingsModels, l10n.settingsVisionModel, l10n.settingsBotKeyword, l10n.settingsRuntimeKeyword, l10n.settingsUsage, l10n.commonScheduledTasks, //
+    l10n.settingsDockKeyword, l10n.settingsBubblesKeyword, l10n.settingsShowThinking, l10n.settingsStreamAnimation, l10n.settingsChatTextSize, l10n.commonPlugins,
   ]),
-  _Category('transfer', '下载与转写', Icons.download_outlined, '下载速度、语音转写、课件解析', [
-    '并发连接', '同时下载的视频数', '总速度上限', '下载哪个画面', //
-    '语音转写', '转写渠道', '本地模型', '转写完成后删除视频', 'MinerU 课件解析',
+  _Category('transfer', l10n.settingsTransfer, Icons.download_outlined, l10n.settingsTransferHint, [
+    l10n.settingsConnectionsKeyword, l10n.settingsVideoParallel, l10n.settingsRateLimit, l10n.settingsStream, //
+    l10n.assetAsr, l10n.settingsAsrChannels, l10n.settingsLocalModels, l10n.asrDeleteVideo, l10n.settingsMineru,
   ]),
-  _Category('knowledge', '知识库', Icons.local_library_outlined, '课程库、Obsidian、Notion',
-      ['Obsidian', 'Notion', '课程库位置', '文件夹命名模板', '技能格式导出']),
-  _Category('data', '数据与同步', Icons.cloud_sync_outlined, 'WebDAV 同步、备份恢复、存储空间', [
-    'WebDAV', '坚果云', 'Nextcloud', '多端同步', '自动同步', '同步视频', '导出备份', '恢复备份', '存储空间', '清理缓存', '整理索引',
+  _Category('knowledge', l10n.settingsKnowledge, Icons.local_library_outlined, l10n.settingsKnowledgeHint,
+      ['Obsidian', 'Notion', l10n.settingsLibraryLocation, l10n.knowledgeFolderTemplates, l10n.settingsSkillExport]),
+  _Category('data', l10n.settingsData, Icons.cloud_sync_outlined, l10n.settingsDataHint, [
+    'WebDAV', l10n.webdavJianguoyun, 'Nextcloud', l10n.dataSyncTitle, l10n.commonAutoSync, l10n.settingsSyncMedia, l10n.backupExport, l10n.backupRestore, l10n.storageTitle, l10n.settingsCleanCache, l10n.storageCompact,
   ]),
-  _Category('notifications', '通知', Icons.notifications_outlined, '新回放、新课次与自动检查', ['自动检查新回放', '立即检查', '提醒']),
-  _Category('diagnostics', '诊断', Icons.monitor_heart_outlined, '后台状态与日志', ['lookd 后台', 'ffmpeg', 'Pi Agent', '后台日志', '助手日志', '重启后台']),
+  _Category('notifications', l10n.commonNotifications, Icons.notifications_outlined, l10n.settingsNotificationsHint, [l10n.settingsWatchKeyword, l10n.watchCheckNow, l10n.settingsRemindersKeyword]),
+  _Category('diagnostics', l10n.settingsDiagnostics, Icons.monitor_heart_outlined, l10n.settingsDiagnosticsHint, [l10n.settingsDaemonKeyword, 'ffmpeg', 'Pi Agent', l10n.diagDaemonLog, l10n.diagAgentLog, l10n.settingsRestartKeyword]),
 ];
 
 /// The bot's section names (agent/src/operate.mjs) → categories.
@@ -131,7 +130,7 @@ class _SettingsPageState extends State<SettingsPage> {
     try {
       await _settings.put(key, value);
     } catch (e) {
-      if (mounted) showSnack(context, '保存失败：$e');
+      if (mounted) showSnack(context, l10n.commonSaveFailed(e));
     }
   }
 
@@ -149,9 +148,11 @@ class _SettingsPageState extends State<SettingsPage> {
 
   @override
   Widget build(BuildContext context) {
+    // Route transitions paint a background above the shell's Material, so the
+    // category tiles need their own to show selection and ink.
     return ReportScreen(
-      value: const {'screen': '设置'},
-      child: LayoutBuilder(builder: (context, box) {
+      value: {'screen': l10n.commonSettings},
+      child: Material(type: MaterialType.transparency, child: LayoutBuilder(builder: (context, box) {
         _twoPane = box.maxWidth >= _twoPaneWidth;
         if (!_twoPane) return _list(context);
         final c = _categories.firstWhere((c) => c.id == _selected);
@@ -171,7 +172,7 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           ),
         ]);
-      }),
+      })),
     );
   }
 
@@ -189,17 +190,17 @@ class _SettingsPageState extends State<SettingsPage> {
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Padding(
             padding: const EdgeInsets.only(left: Space.sm),
-            child: Text('设置', style: compact ? tt.headlineMedium : tt.headlineLarge),
+            child: Text(l10n.commonSettings, style: compact ? tt.headlineMedium : tt.headlineLarge),
           ),
           const SizedBox(height: Space.lg),
           SearchBar(
             controller: _query,
-            hintText: '搜索设置',
+            hintText: l10n.settingsSearch,
             elevation: const WidgetStatePropertyAll(0),
             backgroundColor: WidgetStatePropertyAll(cs.surfaceContainerHigh),
             leading: const Icon(Icons.search_rounded),
             trailing: [
-              if (q.isNotEmpty) IconButton(tooltip: '清除', onPressed: () => setState(_query.clear), icon: const Icon(Icons.close_rounded)),
+              if (q.isNotEmpty) IconButton(tooltip: l10n.commonClear, onPressed: () => setState(_query.clear), icon: const Icon(Icons.close_rounded)),
             ],
             onChanged: (_) => setState(() {}),
           ),
@@ -225,7 +226,7 @@ class _SettingsPageState extends State<SettingsPage> {
       return [
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: Space.lg, vertical: Space.xl),
-          child: Text('没有和「${_query.text.trim()}」相关的设置', style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
+          child: Text(l10n.settingsNoMatch(_query.text.trim()), style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
         ),
       ];
     }
@@ -282,21 +283,21 @@ class _SettingsPageState extends State<SettingsPage> {
       'account' => [
           const SizedBox(height: Space.xl),
           const _AccountSection(),
-          const SettingsGroup(title: '学校与 Canvas', icon: Icons.school_outlined, children: [CanvasSettingsEntry()]),
+          SettingsGroup(title: l10n.settingsSchoolCanvas, icon: Icons.school_outlined, children: [CanvasSettingsEntry()]),
         ],
-      'appearance' => const [
-          SettingsGroup(title: '外观', icon: Icons.palette_outlined, children: [_Appearance()]),
-          SettingsGroup(title: '播放', icon: Icons.play_circle_outline_rounded, children: [_PlayerSettings()]),
+      'appearance' => [
+          SettingsGroup(title: l10n.settingsAppearanceGroup, icon: Icons.palette_outlined, children: [_Appearance()]),
+          SettingsGroup(title: l10n.commonPlay, icon: Icons.play_circle_outline_rounded, children: [_PlayerSettings()]),
         ],
-      'assistant' => const [
-          SettingsGroup(title: '助手', icon: Icons.auto_awesome_outlined, children: [_AssistantSettings()]),
-          SettingsGroup(title: '插件', icon: Icons.extension_outlined, children: [PluginSettingsSection()]),
+      'assistant' => [
+          SettingsGroup(title: l10n.commonAssistant, icon: Icons.auto_awesome_outlined, children: [_AssistantSettings()]),
+          SettingsGroup(title: l10n.commonPlugins, icon: Icons.extension_outlined, children: [PluginSettingsSection()]),
         ],
       'transfer' => [
-          SettingsGroup(title: '下载', icon: Icons.download_outlined, children: [_downloads(context)]),
-          SettingsGroup(title: '转写', icon: Icons.graphic_eq_rounded, children: [AsrSettings(server: server, put: _put)]),
+          SettingsGroup(title: l10n.commonDownload, icon: Icons.download_outlined, children: [_downloads(context)]),
+          SettingsGroup(title: l10n.assetTranscript, icon: Icons.graphic_eq_rounded, children: [AsrSettings(server: server, put: _put)]),
           SettingsGroup(
-            title: '课件解析',
+            title: l10n.assetParse,
             leading: ClipRRect(borderRadius: BorderRadius.circular(4), child: Image.asset('assets/brands/mineru.png', width: 18, height: 18)),
             children: const [MinerUSettings()],
           ),
@@ -304,9 +305,9 @@ class _SettingsPageState extends State<SettingsPage> {
       'knowledge' => [KnowledgeSettings(settings: _settings)],
       'data' => const [DataSettings()],
       'notifications' => [
-          SettingsGroup(title: '通知与自动刷新', icon: Icons.notifications_outlined, children: [WatchSettings(server: server, put: _put)]),
+          SettingsGroup(title: l10n.settingsWatchGroup, icon: Icons.notifications_outlined, children: [WatchSettings(server: server, put: _put)]),
         ],
-      _ => const [SettingsGroup(title: '诊断', icon: Icons.monitor_heart_outlined, children: [_Diagnostics()])],
+      _ => const [Diagnostics()],
     };
   }
 
@@ -319,32 +320,32 @@ class _SettingsPageState extends State<SettingsPage> {
     final par = _num('download.video_parallel', 2).toDouble();
     final limit = _num('download.rate_limit', 0).toInt();
     final stream = '${_settings.values['download.stream'] ?? ''}';
-    const limits = [(0, '不限'), (2 << 20, '2 MB/s'), (5 << 20, '5 MB/s'), (10 << 20, '10 MB/s'), (20 << 20, '20 MB/s')];
+    final limits = [(0, l10n.commonUnlimited), (2 << 20, '2 MB/s'), (5 << 20, '5 MB/s'), (10 << 20, '10 MB/s'), (20 << 20, '20 MB/s')];
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       _SliderTile(
-        title: '单个视频的并发连接',
-        subtitle: '分段并行下载，支持断点续传；校园网瓶颈时增加连接帮助有限',
+        title: l10n.settingsConnections,
+        subtitle: l10n.settingsConnectionsHint,
         value: conns,
         min: 1,
         max: 16,
         divisions: 15,
-        label: '${conns.round()} 路',
+        label: l10n.settingsConnectionsValue(conns.round()),
         onChanged: (v) => _settings.set('download.max_conns', v.round()),
         onChangeEnd: (v) => _put('download.max_conns', v.round()),
       ),
       _SliderTile(
-        title: '同时下载的视频数',
+        title: l10n.settingsVideoParallel,
         value: par,
         min: 1,
         max: 4,
         divisions: 3,
-        label: '${par.round()} 个',
+        label: l10n.settingsVideoParallelValue(par.round()),
         onChanged: (v) => _settings.set('download.video_parallel', v.round()),
         onChangeEnd: (v) => _put('download.video_parallel', v.round()),
       ),
       ListTile(
         contentPadding: EdgeInsets.zero,
-        title: const Text('总速度上限'),
+        title: Text(l10n.settingsRateLimit),
         subtitle: Padding(
           padding: const EdgeInsets.only(top: Space.sm),
           child: Wrap(spacing: Space.sm, runSpacing: Space.sm, children: [
@@ -354,16 +355,16 @@ class _SettingsPageState extends State<SettingsPage> {
       ),
       ListTile(
         contentPadding: EdgeInsets.zero,
-        title: const Text('下载哪个画面'),
+        title: Text(l10n.settingsStream),
         subtitle: Padding(
           padding: const EdgeInsets.only(top: Space.sm),
           child: Wrap(spacing: Space.sm, children: [
-            for (final (v, l) in const [('', '自动'), ('屏幕', '屏幕'), ('教师', '教师'), ('学生', '学生')])
+            for (final (v, l) in [('', l10n.commonAuto), (l10n.streamScreen, l10n.streamScreen), (l10n.streamTeacher, l10n.streamTeacher), (l10n.streamStudent, l10n.streamStudent)])
               ChoiceChip(label: Text(l), selected: stream == v, onSelected: (_) => _put('download.stream', v)),
           ]),
         ),
       ),
-      Text('自动：优先屏幕（含 PPT），没有时用第一个画面。', style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+      Text(l10n.settingsStreamHint, style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
     ]);
   }
 }
@@ -401,7 +402,7 @@ class _CategoryTile extends StatelessWidget {
         leading: leading,
         title: Text(account ? userDisplayName(context) : category.title, maxLines: 1, overflow: TextOverflow.ellipsis),
         subtitle: Text(
-          account ? '${auth!.status == 'active' ? '已登录' : '未登录'} · 同济大学 · Canvas' : category.summary,
+          account ? l10n.settingsAccountSummary(auth!.status == 'active' ? l10n.authSignedIn : l10n.authSignedOut) : category.summary,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
@@ -461,16 +462,16 @@ class _AccountSection extends StatelessWidget {
     final name = a.realname.isNotEmpty ? a.realname : a.username;
     final exp = a.expiresAt;
     final (statusText, statusColor) = switch (a.status) {
-      'active' => ('已登录', cs.primary),
-      'renewing' => ('正在续期…', cs.tertiary),
-      'needs_password' => ('需要重新登录', cs.error),
-      _ => ('未登录', cs.onSurfaceVariant),
+      'active' => (l10n.authSignedIn, cs.primary),
+      'renewing' => (l10n.authRenewing, cs.tertiary),
+      'needs_password' => (l10n.authNeedsSignIn, cs.error),
+      _ => (l10n.authSignedOut, cs.onSurfaceVariant),
     };
     final method = switch (a.method) {
-      'password' => '密码登录',
-      'sso' => '统一认证静默续期',
-      'stored' => '已保存的密码续期',
-      'cache' => '从本地会话恢复',
+      'password' => l10n.authMethodPassword,
+      'sso' => l10n.authMethodSso,
+      'stored' => l10n.authMethodSavedPassword,
+      'cache' => l10n.authMethodRestored,
       final m => m,
     };
     return Container(
@@ -479,7 +480,7 @@ class _AccountSection extends StatelessWidget {
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
           Tooltip(
-            message: '编辑个人资料',
+            message: l10n.profileEdit,
             child: InkWell(
               customBorder: const CircleBorder(),
               onTap: () => showProfileDialog(context),
@@ -492,13 +493,13 @@ class _AccountSection extends StatelessWidget {
               Row(children: [
                 Flexible(child: Text(userDisplayName(context), style: tt.titleLarge?.copyWith(color: cs.onSecondaryContainer), overflow: TextOverflow.ellipsis)),
                 IconButton(
-                  tooltip: '编辑昵称和头像',
+                  tooltip: l10n.profileEditTooltip,
                   visualDensity: VisualDensity.compact,
                   onPressed: () => showProfileDialog(context),
                   icon: Icon(Icons.edit_outlined, size: 18, color: cs.onSecondaryContainer),
                 ),
               ]),
-              Text([if (context.watch<UserProfile>().nickname.isNotEmpty) name, a.username, '同济大学'].join(' · '),
+              Text([if (context.watch<UserProfile>().nickname.isNotEmpty) name, a.username, l10n.schoolTongji].join(' · '),
                   style: tt.bodyMedium?.copyWith(color: cs.onSecondaryContainer.withValues(alpha: 0.8))),
             ]),
           ),
@@ -515,9 +516,9 @@ class _AccountSection extends StatelessWidget {
         const SizedBox(height: Space.lg),
         Text(
           [
-            if (exp != null) '凭证 ${fmtUntil(exp)}后到期，会在到期前自动续期',
-            if (a.renewedAt != null) '上次续期 ${fmtRelative(a.renewedAt!)}（$method）',
-            a.remember ? '已在本机加密保存密码，统一认证失效时用于自动登录' : '未保存密码：统一认证会话失效后需要手动登录',
+            if (exp != null) l10n.authExpires(fmtUntil(exp)),
+            if (a.renewedAt != null) l10n.authLastRenewed(fmtRelative(a.renewedAt!), method),
+            a.remember ? l10n.authPasswordSaved : l10n.authPasswordNotSaved,
           ].join('\n'),
           style: tt.bodySmall?.copyWith(color: cs.onSecondaryContainer, height: 1.7),
         ),
@@ -530,31 +531,31 @@ class _AccountSection extends StatelessWidget {
                 : () async {
                     try {
                       await app.api.post('/api/auth/renew');
-                      if (context.mounted) showSnack(context, '已续期');
+                      if (context.mounted) showSnack(context, l10n.authRenewed);
                     } catch (e) {
-                      if (context.mounted) showSnack(context, '续期失败：$e');
+                      if (context.mounted) showSnack(context, l10n.authRenewFailed(e));
                     }
                   },
             icon: const Icon(Icons.autorenew_rounded),
-            label: const Text('立即续期'),
+            label: Text(l10n.authRenewNow),
           ),
           TextButton.icon(
             onPressed: () async {
               final ok = await showDialog<bool>(
                 context: context,
                 builder: (context) => AlertDialog(
-                  title: const Text('退出登录？'),
-                  content: const Text('会清除本机保存的会话和密码。已下载的文件不受影响。'),
+                  title: Text(l10n.authSignOutTitle),
+                  content: Text(l10n.authSignOutBody),
                   actions: [
-                    TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('取消')),
-                    FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('退出')),
+                    TextButton(onPressed: () => Navigator.pop(context, false), child: Text(l10n.commonCancel)),
+                    FilledButton(onPressed: () => Navigator.pop(context, true), child: Text(l10n.authSignOutAction)),
                   ],
                 ),
               );
               if (ok == true) await app.logout();
             },
             icon: const Icon(Icons.logout_rounded),
-            label: const Text('退出登录'),
+            label: Text(l10n.authSignOut),
           ),
         ]),
       ]),
@@ -578,10 +579,10 @@ class _Appearance extends StatelessWidget {
         return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           const SizedBox(height: Space.sm),
           SegmentedButton<ThemeMode>(
-            segments: const [
-              ButtonSegment(value: ThemeMode.system, icon: Icon(Icons.brightness_auto_outlined), label: Text('跟随系统')),
-              ButtonSegment(value: ThemeMode.light, icon: Icon(Icons.light_mode_outlined), label: Text('浅色')),
-              ButtonSegment(value: ThemeMode.dark, icon: Icon(Icons.dark_mode_outlined), label: Text('深色')),
+            segments: [
+              ButtonSegment(value: ThemeMode.system, icon: Icon(Icons.brightness_auto_outlined), label: Text(l10n.themeSystem)),
+              ButtonSegment(value: ThemeMode.light, icon: Icon(Icons.light_mode_outlined), label: Text(l10n.themeLight)),
+              ButtonSegment(value: ThemeMode.dark, icon: Icon(Icons.dark_mode_outlined), label: Text(l10n.themeDark)),
             ],
             selected: {p.themeMode},
             onSelectionChanged: (s) => p.update((x) => x.themeMode = s.first),
@@ -592,14 +593,14 @@ class _Appearance extends StatelessWidget {
               contentPadding: EdgeInsets.zero,
               value: p.dynamicColor,
               onChanged: (v) => p.update((x) => x.dynamicColor = v),
-              title: const Text('使用系统强调色'),
-              subtitle: const Text('从桌面主题取色生成配色'),
+              title: Text(l10n.settingsUseSystemAccent),
+              subtitle: Text(l10n.settingsUseSystemAccentHint),
             ),
           AnimatedOpacity(
             opacity: hasSystem && p.dynamicColor ? 0.4 : 1,
             duration: Motion.medium1,
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('主题色', style: tt.titleSmall),
+              Text(l10n.settingsThemeColor, style: tt.titleSmall),
               const SizedBox(height: Space.sm),
               Wrap(spacing: Space.md, runSpacing: Space.md, children: [
                 for (final (name, c) in kSeedPalette)
@@ -629,14 +630,14 @@ class _Appearance extends StatelessWidget {
             ]),
           ),
           const SizedBox(height: Space.lg),
-          Text('配色风格', style: tt.titleSmall),
+          Text(l10n.settingsSchemeStyle, style: tt.titleSmall),
           const SizedBox(height: Space.sm),
           Wrap(spacing: Space.sm, runSpacing: Space.sm, children: [
             for (final e in kVariantLabels.entries)
               ChoiceChip(label: Text(e.value), selected: p.variant == e.key, onSelected: (_) => p.update((x) => x.variant = e.key)),
           ]),
           const SizedBox(height: Space.lg),
-          Text('对比度', style: tt.titleSmall),
+          Text(l10n.settingsContrast, style: tt.titleSmall),
           const SizedBox(height: Space.sm),
           SegmentedButton<ContrastLevel>(
             segments: [for (final c in ContrastLevel.values) ButtonSegment(value: c, label: Text(c.label))],
@@ -645,14 +646,14 @@ class _Appearance extends StatelessWidget {
           ),
           const SizedBox(height: Space.lg),
           DropdownMenu<String?>(
-            label: const Text('字体'),
+            label: Text(l10n.settingsFont),
             initialSelection: p.fontFamily,
             expandedInsets: EdgeInsets.zero,
             dropdownMenuEntries: [for (final (l, f) in kFontChoices) DropdownMenuEntry(value: f, label: l)],
             onSelected: (v) => p.update((x) => x.fontFamily = v),
           ),
           _SliderTile(
-            title: '文字大小',
+            title: l10n.settingsTextSize,
             value: p.textScale,
             min: 0.85,
             max: 1.3,
@@ -664,13 +665,13 @@ class _Appearance extends StatelessWidget {
             contentPadding: EdgeInsets.zero,
             value: p.compactDensity,
             onChanged: (v) => p.update((x) => x.compactDensity = v),
-            title: const Text('紧凑布局'),
+            title: Text(l10n.settingsCompact),
           ),
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
             value: p.reduceMotion,
             onChanged: (v) => p.update((x) => x.reduceMotion = v),
-            title: const Text('减少动画'),
+            title: Text(l10n.settingsReduceMotion),
           ),
         ]);
       },
@@ -685,7 +686,7 @@ class _PlayerSettings extends StatelessWidget {
     final p = context.watch<UiPrefs>();
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       _SliderTile(
-        title: '默认倍速',
+        title: l10n.settingsDefaultSpeed,
         value: p.defaultSpeed,
         min: 0.5,
         max: 3,
@@ -694,8 +695,8 @@ class _PlayerSettings extends StatelessWidget {
         onChanged: (v) => p.update((x) => x.defaultSpeed = (v * 4).round() / 4),
       ),
       _SliderTile(
-        title: '长按快进倍速',
-        subtitle: '长按画面或按住 → 键临时加速',
+        title: l10n.settingsBoostSpeed,
+        subtitle: l10n.settingsBoostSpeedHint,
         value: p.boostSpeed,
         min: 1.5,
         max: 4,
@@ -704,16 +705,16 @@ class _PlayerSettings extends StatelessWidget {
         onChanged: (v) => p.update((x) => x.boostSpeed = (v * 4).round() / 4),
       ),
       _SliderTile(
-        title: '快进 / 快退步长',
+        title: l10n.settingsSeekStep,
         value: p.seekStepSec.toDouble(),
         min: 5,
         max: 30,
         divisions: 5,
-        label: '${p.seekStepSec} 秒',
+        label: l10n.commonSecondsValue(p.seekStepSec),
         onChanged: (v) => p.update((x) => x.seekStepSec = v.round()),
       ),
       _SliderTile(
-        title: '字幕大小',
+        title: l10n.settingsSubtitleSize,
         value: p.subtitleScale,
         min: 0.8,
         max: 1.6,
@@ -721,11 +722,11 @@ class _PlayerSettings extends StatelessWidget {
         label: '${(p.subtitleScale * 100).round()}%',
         onChanged: (v) => p.update((x) => x.subtitleScale = v),
       ),
-      SwitchListTile(contentPadding: EdgeInsets.zero, value: p.autoResume, onChanged: (v) => p.update((x) => x.autoResume = v), title: const Text('从上次位置继续')),
-      SwitchListTile(contentPadding: EdgeInsets.zero, value: p.showSubtitles, onChanged: (v) => p.update((x) => x.showSubtitles = v), title: const Text('有文字稿时显示字幕')),
-      SwitchListTile(contentPadding: EdgeInsets.zero, value: p.slideFollow, onChanged: (v) => p.update((x) => x.slideFollow = v), title: const Text('PPT 跟随播放进度')),
+      SwitchListTile(contentPadding: EdgeInsets.zero, value: p.autoResume, onChanged: (v) => p.update((x) => x.autoResume = v), title: Text(l10n.settingsResume)),
+      SwitchListTile(contentPadding: EdgeInsets.zero, value: p.showSubtitles, onChanged: (v) => p.update((x) => x.showSubtitles = v), title: Text(l10n.settingsShowSubtitlesHint)),
+      SwitchListTile(contentPadding: EdgeInsets.zero, value: p.slideFollow, onChanged: (v) => p.update((x) => x.slideFollow = v), title: Text(l10n.settingsSlidesFollowHint)),
       const SizedBox(height: Space.sm),
-      Text('快捷键：空格 播放/暂停 · ←/→ 快退/快进 · ↑/↓ 音量 · [ ] 倍速 · F 全屏 · C 字幕 · B 书签 · P 侧栏 · M 静音',
+      Text(l10n.settingsShortcutsBody,
           style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant, height: 1.6)),
     ]);
   }
@@ -741,8 +742,8 @@ class _AssistantSettings extends StatelessWidget {
       ListTile(
         contentPadding: EdgeInsets.zero,
         leading: const Icon(Icons.memory_rounded),
-        title: const Text('模型与服务商'),
-        subtitle: Text(a.selected == null ? '未配置' : '${a.selected!['provider']} / ${a.selected!['model']}'),
+        title: Text(l10n.settingsModels),
+        subtitle: Text(a.selected == null ? l10n.commonNotConfigured : '${a.selected!['provider']} / ${a.selected!['model']}'),
         trailing: const Icon(Icons.chevron_right_rounded),
         onTap: () => Navigator.of(context, rootNavigator: true).push(MaterialPageRoute(builder: (_) => const ModelsPage())),
       ),
@@ -751,56 +752,56 @@ class _AssistantSettings extends StatelessWidget {
         contentPadding: EdgeInsets.zero,
         leading: BotAvatar(size: 28, shape: a.botShape, color: a.botColor, animate: false),
         title: Text(a.botName),
-        subtitle: const Text('常驻 bot 的形象、记忆与学习方式'),
+        subtitle: Text(l10n.settingsBotHint),
         trailing: const Icon(Icons.chevron_right_rounded),
         onTap: () => Navigator.of(context, rootNavigator: true).push(MaterialPageRoute(builder: (_) => const BotPage())),
       ),
       ListTile(
         contentPadding: EdgeInsets.zero,
         leading: const Icon(Icons.terminal_rounded),
-        title: const Text('运行环境'),
-        subtitle: Text(a.ready ? 'Node.js 与 Pi SDK 已就绪' : '助手未运行 · 检查或安装 Node.js 与 Pi SDK'),
+        title: Text(l10n.settingsRuntime),
+        subtitle: Text(a.ready ? l10n.settingsRuntimeReady : l10n.settingsRuntimeMissing),
         trailing: const Icon(Icons.chevron_right_rounded),
         onTap: () => showRuntimeSetup(context),
       ),
       ListTile(
         contentPadding: EdgeInsets.zero,
         leading: const Icon(Icons.insights_outlined),
-        title: const Text('用量与费用'),
-        subtitle: const Text('按模型、用途和对话查看 token 与估算费用'),
+        title: Text(l10n.settingsUsage),
+        subtitle: Text(l10n.settingsUsageHint),
         trailing: const Icon(Icons.chevron_right_rounded),
         onTap: () => Navigator.of(context, rootNavigator: true).push(MaterialPageRoute(builder: (_) => const UsagePage())),
       ),
       ListTile(
         contentPadding: EdgeInsets.zero,
         leading: const Icon(Icons.schedule_rounded),
-        title: const Text('定时任务'),
-        subtitle: const Text('让助手按计划复盘、出题、汇总截止事项'),
+        title: Text(l10n.commonScheduledTasks),
+        subtitle: Text(l10n.settingsTasksHint),
         trailing: const Icon(Icons.chevron_right_rounded),
         onTap: () => ShellScope.of(context).goTo(Tabs.tasks),
       ),
-      SwitchListTile(contentPadding: EdgeInsets.zero, value: p.assistantDocked, onChanged: (v) => p.update((x) => x.assistantDocked = v), title: const Text('宽屏时常驻在右侧')),
-      SwitchListTile(contentPadding: EdgeInsets.zero, value: p.chatBubbles, onChanged: (v) => p.update((x) => x.chatBubbles = v), title: const Text('回复使用气泡')),
-      SwitchListTile(contentPadding: EdgeInsets.zero, value: p.showThinking, onChanged: (v) => p.update((x) => x.showThinking = v), title: const Text('显示思考过程')),
+      SwitchListTile(contentPadding: EdgeInsets.zero, value: p.assistantDocked, onChanged: (v) => p.update((x) => x.assistantDocked = v), title: Text(l10n.settingsDock)),
+      SwitchListTile(contentPadding: EdgeInsets.zero, value: p.chatBubbles, onChanged: (v) => p.update((x) => x.chatBubbles = v), title: Text(l10n.settingsBubbles)),
+      SwitchListTile(contentPadding: EdgeInsets.zero, value: p.showThinking, onChanged: (v) => p.update((x) => x.showThinking = v), title: Text(l10n.settingsShowThinking)),
       ListTile(
         contentPadding: EdgeInsets.zero,
-        title: const Text('流式输出动画'),
+        title: Text(l10n.settingsStreamAnimation),
         subtitle: Padding(
           padding: const EdgeInsets.only(top: Space.sm),
           child: Wrap(spacing: Space.sm, runSpacing: Space.sm, children: [
-            for (final (v, l) in const [
-              (GptMarkdownAnimation.none, '无'),
-              (GptMarkdownAnimation.fade, '淡入'),
-              (GptMarkdownAnimation.blurIn, '模糊显现'),
-              (GptMarkdownAnimation.typewriter, '打字机'),
-              (GptMarkdownAnimation.wave, '波浪'),
+            for (final (v, l) in [
+              (GptMarkdownAnimation.none, l10n.commonNone),
+              (GptMarkdownAnimation.fade, l10n.streamFade),
+              (GptMarkdownAnimation.blurIn, l10n.streamBlur),
+              (GptMarkdownAnimation.typewriter, l10n.streamTypewriter),
+              (GptMarkdownAnimation.wave, l10n.streamWave),
             ])
               ChoiceChip(label: Text(l), selected: p.streamAnimation == v, onSelected: (_) => p.update((x) => x.streamAnimation = v)),
           ]),
         ),
       ),
       _SliderTile(
-        title: '对话文字大小',
+        title: l10n.settingsChatTextSize,
         value: p.chatTextScale,
         min: 0.85,
         max: 1.3,
@@ -825,16 +826,16 @@ class _VisionModelTile extends StatelessWidget {
     final direct = a.selected?['vision'] == true;
     final ready = a.models?['vision_ready'] == true;
     final subtitle = direct
-        ? '当前模型可以直接看 PPT 和插图${vision.isEmpty ? '' : '；换成纯文本模型时使用 $vision'}'
+        ? l10n.visionNative(vision.isEmpty ? '' : l10n.visionNativeFallback(vision))
         : vision.isEmpty
-            ? '当前模型不能看图。选一个识图模型，助手写笔记时才能核对 PPT 和课件插图'
+            ? l10n.visionNeeded
             : ready
-                ? '$vision · 为纯文本模型转写 PPT 和插图'
-                : '$vision 不可用（检查服务商密钥）';
+                ? l10n.visionUsing(vision)
+                : l10n.visionUnavailable(vision);
     return ListTile(
       contentPadding: EdgeInsets.zero,
       leading: const Icon(Icons.image_search_rounded),
-      title: const Text('识图模型'),
+      title: Text(l10n.settingsVisionModel),
       subtitle: Text(subtitle, style: TextStyle(color: !direct && (vision.isEmpty || !ready) ? cs.error : null)),
       trailing: const Icon(Icons.chevron_right_rounded),
       onTap: () => _pick(context, vision),
@@ -857,11 +858,11 @@ class _VisionModelTile extends StatelessWidget {
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(Space.xl, 0, Space.xl, Space.sm),
-            child: Text('识图模型', style: Theme.of(c).textTheme.titleLarge),
+            child: Text(l10n.settingsVisionModel, style: Theme.of(c).textTheme.titleLarge),
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(Space.xl, 0, Space.xl, Space.md),
-            child: Text('只用来把 PPT 和课件插图转写成文字，交给不能看图的对话模型。结果按图片缓存，同一张图只识别一次。',
+            child: Text(l10n.visionBody,
                 style: Theme.of(c).textTheme.bodySmall?.copyWith(color: Theme.of(c).colorScheme.onSurfaceVariant)),
           ),
           Expanded(
@@ -869,10 +870,10 @@ class _VisionModelTile extends StatelessWidget {
               groupValue: current,
               onChanged: (v) => Navigator.pop(c, v),
               child: ListView(children: [
-                const RadioListTile(value: '', title: Text('不使用')),
+                RadioListTile(value: '', title: Text(l10n.visionNone)),
                 for (final (id, name, provider) in options) RadioListTile(value: id, title: Text(name), subtitle: Text(provider)),
                 if (options.isEmpty)
-                  const Padding(padding: EdgeInsets.all(Space.xl), child: Text('已配置的服务商里没有支持图片输入的模型。')),
+                  Padding(padding: EdgeInsets.all(Space.xl), child: Text(l10n.visionNoModels)),
               ]),
             ),
           ),
@@ -883,88 +884,8 @@ class _VisionModelTile extends StatelessWidget {
     try {
       await a.setPrefs({'vision': picked});
     } catch (e) {
-      if (context.mounted) showSnack(context, '保存失败：$e');
+      if (context.mounted) showSnack(context, l10n.commonSaveFailed(e));
     }
-  }
-}
-
-class _Diagnostics extends StatelessWidget {
-  const _Diagnostics();
-  @override
-  Widget build(BuildContext context) {
-    final app = context.watch<AppState>();
-    final daemon = context.watch<LookdService>();
-    final tt = Theme.of(context).textTheme;
-    final h = app.health;
-    final agent = app.agent;
-    Widget row(String k, String v, {bool ok = true}) => Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          child: Row(children: [
-            Icon(ok ? Icons.check_circle_outline_rounded : Icons.error_outline_rounded, size: 18,
-                color: ok ? Theme.of(context).colorScheme.primary : Theme.of(context).colorScheme.error),
-            const SizedBox(width: Space.sm),
-            Text(k, style: tt.bodyMedium),
-            const Spacer(),
-            Flexible(child: Text(v, style: tt.bodySmall, textAlign: TextAlign.end, overflow: TextOverflow.ellipsis)),
-          ]),
-        );
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      row('lookd 后台', daemon.state == DaemonState.ready ? 'v${h['version'] ?? ''} · 端口 ${daemon.port}' : daemon.error ?? '启动中',
-          ok: daemon.state == DaemonState.ready),
-      if (daemon.workspace != null) row('Linux 工作区', 'Ubuntu 24.04 · proot'),
-      row('ffmpeg（转写用）', h['ffmpeg'] == true ? '已安装' : '未找到', ok: h['ffmpeg'] == true),
-      if (daemon.workspace != null && h['ffmpeg'] != true)
-        Padding(
-          padding: const EdgeInsets.only(left: 26, top: Space.xs, bottom: Space.xs),
-          child: Align(alignment: Alignment.centerLeft, child: WorkspaceFFmpegButton(workspace: daemon.workspace!, onDone: app.refreshHealth)),
-        ),
-      row('Pi Agent', '${agent['state']}${agent['error'] != null && '${agent['error']}'.isNotEmpty ? ' · ${agent['error']}' : ''}', ok: app.agentReady),
-      const SizedBox(height: Space.md),
-      Wrap(spacing: Space.sm, runSpacing: Space.sm, children: [
-        OutlinedButton.icon(
-          onPressed: () => _logs(context, '后台日志', daemon.log.join('\n')),
-          icon: const Icon(Icons.receipt_long_outlined, size: 18),
-          label: const Text('后台日志'),
-        ),
-        OutlinedButton.icon(
-          onPressed: () async {
-            try {
-              final r = await app.api.get('/api/agent/status') as Map;
-              if (context.mounted) _logs(context, '助手日志', ((r['logs'] as List?) ?? const []).join('\n'));
-            } catch (e) {
-              if (context.mounted) showSnack(context, '$e');
-            }
-          },
-          icon: const Icon(Icons.smart_toy_outlined, size: 18),
-          label: const Text('助手日志'),
-        ),
-        TextButton.icon(onPressed: daemon.restart, icon: const Icon(Icons.restart_alt_rounded, size: 18), label: const Text('重启后台')),
-      ]),
-    ]);
-  }
-
-  void _logs(BuildContext context, String title, String text) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(title),
-        content: SizedBox(
-          width: 640,
-          height: 420,
-          child: SingleChildScrollView(
-            reverse: true,
-            child: SelectableText(text.isEmpty ? '（空）' : text, style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Clipboard.setData(ClipboardData(text: text)),
-            child: const Text('复制'),
-          ),
-          FilledButton(onPressed: () => Navigator.pop(context), child: const Text('关闭')),
-        ],
-      ),
-    );
   }
 }
 

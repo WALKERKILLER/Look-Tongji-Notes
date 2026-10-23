@@ -10,6 +10,7 @@ import '../../widgets/states.dart';
 import 'assistant_controller.dart';
 import 'assistant_panel.dart';
 import 'task_inbox.dart';
+import '../../l10n/l10n.dart';
 
 // Scheduled assistant tasks (docs/specs/0003-scheduled-agent-tasks.md).
 
@@ -29,21 +30,25 @@ TaskApi _api(BuildContext context) {
   };
 }
 
-const _weekdayNames = ['一', '二', '三', '四', '五', '六', '日'];
+/// Whether a weekly [s] runs Monday to Friday only.
+bool isWorkdays(Map s) {
+  final days = {for (final d in (s['days'] as List? ?? const [])) (d as num).toInt()};
+  return s['type'] == 'weekly' && days.length == 5 && days.every((d) => d <= 5);
+}
 
 /// "每天 21:30", "工作日 08:00", "每周一、五 08:00", "10月15日 07:00".
 String fmtSchedule(Map s) {
   switch (s['type']) {
     case 'daily':
-      return '每天 ${s['time']}';
+      return l10n.scheduleDaily(s['time']);
     case 'weekly':
       final days = [for (final d in (s['days'] as List? ?? const [])) (d as num).toInt()];
-      if (days.length == 7) return '每天 ${s['time']}';
-      if (days.length == 5 && days.every((d) => d <= 5)) return '工作日 ${s['time']}';
-      return '每周${days.map((d) => _weekdayNames[d - 1]).join('、')} ${s['time']}';
+      if (days.length == 7) return l10n.scheduleDaily(s['time']);
+      if (isWorkdays(s)) return l10n.scheduleWorkdays(s['time']);
+      return l10n.scheduleWeekly(days.map((d) => weekdayNames[d - 1]).join(l10n.listSeparator), s['time']);
     case 'once':
       final at = DateTime.tryParse('${s['at']}');
-      return at == null ? '一次' : '${at.month}月${at.day}日 ${_hm(at)}（一次）';
+      return at == null ? l10n.scheduleOnce : l10n.scheduleOnceAt(at.month, at.day, _hm(at));
   }
   return '';
 }
@@ -54,22 +59,22 @@ String _hm(DateTime d) => '${d.hour.toString().padLeft(2, '0')}:${d.minute.toStr
 String fmtWhen(DateTime t, DateTime now) {
   final days = DateTime(t.year, t.month, t.day).difference(DateTime(now.year, now.month, now.day)).inDays;
   final day = switch (days) {
-    0 => '今天',
-    1 => '明天',
-    -1 => '昨天',
-    > 1 && < 7 => '周${_weekdayNames[t.weekday - 1]}',
-    _ => '${t.month}月${t.day}日',
+    0 => l10n.commonToday,
+    1 => l10n.commonTomorrow,
+    -1 => l10n.commonYesterday,
+    > 1 && < 7 => l10n.weekdayName(weekdayNames[t.weekday - 1]),
+    _ => l10n.dateMonthDay(t.month, t.day),
   };
   return '$day ${_hm(t)}';
 }
 
 /// Status label and icon of a run; colors come from the theme.
 (String, IconData, bool) runStatus(String s) => switch (s) {
-      'ok' => ('完成', Icons.check_circle_outline_rounded, false),
-      'error' => ('失败', Icons.error_outline_rounded, true),
-      'budget' => ('超出费用上限', Icons.money_off_rounded, true),
-      'aborted' => ('已中止', Icons.stop_circle_outlined, false),
-      'skipped' => ('已错过', Icons.skip_next_outlined, false),
+      'ok' => (l10n.commonFinished, Icons.check_circle_outline_rounded, false),
+      'error' => (l10n.commonFailed, Icons.error_outline_rounded, true),
+      'budget' => (l10n.runCostLimit, Icons.money_off_rounded, true),
+      'aborted' => (l10n.runAborted, Icons.stop_circle_outlined, false),
+      'skipped' => (l10n.runMissed, Icons.skip_next_outlined, false),
       _ => (s, Icons.circle_outlined, false),
     };
 
@@ -77,7 +82,7 @@ String fmtWhen(DateTime t, DateTime now) {
 Future<void> openRunConversation(BuildContext context, String sessionId) async {
   final a = context.read<AssistantController>();
   if (a.busy) {
-    showSnack(context, '助手正在回复，请稍后再查看');
+    showSnack(context, l10n.tasksBusy);
     return;
   }
   await a.openSession(sessionId);
@@ -92,9 +97,9 @@ List<Map<String, dynamic>> _maps(Object? v) => [for (final x in (v as List? ?? c
 String _dayLabel(DateTime t, DateTime now) {
   final days = DateTime(now.year, now.month, now.day).difference(DateTime(t.year, t.month, t.day)).inDays;
   return switch (days) {
-    0 => '今天',
-    1 => '昨天',
-    _ => '${t.month}月${t.day}日 周${_weekdayNames[t.weekday - 1]}',
+    0 => l10n.commonToday,
+    1 => l10n.commonYesterday,
+    _ => l10n.dateMonthDayWeek(t.month, t.day, weekdayNames[t.weekday - 1]),
   };
 }
 
@@ -221,25 +226,25 @@ class _TasksPageState extends State<TasksPage> {
   Widget _header(BuildContext context, List<Map<String, dynamic>>? tasks, DateTime now, double pad, bool compact) {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
-    String sub = '按计划在新对话里复盘、出题、汇总截止事项';
+    String sub = l10n.tasksSubtitle;
     if (tasks != null && tasks.isNotEmpty) {
       final on = tasks.where((t) => t['enabled'] == true).toList();
       final upcoming = on.where((t) => t['next_run'] is num).toList()..sort((a, b) => (a['next_run'] as num).compareTo(b['next_run'] as num));
       sub = [
-        '${tasks.length} 个任务',
-        on.length == tasks.length ? '全部启用' : '${on.length} 个启用',
-        if (upcoming.isNotEmpty) '下一个「${upcoming.first['name']}」${fmtWhen(_at(upcoming.first['next_run'])!, now)}',
+        l10n.tasksCount(tasks.length),
+        on.length == tasks.length ? l10n.commonAllEnabled : l10n.tasksEnabledCount(on.length),
+        if (upcoming.isNotEmpty) l10n.tasksNextUp(upcoming.first['name'], fmtWhen(_at(upcoming.first['next_run'])!, now)),
       ].join(' · ');
     }
     final add = compact
-        ? IconButton.filled(tooltip: '新建任务', onPressed: () => _edit(), icon: const Icon(Icons.add_rounded))
-        : FilledButton.icon(onPressed: () => _edit(), icon: const Icon(Icons.add_rounded), label: const Text('新建任务'));
+        ? IconButton.filled(tooltip: l10n.tasksNew, onPressed: () => _edit(), icon: const Icon(Icons.add_rounded))
+        : FilledButton.icon(onPressed: () => _edit(), icon: const Icon(Icons.add_rounded), label: Text(l10n.tasksNew));
     return ContentWidth(
       max: kMaxContentWidth + 200,
       child: Padding(
         padding: EdgeInsets.fromLTRB(pad, compact ? Space.xl : Space.xxl, pad, Space.lg),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('定时任务', style: compact ? tt.headlineMedium : tt.displaySmall),
+          Text(l10n.commonScheduledTasks, style: compact ? tt.headlineMedium : tt.displaySmall),
           const SizedBox(height: Space.xs),
           Text(sub, style: tt.bodyLarge?.copyWith(color: cs.onSurfaceVariant)),
           const SizedBox(height: Space.lg),
@@ -247,8 +252,8 @@ class _TasksPageState extends State<TasksPage> {
             SegmentedButton<int>(
               showSelectedIcon: false,
               segments: [
-                ButtonSegment(value: 0, icon: const Icon(Icons.schedule_rounded), label: Text(tasks == null || tasks.isEmpty ? '任务' : '任务 ${tasks.length}')),
-                const ButtonSegment(value: 1, icon: Icon(Icons.history_rounded), label: Text('运行记录')),
+                ButtonSegment(value: 0, icon: const Icon(Icons.schedule_rounded), label: Text(tasks == null || tasks.isEmpty ? l10n.commonTasks : l10n.commonTasksCount(tasks.length))),
+                ButtonSegment(value: 1, icon: Icon(Icons.history_rounded), label: Text(l10n.tasksRuns)),
               ],
               selected: {_view},
               onSelectionChanged: (v) => setState(() => _view = v.first),
@@ -321,13 +326,13 @@ class _TasksPageState extends State<TasksPage> {
           max: 840,
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             Wrap(spacing: Space.sm, runSpacing: Space.sm, children: [
-              for (final (k, label) in const [('all', '全部'), ('ok', '完成'), ('failed', '失败'), ('skipped', '已错过')])
+              for (final (k, label) in [('all', l10n.commonAll), ('ok', l10n.commonFinished), ('failed', l10n.commonFailed), ('skipped', l10n.runMissed)])
                 ChoiceChip(label: Text(label), selected: _filter == k, onSelected: (_) => setState(() => _filter = k)),
             ]),
             if (days.isEmpty)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: Space.xxl),
-                child: Text(_runs.isEmpty ? '任务运行后，结果会按时间出现在这里' : '没有符合条件的运行', textAlign: TextAlign.center, style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
+                child: Text(_runs.isEmpty ? l10n.tasksRunsEmpty : l10n.tasksRunsNoMatch, textAlign: TextAlign.center, style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
               ),
             for (final MapEntry(key: day, value: list) in days.entries) ...[
               Padding(
@@ -362,7 +367,7 @@ class _TaskGlyph extends StatelessWidget {
     final hour = int.tryParse('${s['time'] ?? ''}'.split(':').first) ?? 12;
     final icon = switch (s['type']) {
       'once' => Icons.alarm_rounded,
-      'weekly' when fmtSchedule(s).startsWith('工作日') => Icons.work_outline_rounded,
+      'weekly' when isWorkdays(s) => Icons.work_outline_rounded,
       'weekly' => Icons.date_range_rounded,
       _ when hour >= 18 || hour < 5 => Icons.nightlight_outlined,
       _ when hour < 11 => Icons.wb_sunny_outlined,
@@ -395,10 +400,10 @@ class _StatePill extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
     final (label, bg, fg) = switch ('${task['state'] ?? 'idle'}') {
-      'running' => ('运行中', cs.primary, cs.onPrimary),
-      'queued' => ('排队中', cs.secondaryContainer, cs.onSecondaryContainer),
-      _ when task['enabled'] != true => ('已暂停', cs.surfaceContainerHighest, cs.onSurfaceVariant),
-      _ => ('已启用', cs.primaryContainer, cs.onPrimaryContainer),
+      'running' => (l10n.commonRunning, cs.primary, cs.onPrimary),
+      'queued' => (l10n.commonQueued, cs.secondaryContainer, cs.onSecondaryContainer),
+      _ when task['enabled'] != true => (l10n.commonPaused, cs.surfaceContainerHighest, cs.onSurfaceVariant),
+      _ => (l10n.commonEnabled, cs.primaryContainer, cs.onPrimaryContainer),
     };
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: Space.sm, vertical: Space.xxs),
@@ -431,9 +436,9 @@ class _TaskRow extends StatelessWidget {
     final last = task['last_run'] as Map?;
     final state = '${task['state'] ?? 'idle'}';
     final line = switch (state) {
-      'running' => '正在运行',
-      'queued' => '排队中',
-      _ => !enabled ? '已暂停' : next == null ? '没有下次运行' : '下次 ${fmtWhen(next, now)}',
+      'running' => l10n.tasksRunningNow,
+      'queued' => l10n.commonQueued,
+      _ => !enabled ? l10n.commonPaused : next == null ? l10n.tasksNoNextRun : l10n.tasksNextRun(fmtWhen(next, now)),
     };
     final card = onToggle != null;
     return Semantics(
@@ -560,7 +565,7 @@ class _TaskDetailViewState extends State<TaskDetailView> {
       setState(() {
         _task = t.isEmpty ? null : t.cast<String, dynamic>();
         _runs = _maps(runs);
-        _error = t.isEmpty ? '任务不存在' : null;
+        _error = t.isEmpty ? l10n.tasksNotFound : null;
       });
     } catch (e) {
       if (mounted) setState(() => _error = e);
@@ -583,11 +588,11 @@ class _TaskDetailViewState extends State<TaskDetailView> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
-        title: const Text('删除任务？'),
-        content: const Text('以后不会再运行。已经生成的对话、笔记和练习会保留，运行记录仍可在“运行记录”里查看。'),
+        title: Text(l10n.tasksDeleteTitle),
+        content: Text(l10n.tasksDeleteBody),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('取消')),
-          FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('删除')),
+          TextButton(onPressed: () => Navigator.pop(c, false), child: Text(l10n.commonCancel)),
+          FilledButton(onPressed: () => Navigator.pop(c, true), child: Text(l10n.commonDelete)),
         ],
       ),
     );
@@ -633,41 +638,41 @@ class _TaskDetailViewState extends State<TaskDetailView> {
               ]),
             ),
             Tooltip(
-              message: enabled ? '暂停' : '启用',
+              message: enabled ? l10n.commonPause : l10n.commonEnable,
               child: Switch(value: enabled, onChanged: (v) => _act(() => _call('PUT', '/agent/tasks/${widget.taskId}', {'enabled': v}))),
             ),
           ]),
           const SizedBox(height: Space.lg),
           Wrap(spacing: Space.sm, runSpacing: Space.sm, children: [
             FilledButton.tonalIcon(
-              onPressed: state == 'idle' ? () => _act(() => _call('POST', '/agent/tasks/${widget.taskId}/run'), '已开始运行') : null,
+              onPressed: state == 'idle' ? () => _act(() => _call('POST', '/agent/tasks/${widget.taskId}/run'), l10n.tasksStarted) : null,
               icon: const Icon(Icons.play_arrow_rounded),
-              label: Text(state == 'running' ? '正在运行' : state == 'queued' ? '排队中' : '立即运行'),
+              label: Text(state == 'running' ? l10n.tasksRunningNow : state == 'queued' ? l10n.commonQueued : l10n.tasksRunNow),
             ),
             OutlinedButton.icon(
               onPressed: () async {
                 if (await showTaskEditor(context, task: t, api: _call) != null) _act(() async {});
               },
               icon: const Icon(Icons.edit_outlined),
-              label: const Text('编辑'),
+              label: Text(l10n.commonEdit),
             ),
             TextButton.icon(
               onPressed: _delete,
               style: TextButton.styleFrom(foregroundColor: cs.error),
               icon: const Icon(Icons.delete_outline_rounded),
-              label: const Text('删除'),
+              label: Text(l10n.commonDelete),
             ),
           ]),
           const SizedBox(height: Space.xl),
           Row(children: [
-            Expanded(child: _Fact(color: tile, icon: Icons.update_rounded, label: '下次运行', value: !enabled ? '已暂停' : next == null ? '无' : fmtWhen(next, now))),
+            Expanded(child: _Fact(color: tile, icon: Icons.update_rounded, label: l10n.tasksNextRunLabel, value: !enabled ? l10n.commonPaused : next == null ? l10n.commonNone : fmtWhen(next, now))),
             const SizedBox(width: Space.sm),
             Expanded(
               child: _Fact(
                 color: tile,
                 icon: Icons.history_rounded,
-                label: '上次结果',
-                value: last == null ? '还没运行' : runStatus('${last['status']}').$1,
+                label: l10n.tasksLastResult,
+                value: last == null ? l10n.tasksNeverRun : runStatus('${last['status']}').$1,
                 bad: last != null && runStatus('${last['status']}').$3,
               ),
             ),
@@ -676,7 +681,7 @@ class _TaskDetailViewState extends State<TaskDetailView> {
               child: _Fact(
                 color: tile,
                 icon: Icons.savings_outlined,
-                label: t['catch_up'] == true ? '单次上限 · 补跑' : '单次上限',
+                label: t['catch_up'] == true ? l10n.tasksCostLimitCatchUp : l10n.tasksCostLimit,
                 value: fmtUsd((t['budget_usd'] as num?) ?? 0.2),
               ),
             ),
@@ -686,11 +691,11 @@ class _TaskDetailViewState extends State<TaskDetailView> {
             Icon(writes.isEmpty ? Icons.lock_outline_rounded : Icons.edit_note_rounded, size: 18, color: cs.onSurfaceVariant),
             const SizedBox(width: Space.sm),
             Expanded(
-              child: Text(writes.isEmpty ? '只读：结果写在总结里，不改动课程库' : '允许：${writes.join('、')}', style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
+              child: Text(writes.isEmpty ? l10n.tasksReadOnly : l10n.tasksAllowed(writes.join(l10n.listSeparator)), style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
             ),
           ]),
           const SizedBox(height: Space.xl),
-          Text('任务内容', style: tt.titleSmall),
+          Text(l10n.tasksPrompt, style: tt.titleSmall),
           const SizedBox(height: Space.sm),
           Container(
             padding: const EdgeInsets.all(Space.lg),
@@ -699,12 +704,12 @@ class _TaskDetailViewState extends State<TaskDetailView> {
           ),
           const SizedBox(height: Space.xl),
           Row(children: [
-            Text('运行记录', style: tt.titleSmall),
+            Text(l10n.tasksRuns, style: tt.titleSmall),
             const Spacer(),
-            if (_runs.isNotEmpty) Text('最近 ${_runs.length} 次', style: tt.labelMedium?.copyWith(color: cs.onSurfaceVariant)),
+            if (_runs.isNotEmpty) Text(l10n.tasksRecentRuns(_runs.length), style: tt.labelMedium?.copyWith(color: cs.onSurfaceVariant)),
           ]),
           const SizedBox(height: Space.xs),
-          if (_runs.isEmpty) Text('还没有运行过。可以点“立即运行”先试一次。', style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
+          if (_runs.isEmpty) Text(l10n.tasksNoRunsYet, style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
           for (final r in _runs) _RunTile(run: r, now: now),
         ]),
       ),
@@ -753,11 +758,11 @@ class _RunTile extends StatelessWidget {
     final (label, icon, bad) = runStatus(status);
     final started = _at(run['started'])!;
     final secs = (((run['finished'] as num? ?? 0) - (run['started'] as num)) / 1000).round();
-    final dur = secs < 60 ? '$secs 秒' : '${secs ~/ 60} 分 ${secs % 60} 秒';
+    final dur = secs < 60 ? l10n.durationSeconds(secs) : l10n.durationMinutesSeconds(secs ~/ 60, secs % 60);
     final cost = (run['cost'] as num?) ?? 0;
     final session = '${run['session_id'] ?? ''}';
     final summary = '${run['summary'] ?? ''}';
-    final manual = run['manual'] == true ? ' · 手动' : '';
+    final manual = run['manual'] == true ? l10n.tasksManualSuffix : '';
     final (bg, fg) = bad
         ? (cs.errorContainer, cs.onErrorContainer)
         : status == 'ok'
@@ -765,7 +770,7 @@ class _RunTile extends StatelessWidget {
             : (cs.surfaceContainerHighest, cs.onSurfaceVariant);
     final String title, sub;
     if (showTask) {
-      title = '${run['name'] ?? '已删除的任务'}${run['deleted'] == true && run['name'] != null ? '（已删除）' : ''}';
+      title = '${run['name'] ?? l10n.tasksDeletedTask}${run['deleted'] == true && run['name'] != null ? l10n.tasksDeletedSuffix : ''}';
       sub = '$label · ${_hm(started)}$manual${summary.isEmpty ? '' : '\n$summary'}';
     } else {
       title = '$label · ${fmtWhen(started, now)}$manual';
@@ -778,7 +783,7 @@ class _RunTile extends StatelessWidget {
         Flexible(child: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis)),
         if (isNew) ...[
           const SizedBox(width: Space.sm),
-          Semantics(label: '新', child: Container(width: 8, height: 8, decoration: BoxDecoration(color: cs.primary, shape: BoxShape.circle))),
+          Semantics(label: l10n.commonNewBadge, child: Container(width: 8, height: 8, decoration: BoxDecoration(color: cs.primary, shape: BoxShape.circle))),
         ],
       ]),
       subtitle: sub.isEmpty ? null : Text(sub, maxLines: showTask ? 3 : 2, overflow: TextOverflow.ellipsis),
@@ -804,9 +809,9 @@ class _TemplateGallery extends StatelessWidget {
       ContentWidth(
         max: 900,
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('让助手按计划替你做事', style: tt.titleLarge),
+          Text(l10n.tasksIntroTitle, style: tt.titleLarge),
           const SizedBox(height: Space.xs),
-          Text('每次运行都会开一个新对话，结果可在“运行记录”里查看。任务只在 Look Studio 打开时执行；错过的时间可以在 12 小时内启动时补跑。',
+          Text(l10n.tasksIntroBody,
               style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
           const SizedBox(height: Space.xl),
           LayoutBuilder(builder: (context, box) {
@@ -817,7 +822,7 @@ class _TemplateGallery extends StatelessWidget {
             ]);
           }),
           const SizedBox(height: Space.lg),
-          OutlinedButton.icon(onPressed: () => onPick(null), icon: const Icon(Icons.edit_note_rounded), label: const Text('从空白开始')),
+          OutlinedButton.icon(onPressed: () => onPick(null), icon: const Icon(Icons.edit_note_rounded), label: Text(l10n.tasksFromBlank)),
         ]),
       ),
     ]);
@@ -862,10 +867,10 @@ class _TemplateCard extends StatelessWidget {
 
 /// Ready-made tasks offered when the list is empty.
 /// What a run may change (the agent's TASK_WRITES); other writes are refused.
-const kTaskWrites = {
-  'notes': ('保存笔记与大纲', Icons.edit_note_rounded),
-  'schedule': ('标记与修改日程', Icons.event_available_outlined),
-  'quiz': ('创建练习', Icons.quiz_outlined),
+final kTaskWrites = {
+  'notes': (l10n.tasksWriteNotes, Icons.edit_note_rounded),
+  'schedule': (l10n.tasksWriteSchedule, Icons.event_available_outlined),
+  'quiz': (l10n.tasksWriteQuizzes, Icons.quiz_outlined),
 };
 
 class TaskTemplate {
@@ -877,13 +882,13 @@ class TaskTemplate {
   Map<String, dynamic> toJson() => {'name': name, 'prompt': prompt, 'schedule': schedule, 'writes': writes};
 }
 
-const kTaskTemplates = [
-  TaskTemplate('每晚复盘今天的课', Icons.nightlight_outlined,
-      '看看今天有哪些课的转写已经完成，为每节课写一份简明的复盘笔记并保存：核心概念、关键公式与例题、老师强调的要点，附时间戳。没有新课就简单说明。', {'type': 'daily', 'time': '21:30'}, ['notes']),
-  TaskTemplate('每周一出一组复习题', Icons.quiz_outlined,
-      '回顾上周转写过的课程，为每门课出一组 10 道中等难度的选择题并保存为练习，重点覆盖上周的新内容。', {'type': 'weekly', 'days': [1], 'time': '08:00'}, ['quiz']),
-  TaskTemplate('每天早上汇总近期截止', Icons.event_note_outlined,
-      '列出今天起 7 天内的作业、考试和截止事项，按日期排序，提醒最紧急的两件；如果有已经过期但没完成的也指出来。', {'type': 'daily', 'time': '08:00'}, []),
+final kTaskTemplates = [
+  TaskTemplate(l10n.taskTemplateReviewName, Icons.nightlight_outlined,
+      l10n.taskTemplateReviewPrompt, {'type': 'daily', 'time': '21:30'}, ['notes']),
+  TaskTemplate(l10n.taskTemplateQuizName, Icons.quiz_outlined,
+      l10n.taskTemplateQuizPrompt, {'type': 'weekly', 'days': [1], 'time': '08:00'}, ['quiz']),
+  TaskTemplate(l10n.taskTemplateDeadlinesName, Icons.event_note_outlined,
+      l10n.taskTemplateDeadlinesPrompt, {'type': 'daily', 'time': '08:00'}, []),
 ];
 
 /// Creates or edits a task; returns the saved task.
@@ -915,7 +920,7 @@ class _TaskEditorState extends State<_TaskEditor> {
   late final _name = TextEditingController(text: '${_src['name'] ?? ''}');
   late final _prompt = TextEditingController(text: '${_src['prompt'] ?? ''}');
   late final _budget = TextEditingController(text: '${_src['budget_usd'] ?? 0.2}');
-  late String _type = _src['schedule'] is Map && fmtSchedule(_src['schedule'] as Map).startsWith('工作日') ? 'workdays' : '${(_src['schedule'] as Map?)?['type'] ?? 'daily'}';
+  late String _type = _src['schedule'] is Map && isWorkdays(_src['schedule'] as Map) ? 'workdays' : '${(_src['schedule'] as Map?)?['type'] ?? 'daily'}';
   late TimeOfDay _time = _parseTime('${(_src['schedule'] as Map?)?['time'] ?? '21:30'}');
   late Set<int> _days = {for (final d in ((_src['schedule'] as Map?)?['days'] as List? ?? const [1])) (d as num).toInt()};
   late DateTime _once = DateTime.tryParse('${(_src['schedule'] as Map?)?['at'] ?? ''}') ?? DateTime.now().add(const Duration(hours: 1));
@@ -997,12 +1002,12 @@ class _TaskEditorState extends State<_TaskEditor> {
     Widget label(String t) => Padding(padding: const EdgeInsets.only(top: Space.lg, bottom: Space.sm), child: Text(t, style: tt.labelLarge?.copyWith(color: cs.onSurfaceVariant)));
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(tooltip: '取消', onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close_rounded)),
-        title: Text(widget.task == null ? '新建定时任务' : '编辑定时任务'),
+        leading: IconButton(tooltip: l10n.commonCancel, onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close_rounded)),
+        title: Text(widget.task == null ? l10n.tasksNewTitle : l10n.tasksEditTitle),
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: Space.md),
-            child: FilledButton(onPressed: _saving ? null : _save, child: const Text('保存')),
+            child: FilledButton(onPressed: _saving ? null : _save, child: Text(l10n.commonSave)),
           ),
         ],
       ),
@@ -1027,23 +1032,23 @@ class _TaskEditorState extends State<_TaskEditor> {
           ]),
           const SizedBox(height: Space.lg),
         ],
-        TextField(controller: _name, maxLength: 40, decoration: const InputDecoration(labelText: '名称', border: OutlineInputBorder())),
+        TextField(controller: _name, maxLength: 40, decoration: InputDecoration(labelText: l10n.commonName, border: OutlineInputBorder())),
         const SizedBox(height: Space.sm),
         TextField(
           controller: _prompt,
           minLines: 4,
           maxLines: 10,
           maxLength: 4000,
-          decoration: const InputDecoration(labelText: '让助手做什么', alignLabelWithHint: true, border: OutlineInputBorder()),
+          decoration: InputDecoration(labelText: l10n.tasksPromptLabel, alignLabelWithHint: true, border: OutlineInputBorder()),
         ),
-        label('时间'),
+        label(l10n.commonTime),
         SegmentedButton<String>(
           showSelectedIcon: false,
-          segments: const [
-            ButtonSegment(value: 'daily', label: Text('每天')),
-            ButtonSegment(value: 'workdays', label: Text('工作日')),
-            ButtonSegment(value: 'weekly', label: Text('每周')),
-            ButtonSegment(value: 'once', label: Text('一次')),
+          segments: [
+            ButtonSegment(value: 'daily', label: Text(l10n.commonDaily)),
+            ButtonSegment(value: 'workdays', label: Text(l10n.tasksWorkdays)),
+            ButtonSegment(value: 'weekly', label: Text(l10n.commonWeekly)),
+            ButtonSegment(value: 'once', label: Text(l10n.scheduleOnce)),
           ],
           selected: {_type},
           onSelectionChanged: (v) => setState(() => _type = v.first),
@@ -1053,7 +1058,7 @@ class _TaskEditorState extends State<_TaskEditor> {
           Wrap(spacing: Space.xs, runSpacing: Space.xs, children: [
             for (var d = 1; d <= 7; d++)
               FilterChip(
-                label: Text('周${_weekdayNames[d - 1]}'),
+                label: Text(l10n.weekdayName(weekdayNames[d - 1])),
                 selected: _days.contains(d),
                 onSelected: (on) => setState(() => on ? _days.add(d) : _days.remove(d)),
               ),
@@ -1061,10 +1066,10 @@ class _TaskEditorState extends State<_TaskEditor> {
           const SizedBox(height: Space.md),
         ],
         Wrap(spacing: Space.sm, runSpacing: Space.sm, children: [
-          if (_type == 'once') OutlinedButton.icon(onPressed: _pickDate, icon: const Icon(Icons.calendar_today_outlined, size: 18), label: Text('${_once.month}月${_once.day}日')),
+          if (_type == 'once') OutlinedButton.icon(onPressed: _pickDate, icon: const Icon(Icons.calendar_today_outlined, size: 18), label: Text(l10n.dateMonthDay(_once.month, _once.day))),
           OutlinedButton.icon(onPressed: _pickTime, icon: const Icon(Icons.schedule_rounded, size: 18), label: Text(_type == 'once' ? _hm(_once) : _hhmm)),
         ]),
-        label('允许它'),
+        label(l10n.tasksAllowLabel),
         Wrap(spacing: Space.sm, runSpacing: Space.sm, children: [
           for (final MapEntry(key: k, value: (name, icon)) in kTaskWrites.entries)
             FilterChip(
@@ -1076,20 +1081,20 @@ class _TaskEditorState extends State<_TaskEditor> {
         ]),
         Padding(
           padding: const EdgeInsets.only(top: Space.xs),
-          child: Text('运行时只允许勾选的写入；都不选则只读，结果写在总结里。任务读到的转写稿、课件等资料不能让它做别的修改。', style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+          child: Text(l10n.tasksAllowHint, style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
         ),
-        label('限制'),
+        label(l10n.tasksLimits),
         TextField(
           controller: _budget,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          decoration: const InputDecoration(labelText: '单次费用上限', prefixText: r'$ ', helperText: '超过后中止这次运行（按模型价格估算）', border: OutlineInputBorder()),
+          decoration: InputDecoration(labelText: l10n.tasksCostLimitLabel, prefixText: r'$ ', helperText: l10n.tasksCostLimitHelper, border: OutlineInputBorder()),
         ),
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
           value: _catchUp,
           onChanged: (v) => setState(() => _catchUp = v),
-          title: const Text('错过时补跑'),
-          subtitle: const Text('应用在计划时间未运行时，12 小时内启动会补跑一次'),
+          title: Text(l10n.tasksCatchUp),
+          subtitle: Text(l10n.tasksCatchUpHint),
         ),
         if (_error != null) Padding(padding: const EdgeInsets.only(top: Space.sm), child: Text(_error!, style: tt.bodyMedium?.copyWith(color: cs.error))),
       ]),
@@ -1119,15 +1124,15 @@ class _TaskRunListenerState extends State<TaskRunListener> {
       if (d['phase'] != 'finished' || d['status'] == 'skipped') return;
       final (label, _, bad) = runStatus('${d['status']}');
       final session = '${d['session_id'] ?? ''}';
-      final why = bad && '${d['summary'] ?? ''}'.isNotEmpty ? '：${d['summary']}' : '';
+      final why = bad && '${d['summary'] ?? ''}'.isNotEmpty ? l10n.tasksRunReason(d['summary']) : '';
       widget.messenger.currentState?.showSnackBar(SnackBar(
         persist: false,
         duration: const Duration(seconds: 6),
-        content: Text('定时任务「${d['name']}」$label$why', maxLines: 2, overflow: TextOverflow.ellipsis),
+        content: Text(l10n.tasksRunNotice(d['name'], label, why), maxLines: 2, overflow: TextOverflow.ellipsis),
         action: session.isEmpty
             ? null
             : SnackBarAction(
-                label: '查看',
+                label: l10n.commonView,
                 onPressed: () {
                   final c = widget.navigator.currentContext;
                   if (c != null) openRunConversation(c, session);

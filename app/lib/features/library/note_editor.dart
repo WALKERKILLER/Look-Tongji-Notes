@@ -8,6 +8,7 @@ import '../../theme/tokens.dart';
 import '../../widgets/states.dart';
 import '../../widgets/look_markdown.dart';
 import 'note_reader.dart';
+import '../../l10n/l10n.dart';
 
 /// Markdown note editor with live preview. Saves through lookd, which writes
 /// the note as a Markdown file with front matter and indexes it.
@@ -95,7 +96,7 @@ class _NoteEditorState extends State<NoteEditor> {
         'id': ?_id,
         'course_id': widget.note?.courseId ?? widget.courseId,
         'lecture_id': widget.note?.lectureId ?? widget.lectureId,
-        'title': _title.text.trim().isEmpty ? '未命名笔记' : _title.text.trim(),
+        'title': _title.text.trim().isEmpty ? l10n.noteUntitled : _title.text.trim(),
         'body': _body.text,
         'source': widget.note?.source.isNotEmpty == true ? widget.note!.source : 'user',
       });
@@ -103,9 +104,9 @@ class _NoteEditorState extends State<NoteEditor> {
       _id = n.id;
       setState(() => _dirty = false);
       widget.onSaved?.call(n);
-      if (mounted) showSnack(context, '笔记已保存');
+      if (mounted) showSnack(context, l10n.noteSaved);
     } catch (e) {
-      if (mounted) showSnack(context, '保存失败：$e');
+      if (mounted) showSnack(context, l10n.commonSaveFailed(e));
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -117,19 +118,19 @@ class _NoteEditorState extends State<NoteEditor> {
     final tt = Theme.of(context).textTheme;
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Row(children: [
-        if (widget.onClose != null) IconButton(onPressed: widget.onClose, icon: const Icon(Icons.arrow_back_rounded), tooltip: '返回'),
+        if (widget.onClose != null) IconButton(onPressed: widget.onClose, icon: const Icon(Icons.arrow_back_rounded), tooltip: l10n.commonBack),
         Expanded(
           child: TextField(
             controller: _title,
             style: tt.titleLarge,
-            decoration: const InputDecoration(hintText: '标题', border: InputBorder.none, filled: false, isDense: true),
+            decoration: InputDecoration(hintText: l10n.commonTitle, border: InputBorder.none, filled: false, isDense: true),
           ),
         ),
         SegmentedButton<bool>(
           showSelectedIcon: false,
-          segments: const [
-            ButtonSegment(value: false, icon: Icon(Icons.edit_outlined, size: 18), tooltip: '编辑'),
-            ButtonSegment(value: true, icon: Icon(Icons.visibility_outlined, size: 18), tooltip: '预览'),
+          segments: [
+            ButtonSegment(value: false, icon: Icon(Icons.edit_outlined, size: 18), tooltip: l10n.commonEdit),
+            ButtonSegment(value: true, icon: Icon(Icons.visibility_outlined, size: 18), tooltip: l10n.commonPreview),
           ],
           selected: {_preview},
           onSelectionChanged: (s) => setState(() => _preview = s.first),
@@ -146,7 +147,7 @@ class _NoteEditorState extends State<NoteEditor> {
                   decoration: BoxDecoration(color: cs.surfaceContainerLow, borderRadius: BorderRadius.circular(Corners.lg)),
                   child: SingleChildScrollView(
                     child: LookMarkdown(
-                      _body.text.isEmpty ? '_（空）_' : _body.text,
+                      _body.text.isEmpty ? l10n.noteEmptyPreview : _body.text,
                       style: tt.bodyMedium?.copyWith(height: 1.7),
                       lectureId: _lectureId,
                       baseDir: widget.note == null ? '' : p.posix.dirname(widget.note!.path),
@@ -162,7 +163,7 @@ class _NoteEditorState extends State<NoteEditor> {
                   textAlignVertical: TextAlignVertical.top,
                   style: tt.bodyMedium?.copyWith(height: 1.6),
                   decoration: InputDecoration(
-                    hintText: '支持 Markdown。${widget.timestamp != null ? '点“插入时间”记录当前播放位置，' : ''}内容保存在课程库的 notes 文件夹。',
+                    hintText: l10n.noteEditorHint(widget.timestamp != null ? l10n.noteEditorHintTimestamp : ''),
                     alignLabelWithHint: true,
                   ),
                 ),
@@ -171,18 +172,18 @@ class _NoteEditorState extends State<NoteEditor> {
       const SizedBox(height: Space.sm),
       Row(children: [
         if (widget.timestamp != null)
-          TextButton.icon(onPressed: _insertTimestamp, icon: const Icon(Icons.more_time_rounded, size: 18), label: const Text('插入时间')),
+          TextButton.icon(onPressed: _insertTimestamp, icon: const Icon(Icons.more_time_rounded, size: 18), label: Text(l10n.noteInsertTime)),
         const Spacer(),
         AnimatedOpacity(
           opacity: _dirty ? 1 : 0,
           duration: Motion.short4,
-          child: Text('未保存', style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant)),
+          child: Text(l10n.noteUnsaved, style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant)),
         ),
         const SizedBox(width: Space.sm),
         FilledButton.icon(
           onPressed: _saving || !_dirty && _id != null ? null : _save,
           icon: _saving ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.check_rounded, size: 18),
-          label: const Text('保存'),
+          label: Text(l10n.commonSave),
         ),
       ]),
     ]);

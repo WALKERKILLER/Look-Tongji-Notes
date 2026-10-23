@@ -13,6 +13,7 @@ import 'theme/prefs.dart';
 import 'theme/theme.dart';
 import 'theme/tokens.dart';
 import 'widgets/states.dart';
+import 'l10n/l10n.dart';
 
 /// App-wide snackbars and navigation for events that arrive on any screen.
 final rootMessenger = GlobalKey<ScaffoldMessengerState>();
@@ -29,8 +30,11 @@ class LookApp extends StatelessWidget {
       final lightTheme = buildTheme(buildScheme(prefs, Brightness.light, systemAccent: accent), prefs);
       final darkTheme = buildTheme(buildScheme(prefs, Brightness.dark, systemAccent: dark?.primary ?? accent), prefs);
       return MaterialApp(
-        title: 'Look Studio',
+        onGenerateTitle: (context) => l10n.appTitle,
         debugShowCheckedModeBanner: false,
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        locale: const Locale('zh'),
         scaffoldMessengerKey: rootMessenger,
         navigatorKey: rootNavigator,
         theme: lightTheme,
@@ -39,6 +43,7 @@ class LookApp extends StatelessWidget {
         themeAnimationDuration: Motion.medium2,
         themeAnimationCurve: Motion.standard,
         builder: (context, child) {
+          l10n = AppLocalizations.of(context);
           final mq = MediaQuery.of(context);
           return MediaQuery(
             data: mq.copyWith(
@@ -70,13 +75,13 @@ class RootGate extends StatelessWidget {
         key: const ValueKey('failed'),
         body: EmptyState(
           icon: Icons.power_off_rounded,
-          title: '后台服务未能启动',
+          title: l10n.appDaemonFailed,
           body: daemon.error,
-          action: FilledButton.tonal(onPressed: daemon.restart, child: const Text('重新启动')),
+          action: FilledButton.tonal(onPressed: daemon.restart, child: Text(l10n.appRestart)),
         ),
       );
     } else if (!app.connected || !app.authKnown) {
-      child = const Scaffold(key: ValueKey('splash'), body: CenteredLoader(label: '正在启动'));
+      child = Scaffold(key: ValueKey('splash'), body: CenteredLoader(label: l10n.commonStarting));
     } else if (!app.auth.signedIn && app.auth.status != 'needs_password') {
       child = const LoginPage(key: ValueKey('login'));
     } else {

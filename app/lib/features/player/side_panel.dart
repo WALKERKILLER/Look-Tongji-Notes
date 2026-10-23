@@ -22,6 +22,7 @@ import '../library/note_reader.dart';
 import '../plugins/plugin_views.dart';
 import '../practice/quiz.dart';
 import '../../widgets/look_markdown.dart';
+import '../../l10n/l10n.dart';
 
 /// Outline / transcript / materials / notes (and the assistant) beside or
 /// below the video.
@@ -98,11 +99,11 @@ class _PlayerSidePanelState extends State<PlayerSidePanel> with SingleTickerProv
                 splashBorderRadius: BorderRadius.circular(Corners.full),
                 overlayColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.hovered) ? cs.onSurface.withValues(alpha: 0.06) : null),
                 tabs: [
-                  Tab(text: count('大纲', ctl.chapters.length), height: 44),
-                  const Tab(text: '文字稿', height: 44),
-                  Tab(text: count('资料', ctl.slides.length + ctl.courseware.length), height: 44),
-                  Tab(text: count('笔记', ctl.notes.length + ctl.bookmarks.length), height: 44),
-                  if (widget.assistant != null) const Tab(text: '助手', height: 44),
+                  Tab(text: count(l10n.commonOutline, ctl.chapters.length), height: 44),
+                  Tab(text: l10n.commonTranscript, height: 44),
+                  Tab(text: count(l10n.panelMaterials, ctl.slides.length + ctl.courseware.length), height: 44),
+                  Tab(text: count(l10n.commonNotes, ctl.notes.length + ctl.bookmarks.length), height: 44),
+                  if (widget.assistant != null) Tab(text: l10n.commonAssistant, height: 44),
                 ],
               ),
             ),
@@ -160,8 +161,8 @@ class _MaterialsTabState extends State<_MaterialsTab> with AutomaticKeepAliveCli
             showSelectedIcon: false,
             style: const ButtonStyle(visualDensity: VisualDensity(vertical: -2)),
             segments: [
-              ButtonSegment(value: true, icon: const Icon(Icons.slideshow_outlined, size: 18), label: Text(ctl.slides.isEmpty ? 'PPT 截图' : 'PPT 截图 ${ctl.slides.length}')),
-              ButtonSegment(value: false, icon: const Icon(Icons.description_outlined, size: 18), label: Text(ctl.courseware.isEmpty ? '课件' : '课件 ${ctl.courseware.length}')),
+              ButtonSegment(value: true, icon: const Icon(Icons.slideshow_outlined, size: 18), label: Text(ctl.slides.isEmpty ? l10n.assetSlides : l10n.panelSlidesCount(ctl.slides.length))),
+              ButtonSegment(value: false, icon: const Icon(Icons.description_outlined, size: 18), label: Text(ctl.courseware.isEmpty ? l10n.assetCourseware : l10n.panelCoursewareCount(ctl.courseware.length))),
             ],
             selected: {slides},
             onSelectionChanged: (v) => setState(() => _slides = v.first),
@@ -250,8 +251,8 @@ class _SlidesTabState extends State<_SlidesTab> with AutomaticKeepAliveClientMix
     if (ctl.slides.isEmpty) {
       return EmptyState(
         icon: Icons.slideshow_outlined,
-        title: '这节课没有 PPT 截图',
-        body: '平台只在老师投屏时生成截图',
+        title: l10n.slidesEmpty,
+        body: l10n.slidesEmptyBody,
       );
     }
     return Column(children: [
@@ -260,18 +261,18 @@ class _SlidesTabState extends State<_SlidesTab> with AutomaticKeepAliveClientMix
         child: Row(children: [
           // Without page-change marks there is nothing to filter.
           if (ctl.slides.any((s) => s.isKey)) ...[
-            FilterChip(label: const Text('仅换页'), selected: _keyOnly, onSelected: (v) => setState(() => _keyOnly = v)),
+            FilterChip(label: Text(l10n.slidesPageOnly), selected: _keyOnly, onSelected: (v) => setState(() => _keyOnly = v)),
             const SizedBox(width: Space.sm),
           ],
           FilterChip(
-            label: const Text('跟随播放'),
+            label: Text(l10n.slidesFollow),
             selected: prefs.slideFollow,
             onSelected: (v) => prefs.update((p) => p.slideFollow = v),
           ),
           const Spacer(),
           if (!ctl.slides.any((s) => s.path.isNotEmpty))
             IconButton(
-              tooltip: '下载 PPT',
+              tooltip: l10n.slidesDownload,
               onPressed: () => showDownloadSheet(context, [ctl.lectureId], title: ctl.lecture?.shortTitle),
               icon: const Icon(Icons.download_outlined),
             ),
@@ -330,7 +331,7 @@ class _SlidesTabState extends State<_SlidesTab> with AutomaticKeepAliveClientMix
                       ),
                       const SizedBox(height: 6),
                       Row(children: [
-                        Text('第 ${s.idx} 张', style: tt.labelMedium?.copyWith(color: on ? cs.primary : cs.onSurfaceVariant)),
+                        Text(l10n.slidesIndex(s.idx), style: tt.labelMedium?.copyWith(color: on ? cs.primary : cs.onSurfaceVariant)),
                         const Spacer(),
                         Text(fmtClock(s.tSec * 1000), style: tt.labelMedium?.copyWith(color: cs.onSurfaceVariant, fontFeatures: const [FontFeature.tabularFigures()])),
                       ]),
@@ -392,7 +393,7 @@ class _SlidesTabState extends State<_SlidesTab> with AutomaticKeepAliveClientMix
                           Navigator.pop(context);
                         },
                         icon: const Icon(Icons.play_arrow_rounded),
-                        label: Text('${cur + 1} / ${list.length} · 从 ${fmtClock(list[cur].tSec * 1000)} 播放'),
+                        label: Text(l10n.slidesPosition(cur + 1, list.length, fmtClock(list[cur].tSec * 1000))),
                       ),
                       const SizedBox(width: Space.md),
                       IconButton.filledTonal(onPressed: () => page.nextPage(duration: Motion.medium2, curve: Motion.emphasized), icon: const Icon(Icons.chevron_right_rounded)),
@@ -476,15 +477,15 @@ class _TranscriptTabState extends State<_TranscriptTab> with AutomaticKeepAliveC
     if (ctl.segments.isEmpty) {
       return EmptyState(
         icon: Icons.subject_rounded,
-        title: '还没有文字稿',
-        body: '转写会提取音频并生成带时间戳的文字，之后可以搜索、做字幕，也能让助手整理笔记。',
+        title: l10n.transcriptEmpty,
+        body: l10n.transcriptEmptyBody,
         action: FilledButton.tonalIcon(
           onPressed: () async {
             await context.read<AppState>().enqueue([ctl.lectureId], ['transcript']);
-            if (context.mounted) showSnack(context, '已加入转写队列，完成后自动显示');
+            if (context.mounted) showSnack(context, l10n.asrQueuedShowLater);
           },
           icon: const Icon(Icons.auto_awesome_outlined),
-          label: const Text('开始转写'),
+          label: Text(l10n.asrStart),
         ),
       );
     }
@@ -521,17 +522,17 @@ class _TranscriptTabState extends State<_TranscriptTab> with AutomaticKeepAliveC
                 controller: _q,
                 onChanged: (_) => setState(() {}),
                 decoration: InputDecoration(
-                  hintText: '在文字稿中查找',
+                  hintText: l10n.transcriptFindHint,
                   prefixIcon: const Icon(Icons.search_rounded, size: 20),
                   contentPadding: EdgeInsets.zero,
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(Corners.full), borderSide: BorderSide.none),
-                  suffixText: q.isEmpty ? null : '${idx.length} 处',
+                  suffixText: q.isEmpty ? null : l10n.transcriptMatches(idx.length),
                 ),
               ),
             ),
           ),
           IconButton(
-            tooltip: _follow ? '跟随播放：开' : '跟随播放：关',
+            tooltip: _follow ? l10n.transcriptFollowOn : l10n.transcriptFollowOff,
             isSelected: _follow,
             onPressed: () {
               setState(() => _follow = !_follow);
@@ -546,25 +547,25 @@ class _TranscriptTabState extends State<_TranscriptTab> with AutomaticKeepAliveC
                 leadingIcon: const Icon(Icons.copy_rounded),
                 onPressed: () {
                   Clipboard.setData(ClipboardData(text: ctl.segments.map((s) => '[${fmtClock(s.startMs)}] ${s.text}').join('\n')));
-                  showSnack(context, '已复制全文');
+                  showSnack(context, l10n.transcriptCopied);
                 },
-                child: const Text('复制全文'),
+                child: Text(l10n.transcriptCopyAll),
               ),
               if (widget.onAsk != null) ...[
                 MenuItemButton(
                   leadingIcon: const Icon(Icons.auto_awesome_outlined),
-                  onPressed: () => widget.onAsk!('请为这节课整理一份完整的学习笔记并保存：以字幕为主，找出重点和不确定的地方，对照当时的 PPT 和已上传的课件核实，公式用 LaTeX，要点附时间戳。'),
-                  child: const Text('让助手整理笔记'),
+                  onPressed: () => widget.onAsk!(l10n.promptNotes),
+                  child: Text(l10n.panelAskNotes),
                 ),
                 MenuItemButton(
                   leadingIcon: const Icon(Icons.quiz_outlined),
                   onPressed: () => showQuizSheet(context, lectureId: ctl.lectureId, onAsk: widget.onAsk!),
-                  child: const Text('出题练习…'),
+                  child: Text(l10n.panelQuizMore),
                 ),
                 MenuItemButton(
                   leadingIcon: const Icon(Icons.summarize_outlined),
-                  onPressed: () => widget.onAsk!('用几句话概括我刚才看的这一段（当前播放位置前 5 分钟）讲了什么。'),
-                  child: const Text('概括刚才这段'),
+                  onPressed: () => widget.onAsk!(l10n.promptSummarizeRecent),
+                  child: Text(l10n.panelSummarizeRecent),
                 ),
               ],
             ],
@@ -780,14 +781,14 @@ class _NotesTabState extends State<_NotesTab> with AutomaticKeepAliveClientMixin
     }
     return ListView(padding: const EdgeInsets.all(Space.md), children: [
       Row(children: [
-        Text('书签', style: tt.titleSmall),
+        Text(l10n.commonBookmarks, style: tt.titleSmall),
         const Spacer(),
-        TextButton.icon(onPressed: () => ctl.addBookmark(), icon: const Icon(Icons.bookmark_add_outlined, size: 18), label: const Text('当前位置')),
+        TextButton.icon(onPressed: () => ctl.addBookmark(), icon: const Icon(Icons.bookmark_add_outlined, size: 18), label: Text(l10n.panelCurrentPosition)),
       ]),
       if (ctl.bookmarks.isEmpty)
         Padding(
           padding: const EdgeInsets.symmetric(vertical: Space.sm),
-          child: Text('按 B 键或点播放器上的书签按钮标记重点', style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+          child: Text(l10n.bookmarksHint, style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
         ),
       for (final b in ctl.bookmarks)
         ListTile(
@@ -799,12 +800,12 @@ class _NotesTabState extends State<_NotesTab> with AutomaticKeepAliveClientMixin
         ),
       const SizedBox(height: Space.lg),
       Row(children: [
-        Text('笔记', style: tt.titleSmall),
+        Text(l10n.commonNotes, style: tt.titleSmall),
         const Spacer(),
-        FilledButton.tonalIcon(onPressed: () => setState(() => _new = true), icon: const Icon(Icons.add_rounded, size: 18), label: const Text('新建')),
+        FilledButton.tonalIcon(onPressed: () => setState(() => _new = true), icon: const Icon(Icons.add_rounded, size: 18), label: Text(l10n.commonNew)),
       ]),
       const SizedBox(height: Space.sm),
-      if (ctl.notes.isEmpty) Text('笔记以 Markdown 文件保存在课程库中，助手也能读取', style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+      if (ctl.notes.isEmpty) Text(l10n.notesHint, style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
       for (final n in ctl.notes)
         Card(
           color: cs.surfaceContainerHigh,
@@ -825,26 +826,26 @@ class _NotesTabState extends State<_NotesTab> with AutomaticKeepAliveClientMixin
         ),
       const SizedBox(height: Space.lg),
       Row(children: [
-        Text('练习', style: tt.titleSmall),
+        Text(l10n.commonPractice, style: tt.titleSmall),
         const Spacer(),
         if (widget.onAsk != null)
           FilledButton.tonalIcon(
             onPressed: () => showQuizSheet(context, lectureId: ctl.lectureId, onAsk: widget.onAsk!),
             icon: const Icon(Icons.auto_awesome_outlined, size: 18),
-            label: const Text('出题'),
+            label: Text(l10n.panelQuiz),
           ),
       ]),
       const SizedBox(height: Space.sm),
       QuizList(
         lectureId: ctl.lectureId,
-        empty: Text('让助手根据这节课出一组选择题，每题附解析和出处', style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+        empty: Text(l10n.panelQuizHint, style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
       ),
     ]);
   }
 
   String _snippetAt(LecturePlayer ctl, int ms) {
     final i = ctl.segmentAt(ms);
-    return i >= 0 ? ctl.segments[i].text : '书签';
+    return i >= 0 ? ctl.segments[i].text : l10n.commonBookmarks;
   }
 
   @override

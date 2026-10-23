@@ -10,23 +10,24 @@ import '../../theme/tokens.dart';
 import '../../widgets/states.dart';
 import 'assistant_controller.dart';
 import 'bot_avatar.dart';
+import '../../l10n/l10n.dart';
 
 // The resident bot's page: who it is, what it remembers and how it learns
 // (docs/specs/0007-resident-bot-and-course-agents.md).
 
-const _memoryKinds = <(String, String, IconData)>[
-  ('profile.md', '关于你', Icons.person_outline_rounded),
-  ('preferences.md', '偏好', Icons.tune_rounded),
-  ('routines/', '做法', Icons.route_outlined),
-  ('courses/', '课程', Icons.school_outlined),
-  ('notes/', '笔记', Icons.sticky_note_2_outlined),
+final _memoryKinds = <(String, String, IconData)>[
+  ('profile.md', l10n.memoryAboutYou, Icons.person_outline_rounded),
+  ('preferences.md', l10n.memoryPreferences, Icons.tune_rounded),
+  ('routines/', l10n.memoryRoutines, Icons.route_outlined),
+  ('courses/', l10n.commonCourses, Icons.school_outlined),
+  ('notes/', l10n.commonNotes, Icons.sticky_note_2_outlined),
 ];
 
 (String, IconData) _kindOf(String path) {
   for (final (prefix, label, icon) in _memoryKinds) {
     if (path == prefix || (prefix.endsWith('/') && path.startsWith(prefix))) return (label, icon);
   }
-  return ('其他', Icons.description_outlined);
+  return (l10n.commonOther, Icons.description_outlined);
 }
 
 class BotPage extends StatefulWidget {
@@ -124,11 +125,11 @@ class _BotPageState extends State<BotPage> {
           constraints: const BoxConstraints(maxWidth: 760),
           child: ListView(padding: pad.copyWith(bottom: Space.xxl), children: [
             _hero(context, a),
-            _Section('形象'),
+            _Section(l10n.botSectionLook),
             TextField(
               controller: _name,
               maxLength: 12,
-              decoration: const InputDecoration(labelText: '名字', border: OutlineInputBorder()),
+              decoration: InputDecoration(labelText: l10n.botName, border: OutlineInputBorder()),
               onSubmitted: (v) => _patch({'name': v}),
               onTapOutside: (_) {
                 if (_name.text.trim() != a.botName && _name.text.trim().isNotEmpty) _patch({'name': _name.text});
@@ -146,7 +147,7 @@ class _BotPageState extends State<BotPage> {
                 ),
             ]),
             const SizedBox(height: Space.lg),
-            Text('颜色', style: tt.labelLarge?.copyWith(color: cs.onSurfaceVariant)),
+            Text(l10n.commonColor, style: tt.labelLarge?.copyWith(color: cs.onSurfaceVariant)),
             const SizedBox(height: Space.sm),
             Wrap(spacing: Space.sm, runSpacing: Space.sm, children: [
               for (final k in kBotColorKeys)
@@ -157,14 +158,14 @@ class _BotPageState extends State<BotPage> {
                   onSelected: (_) => _patch({'color': k}),
                 ),
             ]),
-            _Section('相处方式'),
+            _Section(l10n.botSectionPersona),
             TextField(
               controller: _persona,
               maxLength: 500,
               minLines: 2,
               maxLines: 5,
-              decoration: const InputDecoration(
-                hintText: '比如：说话轻松一点，先给结论；复习时多出几道题考我。',
+              decoration: InputDecoration(
+                hintText: l10n.botPersonaHint,
                 border: OutlineInputBorder(),
               ),
             ),
@@ -174,12 +175,12 @@ class _BotPageState extends State<BotPage> {
                 listenable: _persona,
                 builder: (context, _) => FilledButton.tonal(
                   onPressed: _persona.text.trim() == '${a.bot['persona'] ?? ''}' ? null : () => _patch({'persona': _persona.text}),
-                  child: const Text('保存'),
+                  child: Text(l10n.commonSave),
                 ),
               ),
             ),
-            _Section('记忆', trailing: [
-              IconButton(tooltip: '添加记忆', onPressed: () => _edit(null), icon: const Icon(Icons.add_rounded)),
+            _Section(l10n.botSectionMemory, trailing: [
+              IconButton(tooltip: l10n.memoryAdd, onPressed: () => _edit(null), icon: const Icon(Icons.add_rounded)),
               const SizedBox(width: Space.xs),
               FilledButton.tonalIcon(
                 onPressed: a.consolidating
@@ -194,37 +195,37 @@ class _BotPageState extends State<BotPage> {
                 icon: a.consolidating
                     ? const SizedBox.square(dimension: 16, child: CircularProgressIndicator(strokeWidth: 2))
                     : const Icon(Icons.bedtime_outlined, size: 18),
-                label: Text(a.consolidating ? '正在沉淀' : '立即沉淀'),
+                label: Text(a.consolidating ? l10n.memoryConsolidating : l10n.memoryConsolidateNow),
               ),
             ]),
-            Text('${a.botName} 会把你说过的、反复用到的做法整理成记忆文件，每次对话都会带上“关于你”和“偏好”。这些文件只保存在这台电脑上，不会写入密码、证件号、银行卡号、手机号和密钥。',
+            Text(l10n.memoryIntro(a.botName),
                 style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant, height: 1.6)),
             const SizedBox(height: Space.md),
             if (_loading)
               const Padding(padding: EdgeInsets.all(Space.xl), child: Center(child: CircularProgressIndicator()))
             else if (_error != null)
-              Text('读取记忆失败：${_error is ApiError ? (_error as ApiError).message : _error}', style: tt.bodySmall?.copyWith(color: cs.error))
+              Text(l10n.memoryReadFailed(_error is ApiError ? (_error as ApiError).message : _error!), style: tt.bodySmall?.copyWith(color: cs.error))
             else if (_files.isEmpty)
               _EmptyMemory(name: a.botName)
             else
               _memoryList(context),
-            _Section('沉淀记录'),
+            _Section(l10n.memoryRuns),
             if (_runs.isEmpty)
-              Text('还没有沉淀过。对话结束两分钟后会自动整理。', style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant))
+              Text(l10n.memoryRunsEmpty, style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant))
             else
               for (final r in _runs.take(20)) _RunTile(run: r),
-            _Section('学习方式'),
+            _Section(l10n.pluginCategoryTutor),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
-              title: const Text('自动沉淀'),
-              subtitle: const Text('对话停下两分钟、或攒够六轮后，在后台整理记忆'),
+              title: Text(l10n.memoryAuto),
+              subtitle: Text(l10n.memoryAutoHint),
               value: memory['auto'] != false,
               onChanged: (v) => _patch({'memory': {'auto': v}}),
             ),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
-              title: const Text('从课程会话中学习'),
-              subtitle: const Text('课程助手里的对话也参与沉淀'),
+              title: Text(l10n.memoryFromCourses),
+              subtitle: Text(l10n.memoryFromCoursesHint),
               value: memory['learn_from_courses'] == true,
               onChanged: (v) => _patch({'memory': {'learn_from_courses': v}}),
             ),
@@ -234,18 +235,18 @@ class _BotPageState extends State<BotPage> {
                 final ok = await showDialog<bool>(
                   context: context,
                   builder: (context) => AlertDialog(
-                    title: const Text('重新开始对话？'),
-                    content: Text('${a.botName} 的对话会从头开始，记忆保留。'),
+                    title: Text(l10n.botRestartTitle),
+                    content: Text(l10n.botRestartBody(a.botName)),
                     actions: [
-                      TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('取消')),
-                      FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('重新开始')),
+                      TextButton(onPressed: () => Navigator.pop(context, false), child: Text(l10n.commonCancel)),
+                      FilledButton(onPressed: () => Navigator.pop(context, true), child: Text(l10n.botRestart)),
                     ],
                   ),
                 );
                 if (ok == true) await a.resetBot();
               },
               icon: const Icon(Icons.restart_alt_rounded),
-              label: const Text('重新开始对话'),
+              label: Text(l10n.botRestartChat),
             ),
           ]),
         ),
@@ -266,7 +267,7 @@ class _BotPageState extends State<BotPage> {
         child: Column(children: [
           Semantics(
             button: true,
-            label: '${a.botName}，${kBotMoodLabels[mood]}',
+            label: l10n.botMoodLabel(a.botName, kBotMoodLabels[mood]!),
             child: GestureDetector(
               onTap: () => _flash(BotMood.happy),
               onLongPress: () => _flash(BotMood.confused),
@@ -278,8 +279,8 @@ class _BotPageState extends State<BotPage> {
           const SizedBox(height: Space.xs),
           Text(
             [
-              _files.isEmpty ? '还没有记忆' : '记得 ${_files.length} 件事',
-              if (a.consolidating) '正在整理记忆' else if (last != null) '上次沉淀 ${fmtRelative(DateTime.fromMillisecondsSinceEpoch(last.toInt()))}',
+              _files.isEmpty ? l10n.memoryEmptyShort : l10n.memoryCount(_files.length),
+              if (a.consolidating) l10n.memoryWorking else if (last != null) l10n.memoryLastRun(fmtRelative(DateTime.fromMillisecondsSinceEpoch(last.toInt()))),
             ].join(' · '),
             style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
           ),
@@ -320,8 +321,8 @@ class _BotPageState extends State<BotPage> {
       child: ListTile(
         leading: Icon(_kindOf(path).$2, color: cs.onSurfaceVariant),
         title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
-        subtitle: Text([if (desc.isNotEmpty) desc, if (when.isNotEmpty) '适用：$when', fmtRelative(updated)].join(' · '), maxLines: 2, overflow: TextOverflow.ellipsis),
-        trailing: IconButton(tooltip: '删除', icon: const Icon(Icons.delete_outline_rounded), onPressed: () => _delete(path, title)),
+        subtitle: Text([if (desc.isNotEmpty) desc, if (when.isNotEmpty) l10n.memoryWhen(when), fmtRelative(updated)].join(' · '), maxLines: 2, overflow: TextOverflow.ellipsis),
+        trailing: IconButton(tooltip: l10n.commonDelete, icon: const Icon(Icons.delete_outline_rounded), onPressed: () => _delete(path, title)),
         onTap: () => _edit(path),
       ),
     );
@@ -331,11 +332,11 @@ class _BotPageState extends State<BotPage> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('删除这条记忆？'),
-        content: Text('「$title」会被忘掉，之后的对话不再用到。'),
+        title: Text(l10n.memoryDeleteTitle),
+        content: Text(l10n.memoryDeleteBody(title)),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('取消')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('删除')),
+          TextButton(onPressed: () => Navigator.pop(context, false), child: Text(l10n.commonCancel)),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: Text(l10n.commonDelete)),
         ],
       ),
     );
@@ -433,7 +434,7 @@ class _EmptyMemory extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(Space.lg),
       decoration: BoxDecoration(color: cs.surfaceContainer, borderRadius: BorderRadius.circular(Corners.lg)),
-      child: Text('还没有记忆。和 $name 聊聊你的专业、学习习惯，或者直接说“记住……”。', style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
+      child: Text(l10n.memoryEmpty(name), style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
     );
   }
 }
@@ -449,9 +450,9 @@ class _RunTile extends StatelessWidget {
     final changes = [for (final c in (run['changes'] as List?) ?? const []) (c as Map).cast<String, dynamic>()];
     final at = DateTime.fromMillisecondsSinceEpoch(((run['at'] as num?) ?? 0).toInt());
     final (title, icon, color) = switch (status) {
-      'ok' => ('整理了 ${changes.length} 处', Icons.task_alt_rounded, cs.primary),
-      'error' => ('没有完成', Icons.error_outline_rounded, cs.error),
-      _ => ('没有需要记的', Icons.check_rounded, cs.onSurfaceVariant),
+      'ok' => (l10n.memoryRunChanged(changes.length), Icons.task_alt_rounded, cs.primary),
+      'error' => (l10n.memoryRunUnfinished, Icons.error_outline_rounded, cs.error),
+      _ => (l10n.memoryRunNothing, Icons.check_rounded, cs.onSurfaceVariant),
     };
     final cost = ((run['cost'] as num?) ?? 0).toDouble();
     return ListTile(
@@ -459,7 +460,7 @@ class _RunTile extends StatelessWidget {
       leading: Icon(icon, color: color),
       title: Text(title),
       subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text([fmtRelative(at), '${run['sessions'] ?? 0} 个对话 ${run['turns'] ?? 0} 轮', if (cost > 0) fmtUsd(cost)].join(' · ')),
+        Text([fmtRelative(at), l10n.memoryRunScope(run['sessions'] ?? 0, run['turns'] ?? 0), if (cost > 0) fmtUsd(cost)].join(' · ')),
         if ('${run['summary'] ?? ''}'.isNotEmpty) Text('${run['summary']}', style: tt.bodySmall, maxLines: 3, overflow: TextOverflow.ellipsis),
         if (changes.isNotEmpty)
           Padding(
@@ -468,7 +469,7 @@ class _RunTile extends StatelessWidget {
               for (final c in changes)
                 Chip(
                   visualDensity: VisualDensity.compact,
-                  label: Text('${const {'created': '新建', 'updated': '更新', 'appended': '追加'}[c['action']] ?? c['action']} ${c['path']}'),
+                  label: Text('${{'created': l10n.commonNew, 'updated': l10n.memoryUpdated, 'appended': l10n.memoryAppended}[c['action']] ?? c['action']} ${c['path']}'),
                 ),
             ]),
           ),
@@ -511,7 +512,7 @@ class _MemoryEditorState extends State<MemoryEditor> {
   Future<void> _save() async {
     final p = _path;
     if (p == null) {
-      setState(() => _error = '名称只能用小写字母、数字、- 和 _');
+      setState(() => _error = l10n.memoryFileNameInvalid);
       return;
     }
     setState(() {
@@ -538,7 +539,7 @@ class _MemoryEditorState extends State<MemoryEditor> {
     return Padding(
       padding: EdgeInsets.fromLTRB(Space.xl, 0, Space.xl, Space.lg + MediaQuery.viewInsetsOf(context).bottom),
       child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Text(widget.path == null ? '添加记忆' : widget.path!, style: tt.titleMedium),
+        Text(widget.path == null ? l10n.memoryAdd : widget.path!, style: tt.titleMedium),
         const SizedBox(height: Space.md),
         if (widget.path == null) ...[
           SegmentedButton<String>(
@@ -551,7 +552,7 @@ class _MemoryEditorState extends State<MemoryEditor> {
             const SizedBox(height: Space.md),
             TextField(
               controller: _slug,
-              decoration: InputDecoration(labelText: '文件名', prefixText: _kind, suffixText: '.md', border: const OutlineInputBorder()),
+              decoration: InputDecoration(labelText: l10n.memoryFileName, prefixText: _kind, suffixText: '.md', border: const OutlineInputBorder()),
             ),
           ],
           const SizedBox(height: Space.md),
@@ -562,8 +563,8 @@ class _MemoryEditorState extends State<MemoryEditor> {
             minLines: 8,
             maxLines: 18,
             style: tt.bodyMedium?.copyWith(fontFamily: 'monospace', height: 1.5),
-            decoration: const InputDecoration(
-              hintText: '---\ntitle: 标题\ndescription: 一句话说明\n---\n内容',
+            decoration: InputDecoration(
+              hintText: l10n.memoryFileHint,
               border: OutlineInputBorder(),
             ),
           ),
@@ -573,9 +574,9 @@ class _MemoryEditorState extends State<MemoryEditor> {
         const SizedBox(height: Space.md),
         Row(children: [
           const Spacer(),
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('取消')),
+          TextButton(onPressed: () => Navigator.pop(context), child: Text(l10n.commonCancel)),
           const SizedBox(width: Space.sm),
-          FilledButton(onPressed: _saving ? null : _save, child: Text(_saving ? '保存中…' : '保存')),
+          FilledButton(onPressed: _saving ? null : _save, child: Text(_saving ? l10n.commonSaving : l10n.commonSave)),
         ]),
       ]),
     );

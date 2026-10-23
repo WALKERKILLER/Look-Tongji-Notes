@@ -12,20 +12,21 @@ import '../../widgets/pickers.dart';
 import '../../widgets/states.dart';
 import '../practice/quiz.dart' show askInSheet;
 import 'plugin_views.dart';
+import '../../l10n/l10n.dart';
 
 // The 插件 tab: discover, install and manage plugins
 // (docs/specs/0004-plugin-platform.md).
 
-const _surfaceLabels = {
-  'note.toolbar': '笔记工具栏',
-  'lecture.menu': '课次菜单',
-  'course.menu': '课程菜单',
-  'schedule.item': '日程条目',
-  'assignment.actions': '作业页',
-  'composer.plus': '输入框的「+」菜单',
+final _surfaceLabels = {
+  'note.toolbar': l10n.pluginSlotNoteToolbar,
+  'lecture.menu': l10n.pluginSlotLectureMenu,
+  'course.menu': l10n.pluginSlotCourseMenu,
+  'schedule.item': l10n.pluginSlotScheduleItem,
+  'assignment.actions': l10n.pluginSlotAssignment,
+  'composer.plus': l10n.pluginSlotComposer,
 };
 
-const _scopeLabels = {'note': '笔记', 'course': '课程', 'library': '课程库', 'schedule': '日程'};
+final _scopeLabels = {'note': l10n.commonNotes, 'course': l10n.commonCourses, 'library': l10n.commonLibrary, 'schedule': l10n.commonSchedule};
 
 String _err(Object e) => e is ApiError ? e.message : '$e';
 
@@ -50,11 +51,11 @@ Future<void> _setThirdParty(BuildContext context, bool v) async {
       context: context,
       builder: (context) => AlertDialog(
         icon: const Icon(Icons.shield_outlined),
-        title: const Text('允许第三方插件？'),
-        content: const Text('第三方插件不是 Look Studio 发布的，与助手运行在同一进程中。只安装你信任的作者的插件；每次安装前都会列出它需要的权限。'),
+        title: Text(l10n.pluginsAllowThirdPartyTitle),
+        content: Text(l10n.pluginsAllowThirdPartyBody),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('取消')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('允许')),
+          TextButton(onPressed: () => Navigator.pop(context, false), child: Text(l10n.commonCancel)),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: Text(l10n.commonAllow)),
         ],
       ),
     );
@@ -79,12 +80,12 @@ class PluginSettingsSection extends StatelessWidget {
       ListTile(
         contentPadding: EdgeInsets.zero,
         leading: const Icon(Icons.extension_outlined),
-        title: const Text('已安装的插件'),
+        title: Text(l10n.pluginsInstalled),
         subtitle: Text(!store.ready
-            ? '助手启动后可用'
+            ? l10n.pluginsAfterAssistant
             : store.installed.isEmpty
-                ? '还没有安装插件'
-                : '$on 个已启用${attention > 0 ? ' · $attention 个需要处理' : ''}'),
+                ? l10n.pluginsNoneInstalled
+                : l10n.pluginsEnabledSummary(on, attention > 0 ? l10n.pluginsAttentionSuffix(attention) : '')),
         trailing: attention > 0 ? Badge(label: Text('$attention')) : const Icon(Icons.chevron_right_rounded),
         enabled: store.ready,
         onTap: () => openPlugins(context, installed: true),
@@ -92,8 +93,8 @@ class PluginSettingsSection extends StatelessWidget {
       ListTile(
         contentPadding: EdgeInsets.zero,
         leading: const Icon(Icons.explore_outlined),
-        title: const Text('发现插件'),
-        subtitle: const Text('引导式提问、思维导图、闪卡复习……让助手学会新本事'),
+        title: Text(l10n.pluginsDiscover),
+        subtitle: Text(l10n.pluginsTagline),
         trailing: const Icon(Icons.chevron_right_rounded),
         enabled: store.ready,
         onTap: () => openPlugins(context),
@@ -197,7 +198,7 @@ class _PluginsPageState extends State<PluginsPage> {
         final view = pluginsView.value;
         final Widget body;
         if (!store.ready) {
-          body = const EmptyState(icon: Icons.extension_outlined, title: '助手启动后可用', body: '插件在助手里运行，助手启动后就能浏览和管理插件。');
+          body = EmptyState(icon: Icons.extension_outlined, title: l10n.pluginsAfterAssistant, body: l10n.pluginsNeedAssistant);
         } else if (view == 0) {
           body = _discover(store, pad, box.maxWidth, wide);
         } else {
@@ -227,19 +228,19 @@ class _PluginsPageState extends State<PluginsPage> {
     final attention = store.attention;
     final updates = _listings.where((p) => p['update'] == true).length;
     final sub = n == 0
-        ? '让助手学会新本事：换一种方式讲题、把笔记画成导图、连接你常用的工具'
+        ? l10n.pluginsSubtitle
         : [
-            '$n 个已安装',
-            on == n ? '全部启用' : '$on 个启用',
-            if (attention > 0) '$attention 个需要处理',
-            if (updates > 0) '$updates 个可更新',
+            l10n.pluginsInstalledCount(n),
+            on == n ? l10n.commonAllEnabled : l10n.pluginsEnabledCount(on),
+            if (attention > 0) l10n.pluginsAttentionCount(attention),
+            if (updates > 0) l10n.pluginsUpdatesCount(updates),
           ].join(' · ');
     return ContentWidth(
       max: kMaxContentWidth + 200,
       child: Padding(
         padding: EdgeInsets.fromLTRB(pad, compact ? Space.xl : Space.xxl, pad, Space.lg),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('插件', style: compact ? tt.headlineMedium : tt.displaySmall),
+          Text(l10n.commonPlugins, style: compact ? tt.headlineMedium : tt.displaySmall),
           const SizedBox(height: Space.xs),
           Text(sub, style: tt.bodyLarge?.copyWith(color: cs.onSurfaceVariant)),
           const SizedBox(height: Space.lg),
@@ -247,11 +248,11 @@ class _PluginsPageState extends State<PluginsPage> {
             SegmentedButton<int>(
               showSelectedIcon: false,
               segments: [
-                const ButtonSegment(value: 0, icon: Icon(Icons.explore_outlined), label: Text('发现')),
+                ButtonSegment(value: 0, icon: Icon(Icons.explore_outlined), label: Text(l10n.pluginsDiscoverTab)),
                 ButtonSegment(
                   value: 1,
                   icon: Badge(isLabelVisible: attention > 0, child: const Icon(Icons.extension_outlined)),
-                  label: Text(n == 0 ? '已安装' : '已安装 $n'),
+                  label: Text(n == 0 ? l10n.commonInstalled : l10n.pluginsInstalledTab(n)),
                 ),
               ],
               selected: {pluginsView.value},
@@ -299,7 +300,7 @@ class _PluginsPageState extends State<PluginsPage> {
     // Official plugins first, then one section per added catalog.
     final groups = <String, List<Map<String, dynamic>>>{};
     for (final p in shown) {
-      groups.putIfAbsent(p['official'] == true ? '' : '${p['catalog'] ?? '其他来源'}', () => []).add(p);
+      groups.putIfAbsent(p['official'] == true ? '' : '${p['catalog'] ?? l10n.pluginsOtherSource}', () => []).add(p);
     }
     void open(Map<String, dynamic> p) {
       if (!wide) return _openDetail(p);
@@ -331,7 +332,7 @@ class _PluginsPageState extends State<PluginsPage> {
       onRefresh: _refresh,
       child: ListView(padding: EdgeInsets.fromLTRB(pad, 0, pad, Space.huge), children: [
         SearchBar(
-          hintText: '搜索插件',
+          hintText: l10n.pluginsSearch,
           constraints: const BoxConstraints(minHeight: 52, maxWidth: 640),
           leading: const Padding(padding: EdgeInsets.only(left: Space.sm), child: Icon(Icons.search_rounded)),
           elevation: const WidgetStatePropertyAll(0),
@@ -340,15 +341,15 @@ class _PluginsPageState extends State<PluginsPage> {
         ),
         const SizedBox(height: Space.md),
         Wrap(spacing: Space.sm, runSpacing: Space.sm, children: [
-          FilterChip(label: const Text('全部'), selected: _category.isEmpty, onSelected: (_) => setState(() => _category = '')),
+          FilterChip(label: Text(l10n.commonAll), selected: _category.isEmpty, onSelected: (_) => setState(() => _category = '')),
           for (final c in cats) FilterChip(label: Text(pluginCategories[c]!), selected: _category == c, onSelected: (on) => setState(() => _category = on ? c : '')),
         ]),
         if (errors.isNotEmpty) ...[
           const SizedBox(height: Space.lg),
           _Banner(
             icon: Icons.cloud_off_rounded,
-            text: '有 ${errors.length} 个插件目录没能加载',
-            action: TextButton(onPressed: () => showDialog(context: context, builder: (_) => const _CatalogsDialog()).then((_) => _loadCatalog()), child: const Text('查看')),
+            text: l10n.pluginsCatalogErrors(errors.length),
+            action: TextButton(onPressed: () => showDialog(context: context, builder: (_) => const _CatalogsDialog()).then((_) => _loadCatalog()), child: Text(l10n.commonView)),
             error: true,
           ),
         ],
@@ -357,9 +358,9 @@ class _PluginsPageState extends State<PluginsPage> {
           _Featured(plugins: featured, onOpen: open),
         ],
         if (shown.isEmpty)
-          const Padding(
+          Padding(
             padding: EdgeInsets.only(top: Space.xxl),
-            child: EmptyState(icon: Icons.search_off_rounded, title: '没有找到插件', body: '换个关键词，或在「来源」里添加更多插件目录'),
+            child: EmptyState(icon: Icons.search_off_rounded, title: l10n.pluginsNoMatch, body: l10n.pluginsNoMatchBody),
           ),
         for (final MapEntry(key: name, value: plugins) in groups.entries) ...[
           Padding(
@@ -367,7 +368,7 @@ class _PluginsPageState extends State<PluginsPage> {
             child: Row(children: [
               Icon(name.isEmpty ? Icons.verified_rounded : Icons.public_rounded, size: 20, color: name.isEmpty ? cs.primary : cs.onSurfaceVariant),
               const SizedBox(width: Space.sm),
-              Flexible(child: Text(name.isEmpty ? 'Look Studio 官方' : name, style: tt.titleMedium, maxLines: 1, overflow: TextOverflow.ellipsis)),
+              Flexible(child: Text(name.isEmpty ? l10n.pluginsOfficial : name, style: tt.titleMedium, maxLines: 1, overflow: TextOverflow.ellipsis)),
               const SizedBox(width: Space.sm),
               Text('${plugins.length}', style: tt.titleMedium?.copyWith(color: cs.onSurfaceVariant)),
             ]),
@@ -378,8 +379,8 @@ class _PluginsPageState extends State<PluginsPage> {
           const SizedBox(height: Space.xxl),
           _Banner(
             icon: Icons.add_link_rounded,
-            text: '想要更多？允许第三方插件后，可以添加社区的插件目录，或从文件夹、npm、Git 安装。安装前都会列出它需要的权限。',
-            action: TextButton(onPressed: () => _setThirdParty(context, true).then((_) => _loadCatalog()), child: const Text('允许')),
+            text: l10n.pluginsMoreHint,
+            action: TextButton(onPressed: () => _setThirdParty(context, true).then((_) => _loadCatalog()), child: Text(l10n.commonAllow)),
           ),
         ],
       ]),
@@ -418,15 +419,15 @@ class _PluginsPageState extends State<PluginsPage> {
     if (store.installed.isEmpty) {
       return EmptyState(
         icon: Icons.extension_outlined,
-        title: '还没有安装插件',
-        body: '在「发现」里挑几个：换一种方式讲题、把笔记画成导图、连接你常用的工具。',
-        action: FilledButton.icon(onPressed: () => pluginsView.value = 0, icon: const Icon(Icons.explore_outlined), label: const Text('去发现')),
+        title: l10n.pluginsNoneInstalled,
+        body: l10n.pluginsEmptyBody,
+        action: FilledButton.icon(onPressed: () => pluginsView.value = 0, icon: const Icon(Icons.explore_outlined), label: Text(l10n.pluginsGoDiscover)),
       );
     }
     final groups = [
-      ('需要处理', store.installed.where(_needsAttention).toList()),
-      ('已启用', store.installed.where((p) => p['state'] == 'enabled').toList()),
-      ('已停用', store.installed.where((p) => p['state'] == 'disabled').toList()),
+      (l10n.commonNeedsAttention, store.installed.where(_needsAttention).toList()),
+      (l10n.commonEnabled, store.installed.where((p) => p['state'] == 'enabled').toList()),
+      (l10n.commonDisabled, store.installed.where((p) => p['state'] == 'disabled').toList()),
     ];
     final flat = [for (final (_, items) in groups) ...items];
     final sel = flat.firstWhere((p) => p['id'] == _selected, orElse: () => flat.first);
@@ -502,31 +503,31 @@ class _SourcesMenu extends StatelessWidget {
         CheckboxMenuButton(
           value: third,
           onChanged: store.ready ? (v) => _setThirdParty(context, v ?? false).then((_) => onChanged()) : null,
-          child: const Text('允许第三方插件'),
+          child: Text(l10n.pluginsAllowThirdParty),
         ),
         const Divider(height: Space.sm),
         MenuItemButton(
           leadingIcon: const Icon(Icons.library_add_outlined, size: 20),
           onPressed: third ? () => showDialog(context: context, builder: (_) => const _CatalogsDialog()).then((_) => onChanged()) : null,
-          child: const Text('插件目录…'),
+          child: Text(l10n.pluginsCatalogs),
         ),
         MenuItemButton(
           leadingIcon: const Icon(Icons.drive_folder_upload_outlined, size: 20),
           onPressed: third ? () => showDialog(context: context, builder: (_) => const _SourceDialog()) : null,
-          child: const Text('从文件夹、npm 或 Git 安装…'),
+          child: Text(l10n.pluginsInstallFrom),
         ),
         const Divider(height: Space.sm),
         MenuItemButton(
           leadingIcon: const Icon(Icons.refresh_rounded, size: 20),
           onPressed: store.ready ? onChanged : null,
-          child: const Text('刷新'),
+          child: Text(l10n.commonRefresh),
         ),
       ],
       builder: (context, c, _) {
         void toggle() => c.isOpen ? c.close() : c.open();
         return compact
-            ? IconButton.filledTonal(tooltip: '插件来源', onPressed: toggle, icon: const Icon(Icons.tune_rounded))
-            : FilledButton.tonalIcon(onPressed: toggle, icon: const Icon(Icons.tune_rounded), label: const Text('来源'));
+            ? IconButton.filledTonal(tooltip: l10n.pluginsSources, onPressed: toggle, icon: const Icon(Icons.tune_rounded))
+            : FilledButton.tonalIcon(onPressed: toggle, icon: const Icon(Icons.tune_rounded), label: Text(l10n.pluginsSourcesTab));
       },
     );
   }
@@ -570,11 +571,11 @@ class _PluginPill extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
     final (label, bg, fg) = switch ('${plugin['state']}') {
-      'needs_consent' => ('需要授权', cs.tertiaryContainer, cs.onTertiaryContainer),
-      'error' => ('出错', cs.errorContainer, cs.onErrorContainer),
-      'disabled' => ('已停用', cs.surfaceContainerHighest, cs.onSurfaceVariant),
-      _ when update => ('可更新', cs.primary, cs.onPrimary),
-      _ => ('已启用', cs.primaryContainer, cs.onPrimaryContainer),
+      'needs_consent' => (l10n.pluginsNeedsGrant, cs.tertiaryContainer, cs.onTertiaryContainer),
+      'error' => (l10n.pluginsErrored, cs.errorContainer, cs.onErrorContainer),
+      'disabled' => (l10n.commonDisabled, cs.surfaceContainerHighest, cs.onSurfaceVariant),
+      _ when update => (l10n.pluginsUpdatable, cs.primary, cs.onPrimary),
+      _ => (l10n.commonEnabled, cs.primaryContainer, cs.onPrimaryContainer),
     };
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: Space.sm, vertical: Space.xxs),
@@ -727,12 +728,12 @@ class _HeroCard extends StatelessWidget {
         return Row(children: [
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [
-              Text('精选', style: tt.labelLarge?.copyWith(color: cs.onPrimaryContainer.withValues(alpha: 0.8))),
+              Text(l10n.pluginsFeatured, style: tt.labelLarge?.copyWith(color: cs.onPrimaryContainer.withValues(alpha: 0.8))),
               const SizedBox(height: Space.xs),
               Text('${plugin['title']}', style: tt.headlineSmall?.copyWith(color: cs.onPrimaryContainer), maxLines: 1, overflow: TextOverflow.ellipsis),
               const SizedBox(height: Space.sm),
-              Text('${plugin['summary']}', style: tt.bodyMedium?.copyWith(color: cs.onPrimaryContainer), maxLines: 2, overflow: TextOverflow.ellipsis),
-              if (examples.isNotEmpty && c.maxHeight > 150) ...[
+              Flexible(child: Text('${plugin['summary']}', style: tt.bodyMedium?.copyWith(color: cs.onPrimaryContainer), maxLines: c.maxHeight > MediaQuery.textScalerOf(context).scale(120) ? 2 : 1, overflow: TextOverflow.ellipsis)),
+              if (examples.isNotEmpty && c.maxHeight > MediaQuery.textScalerOf(context).scale(150)) ...[
                 const SizedBox(height: Space.md),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: Space.md, vertical: 6),
@@ -795,7 +796,7 @@ class _MarketCard extends StatelessWidget {
                       Row(children: [
                         if (official) ...[Icon(Icons.verified_rounded, size: 14, color: cs.primary), const SizedBox(width: Space.xxs)],
                         Flexible(
-                          child: Text(official ? 'Look Studio 官方' : '${plugin['author'] ?? plugin['catalog'] ?? ''}',
+                          child: Text(official ? l10n.pluginsOfficial : '${plugin['author'] ?? plugin['catalog'] ?? ''}',
                               style: tt.labelMedium?.copyWith(color: cs.onSurfaceVariant), maxLines: 1, overflow: TextOverflow.ellipsis),
                         ),
                       ]),
@@ -819,12 +820,12 @@ class _MarketCard extends StatelessWidget {
                     Row(children: [
                       Icon(Icons.check_circle_rounded, size: 16, color: cs.primary),
                       const SizedBox(width: Space.xs),
-                      Text('已安装', style: tt.labelLarge?.copyWith(color: cs.primary)),
+                      Text(l10n.commonInstalled, style: tt.labelLarge?.copyWith(color: cs.primary)),
                     ])
                   else if (update)
-                    FilledButton(style: FilledButton.styleFrom(visualDensity: VisualDensity.compact), onPressed: onInstall, child: const Text('更新'))
+                    FilledButton(style: FilledButton.styleFrom(visualDensity: VisualDensity.compact), onPressed: onInstall, child: Text(l10n.memoryUpdated))
                   else
-                    FilledButton.tonal(style: FilledButton.styleFrom(visualDensity: VisualDensity.compact), onPressed: onInstall, child: const Text('安装')),
+                    FilledButton.tonal(style: FilledButton.styleFrom(visualDensity: VisualDensity.compact), onPressed: onInstall, child: Text(l10n.commonInstall)),
                 ]),
               ]),
             ),
@@ -857,13 +858,13 @@ class _SourceDialogState extends State<_SourceDialog> {
   Widget build(BuildContext context) {
     final hints = ['/home/me/my-plugin', '@scope/look-plugin@1.0.0', 'https://github.com/me/plugin#v1.0.0'];
     return AlertDialog(
-      title: const Text('从其他来源安装'),
+      title: Text(l10n.pluginsInstallOther),
       content: SizedBox(
         width: 440,
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           SegmentedButton<int>(
-            segments: const [
-              ButtonSegment(value: 0, label: Text('文件夹'), icon: Icon(Icons.folder_outlined)),
+            segments: [
+              ButtonSegment(value: 0, label: Text(l10n.commonFolder), icon: Icon(Icons.folder_outlined)),
               ButtonSegment(value: 1, label: Text('npm')),
               ButtonSegment(value: 2, label: Text('Git')),
             ],
@@ -876,10 +877,10 @@ class _SourceDialogState extends State<_SourceDialog> {
             autofocus: true,
             decoration: InputDecoration(
               hintText: hints[_kind],
-              helperText: _kind == 0 ? null : '需要写明固定版本',
+              helperText: _kind == 0 ? null : l10n.pluginsPinnedVersion,
               suffixIcon: _kind == 0
                   ? IconButton(
-                      tooltip: '选择文件夹',
+                      tooltip: l10n.pickerChooseFolder,
                       icon: const Icon(Icons.folder_open_outlined),
                       onPressed: () async {
                         final dir = await pickDirectory(context, initial: _text.text.trim());
@@ -892,7 +893,7 @@ class _SourceDialogState extends State<_SourceDialog> {
         ]),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('取消')),
+        TextButton(onPressed: () => Navigator.pop(context), child: Text(l10n.commonCancel)),
         ListenableBuilder(
           listenable: _text,
           builder: (context, _) => FilledButton(
@@ -904,7 +905,7 @@ class _SourceDialogState extends State<_SourceDialog> {
                     nav.pop();
                     installPlugin(nav.context, source);
                   },
-            child: const Text('下一步'),
+            child: Text(l10n.commonNext),
           ),
         ),
       ],
@@ -964,21 +965,21 @@ class _CatalogsDialogState extends State<_CatalogsDialog> {
     final store = context.read<PluginStore>();
     final cs = Theme.of(context).colorScheme;
     return AlertDialog(
-      title: const Text('插件目录'),
+      title: Text(l10n.pluginsCatalog),
       content: SizedBox(
         width: 480,
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          const ListTile(contentPadding: EdgeInsets.zero, leading: Icon(Icons.verified_rounded), title: Text('Look Studio 官方'), subtitle: Text('随应用提供')),
+          ListTile(contentPadding: EdgeInsets.zero, leading: Icon(Icons.verified_rounded), title: Text(l10n.pluginsOfficial), subtitle: Text(l10n.pluginsBundled)),
           for (final c in _catalogs)
             ListTile(
               contentPadding: EdgeInsets.zero,
               leading: const Icon(Icons.public_rounded),
               title: Text('${c['url']}', maxLines: 1, overflow: TextOverflow.ellipsis),
               subtitle: _errors.any((e) => e is Map && e['url'] == c['url'])
-                  ? Text('加载失败：${(_errors.firstWhere((e) => e is Map && e['url'] == c['url']) as Map)['error']}', style: TextStyle(color: cs.error))
+                  ? Text(l10n.pluginsLoadFailed((_errors.firstWhere((e) => e is Map && e['url'] == c['url']) as Map)['error']), style: TextStyle(color: cs.error))
                   : null,
               trailing: IconButton(
-                tooltip: '移除',
+                tooltip: l10n.commonRemove,
                 icon: const Icon(Icons.delete_outline_rounded),
                 onPressed: _busy ? null : () => _run(() => store.removeCatalog('${c['url']}')),
               ),
@@ -987,9 +988,9 @@ class _CatalogsDialogState extends State<_CatalogsDialog> {
           TextField(
             controller: _url,
             decoration: InputDecoration(
-              hintText: 'owner/repo 或 https://…/look-catalog.json',
+              hintText: l10n.pluginsCatalogHint,
               suffixIcon: IconButton(
-                tooltip: '添加',
+                tooltip: l10n.commonAdd,
                 icon: const Icon(Icons.add_rounded),
                 onPressed: _busy
                     ? null
@@ -1002,7 +1003,7 @@ class _CatalogsDialogState extends State<_CatalogsDialog> {
           ),
         ]),
       ),
-      actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('完成'))],
+      actions: [TextButton(onPressed: () => Navigator.pop(context), child: Text(l10n.commonFinished))],
     );
   }
 }
@@ -1012,29 +1013,29 @@ Future<bool> installPlugin(BuildContext context, String source) async {
   final store = context.read<PluginStore>();
   final nav = Navigator.of(context, rootNavigator: true);
   Map<String, dynamic> preview;
-  showDialog(context: context, barrierDismissible: false, useRootNavigator: true, builder: (_) => const _Busy(label: '正在获取插件…'));
+  showDialog(context: context, barrierDismissible: false, useRootNavigator: true, builder: (_) => _Busy(label: l10n.pluginsFetching));
   try {
     preview = await store.preview(source);
   } catch (e) {
     nav.pop();
-    if (context.mounted) showSnack(context, '没能获取插件：${_err(e)}');
+    if (context.mounted) showSnack(context, l10n.pluginsFetchFailed(_err(e)));
     return false;
   }
   nav.pop();
   if (!context.mounted) return false;
   final ok = await showDialog<bool>(context: context, useRootNavigator: true, builder: (_) => ConsentDialog(preview: preview));
   if (ok != true || !context.mounted) return false;
-  showDialog(context: context, barrierDismissible: false, useRootNavigator: true, builder: (_) => const _Busy(label: '正在安装…'));
+  showDialog(context: context, barrierDismissible: false, useRootNavigator: true, builder: (_) => _Busy(label: l10n.pluginsInstalling));
   try {
     final p = await store.confirm('${preview['token']}');
     nav.pop();
     if (context.mounted) {
-      showSnack(context, p['state'] == 'error' ? '已安装，但加载失败：${p['error']}' : '已安装「${p['title']}」');
+      showSnack(context, p['state'] == 'error' ? l10n.pluginsInstalledLoadFailed(p['error']) : l10n.pluginsInstalledToast(p['title']));
     }
     return true;
   } catch (e) {
     nav.pop();
-    if (context.mounted) showSnack(context, '安装失败：${_err(e)}');
+    if (context.mounted) showSnack(context, l10n.pluginsInstallFailed(_err(e)));
     return false;
   }
 }
@@ -1065,13 +1066,13 @@ class ConsentDialog extends StatelessWidget {
     final official = preview['official'] == true;
     return AlertDialog(
       icon: PluginGlyph(icon: m['icon'], size: 56),
-      title: Text(update == null ? '安装「${m['title']}」？' : '更新「${m['title']}」？'),
+      title: Text(update == null ? l10n.pluginsInstallTitle(m['title']) : l10n.pluginsUpdateTitle(m['title'])),
       content: SizedBox(
         width: 440,
         child: SingleChildScrollView(
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             Text(
-              [if (official) 'Look Studio 官方' else if ('${m['author'] ?? ''}'.isNotEmpty) '${m['author']}', 'v${m['version']}', if (update != null) '当前 v${update['from']}'].join(' · '),
+              [if (official) l10n.pluginsOfficial else if ('${m['author'] ?? ''}'.isNotEmpty) '${m['author']}', 'v${m['version']}', if (update != null) l10n.pluginsCurrentVersion(update['from'])].join(' · '),
               style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
               textAlign: TextAlign.center,
             ),
@@ -1084,14 +1085,14 @@ class ConsentDialog extends StatelessWidget {
                   Icon(Icons.shield_outlined, size: 18, color: cs.onTertiaryContainer),
                   const SizedBox(width: Space.sm),
                   Expanded(
-                    child: Text('第三方插件，来源：${preview['source']}。它与助手运行在同一进程中，请确认你信任作者。',
+                    child: Text(l10n.pluginsThirdPartyWarning(preview['source']),
                         style: tt.bodySmall?.copyWith(color: cs.onTertiaryContainer)),
                   ),
                 ]),
               ),
             ],
             const SizedBox(height: Space.lg),
-            Text(perms.isEmpty ? '不需要额外权限' : '它将可以', style: tt.titleSmall),
+            Text(perms.isEmpty ? l10n.pluginsNoPermissions : l10n.pluginsWillBeAble, style: tt.titleSmall),
             for (final p in perms)
               ListTile(
                 contentPadding: EdgeInsets.zero,
@@ -1100,14 +1101,14 @@ class ConsentDialog extends StatelessWidget {
                     color: sensitivePermissions.contains(p['id']) ? cs.tertiary : cs.onSurfaceVariant),
                 title: Text('${p['label']}', style: sensitivePermissions.contains(p['id']) ? tt.bodyMedium?.copyWith(fontWeight: FontWeight.w600) : null),
                 subtitle: p['detail'] == null ? null : Text('${p['detail']}'),
-                trailing: added.contains(p['id']) ? Text('新增', style: tt.labelSmall?.copyWith(color: cs.tertiary)) : null,
+                trailing: added.contains(p['id']) ? Text(l10n.pluginsNewPermissions, style: tt.labelSmall?.copyWith(color: cs.tertiary)) : null,
               ),
           ]),
         ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('取消')),
-        FilledButton(onPressed: () => Navigator.pop(context, true), child: Text(update == null ? '安装' : '更新')),
+        TextButton(onPressed: () => Navigator.pop(context, false), child: Text(l10n.commonCancel)),
+        FilledButton(onPressed: () => Navigator.pop(context, true), child: Text(update == null ? l10n.commonInstall : l10n.memoryUpdated)),
       ],
     );
   }
@@ -1176,9 +1177,9 @@ class _PluginDetailViewState extends State<PluginDetailView> {
     final contributes = (p['contributes'] as Map?)?.cast<String, dynamic>() ?? const {};
     final places = [
       for (final a in jsonList(contributes['actions'])) if (a is Map) ('${a['title']}', _surfaceLabels['${a['surface']}'] ?? '${a['surface']}', a['icon']),
-      for (final a in jsonList(contributes['noteViews'])) if (a is Map) ('${a['title']}', '笔记的「换种方式看」', a['icon']),
-      for (final a in jsonList(contributes['exporters'])) if (a is Map) ('${a['title']}', '${_scopeLabels['${a['scope']}'] ?? ''}导出菜单', a['icon']),
-      for (final a in jsonList(contributes['pages'])) if (a is Map) ('${a['title']}', '插件页面', a['icon']),
+      for (final a in jsonList(contributes['noteViews'])) if (a is Map) ('${a['title']}', l10n.pluginsContribAlternative, a['icon']),
+      for (final a in jsonList(contributes['exporters'])) if (a is Map) ('${a['title']}', l10n.pluginsContribExport(_scopeLabels['${a['scope']}'] ?? ''), a['icon']),
+      for (final a in jsonList(contributes['pages'])) if (a is Map) ('${a['title']}', l10n.pluginsContribPage, a['icon']),
     ];
     final pages = [for (final pg in jsonList(contributes['pages'])) if (pg is Map) pg];
     final examples = jsonList(p['examples']);
@@ -1190,9 +1191,9 @@ class _PluginDetailViewState extends State<PluginDetailView> {
     final tile = widget.embedded ? cs.surfaceContainer : cs.surfaceContainerLow;
     final pad = context.isCompact ? Space.lg : Space.xl;
     final meta = [
-      official ? 'Look Studio 官方' : '${p['author'] ?? ''}',
+      official ? l10n.pluginsOfficial : '${p['author'] ?? ''}',
       if ('${p['version'] ?? ''}'.isNotEmpty) 'v${p['version']}',
-      if (update) 'v${widget.entry['version']} 可用',
+      if (update) l10n.pluginsVersionAvailable(widget.entry['version']),
     ].where((s) => s.isNotEmpty).join(' · ');
 
     Widget section(String title, IconData icon, List<Widget> children) => Padding(
@@ -1239,10 +1240,10 @@ class _PluginDetailViewState extends State<PluginDetailView> {
             ),
             if (installed != null && state != 'needs_consent')
               Tooltip(
-                message: installed['enabled'] == true ? '停用' : '启用',
+                message: installed['enabled'] == true ? l10n.commonDisable : l10n.commonEnable,
                 child: Switch(value: installed['enabled'] == true, onChanged: _busy ? null : (v) => _run(() => store.update(id, {'enabled': v}))),
               ),
-            if (widget.onClose != null) IconButton(tooltip: '关闭', onPressed: widget.onClose, icon: const Icon(Icons.close_rounded)),
+            if (widget.onClose != null) IconButton(tooltip: l10n.commonClose, onPressed: widget.onClose, icon: const Icon(Icons.close_rounded)),
           ]),
           const SizedBox(height: Space.lg),
           Text('${p['summary']}', style: tt.bodyLarge),
@@ -1252,12 +1253,12 @@ class _PluginDetailViewState extends State<PluginDetailView> {
               FilledButton.icon(
                 onPressed: _busy || source == null ? null : () => _run(() => installPlugin(context, '$source')),
                 icon: const Icon(Icons.download_rounded),
-                label: const Text('安装'),
+                label: Text(l10n.commonInstall),
               ),
             if (state == 'needs_consent')
-              FilledButton.icon(onPressed: _busy ? null : () => _consentUpdate(context, installed!), icon: const Icon(Icons.verified_user_outlined), label: const Text('查看并授权')),
+              FilledButton.icon(onPressed: _busy ? null : () => _consentUpdate(context, installed!), icon: const Icon(Icons.verified_user_outlined), label: Text(l10n.pluginsReviewGrant)),
             if (update)
-              FilledButton.icon(onPressed: _busy ? null : () => _run(() => installPlugin(context, '$source')), icon: const Icon(Icons.upgrade_rounded), label: const Text('更新')),
+              FilledButton.icon(onPressed: _busy ? null : () => _run(() => installPlugin(context, '$source')), icon: const Icon(Icons.upgrade_rounded), label: Text(l10n.memoryUpdated)),
             if (state == 'enabled')
               for (final pg in pages)
                 FilledButton.tonalIcon(
@@ -1266,9 +1267,9 @@ class _PluginDetailViewState extends State<PluginDetailView> {
                   label: Text('${pg['title']}'),
                 ),
             if (installed != null)
-              OutlinedButton.icon(onPressed: _busy ? null : () => _uninstall(context, installed), icon: const Icon(Icons.delete_outline_rounded), label: const Text('卸载')),
+              OutlinedButton.icon(onPressed: _busy ? null : () => _uninstall(context, installed), icon: const Icon(Icons.delete_outline_rounded), label: Text(l10n.commonUninstall)),
             if (homepage.startsWith('https://'))
-              TextButton.icon(onPressed: () => launchUrl(Uri.parse(homepage)), icon: const Icon(Icons.open_in_new_rounded), label: const Text('主页')),
+              TextButton.icon(onPressed: () => launchUrl(Uri.parse(homepage)), icon: const Icon(Icons.open_in_new_rounded), label: Text(l10n.pluginsHomepage)),
           ]),
           if (state == 'error')
             Padding(
@@ -1289,7 +1290,7 @@ class _PluginDetailViewState extends State<PluginDetailView> {
           ],
           if (examples.isNotEmpty) ...[
             const SizedBox(height: Space.xl),
-            Text(state == 'enabled' ? '试试这样问' : '启用后可以这样问', style: tt.titleSmall),
+            Text(state == 'enabled' ? l10n.pluginsTryAsking : l10n.pluginsTryAfterEnable, style: tt.titleSmall),
             const SizedBox(height: Space.sm),
             Wrap(spacing: Space.sm, runSpacing: Space.sm, children: [
               for (final e in examples)
@@ -1300,7 +1301,7 @@ class _PluginDetailViewState extends State<PluginDetailView> {
             ]),
           ],
           if (abilities.isNotEmpty)
-            section('助手获得的能力', Icons.auto_awesome_outlined, [
+            section(l10n.pluginsCapabilities, Icons.auto_awesome_outlined, [
               for (final t in jsonList(installed!['tools']))
                 ListTile(contentPadding: EdgeInsets.zero, leading: const Icon(Icons.build_outlined), title: Text('${(t as Map)['label']}'), subtitle: Text('${t['name']}')),
               for (final k in jsonList(installed['skills']))
@@ -1312,13 +1313,13 @@ class _PluginDetailViewState extends State<PluginDetailView> {
                 ),
             ]),
           if (places.isNotEmpty)
-            section('会出现在', Icons.widgets_outlined, [
+            section(l10n.pluginsAppearsIn, Icons.widgets_outlined, [
               for (final (title, where, icon) in places)
                 ListTile(contentPadding: EdgeInsets.zero, leading: Icon(pluginIcon(icon)), title: Text(title), subtitle: Text(where)),
             ]),
-          section('权限', Icons.shield_outlined, [
+          section(l10n.pluginsPermissions, Icons.shield_outlined, [
             if (perms.isEmpty)
-              const ListTile(contentPadding: EdgeInsets.zero, leading: Icon(Icons.lock_outline_rounded), title: Text('不需要额外权限'), subtitle: Text('只在对话中提供指导与工具'))
+              ListTile(contentPadding: EdgeInsets.zero, leading: Icon(Icons.lock_outline_rounded), title: Text(l10n.pluginsNoPermissions), subtitle: Text(l10n.pluginsGuidanceOnly))
             else
               for (final x in perms)
                 ListTile(
@@ -1329,21 +1330,21 @@ class _PluginDetailViewState extends State<PluginDetailView> {
                 ),
           ]),
           if (hasSettings)
-            section('设置', Icons.tune_rounded, [
+            section(l10n.commonSettings, Icons.tune_rounded, [
               PluginSettingsForm(
                 key: ValueKey('$id-${installed['version']}'),
                 schema: schema!,
                 values: (installed['settings_values'] as Map?)?.cast<String, dynamic>() ?? const {},
                 onSave: (v) => _run(() async {
                   await store.update(id, {'settings': v});
-                  if (context.mounted) showSnack(context, '设置已保存');
+                  if (context.mounted) showSnack(context, l10n.pluginsSettingsSaved);
                 }),
               ),
             ]),
           const SizedBox(height: Space.xl),
           Wrap(spacing: Space.lg, runSpacing: Space.xs, children: [
-            if ('${p['license'] ?? ''}'.isNotEmpty) Text('许可：${p['license']}', style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
-            if ('${p['source'] ?? ''}'.isNotEmpty) Text('来源：${p['source']}', style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+            if ('${p['license'] ?? ''}'.isNotEmpty) Text(l10n.commonLicense(p['license']), style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+            if ('${p['source'] ?? ''}'.isNotEmpty) Text(l10n.pluginsSource(p['source']), style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
           ]),
         ]),
       ),
@@ -1367,11 +1368,11 @@ class _PluginDetailViewState extends State<PluginDetailView> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('卸载「${p['title']}」？'),
-        content: const Text('插件保存的数据会一起删除。已经生成的笔记、练习等内容不受影响。'),
+        title: Text(l10n.pluginsUninstallTitle(p['title'])),
+        content: Text(l10n.pluginsUninstallBody),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('取消')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('卸载')),
+          TextButton(onPressed: () => Navigator.pop(context, false), child: Text(l10n.commonCancel)),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: Text(l10n.commonUninstall)),
         ],
       ),
     );
@@ -1444,9 +1445,9 @@ class _PluginSettingsFormState extends State<PluginSettingsForm> {
       final p = _props[key]!;
       final v = _parse(p, value.text);
       if (v == null || (v is List && v.contains(null))) {
-        _errors[key] = '请输入${p['type'] == 'string' ? '文字' : '数字'}';
+        _errors[key] = l10n.pluginsSettingRequired(p['type'] == 'string' ? l10n.pluginsSettingText : l10n.pluginsSettingNumber);
       } else if (v is num && ((p['minimum'] is num && v < p['minimum']) || (p['maximum'] is num && v > p['maximum']))) {
-        _errors[key] = '应在 ${p['minimum'] ?? ''}–${p['maximum'] ?? ''} 之间';
+        _errors[key] = l10n.pluginsSettingRange(p['minimum'] ?? '', p['maximum'] ?? '');
       } else {
         out[key] = v;
       }
@@ -1494,7 +1495,7 @@ class _PluginSettingsFormState extends State<PluginSettingsForm> {
                 errorText: _errors[key],
                 suffixIcon: p['format'] == 'path'
                     ? IconButton(
-                        tooltip: '选择文件夹',
+                        tooltip: l10n.pickerChooseFolder,
                         icon: const Icon(Icons.folder_open_outlined),
                         onPressed: () async {
                           final dir = await pickDirectory(context, initial: _text[key]!.text.trim());
@@ -1508,7 +1509,7 @@ class _PluginSettingsFormState extends State<PluginSettingsForm> {
       const SizedBox(height: Space.sm),
       Align(
         alignment: Alignment.centerRight,
-        child: FilledButton.tonal(onPressed: _save, child: Text('保存设置', style: tt.labelLarge)),
+        child: FilledButton.tonal(onPressed: _save, child: Text(l10n.pluginsSaveSettings, style: tt.labelLarge)),
       ),
     ]);
   }

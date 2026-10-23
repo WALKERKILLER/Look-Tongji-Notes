@@ -6,6 +6,7 @@ import '../core/format.dart';
 import '../core/models.dart';
 import '../theme/tokens.dart';
 import 'organic_shapes.dart';
+import '../l10n/l10n.dart';
 
 /// Stable per-course tonal palette: user color if set, else hashed hue.
 ColorScheme courseScheme(BuildContext context, Course c) {
@@ -239,16 +240,16 @@ class AssetBadges extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final items = <(IconData, String)>[
-      if (assets.contains('video')) (Icons.movie_outlined, '视频'),
+      if (assets.contains('video')) (Icons.movie_outlined, l10n.assetVideo),
       if (assets.contains('slides')) (Icons.slideshow_outlined, 'PPT'),
-      if (assets.contains('courseware')) (Icons.attach_file_rounded, '课件'),
-      if (segments > 0 || assets.contains('transcript')) (Icons.subject_rounded, '转写'),
+      if (assets.contains('courseware')) (Icons.attach_file_rounded, l10n.assetCourseware),
+      if (segments > 0 || assets.contains('transcript')) (Icons.subject_rounded, l10n.assetTranscript),
     ];
     if (items.isEmpty) return const SizedBox.shrink();
     return Wrap(spacing: Space.xs, runSpacing: Space.xs, children: [
       for (final (icon, label) in items)
         Tooltip(
-          message: '已下载$label',
+          message: l10n.courseDownloadedKind(label),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
             decoration: BoxDecoration(color: cs.tertiaryContainer, borderRadius: BorderRadius.circular(Corners.xs)),

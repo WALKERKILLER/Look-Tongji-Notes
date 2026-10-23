@@ -82,6 +82,9 @@ func TestBulkActionsAndRequeueKeepProgress(t *testing.T) {
 	if n, _ := m.Bulk(ctx, "resume", nil); n != 2 || state("L2-video").State != "queued" {
 		t.Fatalf("resume: %d", n)
 	}
+	if n, _ := m.Bulk(ctx, "cancel", []string{"L2-video"}); n != 1 || state("L2-video").State != "canceled" || state("L1-video").State != "queued" {
+		t.Fatalf("cancel one: %d %s", n, state("L2-video").State)
+	}
 	if _, err := m.Bulk(ctx, "explode", nil); err == nil {
 		t.Fatal("unknown action accepted")
 	}

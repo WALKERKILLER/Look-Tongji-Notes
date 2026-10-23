@@ -61,6 +61,7 @@ The app starts lookd ([lookd_service.dart](../app/lib/core/lookd_service.dart) s
 | `app/android/workspace/prepare.py` | Fetches the pinned Termux proot build and builds `liblookd.so` and the agent's sources for the APK; [NOTICE](../app/android/workspace/NOTICE) for the shipped programs |
 | `app/lib/widgets` | Shared widgets, including the Markdown/LaTeX renderer and reader, statistics charts (`charts.dart`) and the activity heatmap (`heatmap.dart`) |
 | `app/lib/theme` | Material 3 theme and spacing/motion tokens |
+| `app/lib/l10n` | Interface text: `app_zh.arb` and the `app_localizations*.dart` that `flutter gen-l10n` generates from it, read through the global `l10n` in `l10n.dart` |
 
 ## Seams
 
@@ -80,6 +81,7 @@ The app starts lookd ([lookd_service.dart](../app/lib/core/lookd_service.dart) s
 - Explicit > implicit at boundaries: defaulting is an explicit step in the owning implementation, never a hidden fallback.
 - Long-running work in lookd takes a `context.Context` and stops on cancellation; asynchronous Flutter callbacks check `mounted` before touching `BuildContext`.
 - UI spacing, shape and motion come from `app/lib/theme/tokens.dart` rather than literals.
+- User-visible text comes from `app/lib/l10n/app_zh.arb` (`l10n.<key>`, placeholders for values) rather than string literals in widgets; edit the ARB file and run `flutter gen-l10n`. Copy names UI elements and paths in 「」, starts failures with 无法, and calls this device 本机.
 
 ## Change procedure
 

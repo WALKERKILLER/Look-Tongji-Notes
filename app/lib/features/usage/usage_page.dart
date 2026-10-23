@@ -8,30 +8,37 @@ import '../../theme/tokens.dart';
 import '../../widgets/charts.dart';
 import '../../widgets/horizontal_scroller.dart';
 import '../../widgets/states.dart';
+import '../../l10n/l10n.dart';
 
 /// What each ledger `purpose` means to the user.
-const kUsagePurposes = <String, (String, IconData)>{
-  'chat': ('对话', Icons.chat_bubble_outline_rounded),
-  'timeline': ('大纲', Icons.view_timeline_outlined),
-  'vision': ('识图', Icons.image_search_outlined),
-  'title': ('标题', Icons.title_rounded),
-  'test': ('连接测试', Icons.network_check_rounded),
-  'task': ('定时任务', Icons.schedule_rounded),
-  'quiz': ('出题', Icons.quiz_outlined),
-  'memory': ('记忆沉淀', Icons.bedtime_outlined),
+final kUsagePurposes = <String, (String, IconData)>{
+  'chat': (l10n.usagePurposeChat, Icons.chat_bubble_outline_rounded),
+  'timeline': (l10n.commonOutline, Icons.view_timeline_outlined),
+  'vision': (l10n.modelTagVision, Icons.image_search_outlined),
+  'title': (l10n.commonTitle, Icons.title_rounded),
+  'test': (l10n.usagePurposeTest, Icons.network_check_rounded),
+  'task': (l10n.commonScheduledTasks, Icons.schedule_rounded),
+  'quiz': (l10n.panelQuiz, Icons.quiz_outlined),
+  'memory': (l10n.usagePurposeMemory, Icons.bedtime_outlined),
 };
 
 String purposeLabel(String p) => kUsagePurposes[p]?.$1 ?? p;
 
 enum UsageRange {
-  week('7 天', 7),
-  month('30 天', 30),
-  quarter('90 天', 90),
-  year('今年', 0);
+  week(7),
+  month(30),
+  quarter(90),
+  year(0);
 
-  const UsageRange(this.label, this.days);
-  final String label;
+  const UsageRange(this.days);
   final int days;
+
+  String get label => switch (this) {
+        week => l10n.range7Days,
+        month => l10n.range30Days,
+        quarter => l10n.range90Days,
+        year => l10n.rangeThisYear,
+      };
 
   (DateTime, DateTime) bounds(DateTime now) {
     final today = DateTime(now.year, now.month, now.day);
@@ -136,7 +143,7 @@ class _UsagePageState extends State<UsagePage> {
     if (s == null && _loading) {
       body = const CenteredLoader();
     } else if (s == null) {
-      body = ErrorState(error: _error ?? '没有数据', onRetry: _load);
+      body = ErrorState(error: _error ?? l10n.commonNoData, onRetry: _load);
     } else {
       final totals = (s['totals'] as Map?) ?? const {};
       final empty = _n(totals, 'calls') == 0;
@@ -163,23 +170,23 @@ class _UsagePageState extends State<UsagePage> {
                 _Tiles(totals: totals, previous: (s['previous'] as Map?) ?? const {}, range: _range),
                 const SizedBox(height: Space.lg),
                 if (empty)
-                  const Padding(
+                  Padding(
                     padding: EdgeInsets.only(top: Space.xxl),
                     child: EmptyState(
                       icon: Icons.insights_outlined,
-                      title: '这段时间没有用量',
-                      body: '和助手对话、生成大纲或识图后，这里会按天统计 token 和估算费用。',
+                      title: l10n.usageEmpty,
+                      body: l10n.usageEmptyBody,
                     ),
                   )
                 else ...[
-                  _section(context, title: '每日用量', trailing: _chartControls(), child: _chart(context, s)),
+                  _section(context, title: l10n.usageDaily, trailing: _chartControls(), child: _chart(context, s)),
                   const SizedBox(height: Space.lg),
-                  _section(context, title: '明细', trailing: _breakdownControl(), child: _breakdown(context, s)),
+                  _section(context, title: l10n.usageBreakdown, trailing: _breakdownControl(), child: _breakdown(context, s)),
                   const SizedBox(height: Space.lg),
                   _section(
                     context,
-                    title: '最近调用',
-                    trailing: TextButton(onPressed: () => _openCalls(_rangeFilter(title: '${_range.label}内的调用')), child: const Text('全部')),
+                    title: l10n.usageRecentCalls,
+                    trailing: TextButton(onPressed: () => _openCalls(_rangeFilter(title: l10n.usageCallsInRange(_range.label))), child: Text(l10n.commonAll)),
                     child: Column(children: [for (final c in _recent) CallTile(call: c)]),
                   ),
                 ],
@@ -191,9 +198,9 @@ class _UsagePageState extends State<UsagePage> {
     }
     return Scaffold(
       appBar: AppBar(
-        title: const Text('用量与费用'),
+        title: Text(l10n.settingsUsage),
         bottom: _loading && s != null ? const PreferredSize(preferredSize: Size.fromHeight(2), child: LinearProgressIndicator(minHeight: 2)) : null,
-        actions: [IconButton(tooltip: '刷新', onPressed: _loading ? null : _load, icon: const Icon(Icons.refresh_rounded))],
+        actions: [IconButton(tooltip: l10n.commonRefresh, onPressed: _loading ? null : _load, icon: const Icon(Icons.refresh_rounded))],
       ),
       body: body,
     );
@@ -222,13 +229,13 @@ class _UsagePageState extends State<UsagePage> {
         SegmentedButton<_Metric>(
           showSelectedIcon: false,
           style: const ButtonStyle(visualDensity: VisualDensity.compact),
-          segments: const [ButtonSegment(value: _Metric.cost, label: Text('费用')), ButtonSegment(value: _Metric.tokens, label: Text('Tokens'))],
+          segments: [ButtonSegment(value: _Metric.cost, label: Text(l10n.usageCost)), ButtonSegment(value: _Metric.tokens, label: Text('Tokens'))],
           selected: {_metric},
           onSelectionChanged: (v) => setState(() => _metric = v.first),
         ),
         const SizedBox(width: Space.xs),
         IconButton(
-          tooltip: _table ? '图表' : '表格',
+          tooltip: _table ? l10n.usageChart : l10n.usageTable,
           isSelected: _table,
           onPressed: () => setState(() => _table = !_table),
           icon: const Icon(Icons.table_rows_outlined),
@@ -239,10 +246,10 @@ class _UsagePageState extends State<UsagePage> {
   Widget _breakdownControl() => SegmentedButton<_Breakdown>(
         showSelectedIcon: false,
         style: const ButtonStyle(visualDensity: VisualDensity.compact),
-        segments: const [
-          ButtonSegment(value: _Breakdown.model, label: Text('模型')),
-          ButtonSegment(value: _Breakdown.purpose, label: Text('用途')),
-          ButtonSegment(value: _Breakdown.session, label: Text('对话')),
+        segments: [
+          ButtonSegment(value: _Breakdown.model, label: Text(l10n.commonModel)),
+          ButtonSegment(value: _Breakdown.purpose, label: Text(l10n.usagePurpose)),
+          ButtonSegment(value: _Breakdown.session, label: Text(l10n.usagePurposeChat)),
         ],
         selected: {_by},
         onSelectionChanged: (v) => setState(() => _by = v.first),
@@ -254,11 +261,11 @@ class _UsagePageState extends State<UsagePage> {
     final dates = [for (final d in days) DateTime.parse(d['date'] as String)];
     final bg = cs.surfaceContainerLow;
     final series = _metric == _Metric.cost
-        ? [ChartSeries('估算费用', cs.primary)]
+        ? [ChartSeries(l10n.usageEstimatedCost, cs.primary)]
         : [
-            ChartSeries('输入', cs.primary),
-            ChartSeries('缓存命中', Color.alphaBlend(cs.primary.withValues(alpha: 0.42), bg)),
-            ChartSeries('输出', cs.tertiary),
+            ChartSeries(l10n.usageInput, cs.primary),
+            ChartSeries(l10n.usageCacheHit, Color.alphaBlend(cs.primary.withValues(alpha: 0.42), bg)),
+            ChartSeries(l10n.usageOutput, cs.tertiary),
           ];
     final values = [
       for (final d in days)
@@ -276,7 +283,7 @@ class _UsagePageState extends State<UsagePage> {
         series: series,
         format: format,
         background: bg,
-        semanticLabel: '每日${_metric == _Metric.cost ? '估算费用' : 'token 用量'}柱状图，可切换为表格查看',
+        semanticLabel: l10n.usageChartSemantics(_metric == _Metric.cost ? l10n.usageEstimatedCost : l10n.usageTokens),
       ),
     ]);
   }
@@ -284,7 +291,7 @@ class _UsagePageState extends State<UsagePage> {
   Widget _breakdown(BuildContext context, Map<String, dynamic> s) {
     final key = switch (_by) { _Breakdown.model => 'by_model', _Breakdown.purpose => 'by_purpose', _Breakdown.session => 'by_session' };
     final rows = jsonList(s[key]).whereType<Map>().take(12).toList();
-    if (rows.isEmpty) return const Padding(padding: EdgeInsets.all(Space.lg), child: Text('没有记录'));
+    if (rows.isEmpty) return Padding(padding: EdgeInsets.all(Space.lg), child: Text(l10n.commonNoRecords));
     final byCost = rows.any((r) => _n(r, 'cost') > 0);
     final maxV = rows.map((r) => byCost ? _n(r, 'cost') : _allTokens(r)).fold<num>(0, (a, b) => b > a ? b : a);
     final cs = Theme.of(context).colorScheme;
@@ -295,7 +302,7 @@ class _UsagePageState extends State<UsagePage> {
           final (label, hint, icon) = switch (_by) {
             _Breakdown.model => (k.contains('/') ? k.substring(k.indexOf('/') + 1) : k, k.contains('/') ? k.substring(0, k.indexOf('/')) : '', null),
             _Breakdown.purpose => (purposeLabel(k), '', kUsagePurposes[k]?.$2),
-            _Breakdown.session => ((r['title'] as String?) ?? '已删除的对话', '', null),
+            _Breakdown.session => ((r['title'] as String?) ?? l10n.usageDeletedChat, '', null),
           };
           final v = byCost ? _n(r, 'cost') : _allTokens(r);
           return RankedRow(
@@ -303,9 +310,9 @@ class _UsagePageState extends State<UsagePage> {
             label: label,
             sublabel: [
               if (hint.isNotEmpty) hint,
-              '${fmtCompact(_n(r, 'calls'))} 次',
-              '输入 ${fmtCompact(_n(r, 'input') + _n(r, 'cache_read') + _n(r, 'cache_write'))}',
-              '输出 ${fmtCompact(_n(r, 'output'))}',
+              l10n.usageCalls(fmtCompact(_n(r, 'calls'))),
+              l10n.usageInputTokens(fmtCompact(_n(r, 'input') + _n(r, 'cache_read') + _n(r, 'cache_write'))),
+              l10n.modelTagOutput(fmtCompact(_n(r, 'output'))),
             ].join(' · '),
             trailing: byCost ? fmtUsd(_n(r, 'cost')) : fmtCompact(_allTokens(r)),
             fraction: maxV == 0 ? 0 : v / maxV,
@@ -327,11 +334,11 @@ class _Tiles extends StatelessWidget {
   final UsageRange range;
 
   String? _delta(num now, num before) {
-    final span = range == UsageRange.year ? '去年同期' : '前 ${range.days} 天';
-    if (before == 0) return now == 0 ? null : '$span无用量';
+    final span = range == UsageRange.year ? l10n.usageLastYear : l10n.usagePreviousDays(range.days);
+    if (before == 0) return now == 0 ? null : l10n.usageNoneIn(span);
     final pct = (now - before) / before * 100;
-    if (pct.abs() < 0.5) return '与$span持平';
-    return '比$span${pct > 0 ? '多' : '少'} ${pct.abs().round()}%';
+    if (pct.abs() < 0.5) return l10n.usageSameAs(span);
+    return l10n.usageCompare(span, pct > 0 ? l10n.heatmapMore : l10n.heatmapLess, pct.abs().round());
   }
 
   @override
@@ -340,24 +347,24 @@ class _Tiles extends StatelessWidget {
     final hit = prompt == 0 ? null : _n(totals, 'cache_read') / prompt;
     final errors = _n(totals, 'errors');
     return StatGrid(children: [
-      StatTile(icon: Icons.payments_outlined, label: '估算费用', value: fmtUsd(_n(totals, 'cost')), note: _delta(_n(totals, 'cost'), _n(previous, 'cost'))),
+      StatTile(icon: Icons.payments_outlined, label: l10n.usageEstimatedCost, value: fmtUsd(_n(totals, 'cost')), note: _delta(_n(totals, 'cost'), _n(previous, 'cost'))),
       StatTile(
         icon: Icons.data_usage_rounded,
         label: 'Tokens',
         value: fmtCompact(_allTokens(totals)),
-        note: '输入 ${fmtCompact(prompt + _n(totals, 'cache_write'))} · 输出 ${fmtCompact(_n(totals, 'output'))}',
+        note: l10n.usageInputOutput(fmtCompact(prompt + _n(totals, 'cache_write')), fmtCompact(_n(totals, 'output'))),
       ),
       StatTile(
         icon: Icons.swap_vert_rounded,
-        label: '调用次数',
+        label: l10n.usageCallCount,
         value: fmtCompact(_n(totals, 'calls')),
-        note: errors > 0 ? '失败 ${fmtCompact(errors)} 次' : _delta(_n(totals, 'calls'), _n(previous, 'calls')),
+        note: errors > 0 ? l10n.usageFailedCalls(fmtCompact(errors)) : _delta(_n(totals, 'calls'), _n(previous, 'calls')),
       ),
       StatTile(
         icon: Icons.bolt_outlined,
-        label: '缓存命中率',
+        label: l10n.usageCacheRate,
         value: hit == null ? '—' : '${(hit * 100).toStringAsFixed(hit < 0.1 ? 1 : 0)}%',
-        note: hit == null ? null : '命中 ${fmtCompact(_n(totals, 'cache_read'))} tokens',
+        note: hit == null ? null : l10n.usageCacheTokens(fmtCompact(_n(totals, 'cache_read'))),
       ),
     ]);
   }
@@ -374,7 +381,7 @@ class _DailyTable extends StatelessWidget {
   Widget build(BuildContext context) {
     final figs = Theme.of(context).textTheme.bodySmall?.copyWith(fontFeatures: const [FontFeature.tabularFigures()]);
     final rows = [for (var i = dates.length - 1; i >= 0; i--) i].where((i) => values[i].any((v) => v > 0)).toList();
-    if (rows.isEmpty) return const Text('没有记录');
+    if (rows.isEmpty) return Text(l10n.commonNoRecords);
     return HorizontalScroller(buttons: false, builder: (c) => SingleChildScrollView(
       controller: c,
       scrollDirection: Axis.horizontal,
@@ -383,9 +390,9 @@ class _DailyTable extends StatelessWidget {
         dataRowMinHeight: 32,
         dataRowMaxHeight: 36,
         columns: [
-          const DataColumn(label: Text('日期')),
+          DataColumn(label: Text(l10n.commonDate)),
           for (final s in series) DataColumn(label: Text(s.label), numeric: true),
-          if (series.length > 1) const DataColumn(label: Text('合计'), numeric: true),
+          if (series.length > 1) DataColumn(label: Text(l10n.chartTotal), numeric: true),
         ],
         rows: [
           for (final i in rows)
@@ -437,15 +444,15 @@ class CallTile extends StatelessWidget {
                 const SizedBox(width: Space.sm),
                 Icon(Icons.error_outline_rounded, size: 14, color: cs.error),
                 const SizedBox(width: 2),
-                Text('失败', style: tt.labelSmall?.copyWith(color: cs.error)),
+                Text(l10n.commonFailed, style: tt.labelSmall?.copyWith(color: cs.error)),
               ],
             ]),
             const SizedBox(height: 2),
             Text(
               [
-                '${fmtCompact(_n(call, 'input') + cached + _n(call, 'cache_write'))}${cached > 0 ? '（缓存 ${fmtCompact(cached)}）' : ''} → ${fmtCompact(_n(call, 'output'))}',
+                '${fmtCompact(_n(call, 'input') + cached + _n(call, 'cache_write'))}${cached > 0 ? l10n.usageCachedSuffix(fmtCompact(cached)) : ''} → ${fmtCompact(_n(call, 'output'))}',
                 if (ms > 0) '${(ms / 1000).toStringAsFixed(1)}s',
-                if (ttft != null) '首字 ${(ttft / 1000).toStringAsFixed(1)}s',
+                if (ttft != null) l10n.usageFirstToken((ttft / 1000).toStringAsFixed(1)),
                 if (call['title'] != null) '${call['title']}',
               ].join(' · '),
               style: figs,
@@ -516,7 +523,7 @@ class _CallLogPageState extends State<CallLogPage> {
           : _calls.isEmpty && _loading
               ? const CenteredLoader()
               : _calls.isEmpty
-                  ? const EmptyState(icon: Icons.receipt_long_outlined, title: '没有调用记录')
+                  ? EmptyState(icon: Icons.receipt_long_outlined, title: l10n.usageNoCalls)
                   : NotificationListener<ScrollNotification>(
                       onNotification: (n) {
                         if (n.metrics.extentAfter < 400) _more();

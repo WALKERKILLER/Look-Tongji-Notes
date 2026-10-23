@@ -15,6 +15,7 @@ import '../../widgets/course_visuals.dart';
 import '../../widgets/report_screen.dart';
 import '../../widgets/states.dart';
 import '../player/player_page.dart';
+import '../../l10n/l10n.dart';
 
 class DownloadsPage extends StatefulWidget {
   const DownloadsPage({super.key});
@@ -25,6 +26,23 @@ class DownloadsPage extends StatefulWidget {
 class _DownloadsPageState extends State<DownloadsPage> {
   int _view = 0; // 0 tasks, 1 local files
 
+  /// Selection mode: long-press a job or use 选择任务; the toolbar then acts
+  /// on the picked jobs only.
+  bool _selecting = false;
+  final _picked = <String>{};
+
+  static bool _pickable(Job j) => j.active || j.state == 'paused' || j.state == 'failed';
+
+  void _toggle(Job j) => setState(() {
+        _selecting = true;
+        if (!_picked.remove(j.id)) _picked.add(j.id);
+      });
+
+  void _endSelection() => setState(() {
+        _selecting = false;
+        _picked.clear();
+      });
+
   Future<void> _clearFinished() async {
     final app = context.read<AppState>();
     var files = false;
@@ -33,24 +51,24 @@ class _DownloadsPageState extends State<DownloadsPage> {
       builder: (context) => StatefulBuilder(
         builder: (context, set) => AlertDialog(
           icon: const Icon(Icons.cleaning_services_outlined),
-          title: const Text('清除已完成的任务'),
+          title: Text(l10n.downloadsClearTitle),
           content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Text('任务记录会被清除。已下载的文件默认保留在课程库中。'),
+            Text(l10n.downloadsClearBody),
             const SizedBox(height: Space.md),
             CheckboxListTile(
               contentPadding: EdgeInsets.zero,
               value: files,
               onChanged: (v) => set(() => files = v ?? false),
-              title: const Text('同时删除已下载的文件'),
-              subtitle: const Text('视频、PPT、课件和文字稿会从磁盘移除，不可恢复'),
+              title: Text(l10n.downloadsClearAlsoFiles),
+              subtitle: Text(l10n.downloadsClearAlsoFilesHint),
             ),
           ]),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('取消')),
+            TextButton(onPressed: () => Navigator.pop(context, false), child: Text(l10n.commonCancel)),
             FilledButton(
               style: files ? FilledButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.error, foregroundColor: Theme.of(context).colorScheme.onError) : null,
               onPressed: () => Navigator.pop(context, true),
-              child: Text(files ? '清除并删除文件' : '清除记录'),
+              child: Text(files ? l10n.downloadsClearAndDelete : l10n.downloadsClearRecords),
             ),
           ],
         ),
@@ -59,9 +77,9 @@ class _DownloadsPageState extends State<DownloadsPage> {
     if (ok != true) return;
     try {
       final freed = await app.clearFinished(files: files);
-      if (mounted) showSnack(context, files ? '已清除，释放 ${fmtBytes(freed)}' : '已清除任务记录');
+      if (mounted) showSnack(context, files ? l10n.downloadsClearedFreed(fmtBytes(freed)) : l10n.downloadsCleared);
     } catch (e) {
-      if (mounted) showSnack(context, '清除失败：$e');
+      if (mounted) showSnack(context, l10n.downloadsClearFailed(e));
     }
   }
 
@@ -80,44 +98,45 @@ class _DownloadsPageState extends State<DownloadsPage> {
     final running = jobs.where((j) => j.state == 'running').length;
     final pausable = jobs.where((j) => j.active).length;
     final paused = jobs.where((j) => j.state == 'paused').length;
+    final pickable = jobs.where(_pickable).toList();
+    _picked.retainAll({for (final j in pickable) j.id});
+    final selecting = _selecting && _view == 0 && pickable.isNotEmpty;
+    final picked = [for (final j in pickable) if (_picked.contains(j.id)) j];
 
     final header = SliverToBoxAdapter(
       child: ContentWidth(
         child: Padding(
           padding: EdgeInsets.fromLTRB(pad, compact ? Space.xl : Space.xxl, pad, Space.md),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('下载', style: compact ? tt.headlineMedium : tt.displaySmall),
+            Text(l10n.commonDownload, style: compact ? tt.headlineMedium : tt.displaySmall),
             const SizedBox(height: Space.xs),
             AnimatedSwitcher(
               duration: Motion.short4,
               child: Text(
                 key: ValueKey(running > 0),
-                running > 0 ? '$running 个任务进行中 · ${fmtSpeed(speed)}' : active.isEmpty ? '没有进行中的任务' : '${active.length} 个任务等待中',
+                running > 0
+                    ? l10n.downloadsRunningSummary(running, fmtSpeed(speed))
+                    : pausable > 0
+                        ? l10n.downloadsWaiting(pausable)
+                        : paused > 0
+                            ? l10n.downloadsPausedSummary(paused)
+                            : l10n.downloadsNoneRunning,
                 style: tt.bodyLarge?.copyWith(color: running > 0 ? cs.primary : cs.onSurfaceVariant),
               ),
             ),
             const SizedBox(height: Space.lg),
-            Row(children: [
+            Wrap(spacing: Space.sm, runSpacing: Space.sm, alignment: WrapAlignment.spaceBetween, crossAxisAlignment: WrapCrossAlignment.center, children: [
               SegmentedButton<int>(
                 showSelectedIcon: false,
                 segments: [
-                  ButtonSegment(value: 0, icon: const Icon(Icons.downloading_rounded), label: Text(jobs.isEmpty ? '任务' : '任务 ${jobs.length}')),
-                  const ButtonSegment(value: 1, icon: Icon(Icons.inventory_2_outlined), label: Text('已下载')),
+                  ButtonSegment(value: 0, icon: const Icon(Icons.downloading_rounded), label: Text(jobs.isEmpty ? l10n.commonTasks : l10n.commonTasksCount(jobs.length))),
+                  ButtonSegment(value: 1, icon: Icon(Icons.inventory_2_outlined), label: Text(l10n.commonDownloaded)),
                 ],
                 selected: {_view},
                 onSelectionChanged: (v) => setState(() => _view = v.first),
               ),
-              const Spacer(),
-              if (_view == 0 && pausable > 0)
-                TextButton.icon(onPressed: () => _bulk('pause'), icon: const Icon(Icons.pause_rounded, size: 18), label: const Text('全部暂停')),
-              if (_view == 0 && paused > 0)
-                TextButton.icon(onPressed: () => _bulk('resume'), icon: const Icon(Icons.play_arrow_rounded, size: 18), label: Text('全部继续 $paused')),
-              AnimatedSwitcher(
-                duration: Motion.short4,
-                child: _view == 0 && done.isNotEmpty
-                    ? TextButton.icon(onPressed: _clearFinished, icon: const Icon(Icons.cleaning_services_outlined, size: 18), label: const Text('清除已完成'))
-                    : const SizedBox.shrink(),
-              ),
+              if (_view == 0 && pickable.isNotEmpty && !selecting)
+                TextButton.icon(onPressed: () => setState(() => _selecting = true), icon: const Icon(Icons.checklist_rounded, size: 18), label: Text(l10n.downloadsSelectJobs)),
             ]),
           ]),
         ),
@@ -125,62 +144,130 @@ class _DownloadsPageState extends State<DownloadsPage> {
     );
 
     return ReportScreen(
-      value: {'screen': '下载管理', 'view': _view == 0 ? '任务' : '已下载'},
+      value: {'screen': l10n.screenDownloads, 'view': _view == 0 ? l10n.commonTasks : l10n.commonDownloaded},
       child: _view == 1
           ? _LocalView(header: header, pad: pad)
           : CustomScrollView(slivers: [
               header,
+              if (selecting)
+                PinnedHeaderSliver(
+                  child: ContentWidth(
+                    child: Padding(
+                      padding: EdgeInsets.fromLTRB(pad - Space.xs, Space.xs, pad - Space.xs, Space.sm),
+                      child: _SelectionBar(
+                        count: picked.length,
+                        allPicked: picked.length == pickable.length,
+                        showRetry: failed.isNotEmpty,
+                        can: {
+                          if (picked.any((j) => j.active)) 'pause',
+                          if (picked.any((j) => j.state == 'paused')) 'resume',
+                          if (picked.any((j) => j.state == 'failed')) 'retry',
+                          if (picked.any((j) => j.active || j.state == 'paused')) 'cancel',
+                        },
+                        onClose: _endSelection,
+                        onAll: () => setState(() => picked.length == pickable.length ? _picked.clear() : _picked.addAll(pickable.map((j) => j.id))),
+                        onAction: (a) => _bulkPicked(a, picked),
+                      ),
+                    ),
+                  ),
+                ),
               if (jobs.isEmpty)
-                const SliverFillRemaining(
+                SliverFillRemaining(
                   hasScrollBody: false,
                   child: EmptyState(
                     icon: Icons.download_rounded,
-                    title: '还没有下载',
-                    body: '在课程里选择课次，点下载按钮。视频、PPT、课件和文字稿会按课程整理到课程库。',
+                    title: l10n.downloadsEmpty,
+                    body: l10n.downloadsEmptyBody,
                   ),
                 ),
-              ..._section(context, '进行中', active, pad),
-              ..._section(context, '失败', failed, pad, action: TextButton.icon(onPressed: () => _bulk('retry'), icon: const Icon(Icons.refresh_rounded, size: 18), label: const Text('全部重试'))),
-              ..._section(context, '已完成', done, pad),
+              ..._section(context, l10n.downloadsSectionActive, active, pad, selecting: selecting, actions: [
+                TextButton.icon(onPressed: pausable > 0 ? () => _bulk('pause') : null, icon: const Icon(Icons.pause_rounded, size: 18), label: Text(l10n.downloadsPauseAll)),
+                TextButton.icon(onPressed: paused > 0 ? () => _bulk('resume') : null, icon: const Icon(Icons.play_arrow_rounded, size: 18), label: Text(l10n.downloadsResumeAll)),
+              ]),
+              ..._section(context, l10n.commonFailed, failed, pad, selecting: selecting, actions: [
+                TextButton.icon(onPressed: () => _bulk('retry'), icon: const Icon(Icons.refresh_rounded, size: 18), label: Text(l10n.downloadsRetryAll)),
+              ]),
+              ..._section(context, l10n.commonDone, done, pad, selecting: selecting, actions: [
+                TextButton.icon(onPressed: _clearFinished, icon: const Icon(Icons.cleaning_services_outlined, size: 18), label: Text(l10n.downloadsClearDone)),
+              ]),
               const SliverToBoxAdapter(child: SizedBox(height: Space.huge)),
             ]),
     );
   }
 
-  Future<void> _bulk(String action) async {
+  Future<void> _bulk(String action, {List<String>? ids}) async {
     final app = context.read<AppState>();
     try {
-      final n = await app.bulkJobs(action);
-      if (mounted && n > 0) showSnack(context, '${const {'pause': '已暂停', 'resume': '已继续', 'retry': '已重试'}[action]} $n 个任务');
+      final n = await app.bulkJobs(action, ids: ids);
+      final verb = {'pause': l10n.commonPaused, 'resume': l10n.downloadsResumed, 'retry': l10n.downloadsRetried, 'cancel': l10n.commonCancelled}[action]!;
+      if (mounted && n > 0) showSnack(context, l10n.downloadsBulkDone(verb, n));
     } catch (e) {
-      if (mounted) showSnack(context, '操作失败：$e');
+      if (mounted) showSnack(context, l10n.commonActionFailed(e));
     }
   }
 
-  List<Widget> _section(BuildContext context, String title, List<Job> list, double pad, {Widget? action}) {
+  /// Runs a toolbar action on the picked jobs it applies to.
+  Future<void> _bulkPicked(String action, List<Job> picked) async {
+    final ids = [
+      for (final j in picked)
+        if (switch (action) { 'pause' => j.active, 'resume' => j.state == 'paused', 'retry' => j.state == 'failed', _ => j.active || j.state == 'paused' }) j.id,
+    ];
+    if (ids.isEmpty) return;
+    if (action == 'cancel') {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          icon: const Icon(Icons.stop_circle_outlined),
+          title: Text(l10n.downloadsCancelTitle(ids.length)),
+          content: Text(l10n.downloadsCancelBody),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context, false), child: Text(l10n.downloadsKeep)),
+            FilledButton(onPressed: () => Navigator.pop(context, true), child: Text(l10n.downloadsCancelConfirm)),
+          ],
+        ),
+      );
+      if (ok != true) return;
+    }
+    await _bulk(action, ids: ids);
+    if (mounted) _endSelection();
+  }
+
+  List<Widget> _section(BuildContext context, String title, List<Job> list, double pad, {required bool selecting, List<Widget> actions = const []}) {
     if (list.isEmpty) return const [];
+    final cs = Theme.of(context).colorScheme;
     return [
       SliverToBoxAdapter(
         child: ContentWidth(
           child: Padding(
-            padding: EdgeInsets.fromLTRB(pad, Space.lg, pad - Space.sm, action == null ? Space.sm : 0),
-            child: Row(children: [
-              Expanded(
-                child: Text('$title · ${list.length}', style: Theme.of(context).textTheme.titleSmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+            padding: EdgeInsets.fromLTRB(pad, Space.lg, pad - Space.sm, Space.xs),
+            child: Wrap(alignment: WrapAlignment.spaceBetween, crossAxisAlignment: WrapCrossAlignment.center, children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: Space.sm),
+                child: Text('$title · ${list.length}', style: Theme.of(context).textTheme.titleSmall?.copyWith(color: cs.onSurfaceVariant)),
               ),
-              ?action,
+              // The toolbar takes over while picking jobs.
+              if (!selecting) Wrap(children: actions),
             ]),
           ),
         ),
       ),
       SliverList.builder(
         itemCount: list.length,
-        itemBuilder: (context, i) => ContentWidth(
-          child: Padding(
-            padding: EdgeInsets.symmetric(horizontal: pad, vertical: 2),
-            child: _JobTile(key: ValueKey(list[i].id), job: list[i]),
-          ),
-        ),
+        itemBuilder: (context, i) {
+          final j = list[i];
+          return ContentWidth(
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: pad, vertical: 2),
+              child: _JobTile(
+                key: ValueKey(j.id),
+                job: j,
+                selecting: selecting,
+                picked: _picked.contains(j.id),
+                onPick: _pickable(j) ? () => _toggle(j) : null,
+              ),
+            ),
+          );
+        },
       ),
     ];
   }
@@ -192,14 +279,14 @@ Future<void> confirmDeleteFiles(BuildContext context, {required String what, req
     context: context,
     builder: (context) => AlertDialog(
       icon: const Icon(Icons.delete_forever_outlined),
-      title: const Text('删除文件？'),
-      content: Text('将从磁盘删除$what，不可恢复。需要时可以重新下载。'),
+      title: Text(l10n.downloadsDeleteFilesTitle),
+      content: Text(l10n.downloadsDeleteFilesBody(what)),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('取消')),
+        TextButton(onPressed: () => Navigator.pop(context, false), child: Text(l10n.commonCancel)),
         FilledButton(
           style: FilledButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.error, foregroundColor: Theme.of(context).colorScheme.onError),
           onPressed: () => Navigator.pop(context, true),
-          child: const Text('删除'),
+          child: Text(l10n.commonDelete),
         ),
       ],
     ),
@@ -207,9 +294,9 @@ Future<void> confirmDeleteFiles(BuildContext context, {required String what, req
   if (ok != true) return;
   try {
     final freed = await run();
-    if (context.mounted) showSnack(context, '已删除，释放 ${fmtBytes(freed)}');
+    if (context.mounted) showSnack(context, l10n.downloadsDeletedFreed(fmtBytes(freed)));
   } catch (e) {
-    if (context.mounted) showSnack(context, '删除失败：$e');
+    if (context.mounted) showSnack(context, l10n.commonDeleteFailed(e));
   }
 }
 
@@ -309,9 +396,9 @@ class _LocalViewState extends State<_LocalView> {
       child: CustomScrollView(slivers: [
         widget.header,
         if (items.isEmpty)
-          const SliverFillRemaining(
+          SliverFillRemaining(
             hasScrollBody: false,
-            child: EmptyState(icon: Icons.inventory_2_outlined, title: '本地还没有文件', body: '下载完成的视频、PPT、课件和文字稿会出现在这里。'),
+            child: EmptyState(icon: Icons.inventory_2_outlined, title: l10n.downloadsLocalEmpty, body: l10n.downloadsLocalEmptyBody),
           )
         else ...[
           SliverToBoxAdapter(
@@ -327,7 +414,7 @@ class _LocalViewState extends State<_LocalView> {
                       Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
                         Text(fmtBytes(total), style: tt.headlineMedium?.copyWith(color: cs.onSurface)),
                         const SizedBox(width: Space.sm),
-                        Padding(padding: const EdgeInsets.only(bottom: 4), child: Text('占用空间', style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant))),
+                        Padding(padding: const EdgeInsets.only(bottom: 4), child: Text(l10n.homeStatStorage, style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant))),
                       ]),
                       const SizedBox(height: Space.md),
                       // Stacked usage bar by kind.
@@ -403,8 +490,8 @@ class _LocalViewState extends State<_LocalView> {
                                       avatar: CircleAvatar(radius: 4, backgroundColor: kindColor[it.kind]),
                                       label: Text('${kindLabels[it.kind] ?? it.kind} · ${fmtBytes(it.bytes)}'),
                                       deleteIcon: const Icon(Icons.close_rounded, size: 16),
-                                      deleteButtonTooltipMessage: '删除${kindLabels[it.kind] ?? ''}文件',
-                                      onDeleted: () => _delete(it.lectureId, [it.kind], '这节课的${kindLabels[it.kind] ?? it.kind}（${fmtBytes(it.bytes)}）'),
+                                      deleteButtonTooltipMessage: l10n.downloadsDeleteKindFiles(kindLabels[it.kind] ?? ''),
+                                      onDeleted: () => _delete(it.lectureId, [it.kind], l10n.downloadsLectureKind(kindLabels[it.kind] ?? it.kind, fmtBytes(it.bytes))),
                                     ),
                                 ]),
                               ]),
@@ -415,17 +502,17 @@ class _LocalViewState extends State<_LocalView> {
                                   MenuItemButton(
                                     leadingIcon: const Icon(Icons.folder_open_outlined),
                                     onPressed: () => revealLecture(context, entry.key),
-                                    child: const Text('在文件夹中显示'),
+                                    child: Text(l10n.commonShowInFolder),
                                   ),
                                 MenuItemButton(
                                   leadingIcon: Icon(Icons.delete_forever_outlined, color: cs.error),
                                   onPressed: () => _delete(entry.key, [for (final x in list) x.kind],
-                                      '这节课的全部文件（${fmtBytes(list.fold(0, (s, x) => s + x.bytes))}）'),
-                                  child: Text('删除全部文件', style: TextStyle(color: cs.error)),
+                                      l10n.downloadsLectureAllFiles(fmtBytes(list.fold(0, (s, x) => s + x.bytes)))),
+                                  child: Text(l10n.downloadsDeleteAllFiles, style: TextStyle(color: cs.error)),
                                 ),
                               ],
                               builder: (context, m, _) => IconButton(
-                                tooltip: '更多',
+                                tooltip: l10n.commonMore,
                                 onPressed: () => m.isOpen ? m.close() : m.open(),
                                 icon: const Icon(Icons.more_vert_rounded),
                               ),
@@ -470,15 +557,19 @@ Future<void> revealLecture(BuildContext context, String lectureId) async {
     final dir = (r['lecture'] as Map)['dir']?.toString() ?? '';
     final root = r['library_root']?.toString() ?? '';
     final ok = dir.isNotEmpty && await openPath(p.join(root, dir));
-    if (!ok && context.mounted) showSnack(context, '没能打开文件夹');
+    if (!ok && context.mounted) showSnack(context, l10n.commonCannotOpenFolder);
   } catch (e) {
     if (context.mounted) showSnack(context, '$e');
   }
 }
 
 class _JobTile extends StatelessWidget {
-  const _JobTile({super.key, required this.job});
+  const _JobTile({super.key, required this.job, this.selecting = false, this.picked = false, this.onPick});
   final Job job;
+  final bool selecting, picked;
+
+  /// Toggles the job in the selection; null for jobs that can't be picked.
+  final VoidCallback? onPick;
 
   IconData get _icon => switch (job.kind) {
         'video' => Icons.movie_outlined,
@@ -497,113 +588,234 @@ class _JobTile extends StatelessWidget {
     final course = context.select<AppState, Course?>((a) => a.course(job.courseId));
     final failed = job.state == 'failed';
     final done = job.state == 'done';
-    final retryAt = job.state == 'queued' ? job.retryAt : null;
-    final stateText = switch (job.state) {
-      'running' => job.stage.isNotEmpty ? job.stage : '下载中',
-      'queued' when retryAt != null => '网络中断 · ${fmtClockTime(retryAt)} 自动重试',
-      'queued' when job.progress > 0 => '排队中 · 将从 ${(job.progress * 100).round()}% 继续',
-      'queued' => '排队中',
-      'paused' => '已暂停',
-      'failed' => '失败',
-      'done' => '已完成',
-      'canceled' => '已取消',
-      _ => job.state,
-    };
-    final sizeText = job.totalBytes > 0 ? '${fmtBytes(job.doneBytes)} / ${fmtBytes(job.totalBytes)}' : '';
+    final pickMode = selecting && onPick != null;
+    final Widget lead = pickMode
+        ? AnimatedContainer(
+            key: const ValueKey('pick'),
+            duration: Motion.short4,
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: picked ? cs.primary : Colors.transparent,
+              borderRadius: BorderRadius.circular(picked ? Corners.md : Corners.full),
+              border: picked ? null : Border.all(color: cs.outline, width: 2),
+            ),
+            child: picked ? Icon(Icons.check_rounded, color: cs.onPrimary) : null,
+          )
+        : Container(
+            key: const ValueKey('kind'),
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: done ? cs.tertiaryContainer : failed ? cs.errorContainer : cs.secondaryContainer,
+              borderRadius: BorderRadius.circular(Corners.md),
+            ),
+            child: Icon(done ? Icons.download_done_rounded : _icon,
+                color: done ? cs.onTertiaryContainer : failed ? cs.onErrorContainer : cs.onSecondaryContainer),
+          );
 
-    return Card(
-      color: failed ? cs.errorContainer.withValues(alpha: 0.4) : cs.surfaceContainer,
-      margin: EdgeInsets.zero,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(Corners.md),
-        onTap: done && job.kind == 'video'
-            ? () => Navigator.of(context, rootNavigator: true).push(MaterialPageRoute(builder: (_) => PlayerPage(lectureId: job.lectureId)))
-            : null,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(Space.lg, Space.md, Space.sm, Space.md),
-          child: Row(children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: done ? cs.tertiaryContainer : failed ? cs.errorContainer : cs.secondaryContainer,
-                borderRadius: BorderRadius.circular(Corners.md),
+    return Semantics(
+      selected: pickMode ? picked : null,
+      child: Card(
+        color: picked ? cs.secondaryContainer : failed ? cs.errorContainer.withValues(alpha: 0.4) : cs.surfaceContainer,
+        margin: EdgeInsets.zero,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(Corners.md),
+          // While picking, a tap only picks; finished jobs ignore it.
+          onTap: selecting
+              ? onPick
+              : done && job.kind == 'video'
+                  ? () => Navigator.of(context, rootNavigator: true).push(MaterialPageRoute(builder: (_) => PlayerPage(lectureId: job.lectureId)))
+                  : null,
+          onLongPress: selecting ? null : onPick,
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(Space.lg, Space.md, pickMode ? Space.lg : Space.sm, Space.md),
+            child: Row(children: [
+              AnimatedSwitcher(duration: Motion.short4, child: lead),
+              const SizedBox(width: Space.lg),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(job.title, style: tt.titleSmall, maxLines: 1, overflow: TextOverflow.ellipsis),
+                  Text(
+                    [kindLabels[job.kind] ?? job.kind, if (course != null) course.title].join(' · '),
+                    style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (job.active || job.state == 'paused') ...[
+                    const SizedBox(height: Space.sm),
+                    _JobProgress(job: job),
+                  ] else if (failed) ...[
+                    const SizedBox(height: Space.xs),
+                    Text(job.error, style: tt.bodySmall?.copyWith(color: cs.error), maxLines: 2, overflow: TextOverflow.ellipsis),
+                  ] else if (done && job.totalBytes > 0)
+                    Text(fmtBytes(job.totalBytes), style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant)),
+                ]),
               ),
-              child: Icon(done ? Icons.download_done_rounded : _icon,
-                  color: done ? cs.onTertiaryContainer : failed ? cs.onErrorContainer : cs.onSecondaryContainer),
-            ),
-            const SizedBox(width: Space.lg),
-            Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(job.title, style: tt.titleSmall, maxLines: 1, overflow: TextOverflow.ellipsis),
-                Text(
-                  [kindLabels[job.kind] ?? job.kind, if (course != null) course.title].join(' · '),
-                  style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                if (job.active || job.state == 'paused') ...[
-                  const SizedBox(height: Space.sm),
-                  TweenAnimationBuilder<double>(
-                    tween: Tween(end: job.progress),
-                    duration: Motion.medium2,
-                    builder: (_, v, _) => LinearProgressIndicator(
-                      value: job.state == 'queued' && job.progress == 0 ? null : v,
-                      borderRadius: BorderRadius.circular(4),
-                      color: job.state == 'paused' ? cs.outline : null,
-                    ),
-                  ),
-                  const SizedBox(height: Space.xs),
-                  Row(children: [
-                    Text(stateText, style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant)),
-                    if (job.conns > 1) Text(' · ${job.conns} 路并发', style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant)),
-                    const Spacer(),
-                    if (sizeText.isNotEmpty) Text(sizeText, style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant, fontFeatures: const [FontFeature.tabularFigures()])),
-                    if (job.state == 'running' && job.speed > 0)
-                      Text('  ${fmtSpeed(job.speed)}', style: tt.labelSmall?.copyWith(color: cs.primary, fontFeatures: const [FontFeature.tabularFigures()])),
-                  ]),
-                ] else if (failed) ...[
-                  const SizedBox(height: Space.xs),
-                  Text(job.error, style: tt.bodySmall?.copyWith(color: cs.error), maxLines: 2, overflow: TextOverflow.ellipsis),
-                ] else if (done && job.totalBytes > 0)
-                  Text(fmtBytes(job.totalBytes), style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant)),
-              ]),
-            ),
-            const SizedBox(width: Space.sm),
-            if (job.state == 'running' || job.state == 'queued')
-              IconButton(tooltip: '暂停', onPressed: () => app.jobAction(job.id, 'pause'), icon: const Icon(Icons.pause_rounded)),
-            if (job.state == 'paused')
-              IconButton(tooltip: '继续', onPressed: () => app.jobAction(job.id, 'resume'), icon: const Icon(Icons.play_arrow_rounded)),
-            if (failed) IconButton(tooltip: '重试', onPressed: () => app.jobAction(job.id, 'retry'), icon: const Icon(Icons.refresh_rounded)),
-            if (done && canOpenFolders) IconButton(tooltip: '在文件夹中显示', onPressed: () => revealLecture(context, job.lectureId), icon: const Icon(Icons.folder_open_outlined)),
-            if (job.active || job.state == 'paused')
-              IconButton(tooltip: '取消', onPressed: () => app.jobAction(job.id, 'cancel'), icon: const Icon(Icons.close_rounded))
-            else
-              MenuAnchor(
-                menuChildren: [
-                  MenuItemButton(
-                    leadingIcon: const Icon(Icons.playlist_remove_rounded),
-                    onPressed: () => app.jobAction(job.id, 'remove'),
-                    child: const Text('仅移除记录'),
-                  ),
-                  if (done)
-                    MenuItemButton(
-                      leadingIcon: Icon(Icons.delete_forever_outlined, color: cs.error),
-                      onPressed: () => confirmDeleteFiles(
-                        context,
-                        what: '「${job.title}」的${kindLabels[job.kind] ?? job.kind}文件${job.totalBytes > 0 ? '（${fmtBytes(job.totalBytes)}）' : ''}',
-                        run: () => app.removeJobFiles(job.id),
+              if (!pickMode) ...[
+                const SizedBox(width: Space.sm),
+                if (job.state == 'running' || job.state == 'queued')
+                  IconButton(tooltip: l10n.commonPause, onPressed: () => app.jobAction(job.id, 'pause'), icon: const Icon(Icons.pause_rounded)),
+                if (job.state == 'paused')
+                  IconButton(tooltip: l10n.commonResume, onPressed: () => app.jobAction(job.id, 'resume'), icon: const Icon(Icons.play_arrow_rounded)),
+                if (failed) IconButton(tooltip: l10n.commonRetry, onPressed: () => app.jobAction(job.id, 'retry'), icon: const Icon(Icons.refresh_rounded)),
+                if (done && canOpenFolders) IconButton(tooltip: l10n.commonShowInFolder, onPressed: () => revealLecture(context, job.lectureId), icon: const Icon(Icons.folder_open_outlined)),
+                if (job.active || job.state == 'paused')
+                  IconButton(tooltip: l10n.commonCancel, onPressed: () => app.jobAction(job.id, 'cancel'), icon: const Icon(Icons.close_rounded))
+                else
+                  MenuAnchor(
+                    menuChildren: [
+                      MenuItemButton(
+                        leadingIcon: const Icon(Icons.playlist_remove_rounded),
+                        onPressed: () => app.jobAction(job.id, 'remove'),
+                        child: Text(l10n.downloadsRemoveRecordOnly),
                       ),
-                      child: Text('删除记录和文件', style: TextStyle(color: cs.error)),
+                      if (done)
+                        MenuItemButton(
+                          leadingIcon: Icon(Icons.delete_forever_outlined, color: cs.error),
+                          onPressed: () => confirmDeleteFiles(
+                            context,
+                            what: l10n.downloadsJobFiles(job.title, kindLabels[job.kind] ?? job.kind, job.totalBytes > 0 ? l10n.downloadsSizeSuffix(fmtBytes(job.totalBytes)) : ''),
+                            run: () => app.removeJobFiles(job.id),
+                          ),
+                          child: Text(l10n.downloadsDeleteRecordAndFiles, style: TextStyle(color: cs.error)),
+                        ),
+                    ],
+                    builder: (context, m, _) => IconButton(
+                      tooltip: l10n.commonDelete,
+                      onPressed: () => m.isOpen ? m.close() : m.open(),
+                      icon: const Icon(Icons.delete_outline_rounded),
                     ),
-                ],
-                builder: (context, m, _) => IconButton(
-                  tooltip: '删除',
-                  onPressed: () => m.isOpen ? m.close() : m.open(),
-                  icon: const Icon(Icons.delete_outline_rounded),
-                ),
+                  ),
+              ],
+            ]),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The bar and status line of an unfinished job. Only a running job is drawn
+/// in the accent colour; waiting and paused jobs keep their progress on a
+/// muted bar, and the bar only sweeps while lookd works without knowing the
+/// size yet.
+class _JobProgress extends StatelessWidget {
+  const _JobProgress({required this.job});
+  final Job job;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+    final running = job.state == 'running';
+    final retryAt = job.state == 'queued' ? job.retryAt : null;
+    final known = job.totalBytes > 0 || job.progress > 0;
+    final percent = (job.progress * 100).floor();
+    final (IconData icon, String label) = switch (job.state) {
+      'running' => (Icons.arrow_downward_rounded, job.stage.isNotEmpty ? job.stage : l10n.downloadsStateRunning),
+      'queued' when retryAt != null => (Icons.wifi_off_rounded, l10n.downloadsStateRetrying(fmtClockTime(retryAt))),
+      'paused' => (Icons.pause_rounded, l10n.commonPaused),
+      _ => (Icons.schedule_rounded, l10n.commonQueued),
+    };
+    final tone = running ? cs.primary : retryAt != null ? cs.error : cs.onSurfaceVariant;
+    final details = [
+      label,
+      if (running && job.speed > 0) fmtSpeed(job.speed),
+      if (job.totalBytes > 0) l10n.downloadsSizeProgress(fmtBytes(job.doneBytes), fmtBytes(job.totalBytes)),
+      if (running && job.conns > 1) l10n.downloadsConnections(job.conns),
+    ];
+    const figures = [FontFeature.tabularFigures()];
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      TweenAnimationBuilder<double>(
+        tween: Tween(end: job.progress),
+        duration: Motion.medium2,
+        builder: (_, v, _) => LinearProgressIndicator(
+          value: running && !known ? null : v,
+          color: running ? cs.primary : retryAt != null ? cs.error : cs.outline,
+          backgroundColor: running ? null : cs.surfaceContainerHighest,
+          stopIndicatorColor: running ? null : cs.outline,
+          borderRadius: BorderRadius.circular(Corners.full),
+          semanticsLabel: label,
+          semanticsValue: known ? l10n.downloadsPercent(percent) : null,
+        ),
+      ),
+      const SizedBox(height: Space.xs),
+      Row(children: [
+        Icon(icon, size: 14, color: tone),
+        const SizedBox(width: Space.xs),
+        Expanded(
+          child: Text(details.join(' · '),
+              maxLines: 1, overflow: TextOverflow.ellipsis, style: tt.labelSmall?.copyWith(color: retryAt != null ? cs.error : cs.onSurfaceVariant, fontFeatures: figures)),
+        ),
+        if (known) ...[
+          const SizedBox(width: Space.sm),
+          Text(l10n.downloadsPercent(percent), style: tt.labelMedium?.copyWith(color: tone, fontFeatures: figures)),
+        ],
+      ]),
+    ]);
+  }
+}
+
+/// Floating toolbar for the picked jobs (M3 Expressive floating toolbar):
+/// actions that don't apply to any picked job stay visible but disabled.
+class _SelectionBar extends StatelessWidget {
+  const _SelectionBar({
+    required this.count,
+    required this.allPicked,
+    required this.showRetry,
+    required this.can,
+    required this.onClose,
+    required this.onAll,
+    required this.onAction,
+  });
+  final int count;
+  final bool allPicked, showRetry;
+  final Set<String> can;
+  final VoidCallback onClose, onAll;
+  final ValueChanged<String> onAction;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+    return Material(
+      color: cs.secondaryContainer,
+      elevation: 3,
+      shadowColor: cs.shadow,
+      surfaceTintColor: Colors.transparent,
+      shape: const StadiumBorder(),
+      child: Padding(
+        padding: const EdgeInsets.all(Space.xs),
+        child: IconButtonTheme(
+          data: IconButtonThemeData(style: IconButton.styleFrom(foregroundColor: cs.onSecondaryContainer)),
+          child: LayoutBuilder(builder: (context, box) {
+            final labels = box.maxWidth >= 640;
+            Widget act(String a, IconData icon, String label) {
+              final on = can.contains(a) ? () => onAction(a) : null;
+              return labels
+                  ? TextButton.icon(onPressed: on, style: TextButton.styleFrom(foregroundColor: cs.onSecondaryContainer), icon: Icon(icon, size: 20), label: Text(label))
+                  : IconButton(tooltip: label, onPressed: on, icon: Icon(icon));
+            }
+
+            return Row(children: [
+              IconButton(tooltip: l10n.downloadsExitSelection, onPressed: onClose, icon: const Icon(Icons.close_rounded)),
+              const SizedBox(width: Space.xs),
+              Expanded(
+                child: Text(l10n.downloadsSelectedCount(count),
+                    maxLines: 1, overflow: TextOverflow.ellipsis, style: tt.titleSmall?.copyWith(color: cs.onSecondaryContainer)),
               ),
-          ]),
+              IconButton(
+                tooltip: allPicked ? l10n.downloadsSelectNone : l10n.commonSelectAll,
+                onPressed: onAll,
+                icon: Icon(allPicked ? Icons.deselect_rounded : Icons.select_all_rounded),
+              ),
+              act('pause', Icons.pause_rounded, l10n.commonPause),
+              act('resume', Icons.play_arrow_rounded, l10n.commonResume),
+              if (showRetry) act('retry', Icons.refresh_rounded, l10n.commonRetry),
+              act('cancel', Icons.stop_circle_outlined, l10n.downloadsCancelConfirm),
+            ]);
+          }),
         ),
       ),
     );
