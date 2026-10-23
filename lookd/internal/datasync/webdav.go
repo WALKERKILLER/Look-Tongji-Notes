@@ -209,7 +209,7 @@ func (c *Client) Put(ctx context.Context, p string, open func() (io.ReadCloser, 
 		case resp.StatusCode == http.StatusPreconditionFailed:
 			resp.Body.Close()
 			return "", ErrChanged
-		case (resp.StatusCode == http.StatusConflict || resp.StatusCode == http.StatusNotFound) && attempt == 0:
+		case (resp.StatusCode == http.StatusConflict || resp.StatusCode == http.StatusNotFound || c.orphan(ctx, p, resp)) && attempt == 0:
 			resp.Body.Close()
 			if err := c.MkdirAll(ctx, parent(p)); err != nil {
 				return "", err
@@ -218,6 +218,16 @@ func (c *Client) Put(ctx context.Context, p string, open func() (io.ReadCloser, 
 			return "", failed("PUT", p, resp)
 		}
 	}
+}
+
+// orphan reports a 403 for a file whose folder is missing: some servers
+// answer so instead of 409.
+func (c *Client) orphan(ctx context.Context, p string, resp *http.Response) bool {
+	if resp.StatusCode != http.StatusForbidden || parent(p) == "" {
+		return false
+	}
+	there, err := c.exists(ctx, parent(p)+"/")
+	return err == nil && !there
 }
 
 func parent(p string) string {
@@ -281,6 +291,16 @@ func (c *Client) mkdirAll(ctx context.Context, p string) error {
 		}
 	}
 	return &HTTPError{Method: "MKCOL", Path: p, Status: http.StatusConflict}
+}
+
+// CheckWrite uploads and deletes a small file at p, as a sync does.
+func (c *Client) CheckWrite(ctx context.Context, p string) error {
+	if _, err := c.Put(ctx, p, func() (io.ReadCloser, int64, error) {
+		return io.NopCloser(strings.NewReader("ok")), 2, nil
+	}, ""); err != nil {
+		return err
+	}
+	return c.Delete(ctx, p)
 }
 
 // Delete removes a file; a missing file is not an error.

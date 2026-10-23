@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"context"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -221,6 +222,35 @@ func TestWebDAVForbiddenFolders(t *testing.T) {
 	}
 	if err := c.MkdirAll(ctx, "a/c"); err == nil || !strings.Contains(err.Error(), "新建文件夹 a/c") {
 		t.Fatalf("missing folder: %v", err)
+	}
+}
+
+// Some servers answer 403 for a file whose folder is missing, and a read-only
+// account is refused when connecting, not on the first sync.
+func TestWebDAVForbiddenWrites(t *testing.T) {
+	ctx := context.Background()
+	readOnly := false
+	h := &webdav.Handler{FileSystem: webdav.NewMemFS(), LockSystem: webdav.NewMemLS()}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPut {
+			if _, err := h.FileSystem.Stat(ctx, r.URL.Path[:strings.LastIndex(r.URL.Path, "/")+1]); err != nil || readOnly {
+				w.WriteHeader(http.StatusForbidden)
+				return
+			}
+		}
+		h.ServeHTTP(w, r)
+	}))
+	defer srv.Close()
+	base, _ := url.Parse(srv.URL + "/")
+	if _, err := (&Client{Base: base}).Put(ctx, "state/library.json", func() (io.ReadCloser, int64, error) {
+		return io.NopCloser(strings.NewReader("{}")), 2, nil
+	}, ""); err != nil {
+		t.Fatalf("put into a missing folder: %v", err)
+	}
+	readOnly = true
+	d := newDevice(t)
+	if _, err := d.Configure(ctx, Settings{URL: srv.URL, Folder: "LookStudio"}); err == nil || !strings.Contains(err.Error(), "上传 state/write-check") {
+		t.Fatalf("read-only account: %v", err)
 	}
 }
 
