@@ -6,11 +6,13 @@ import { join } from "node:path";
 import {
 	createAgentSession,
 	createExtensionRuntime,
+	DefaultResourceLoader,
 	SessionManager,
 	SettingsManager,
 } from "@earendil-works/pi-coding-agent";
 import { DATA_DIR, ModelPipeline } from "./models.mjs";
-import { createTools, TURN_TOOL_BUDGET } from "./tools.mjs";
+import { createTools, guard, TURN_TOOL_BUDGET } from "./tools.mjs";
+import { bundledPluginsDir, PluginHost } from "./plugins.mjs";
 import { generateTimeline } from "./timeline.mjs";
 import { api } from "./lookd.mjs";
 import { fmtStamp, TASK_WRITES, TaskScheduler } from "./tasks.mjs";
@@ -51,24 +53,75 @@ const SYSTEM = `你是 Look Studio 的常驻助手，帮助同济大学学生使
 - 公式用 LaTeX：行内 $...$，独立公式 $$...$$；引用课堂内容附时间戳。
 - 回答简洁、中文为主；专有名词可保留英文。不要索要或复述密码。`;
 
-const resourceLoader = {
-	getExtensions: () => ({ extensions: [], errors: [], runtime: createExtensionRuntime() }),
-	getSkills: () => ({ skills: [], diagnostics: [] }),
-	getPrompts: () => ({ prompts: [], diagnostics: [] }),
-	getThemes: () => ({ themes: [], diagnostics: [] }),
-	getAgentsFiles: () => ({ agentsFiles: [] }),
-	getSystemPrompt: () => (pipeline.prefs.persona ? `${SYSTEM}\n\n用户偏好：${pipeline.prefs.persona}` : SYSTEM),
-	getSystemPromptSource: () => undefined,
-	getAppendSystemPrompt: () => [],
-	getAppendSystemPromptSources: () => [],
-	extendResources: () => {},
-	reload: async () => {},
-};
+// ---- plugins (docs/specs/0004-plugin-platform.md) ----
+
+/** @type {Map<string, any>} conversations by session id; declared here for plugin tool guards */
+const live = new Map();
+
+const plugins = new PluginHost({
+	dataDir: DATA_DIR,
+	libraryRoot: CWD,
+	bundledDir: bundledPluginsDir,
+	lookd: api,
+	notify: (data) => api("POST", "/api/agent/event", { type: "plugin_event", data }).catch(() => {}),
+	convOf: (id) => live.get(id),
+	guard,
+});
+try {
+	await plugins.init();
+} catch (e) {
+	console.error(`plugins: ${e.message}`);
+}
+const PI_DIR = join(DATA_DIR, "plugins", "pi");
+await mkdir(PI_DIR, { recursive: true });
+
+/**
+ * A resource loader for one conversation: our system prompt, no Pi skills or
+ * context files, and the enabled plugins as inline extensions. Each
+ * conversation loads its own extension runtime because Pi binds a runtime to
+ * a single session.
+ */
+async function sessionResources() {
+	const factories = plugins.extensionFactories();
+	let extensions = { extensions: [], errors: [], runtime: createExtensionRuntime() };
+	if (factories.length) {
+		const loader = new DefaultResourceLoader({
+			cwd: PI_DIR,
+			agentDir: PI_DIR,
+			noExtensions: true,
+			noSkills: true,
+			noPromptTemplates: true,
+			noThemes: true,
+			noContextFiles: true,
+			extensionFactories: factories,
+		});
+		await loader.reload();
+		extensions = loader.getExtensions();
+		for (const e of extensions.errors) console.error(`plugin ${e.path}: ${e.error}`);
+	}
+	const lines = plugins.promptLines();
+	const system = lines.length ? `${SYSTEM}\n\n已启用的插件（按需用 find_tools 加载）：\n${lines.join("\n")}` : SYSTEM;
+	return {
+		groups: plugins.groups(),
+		hasExtensions: factories.length > 0,
+		loader: {
+			getExtensions: () => extensions,
+			getSkills: () => ({ skills: [], diagnostics: [] }),
+			getPrompts: () => ({ prompts: [], diagnostics: [] }),
+			getThemes: () => ({ themes: [], diagnostics: [] }),
+			getAgentsFiles: () => ({ agentsFiles: [] }),
+			getSystemPrompt: () => (pipeline.prefs.persona ? `${system}\n\n用户偏好：${pipeline.prefs.persona}` : system),
+			getSystemPromptSource: () => undefined,
+			getAppendSystemPrompt: () => [],
+			getAppendSystemPromptSources: () => [],
+			extendResources: () => {},
+			reload: async () => {},
+		},
+	};
+}
 
 // ---- conversations ----
 
-/** @type {Map<string, {session: any, context: any, busy: boolean, used: number, calls: number, lastUser: string}>} */
-const live = new Map();
 const MAX_LIVE = 4;
 
 async function openConversation(id) {
@@ -104,19 +157,23 @@ async function openConversation(id) {
 			conv.session.setActiveToolsByName([...new Set([...active, ...names])]);
 		},
 	};
+	const resources = await sessionResources();
 	const { session } = await createAgentSession({
 		cwd: CWD,
 		agentDir: DATA_DIR,
 		modelRuntime: pipeline.runtime,
 		model,
 		thinkingLevel: model.reasoning ? pipeline.prefs.thinking : "off",
-		resourceLoader,
+		resourceLoader: resources.loader,
 		sessionManager,
 		settingsManager: SettingsManager.inMemory({ compaction: { enabled: true }, retry: { enabled: true, maxRetries: 2 } }),
 		noTools: "builtin",
-		customTools: createTools(conv),
+		customTools: createTools(conv, resources.groups),
 	});
 	conv.session = session;
+	if (resources.hasExtensions) {
+		await session.bindExtensions({ onError: (e) => console.error(`plugin ${e.extensionPath}: ${e.error}`) });
+	}
 	recordUsage(conv);
 	live.set(session.sessionId, conv);
 	if (live.size > MAX_LIVE) {
@@ -148,15 +205,16 @@ function recordUsage(conv) {
 	});
 }
 
-// Model/prefs changes apply to idle conversations on next open.
-pipeline.onChange(() => {
+// Model, prefs and plugin changes apply to idle conversations on next open.
+function closeIdle() {
 	for (const [id, c] of live) {
 		if (!c.busy) {
 			c.session.dispose();
 			live.delete(id);
 		}
 	}
-});
+}
+pipeline.onChange(closeIdle);
 
 const WEEK = ["日", "一", "二", "三", "四", "五", "六"];
 
@@ -436,6 +494,29 @@ route("POST", "/chat", async (req, _m, res) => {
 	return undefined;
 });
 
+// ---- plugin routes ----
+
+const changed = async (out) => {
+	closeIdle();
+	return out;
+};
+route("GET", "/plugins", async () => ({ plugins: await plugins.list(), allow_third_party: plugins.state.allow_third_party }));
+route("GET", "/plugins/catalog", async () => plugins.catalog());
+route("POST", "/plugins/install", async (req) => plugins.preview((await body(req)).source));
+route("POST", "/plugins/install/confirm", async (req) => changed(await plugins.confirm((await body(req)).token)));
+route("PUT", "/plugins/third-party", async (req) => {
+	await plugins.setAllowThirdParty((await body(req)).allow === true);
+	return { allow_third_party: plugins.state.allow_third_party };
+});
+route("POST", "/plugins/catalogs", async (req) => ({ catalogs: await plugins.addCatalog((await body(req)).url) }));
+route("POST", "/plugins/catalogs/remove", async (req) => ({ catalogs: await plugins.removeCatalog((await body(req)).url) }));
+route("POST", "/plugins/([a-z][a-z0-9-]+)/actions/([a-z][a-z0-9_]*)", async (req, [id, name]) => plugins.runAction(id, name, (await body(req)).context ?? {}));
+route("PUT", "/plugins/([a-z][a-z0-9-]+)", async (req, [id]) => changed(await plugins.update(id, await body(req))));
+route("DELETE", "/plugins/([a-z][a-z0-9-]+)", async (_req, [id]) => {
+	await plugins.uninstall(id);
+	return changed({ ok: true });
+});
+
 // ---- scheduled tasks ----
 
 const TASK_TIMEOUT_MS = 15 * 60_000;
@@ -543,8 +624,9 @@ for (const sig of ["SIGINT", "SIGTERM"]) {
 		stopping = true;
 		for (const c of live.values()) c.session.dispose();
 		server.close();
-		// Finished model calls reach the ledger first; lookd allows 5 s before killing us.
-		await Promise.race([usage.flush(), new Promise((r) => setTimeout(r, 3000))]);
+		// Finished model calls reach the ledger and plugin cleanups (spawned
+		// processes) run first; lookd allows 5 s before killing us.
+		await Promise.race([Promise.allSettled([usage.flush(), plugins.close()]), new Promise((r) => setTimeout(r, 3000))]);
 		process.exit(0);
 	});
 }

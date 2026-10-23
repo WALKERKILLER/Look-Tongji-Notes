@@ -10,6 +10,7 @@ import 'app.dart';
 import 'core/activity_tracker.dart';
 import 'core/app_state.dart';
 import 'core/lookd_service.dart';
+import 'core/plugins.dart';
 import 'core/profile.dart';
 import 'features/assistant/assistant_controller.dart';
 import 'features/assistant/task_inbox.dart';
@@ -52,6 +53,7 @@ Future<void> main() async {
       ChangeNotifierProvider(create: (_) => AssistantController(app, screen, players)),
       ChangeNotifierProvider(create: (_) => ScheduleStore(app)),
       ChangeNotifierProvider(create: (_) => TaskInbox(app)),
+      ChangeNotifierProvider(create: (_) => PluginStore(app)),
       ChangeNotifierProvider(create: (_) => ScheduleFocus()),
     ],
     child: const LookApp(),

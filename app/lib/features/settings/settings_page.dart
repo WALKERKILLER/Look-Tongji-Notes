@@ -18,6 +18,7 @@ import '../../widgets/report_screen.dart';
 import '../../widgets/states.dart';
 import '../../widgets/user_avatar.dart';
 import '../assistant/assistant_controller.dart';
+import '../plugins/plugins_page.dart';
 import '../profile/profile_dialog.dart';
 import '../../shell.dart';
 import '../usage/usage_page.dart';
@@ -95,6 +96,7 @@ class _SettingsPageState extends State<SettingsPage> {
             _Section(title: '外观', icon: Icons.palette_outlined, children: [const _Appearance()]),
             _Section(title: '播放', icon: Icons.play_circle_outline_rounded, children: [const _PlayerSettings()]),
             _Section(title: '助手', icon: Icons.auto_awesome_outlined, children: [const _AssistantSettings()]),
+            _Section(title: '插件', icon: Icons.extension_outlined, children: [const PluginSettingsSection()]),
             _Section(title: '下载', icon: Icons.download_outlined, children: [_downloads(context)]),
             _Section(title: '转写', icon: Icons.graphic_eq_rounded, children: [AsrSettings(server: _server, put: _put)]),
             _Section(
