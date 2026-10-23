@@ -68,19 +68,23 @@ class LookdService extends ChangeNotifier {
   String? _findNode() {
     final env = Platform.environment['LOOK_NODE'];
     if (env != null && File(env).existsSync()) return env;
-    final home = Platform.environment['HOME'] ?? '';
+    final win = Platform.isWindows;
+    final home = Platform.environment[win ? 'USERPROFILE' : 'HOME'] ?? '';
     final candidates = <String>[];
-    for (final dir in (Platform.environment['PATH'] ?? '').split(':')) {
-      candidates.add(p.join(dir, 'node'));
+    for (final dir in (Platform.environment['PATH'] ?? '').split(win ? ';' : ':')) {
+      if (dir.isNotEmpty) candidates.add(p.join(dir, win ? 'node.exe' : 'node'));
     }
     final mise = Directory(p.join(home, '.local/share/mise/installs/node'));
     if (mise.existsSync()) {
       final versions = mise.listSync().whereType<Directory>().map((d) => d.path).toList()..sort();
       for (final v in versions.reversed) {
-        candidates.add(p.join(v, 'bin', 'node'));
+        candidates.add(win ? p.join(v, 'node.exe') : p.join(v, 'bin', 'node'));
       }
     }
-    candidates.addAll(['/usr/bin/node', '/usr/local/bin/node']);
+    // Apps started from Finder or the Start menu get a minimal PATH.
+    candidates.addAll(win
+        ? [p.join(Platform.environment['ProgramFiles'] ?? r'C:\Program Files', 'nodejs', 'node.exe')]
+        : ['/usr/bin/node', '/usr/local/bin/node', '/opt/homebrew/bin/node']);
     for (final c in candidates) {
       if (File(c).existsSync()) return c;
     }
@@ -101,12 +105,14 @@ class LookdService extends ChangeNotifier {
   Future<void> _spawn() async {
     final ws = workspace;
     if (ws != null) return _spawnInWorkspace(ws);
-    final bin = _find('LOOKD_BIN', ['lookd', 'lib/lookd'], ['look-studio/lookd/bin/lookd', 'lookd/bin/lookd']);
+    final exe = Platform.isWindows ? 'lookd.exe' : 'lookd';
+    final bin = _find('LOOKD_BIN', [exe, 'lib/$exe'], ['look-studio/lookd/bin/$exe', 'lookd/bin/$exe']);
     if (bin == null) {
       _fail(l10n.daemonNotFound);
       return;
     }
-    final agent = _find('LOOK_AGENT', ['agent/src/host.mjs'], ['look-studio/agent/src/host.mjs', 'agent/src/host.mjs']);
+    // A macOS app keeps the agent in Contents/Resources, beside Contents/MacOS.
+    final agent = _find('LOOK_AGENT', ['agent/src/host.mjs', '../Resources/agent/src/host.mjs'], ['look-studio/agent/src/host.mjs', 'agent/src/host.mjs']);
     final node = _findNode();
     // Without Node.js lookd still gets the agent, so the in-app runtime
     // install (docs/specs/0008-assistant-runtime-setup.md) can set it up.
