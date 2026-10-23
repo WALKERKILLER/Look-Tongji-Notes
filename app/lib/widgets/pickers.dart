@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:path/path.dart' as p;
 
 /// Asks for a folder with the system's own picker: the GTK or desktop
 /// portal dialog on Linux, the shell dialog on Windows, the open panel on
@@ -21,6 +22,33 @@ Future<String?> pickDirectory(BuildContext context, {String? initial, String con
   }
   if (!context.mounted) return null;
   return _askPath(context, initial ?? '', confirm, title);
+}
+
+/// Asks where to save a file with the system's save dialog; where there is
+/// none (Android), it asks for a folder and keeps [suggestedName]. The
+/// returned path ends in one of [type]'s extensions.
+Future<String?> pickSavePath(BuildContext context, {required String suggestedName, required XTypeGroup type, String confirm = '保存'}) async {
+  String? path;
+  var native = false;
+  try {
+    path = (await getSaveLocation(suggestedName: suggestedName, acceptedTypeGroups: [type], confirmButtonText: confirm))?.path;
+    native = true;
+  } on UnimplementedError {
+    // No native dialog.
+  } on MissingPluginException {
+    // Same, in tests.
+  } on PlatformException {
+    // The dialog failed to open.
+  }
+  if (!native) {
+    if (!context.mounted) return null;
+    final dir = await pickDirectory(context, title: '保存到哪个文件夹', confirm: confirm);
+    if (dir != null) path = p.join(dir, suggestedName);
+  }
+  if (path == null || path.isEmpty) return null;
+  final exts = type.extensions ?? const [];
+  if (exts.isNotEmpty && !exts.any((e) => path!.toLowerCase().endsWith('.${e.toLowerCase()}'))) path = '$path.${exts.first}';
+  return path;
 }
 
 Future<String?> _askPath(BuildContext context, String initial, String confirm, String title) {

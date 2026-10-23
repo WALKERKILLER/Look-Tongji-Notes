@@ -24,6 +24,7 @@ import '../assistant/runtime_setup.dart';
 import '../usage/usage_page.dart';
 import '../canvas/canvas_page.dart';
 import 'asr_settings.dart';
+import 'data_settings.dart';
 import 'knowledge_settings.dart';
 import 'mineru_settings.dart';
 import 'models_page.dart';
@@ -63,6 +64,9 @@ const _categories = [
   ]),
   _Category('knowledge', '知识库', Icons.local_library_outlined, '课程库、Obsidian、Notion',
       ['Obsidian', 'Notion', '课程库位置', '文件夹命名模板', '技能格式导出']),
+  _Category('data', '数据与同步', Icons.cloud_sync_outlined, 'WebDAV 同步、备份恢复、存储空间', [
+    'WebDAV', '坚果云', 'Nextcloud', '多端同步', '自动同步', '同步视频', '导出备份', '恢复备份', '存储空间', '清理缓存', '整理索引',
+  ]),
   _Category('notifications', '通知', Icons.notifications_outlined, '新回放、新课次与自动检查', ['自动检查新回放', '立即检查', '提醒']),
   _Category('diagnostics', '诊断', Icons.monitor_heart_outlined, '后台状态与日志', ['lookd 后台', 'ffmpeg', 'Pi Agent', '后台日志', '助手日志', '重启后台']),
 ];
@@ -73,7 +77,8 @@ const _sectionAliases = {
   'appearance': 'appearance', 'player': 'appearance',
   'assistant': 'assistant', 'models': 'assistant', 'plugins': 'assistant',
   'downloads': 'transfer', 'transcript': 'transfer', 'courseware': 'transfer',
-  'knowledge': 'knowledge', 'storage': 'knowledge', 'obsidian': 'knowledge', 'notion': 'knowledge',
+  'knowledge': 'knowledge', 'obsidian': 'knowledge', 'notion': 'knowledge',
+  'data': 'data', 'sync': 'data', 'backup': 'data', 'storage': 'data',
   'notifications': 'notifications',
   'diagnostics': 'diagnostics',
 };
@@ -296,6 +301,7 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
         ],
       'knowledge' => [KnowledgeSettings(settings: _settings)],
+      'data' => const [DataSettings()],
       'notifications' => [
           SettingsGroup(title: '通知与自动刷新', icon: Icons.notifications_outlined, children: [WatchSettings(server: server, put: _put)]),
         ],

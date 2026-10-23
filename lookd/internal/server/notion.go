@@ -117,6 +117,9 @@ func (s *Server) runNotionSync(full bool) {
 // knowledgeChanged refreshes the automatic exports after notes change.
 func (s *Server) knowledgeChanged() {
 	s.exportObsidianSoon()
+	if s.Data != nil {
+		s.Data.Soon(s.Ctx)
+	}
 	if s.Notion == nil || !s.Notion.AutoOn() {
 		return
 	}

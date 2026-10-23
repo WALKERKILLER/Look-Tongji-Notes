@@ -183,7 +183,7 @@ export function operateTools(deps) {
 				note_id: Type.Optional(Type.String()),
 				t: Type.Optional(Type.Number({ description: "Seconds into the lecture" })),
 				day: Type.Optional(Type.String({ description: "YYYY-MM-DD" })),
-				section: Type.Optional(lit(["account", "canvas", "appearance", "player", "assistant", "models", "plugins", "downloads", "transcript", "courseware", "knowledge", "storage", "obsidian", "notion", "notifications", "diagnostics"])),
+				section: Type.Optional(lit(["account", "canvas", "appearance", "player", "assistant", "models", "plugins", "downloads", "transcript", "courseware", "knowledge", "storage", "obsidian", "notion", "sync", "backup", "notifications", "diagnostics"])),
 			}),
 			execute: async (_id, p) => {
 				const need = { course: "course_id", lecture: "lecture_id", note: "note_id" }[p.target];

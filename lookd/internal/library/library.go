@@ -434,15 +434,17 @@ func orDefault(s, d string) string {
 
 // ---- reindex ----
 
-// Reindex rebuilds transcript segments and notes from files on disk, so the
-// database can always be deleted and regenerated.
+// Reindex rebuilds lectures copied from another device, transcript segments
+// and notes from files on disk, so the database can always be deleted and
+// regenerated.
 func (l *Library) Reindex(ctx context.Context) (int, error) {
 	l.mirrorMu.Lock()
 	defer l.mirrorMu.Unlock()
 	if err := l.recoverMirrors(ctx); err != nil {
 		return 0, err
 	}
-	count := 0
+	count := l.reindexLectures(ctx)
+	l.pruneNotes(ctx)
 	// Notes that belong to no course live in the top-level notes/ folder.
 	filepath.WalkDir(l.Abs("notes"), func(p string, d os.DirEntry, err error) error {
 		if err != nil || d.IsDir() || !strings.HasSuffix(d.Name(), ".md") {

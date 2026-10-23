@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:http/http.dart' as http;
 
@@ -78,6 +79,40 @@ class Api {
     }
     if (res.statusCode >= 400) throw ApiError(res.statusCode, out is Map && out['error'] != null ? '${out['error']}' : 'HTTP ${res.statusCode}');
     return out;
+  }
+
+  /// Streams a response into [dest] through a temporary file, reporting the
+  /// bytes written so far (backup export).
+  Future<int> download(String path, Map<String, String> query, File dest, {void Function(int bytes)? onProgress}) async {
+    final req = http.Request('GET', uri(path, query))..headers['Authorization'] = 'Bearer $token';
+    final res = await _client.send(req).timeout(const Duration(minutes: 2));
+    if (res.statusCode >= 400) {
+      final text = await res.stream.bytesToString();
+      String msg = 'HTTP ${res.statusCode}';
+      try {
+        final m = jsonDecode(text);
+        if (m is Map && m['error'] != null) msg = '${m['error']}';
+      } catch (_) {}
+      throw ApiError(res.statusCode, msg);
+    }
+    final tmp = File('${dest.path}.part');
+    final sink = tmp.openWrite();
+    var n = 0;
+    try {
+      await for (final chunk in res.stream) {
+        sink.add(chunk);
+        n += chunk.length;
+        onProgress?.call(n);
+      }
+      await sink.close();
+    } catch (_) {
+      await sink.close().catchError((_) {});
+      await tmp.delete().catchError((_) => tmp);
+      rethrow;
+    }
+    if (await dest.exists()) await dest.delete(); // Windows cannot rename over a file
+    await tmp.rename(dest.path);
+    return n;
   }
 
   /// Server-Sent Events as decoded JSON objects. Cancel the subscription to

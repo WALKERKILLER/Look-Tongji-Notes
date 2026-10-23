@@ -74,3 +74,4 @@ A decision starts `Proposed`. Once implemented, its status becomes `Accepted` an
 - [0004](0004-studio-on-an-orphan-app-branch.md) — Look Studio lives on an orphan `app` branch
 - [0010](0010-obsidian-one-way-export.md) — Obsidian integration starts as a one-way export with standard Markdown links
 - [0011](0011-notion-sync-through-an-internal-integration.md) — Notion sync goes through a user-created internal integration and Markdown page content
+- [0012](0012-webdav-sync-with-a-shared-manifest.md) — WebDAV sync keeps a shared manifest and a per-device base
