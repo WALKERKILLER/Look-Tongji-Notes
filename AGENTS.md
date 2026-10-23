@@ -78,5 +78,5 @@ Follow [docs/testing.md](docs/testing.md). Name the regression risk, then choose
 
 ## Enabled optional capabilities
 
-- CI is an existing mechanism (`ci` capability: external). [.github/workflows/ci.yml](.github/workflows/ci.yml) runs the gates on every push and pull request to `app`, and the Go, Node and Flutter checks only for the parts a change touches (Markdown-only changes skip them); publishing a `studio-v*` release or pre-release builds Linux, Windows and macOS packages and attaches them through [.github/workflows/release.yml](.github/workflows/release.yml).
+- CI is an existing mechanism (`ci` capability: external). [.github/workflows/ci.yml](.github/workflows/ci.yml) runs the gates on every push and pull request to `app`, and the Go, Node and Flutter checks only for the parts a change touches (Markdown-only changes skip them); the app's Linux build runs only for changes to `app/linux/`, the pubspec or the workflow, and on pushes to `app`. Publishing a `studio-v*` release or pre-release builds Linux, Windows and macOS packages and Android APKs and attaches them through [.github/workflows/release.yml](.github/workflows/release.yml).
 - Path-level owners live in [CODEOWNERS](CODEOWNERS). The `app` branch ruleset requires an approving code-owner review (@WALKERKILLER) and green CI checks on every pull request.
