@@ -13,6 +13,7 @@ import '../../widgets/course_visuals.dart';
 import '../../widgets/report_screen.dart';
 import '../../widgets/states.dart';
 import '../player/player_page.dart';
+import '../practice/quiz.dart';
 import 'note_reader.dart';
 
 class LibraryPage extends StatefulWidget {
@@ -294,6 +295,19 @@ class _LibraryPageState extends State<LibraryPage> {
             ),
           ),
         ),
+      SliverToBoxAdapter(
+        child: ContentWidth(
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(pad, Space.xxl, pad, 0),
+            child: LayoutBuilder(
+              builder: (context, c) => QuizList(
+                columns: (c.maxWidth / 300).floor().clamp(1, 3),
+                header: Padding(padding: const EdgeInsets.only(bottom: Space.sm), child: Text('练习', style: tt.titleLarge)),
+              ),
+            ),
+          ),
+        ),
+      ),
       SliverToBoxAdapter(
         child: ContentWidth(
           child: Padding(

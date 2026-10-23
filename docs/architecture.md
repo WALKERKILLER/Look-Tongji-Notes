@@ -37,8 +37,9 @@ The app starts lookd ([lookd_service.dart](../app/lib/core/lookd_service.dart) s
 | `agent/src/models.mjs`, `catalog.mjs` | Providers, model preferences, models.dev metadata |
 | `agent/src/timeline.mjs`, `vision.mjs`, `lookd.mjs` | Outline generation, image bridge for text-only models, lookd client |
 | `agent/src/usage.mjs` | Usage ledger (`usage.jsonl`): one line per model call, summaries and call paging |
+| `agent/src/practice.mjs` | Quiz grounding checks and playbook for `create_quiz` |
 | `app/lib/core` | lookd client (`api.dart`), daemon discovery and startup, app state, models, study-time tracker (`activity_tracker.dart`) |
-| `app/lib/features/<area>` | Screens: activity, assistant, courses, courseware, downloads, home, library, login, player, profile, schedule, settings |
+| `app/lib/features/<area>` | Screens: activity, assistant, courses, courseware, downloads, home, library, login, player, practice, profile, schedule, settings |
 | `app/lib/widgets` | Shared widgets, including the Markdown/LaTeX renderer and reader, statistics charts (`charts.dart`) and the activity heatmap (`heatmap.dart`) |
 | `app/lib/theme` | Material 3 theme and spacing/motion tokens |
 

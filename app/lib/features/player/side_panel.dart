@@ -19,6 +19,7 @@ import 'lecture_player.dart';
 import 'outline_tab.dart';
 import 'player_page.dart';
 import '../library/note_reader.dart';
+import '../practice/quiz.dart';
 import '../../widgets/look_markdown.dart';
 
 /// Outline / transcript / materials / notes (and the assistant) beside or
@@ -104,7 +105,7 @@ class _PlayerSidePanelState extends State<PlayerSidePanel> with SingleTickerProv
             OutlineTab(ctl: ctl),
             _TranscriptTab(ctl: ctl, onAsk: widget.onAsk == null ? null : _ask),
             _MaterialsTab(ctl: ctl),
-            _NotesTab(ctl: ctl),
+            _NotesTab(ctl: ctl, onAsk: widget.onAsk == null ? null : _ask),
             ?widget.assistant,
           ]),
         ),
@@ -537,6 +538,11 @@ class _TranscriptTabState extends State<_TranscriptTab> with AutomaticKeepAliveC
                   child: const Text('让助手整理笔记'),
                 ),
                 MenuItemButton(
+                  leadingIcon: const Icon(Icons.quiz_outlined),
+                  onPressed: () => showQuizSheet(context, lectureId: ctl.lectureId, onAsk: widget.onAsk!),
+                  child: const Text('出题练习…'),
+                ),
+                MenuItemButton(
                   leadingIcon: const Icon(Icons.summarize_outlined),
                   onPressed: () => widget.onAsk!('用几句话概括我刚才看的这一段（当前播放位置前 5 分钟）讲了什么。'),
                   child: const Text('概括刚才这段'),
@@ -692,8 +698,9 @@ class _Highlighted extends StatelessWidget {
 // ---------------------------------------------------------------- notes
 
 class _NotesTab extends StatefulWidget {
-  const _NotesTab({required this.ctl});
+  const _NotesTab({required this.ctl, this.onAsk});
   final LecturePlayer ctl;
+  final ValueChanged<String>? onAsk;
   @override
   State<_NotesTab> createState() => _NotesTabState();
 }
@@ -797,6 +804,22 @@ class _NotesTabState extends State<_NotesTab> with AutomaticKeepAliveClientMixin
             },
           ),
         ),
+      const SizedBox(height: Space.lg),
+      Row(children: [
+        Text('练习', style: tt.titleSmall),
+        const Spacer(),
+        if (widget.onAsk != null)
+          FilledButton.tonalIcon(
+            onPressed: () => showQuizSheet(context, lectureId: ctl.lectureId, onAsk: widget.onAsk!),
+            icon: const Icon(Icons.auto_awesome_outlined, size: 18),
+            label: const Text('出题'),
+          ),
+      ]),
+      const SizedBox(height: Space.sm),
+      QuizList(
+        lectureId: ctl.lectureId,
+        empty: Text('让助手根据这节课出一组选择题，每题附解析和出处', style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+      ),
     ]);
   }
 
