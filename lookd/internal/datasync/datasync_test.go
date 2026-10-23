@@ -6,6 +6,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -194,6 +195,46 @@ func TestWebDAVWrongPassword(t *testing.T) {
 	}
 	if d.Status().Configured {
 		t.Fatal("a rejected account was saved")
+	}
+}
+
+// Servers that check the create permission first answer 403 to MKCOL of
+// a folder that is already there; a 403 says what was refused.
+func TestWebDAVForbiddenFolders(t *testing.T) {
+	ctx := context.Background()
+	fs := webdav.NewMemFS()
+	fs.Mkdir(ctx, "/a", 0o755)
+	fs.Mkdir(ctx, "/a/b", 0o755)
+	h := &webdav.Handler{FileSystem: fs, LockSystem: webdav.NewMemLS()}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "MKCOL" {
+			w.WriteHeader(http.StatusForbidden)
+			return
+		}
+		h.ServeHTTP(w, r)
+	}))
+	defer srv.Close()
+	base, _ := url.Parse(srv.URL + "/")
+	c := &Client{Base: base}
+	if err := c.MkdirAll(ctx, "a/b"); err != nil {
+		t.Fatalf("existing folders: %v", err)
+	}
+	if err := c.MkdirAll(ctx, "a/c"); err == nil || !strings.Contains(err.Error(), "新建文件夹 a/c") {
+		t.Fatalf("missing folder: %v", err)
+	}
+}
+
+func TestWebDAVCloudflareBlock(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Server", "cloudflare")
+		w.Header().Set("Content-Type", "text/html; charset=UTF-8")
+		w.WriteHeader(http.StatusForbidden)
+	}))
+	defer srv.Close()
+	base, _ := url.Parse(srv.URL + "/")
+	_, _, err := (&Client{Base: base}).Get(context.Background(), "manifest.json")
+	if err == nil || !strings.Contains(err.Error(), "Cloudflare") || !strings.Contains(err.Error(), "下载 manifest.json") {
+		t.Fatalf("err %v", err)
 	}
 }
 

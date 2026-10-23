@@ -30,14 +30,21 @@ type HTTPError struct {
 	Method, Path string
 	Status       int
 	RetryAfter   time.Duration
+	Edge         bool // answered by Cloudflare, not the WebDAV server
 }
+
+var davActions = map[string]string{"PROPFIND": "列出", "MKCOL": "新建文件夹", "GET": "下载", "PUT": "上传", "DELETE": "删除"}
 
 func (e *HTTPError) Error() string {
 	switch e.Status {
 	case http.StatusUnauthorized:
 		return "WebDAV 账号或应用密码不正确"
 	case http.StatusForbidden:
-		return "WebDAV 服务器拒绝访问这个目录"
+		what := strings.TrimSpace(davActions[e.Method] + " " + strings.Trim(e.Path, "/"))
+		if e.Edge {
+			return fmt.Sprintf("Cloudflare 拦截了同步请求（%s）。请在 Cloudflare 里为这个 WebDAV 域名放行 WebDAV 请求（WAF 或机器人防护规则）", what)
+		}
+		return fmt.Sprintf("WebDAV 服务器不允许%s（HTTP 403）。请确认这个账号对同步目录有读取、新建、修改和删除权限", what)
 	case http.StatusTooManyRequests, http.StatusServiceUnavailable:
 		return "WebDAV 服务器暂时限制了请求次数，稍后会自动继续"
 	case http.StatusInsufficientStorage:
@@ -101,28 +108,60 @@ func (c *Client) do(ctx context.Context, method, p string, body io.Reader, size 
 func failed(method, p string, resp *http.Response) error {
 	io.Copy(io.Discard, io.LimitReader(resp.Body, 64<<10))
 	resp.Body.Close()
-	e := &HTTPError{Method: method, Path: p, Status: resp.StatusCode}
+	e := &HTTPError{Method: method, Path: p, Status: resp.StatusCode, Edge: edge(resp)}
 	if s, err := strconv.Atoi(resp.Header.Get("Retry-After")); err == nil {
 		e.RetryAfter = time.Duration(s) * time.Second
 	}
 	return e
 }
 
+// edge reports an answer of Cloudflare itself (a WAF block or a challenge
+// page) rather than of the server behind it.
+func edge(resp *http.Response) bool {
+	return resp.Header.Get("Cf-Mitigated") != "" ||
+		strings.EqualFold(resp.Header.Get("Server"), "cloudflare") && strings.HasPrefix(resp.Header.Get("Content-Type"), "text/html")
+}
+
 func ok(resp *http.Response) bool { return resp.StatusCode >= 200 && resp.StatusCode < 300 }
 
 // Check confirms the account can list Base.
 func (c *Client) Check(ctx context.Context) error {
+	_, err := c.exists(ctx, "")
+	return err
+}
+
+// exists lists p (a collection) without its members.
+func (c *Client) exists(ctx context.Context, p string) (bool, error) {
 	body := `<?xml version="1.0" encoding="utf-8"?><propfind xmlns="DAV:"><prop><resourcetype/></prop></propfind>`
-	resp, err := c.do(ctx, "PROPFIND", "", strings.NewReader(body), int64(len(body)),
+	resp, err := c.do(ctx, "PROPFIND", p, strings.NewReader(body), int64(len(body)),
 		map[string]string{"Depth": "0", "Content-Type": "application/xml; charset=utf-8"})
 	if err != nil {
-		return err
+		return false, err
 	}
-	if resp.StatusCode != http.StatusMultiStatus && !ok(resp) {
-		return failed("PROPFIND", "/", resp)
+	switch {
+	case resp.StatusCode == http.StatusMultiStatus || ok(resp):
+		resp.Body.Close()
+		return true, nil
+	case resp.StatusCode == http.StatusNotFound:
+		resp.Body.Close()
+		return false, nil
 	}
-	resp.Body.Close()
-	return nil
+	return false, failed("PROPFIND", "/"+p, resp)
+}
+
+// mkcol creates one collection; one that is already there counts as made.
+// Servers answer 405 for it, or 403 when the account may not create
+// folders (some check the permission before looking).
+func (c *Client) mkcol(ctx context.Context, p string) (*http.Response, error) {
+	resp, err := c.do(ctx, "MKCOL", p+"/", nil, 0, nil)
+	if err != nil || resp.StatusCode != http.StatusForbidden {
+		return resp, err
+	}
+	if there, _ := c.exists(ctx, p+"/"); there {
+		resp.Body.Close()
+		resp.StatusCode = http.StatusMethodNotAllowed
+	}
+	return resp, nil
 }
 
 // Get opens a file and returns its ETag.
@@ -215,16 +254,16 @@ func (c *Client) mkdirAll(ctx context.Context, p string) error {
 	segs := strings.Split(p, "/")
 	// Try the deepest first: usually only the last level is missing.
 	for i := len(segs); i >= 1; i-- {
-		resp, err := c.do(ctx, "MKCOL", strings.Join(segs[:i], "/")+"/", nil, 0, nil)
+		resp, err := c.mkcol(ctx, strings.Join(segs[:i], "/"))
 		if err != nil {
 			return err
 		}
-		resp.Body.Close()
 		switch {
 		case ok(resp), resp.StatusCode == http.StatusMethodNotAllowed:
+			resp.Body.Close()
 			// Created, or already there: make the levels below it.
 			for j := i + 1; j <= len(segs); j++ {
-				resp, err := c.do(ctx, "MKCOL", strings.Join(segs[:j], "/")+"/", nil, 0, nil)
+				resp, err := c.mkcol(ctx, strings.Join(segs[:j], "/"))
 				if err != nil {
 					return err
 				}
@@ -235,9 +274,10 @@ func (c *Client) mkdirAll(ctx context.Context, p string) error {
 			}
 			return nil
 		case resp.StatusCode == http.StatusConflict:
+			resp.Body.Close()
 			continue // a parent is missing
 		default:
-			return &HTTPError{Method: "MKCOL", Path: p, Status: resp.StatusCode}
+			return failed("MKCOL", strings.Join(segs[:i], "/"), resp)
 		}
 	}
 	return &HTTPError{Method: "MKCOL", Path: p, Status: http.StatusConflict}
