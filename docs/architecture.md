@@ -33,11 +33,13 @@ The app starts lookd ([lookd_service.dart](../app/lib/core/lookd_service.dart) s
 | `lookd/internal/events` | SSE event fan-out |
 | `lookd/internal/agent` | Supervises the Node agent host and proxies `/agent/*` |
 | `agent/src/host.mjs` | Agent host: HTTP endpoints, system prompt, sessions |
+| `agent/src/http.mjs` | Request body reading with the 1 MiB limit and 30 s deadline, HTTP error replies |
 | `agent/src/tools.mjs` | Tool groups, `find_tools`, note playbook, write guards |
 | `agent/src/models.mjs`, `catalog.mjs` | Providers, model preferences, models.dev metadata |
 | `agent/src/timeline.mjs`, `vision.mjs`, `lookd.mjs` | Outline generation, image bridge for text-only models, lookd client |
 | `agent/src/usage.mjs` | Usage ledger (`usage.jsonl`): one line per model call, summaries and call paging |
 | `agent/src/practice.mjs` | Quiz grounding checks and playbook for `create_quiz` |
+| `agent/src/tasks.mjs` | Scheduled tasks: validation, next-run computation, queue and run history (`tasks.json`, `tasks-runs.jsonl`) |
 | `app/lib/core` | lookd client (`api.dart`), daemon discovery and startup, app state, models, study-time tracker (`activity_tracker.dart`) |
 | `app/lib/features/<area>` | Screens: activity, assistant, courses, courseware, downloads, home, library, login, player, practice, profile, schedule, settings |
 | `app/lib/widgets` | Shared widgets, including the Markdown/LaTeX renderer and reader, statistics charts (`charts.dart`) and the activity heatmap (`heatmap.dart`) |

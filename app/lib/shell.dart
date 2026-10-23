@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 
 import 'core/app_state.dart';
 import 'features/assistant/assistant_panel.dart';
+import 'features/assistant/task_inbox.dart';
+import 'features/assistant/tasks_page.dart';
 import 'features/courses/courses_page.dart';
 import 'features/downloads/downloads_page.dart';
 import 'features/home/home_page.dart';
@@ -27,7 +29,7 @@ class _Dest {
 
 /// Tab indices, shared with pages that switch tabs.
 abstract final class Tabs {
-  static const home = 0, courses = 1, schedule = 2, downloads = 3, library = 4, settings = 5;
+  static const home = 0, courses = 1, schedule = 2, downloads = 3, library = 4, tasks = 5, settings = 6;
 }
 
 const _dests = [
@@ -36,8 +38,12 @@ const _dests = [
   _Dest('日程', Icons.event_note_outlined, Icons.event_note_rounded, '日程'),
   _Dest('下载', Icons.download_outlined, Icons.download_rounded, '下载管理'),
   _Dest('资料库', Icons.auto_stories_outlined, Icons.auto_stories_rounded, '资料库'),
+  _Dest('定时', Icons.schedule_outlined, Icons.schedule_rounded, '定时任务'),
   _Dest('设置', Icons.tune_outlined, Icons.tune_rounded, '设置'),
 ];
+
+/// The bottom bar leaves out 定时, reached from 设置 and the assistant there.
+const _barTabs = [Tabs.home, Tabs.courses, Tabs.schedule, Tabs.downloads, Tabs.library, Tabs.settings];
 
 /// Lets any page switch tabs (e.g. "see all downloads").
 class ShellScope extends InheritedWidget {
@@ -92,6 +98,7 @@ class _AppShellState extends State<AppShell> {
         Tabs.schedule => const SchedulePage(),
         Tabs.downloads => const DownloadsPage(),
         Tabs.library => const LibraryPage(),
+        Tabs.tasks => const TasksPage(),
         _ => const SettingsPage(),
       };
 
@@ -104,6 +111,7 @@ class _AppShellState extends State<AppShell> {
       _index = i;
       _built.add(i);
     });
+    context.read<TaskInbox>().viewing = i == Tabs.tasks;
     context.read<ScreenContext>().set({'screen': _dests[i].screen});
   }
 
@@ -115,6 +123,7 @@ class _AppShellState extends State<AppShell> {
     final cs = Theme.of(context).colorScheme;
     final downloads = app.activeJobCount;
     final dueSoon = context.watch<ScheduleStore>().dueSoon;
+    final unread = context.watch<TaskInbox>().unread;
 
     // Tabs keep their navigators alive; switching uses an MD3 fade-through.
     final stack = Stack(fit: StackFit.expand, children: [
@@ -138,6 +147,8 @@ class _AppShellState extends State<AppShell> {
       final ic = Icon(sel ? d.selected : d.icon);
       if (i == Tabs.downloads && downloads > 0) return Badge.count(count: downloads, child: ic);
       if (i == Tabs.schedule && dueSoon > 0) return Badge.count(count: dueSoon, child: ic);
+      if (i == Tabs.tasks && unread > 0) return Badge.count(count: unread, child: ic);
+      if (i == Tabs.settings && sc == SizeClass.compact && unread > 0) return Badge(child: ic);
       return ic;
     }
 
@@ -156,12 +167,11 @@ class _AppShellState extends State<AppShell> {
         body: SafeArea(bottom: false, child: content),
         floatingActionButton: _AssistantFab(compact: true),
         bottomNavigationBar: NavigationBar(
-          selectedIndex: _index,
-          onDestinationSelected: _select,
+          selectedIndex: _barTabs.contains(_index) ? _barTabs.indexOf(_index) : _barTabs.indexOf(Tabs.settings),
+          onDestinationSelected: (b) => _select(_barTabs[b]),
           labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
           destinations: [
-            for (var i = 0; i < _dests.length; i++)
-              NavigationDestination(icon: icon(i, false), selectedIcon: icon(i, true), label: _dests[i].label),
+            for (final i in _barTabs) NavigationDestination(icon: icon(i, false), selectedIcon: icon(i, true), label: _dests[i].label),
           ],
         ),
       );

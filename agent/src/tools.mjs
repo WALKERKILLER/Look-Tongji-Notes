@@ -8,6 +8,7 @@
 import { Type } from "typebox";
 import { api, get } from "./lookd.mjs";
 import { checkQuiz, QUIZ_PLAYBOOK } from "./practice.mjs";
+import { TASK_WRITES } from "./tasks.mjs";
 import { generateTimeline } from "./timeline.mjs";
 import { seeImages } from "./vision.mjs";
 
@@ -780,14 +781,29 @@ export function createTools(conv) {
 // ---- harness ----
 
 export const TURN_TOOL_BUDGET = 24;
+
+/** Tools that change the library, by the task permission (TASK_WRITES) allowing them. */
+export const WRITE_TOOLS = {
+	save_note: "notes",
+	save_timeline: "notes",
+	generate_timeline: "notes",
+	mark_schedule: "schedule",
+	update_schedule: "schedule",
+	create_quiz: "quiz",
+};
 const MAX_RESULT_CHARS = 16000;
 
-// guard enforces the per-turn call budget and caps result size.
+// guard enforces the per-turn call budget, a scheduled run's allowed writes
+// (conv.writes; unset in chats) and caps result size.
 function guard(conv, tool) {
 	const run = tool.execute;
 	return {
 		...tool,
 		execute: async (id, params, signal, ...rest) => {
+			const kind = WRITE_TOOLS[tool.name];
+			if (conv.writes && kind && !conv.writes.includes(kind)) {
+				throw new Error(`这个定时任务没有被允许「${TASK_WRITES[kind]}」，${tool.name} 已拒绝。不要再尝试写入，把结果写在总结里。`);
+			}
 			conv.calls = (conv.calls ?? 0) + 1;
 			if (conv.calls > TURN_TOOL_BUDGET) {
 				throw new Error(`本轮已调用 ${TURN_TOOL_BUDGET} 次工具，已达上限。请基于已获得的信息直接回答，并告诉用户还缺什么。`);
