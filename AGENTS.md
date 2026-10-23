@@ -26,7 +26,7 @@ Write code for human readers. Keep the primary logic path visible; introduce an 
 
 ## Commands
 
-- Test: `(cd lookd && go test -count=1 -race ./...) && (cd app && flutter test)`
+- Test: `(cd lookd && go test -count=1 -race ./...) && (cd agent && npm test) && (cd app && flutter test)`
 - Lint: `(cd lookd && test -z "$(gofmt -l .)" && go vet ./...) && (cd agent && npm run check) && (cd app && flutter analyze --no-fatal-infos)`
 - Gates: `node scripts/run-gates.mjs`
 

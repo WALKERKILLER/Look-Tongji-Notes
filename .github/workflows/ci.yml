@@ -104,6 +104,7 @@ jobs:
           cache-dependency-path: agent/package-lock.json
       - run: npm ci
       - run: npm run check
+      - run: npm test
 
   app:
     name: app (Flutter)
