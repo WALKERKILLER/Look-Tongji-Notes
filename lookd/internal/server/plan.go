@@ -39,8 +39,13 @@ func (s *Server) scheduleChanged(ctx context.Context, id string) {
 
 func (s *Server) schedule(_ http.ResponseWriter, r *http.Request) (any, error) {
 	q := r.URL.Query()
-	return s.St.Schedule(r.Context(), store.ScheduleQuery{From: q.Get("from"), To: q.Get("to"), CourseID: q.Get("course_id"),
-		LectureID: q.Get("lecture_id"), Open: q.Get("open") == "1"})
+	sq := store.ScheduleQuery{From: q.Get("from"), To: q.Get("to"), CourseID: q.Get("course_id"),
+		LectureID: q.Get("lecture_id"), Open: q.Get("open") == "1"}
+	items, err := s.St.Schedule(r.Context(), sq)
+	if err != nil {
+		return nil, err
+	}
+	return mergeSchedule(items, s.canvasItems(r.Context(), sq)), nil
 }
 
 func checkItem(it *store.ScheduleItem) error {
@@ -89,7 +94,9 @@ func (s *Server) addSchedule(_ http.ResponseWriter, r *http.Request) (any, error
 	}
 	if it.Source == "agent" {
 		// The assistant may mark the same thing twice; keep the first.
-		same, _ := s.St.Schedule(ctx, store.ScheduleQuery{From: it.DueDate, To: it.DueDate, CourseID: it.CourseID})
+		q := store.ScheduleQuery{From: it.DueDate, To: it.DueDate, CourseID: it.CourseID}
+		same, _ := s.St.Schedule(ctx, q)
+		same = mergeSchedule(same, s.canvasItems(ctx, q))
 		for _, x := range same {
 			if normTitle(x.Title) == normTitle(it.Title) {
 				return map[string]any{"item": x, "duplicate": true}, nil
@@ -110,6 +117,9 @@ func (s *Server) addSchedule(_ http.ResponseWriter, r *http.Request) (any, error
 
 func (s *Server) patchSchedule(_ http.ResponseWriter, r *http.Request) (any, error) {
 	ctx, id := r.Context(), r.PathValue("id")
+	if isCanvasItem(id) {
+		return s.patchCanvasItem(r, id)
+	}
 	it, err := s.St.ScheduleItem(ctx, id)
 	if err != nil {
 		return nil, err
@@ -152,6 +162,13 @@ func (s *Server) patchSchedule(_ http.ResponseWriter, r *http.Request) (any, err
 
 func (s *Server) deleteSchedule(_ http.ResponseWriter, r *http.Request) (any, error) {
 	ctx, id := r.Context(), r.PathValue("id")
+	if isCanvasItem(id) {
+		if err := s.Canvas.Hide(id); err != nil {
+			return nil, canvasErr(err)
+		}
+		s.Bus.Publish("schedule_changed", map[string]string{"id": id})
+		return ok(), nil
+	}
 	if err := s.St.DeleteScheduleItem(ctx, id); err != nil {
 		return nil, err
 	}

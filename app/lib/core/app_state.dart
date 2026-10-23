@@ -25,6 +25,9 @@ class AppState extends ChangeNotifier {
   Object? coursesError;
 
   final Map<String, Job> jobs = {};
+
+  /// Unread items in lookd's notification feed (new replays, assignments …).
+  int unreadNotifications = 0;
   final _events = StreamController<Map<String, dynamic>>.broadcast();
 
   /// Raw daemon events (lecture_changed, notes_changed, ...).
@@ -54,6 +57,7 @@ class AppState extends ChangeNotifier {
       jobs
         ..clear()
         ..addEntries(js.map((e) => Job((e as Map).cast<String, dynamic>())).map((j) => MapEntry(j.id, j)));
+      unreadNotifications = ((await api.get('/api/notifications') as Map)['unread'] as num?)?.toInt() ?? 0;
     } catch (e) {
       debugPrint('init failed: $e');
     }
@@ -100,6 +104,12 @@ class AppState extends ChangeNotifier {
         notifyListeners();
       case 'courses_changed':
         unawaited(loadCourses(quiet: true));
+      case 'notification':
+        unreadNotifications++;
+        notifyListeners();
+      case 'notifications_read':
+        unreadNotifications = ((data as Map)['unread'] as num?)?.toInt() ?? 0;
+        notifyListeners();
     }
     _events.add(e);
   }

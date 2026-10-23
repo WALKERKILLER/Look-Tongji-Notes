@@ -14,6 +14,7 @@ import '../../widgets/report_screen.dart';
 import '../../widgets/states.dart';
 import '../assistant/assistant_panel.dart';
 import '../player/player_page.dart';
+import '../canvas/canvas_course.dart';
 import '../plugins/plugin_views.dart';
 import 'courses_page.dart';
 import 'download_sheet.dart';
@@ -189,6 +190,11 @@ class _CoursePageState extends State<CoursePage> {
                   ),
                 ),
               ),
+            SliverToBoxAdapter(
+              child: ContentWidth(
+                child: Padding(padding: EdgeInsets.fromLTRB(pad, 0, pad, 0), child: CanvasCourseSection(courseId: widget.courseId)),
+              ),
+            ),
             if (_loading)
               const SliverFillRemaining(hasScrollBody: false, child: CenteredLoader(label: '正在读取课表'))
             else if (_error != null && list.isEmpty)

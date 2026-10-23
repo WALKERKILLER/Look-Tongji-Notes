@@ -25,6 +25,7 @@ type ScheduleItem struct {
 	// Derived
 	CourseTitle string `json:"course_title"`
 	Lecture     string `json:"lecture"`
+	URL         string `json:"url,omitempty"` // web page of a Canvas assignment
 }
 
 func (s *Store) PutScheduleItem(ctx context.Context, it ScheduleItem) error {

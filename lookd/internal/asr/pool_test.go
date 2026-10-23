@@ -148,3 +148,28 @@ func TestPoolReportsCooldown(t *testing.T) {
 		t.Fatalf("pick = %v %v %v %v", c, wake, at, err)
 	}
 }
+
+func TestLocalChannelHasNoQuota(t *testing.T) {
+	p := testPool(t, &fake{}, &fake{})
+	p.SetConfig(PoolConfig{Disabled: []string{"a", "b"}, Concurrency: 2})
+	if _, _, _, err := p.pick(60, nil); err == nil {
+		t.Fatal("expected no enabled channel")
+	}
+	p.SetLocal("本地", "", &fake{})
+	p.mu.Lock()
+	p.chans[0].Usage = []use{{At: time.Now().Unix(), Secs: quotaAudio.Seconds() * 2}}
+	p.mu.Unlock()
+	c, _, _, err := p.pick(3600, nil)
+	if err != nil || c == nil || c.id != LocalID {
+		t.Fatalf("local channel not picked: %v %v", c, err)
+	}
+	p.release(c)
+	_, chans, _ := p.Status()
+	if chans[0].ID != LocalID || !chans[0].Local || chans[0].QuotaSecs != 0 || chans[0].State != "ready" {
+		t.Fatalf("status %+v", chans[0])
+	}
+	p.SetLocal("", "", nil)
+	if _, chans, _ := p.Status(); len(chans) != 2 {
+		t.Fatalf("local channel not removed: %d", len(chans))
+	}
+}

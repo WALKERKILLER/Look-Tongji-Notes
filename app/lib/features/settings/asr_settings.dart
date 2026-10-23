@@ -8,6 +8,7 @@ import '../../core/app_state.dart';
 import '../../core/format.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/organic_shapes.dart';
+import 'local_asr_page.dart';
 
 /// Free cloud transcription channels: enable/disable, strategy, concurrency
 /// and live status from lookd's ASR pool.
@@ -68,11 +69,31 @@ class _AsrSettingsState extends State<AsrSettings> {
     final cs = Theme.of(context).colorScheme;
     final strategy = '${widget.server['asr.strategy'] ?? 'balance'}';
     final conc = ((widget.server['asr.concurrency'] as num?) ?? 2).toDouble();
+    final local = _chans.where((c) => c['local'] == true).firstOrNull;
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Padding(
         padding: const EdgeInsets.symmetric(vertical: Space.sm),
-        child: Text('长音频会切成 20 分钟的段，分给下面的免费渠道识别；某个渠道被限流时自动冷却，由其他渠道接手。已识别的段会保留，重试时只补缺失的部分。',
+        child: Text('长音频会切成 20 分钟的段，分给下面的渠道识别；某个渠道被限流时自动冷却，由其他渠道接手。已识别的段会保留，重试时只补缺失的部分。',
             style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant, height: 1.6)),
+      ),
+      Card.filled(
+        margin: const EdgeInsets.only(top: Space.sm),
+        color: local != null ? cs.secondaryContainer : cs.primaryContainer,
+        child: ListTile(
+          contentPadding: const EdgeInsets.symmetric(horizontal: Space.lg, vertical: Space.xs),
+          shape: RoundedRectangleBorder(borderRadius: Corners.all(Corners.lg)),
+          leading: Icon(local != null ? Icons.offline_bolt_rounded : Icons.computer_rounded,
+              color: local != null ? cs.onSecondaryContainer : cs.onPrimaryContainer),
+          title: Text(local != null ? '本地识别已启用' : '免费渠道限流太厉害？改用本地模型',
+              style: TextStyle(color: local != null ? cs.onSecondaryContainer : cs.onPrimaryContainer)),
+          subtitle: Text(local != null ? '${local['name']} · 不受额度限制' : '下载一个识别模型到本机，看对比图选适合你电脑的那个',
+              style: TextStyle(color: local != null ? cs.onSecondaryContainer : cs.onPrimaryContainer)),
+          trailing: Icon(Icons.chevron_right_rounded, color: local != null ? cs.onSecondaryContainer : cs.onPrimaryContainer),
+          onTap: () async {
+            await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LocalAsrPage()));
+            _load();
+          },
+        ),
       ),
       for (final c in _chans)
         Padding(padding: const EdgeInsets.only(top: Space.sm), child: _ChannelCard(c: c, onToggle: (v) => _toggle('${c['id']}', v))),
@@ -142,6 +163,7 @@ class _ChannelCard extends StatelessWidget {
       _ => ('已停用', cs.outline),
     };
     final lastErr = '${c['last_error'] ?? ''}';
+    final local = c['local'] == true;
     return AnimatedOpacity(
       duration: Motion.medium1,
       opacity: enabled ? 1 : 0.6,
@@ -170,21 +192,22 @@ class _ChannelCard extends StatelessWidget {
             Switch(value: enabled, onChanged: onToggle),
           ]),
           const SizedBox(height: Space.md),
-          Padding(
-            padding: const EdgeInsets.only(right: Space.md),
-            child: Row(children: [
-              Expanded(
-                child: LinearProgressIndicator(
-                  value: (used / quota).clamp(0.0, 1.0),
-                  minHeight: 4,
-                  borderRadius: BorderRadius.circular(4),
-                  color: used >= quota ? cs.error : cs.primary,
+          if (!local)
+            Padding(
+              padding: const EdgeInsets.only(right: Space.md),
+              child: Row(children: [
+                Expanded(
+                  child: LinearProgressIndicator(
+                    value: (used / quota).clamp(0.0, 1.0),
+                    minHeight: 4,
+                    borderRadius: BorderRadius.circular(4),
+                    color: used >= quota ? cs.error : cs.primary,
+                  ),
                 ),
-              ),
-              const SizedBox(width: Space.md),
-              Text('12 小时内 ${_dur(used)} / ${_dur(quota)}', style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant)),
-            ]),
-          ),
+                const SizedBox(width: Space.md),
+                Text('12 小时内 ${_dur(used)} / ${_dur(quota)}', style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant)),
+              ]),
+            ),
           const SizedBox(height: Space.xs),
           Text(
             ['成功 ${c['ok'] ?? 0} 段', '失败 ${c['fail'] ?? 0} 段', if ((c['last_used'] ?? 0) != 0) '上次 ${fmtRelative(DateTime.fromMillisecondsSinceEpoch((c['last_used'] as num).toInt() * 1000))}']

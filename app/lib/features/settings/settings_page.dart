@@ -25,9 +25,11 @@ import '../assistant/bot_avatar.dart';
 import '../assistant/bot_page.dart';
 import '../assistant/runtime_setup.dart';
 import '../usage/usage_page.dart';
+import '../canvas/canvas_page.dart';
 import 'asr_settings.dart';
 import 'mineru_settings.dart';
 import 'models_page.dart';
+import 'watch_settings.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -96,6 +98,7 @@ class _SettingsPageState extends State<SettingsPage> {
             Text('设置', style: compact ? tt.headlineMedium : tt.displaySmall),
             const SizedBox(height: Space.xl),
             const _AccountSection(),
+            _Section(title: '学校与 Canvas', icon: Icons.school_outlined, children: const [CanvasSettingsEntry()]),
             _Section(title: '外观', icon: Icons.palette_outlined, children: [const _Appearance()]),
             _Section(title: '播放', icon: Icons.play_circle_outline_rounded, children: [const _PlayerSettings()]),
             _Section(title: '助手', icon: Icons.auto_awesome_outlined, children: [const _AssistantSettings()]),
@@ -108,6 +111,7 @@ class _SettingsPageState extends State<SettingsPage> {
               leading: ClipRRect(borderRadius: BorderRadius.circular(4), child: Image.asset('assets/brands/mineru.png', width: 18, height: 18)),
               children: const [MinerUSettings()],
             ),
+            _Section(title: '通知与自动刷新', icon: Icons.notifications_outlined, children: [WatchSettings(server: _server, put: _put)]),
             _Section(title: '课程库', icon: Icons.folder_outlined, children: [_library(context)]),
             _Section(title: '诊断', icon: Icons.monitor_heart_outlined, children: [const _Diagnostics()]),
           ]),

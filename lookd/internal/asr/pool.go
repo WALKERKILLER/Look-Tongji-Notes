@@ -16,7 +16,7 @@ import (
 	"time"
 )
 
-// Engine is one free transcription channel.
+// Engine is one transcription channel: a free cloud service or a local model.
 type Engine interface {
 	Transcribe(ctx context.Context, audio string, onStage Stage) ([]Utterance, error)
 }
@@ -58,7 +58,8 @@ type Event struct {
 type channel struct {
 	id, name, note string
 	eng            Engine
-	slots          int // chunks in flight at most
+	slots          int  // chunks in flight at most
+	local          bool // runs on this machine: no quota, audio never leaves
 
 	inflight  int
 	coolUntil time.Time
@@ -70,11 +71,15 @@ type channel struct {
 	Usage     []use  `json:"usage"`
 }
 
+// LocalID is the channel id of the on-device recogniser.
+const LocalID = "local"
+
 // ChannelStatus is what the UI shows per channel.
 type ChannelStatus struct {
 	ID        string  `json:"id"`
 	Name      string  `json:"name"`
 	Note      string  `json:"note"`
+	Local     bool    `json:"local"`
 	Enabled   bool    `json:"enabled"`
 	State     string  `json:"state"` // ready | busy | cooling | quota | disabled
 	Busy      int     `json:"busy"`
@@ -106,6 +111,7 @@ type Pool struct {
 	state  string
 	cache  map[string]cached
 	events []Event
+	saved  map[string]*channel // persisted counters, for channels added later
 }
 
 func NewPool(statePath string) *Pool {
@@ -131,6 +137,32 @@ func (p *Pool) SetConfig(c PoolConfig) {
 	}
 	p.mu.Lock()
 	p.cfg = c
+	p.mu.Unlock()
+	p.signal()
+}
+
+// SetLocal adds, replaces or (with a nil engine) removes the local channel.
+func (p *Pool) SetLocal(name, note string, eng Engine) {
+	p.mu.Lock()
+	idx := -1
+	for i, c := range p.chans {
+		if c.id == LocalID {
+			idx = i
+		}
+	}
+	switch {
+	case eng == nil && idx >= 0:
+		p.chans = append(p.chans[:idx:idx], p.chans[idx+1:]...)
+	case eng != nil && idx >= 0:
+		c := p.chans[idx]
+		c.name, c.note, c.eng = name, note, eng
+	case eng != nil:
+		c := &channel{id: LocalID, name: name, note: note, eng: eng, slots: 1, local: true}
+		if s := p.saved[LocalID]; s != nil {
+			c.OK, c.Fail, c.LastErr, c.LastUsed = s.OK, s.Fail, s.LastErr, s.LastUsed
+		}
+		p.chans = append([]*channel{c}, p.chans...)
+	}
 	p.mu.Unlock()
 	p.signal()
 }
@@ -170,14 +202,17 @@ func (p *Pool) Status() (PoolConfig, []ChannelStatus, []Event) {
 	now := time.Now()
 	out := make([]ChannelStatus, 0, len(p.chans))
 	for _, c := range p.chans {
-		st := ChannelStatus{ID: c.id, Name: c.name, Note: c.note, Enabled: p.enabledLocked(c), Busy: c.inflight, Slots: c.slots,
+		st := ChannelStatus{ID: c.id, Name: c.name, Note: c.note, Local: c.local, Enabled: p.enabledLocked(c), Busy: c.inflight, Slots: c.slots,
 			UsedSecs: c.usedLocked(now), QuotaSecs: quotaAudio.Seconds(), OK: c.OK, Fail: c.Fail, LastError: c.LastErr, LastUsed: c.LastUsed}
+		if c.local {
+			st.QuotaSecs = 0
+		}
 		switch {
 		case !st.Enabled:
 			st.State = "disabled"
 		case now.Before(c.coolUntil):
 			st.State, st.CoolUntil = "cooling", c.coolUntil.Unix()
-		case st.UsedSecs >= st.QuotaSecs:
+		case !c.local && st.UsedSecs >= st.QuotaSecs:
 			st.State = "quota"
 		case c.inflight > 0:
 			st.State = "busy"
@@ -206,7 +241,7 @@ func (p *Pool) pick(secs float64, tried map[string]bool) (c *channel, wake <-cha
 			continue
 		}
 		enabled++
-		if c.usedLocked(now)+secs > quotaAudio.Seconds() {
+		if !c.local && c.usedLocked(now)+secs > quotaAudio.Seconds() {
 			overQuota++
 			continue
 		}
@@ -361,7 +396,7 @@ func (p *Pool) Transcribe(ctx context.Context, audio string, onStage Stage) ([]U
 				parts = append(parts, fmt.Sprintf("%s %d", c.name, n[c.id]))
 			}
 		}
-		label := fmt.Sprintf("云端识别 %d/%d 段", finished, len(chunks))
+		label := fmt.Sprintf("识别 %d/%d 段", finished, len(chunks))
 		if len(parts) > 0 {
 			label += "（" + strings.Join(parts, " · ") + "）"
 		}
@@ -577,6 +612,7 @@ func (p *Pool) load() {
 			c.OK, c.Fail, c.LastErr, c.LastUsed, c.Usage = s.OK, s.Fail, s.LastErr, s.LastUsed, s.Usage
 		}
 	}
+	p.saved = st.Channels
 	p.events = st.Events
 }
 

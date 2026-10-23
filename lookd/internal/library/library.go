@@ -152,6 +152,25 @@ func (l *Library) EnsureLecture(ctx context.Context, lectureID string) (store.Co
 	return c, lec, lec.Dir, nil
 }
 
+// EnsureCourse assigns a course its folder and returns it (relative).
+func (l *Library) EnsureCourse(ctx context.Context, courseID string) (string, error) {
+	c, err := l.Store.Course(ctx, courseID)
+	if err != nil {
+		return "", err
+	}
+	if c.Dir == "" {
+		c.Dir = l.unique("courses/"+l.courseDirName(c), c.ID, "course.json")
+		if err := l.Store.SetCourseDir(ctx, c.ID, c.Dir); err != nil {
+			return "", err
+		}
+	}
+	if err := os.MkdirAll(l.Abs(c.Dir), 0o755); err != nil {
+		return "", err
+	}
+	l.writeCourseJSON(c)
+	return c.Dir, nil
+}
+
 // unique returns rel, or rel + " (id)" when another entity already owns it.
 func (l *Library) unique(rel, id, metaFile string) string {
 	b, err := os.ReadFile(filepath.Join(l.Abs(rel), metaFile))
