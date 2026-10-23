@@ -29,7 +29,7 @@ The app starts lookd ([lookd_service.dart](../app/lib/core/lookd_service.dart) s
 | `lookd/internal/asr` | Cloud ASR channels (bcut, JianYing), chunk pool, cooldowns and retries |
 | `lookd/internal/mineru` | MinerU courseware parsing client and sealed token |
 | `lookd/internal/library` | On-disk library layout, courseware search, schedule, timeline, README for AI tools |
-| `lookd/internal/store` | SQLite schema and FTS index ([schema.sql](../lookd/internal/store/schema.sql)); rebuildable from library files |
+| `lookd/internal/store` | SQLite schema and FTS index ([schema.sql](../lookd/internal/store/schema.sql)); rebuildable from library files (schedule and activity via their JSON mirrors) |
 | `lookd/internal/events` | SSE event fan-out |
 | `lookd/internal/agent` | Supervises the Node agent host and proxies `/agent/*` |
 | `agent/src/host.mjs` | Agent host: HTTP endpoints, system prompt, sessions |
@@ -37,9 +37,9 @@ The app starts lookd ([lookd_service.dart](../app/lib/core/lookd_service.dart) s
 | `agent/src/models.mjs`, `catalog.mjs` | Providers, model preferences, models.dev metadata |
 | `agent/src/timeline.mjs`, `vision.mjs`, `lookd.mjs` | Outline generation, image bridge for text-only models, lookd client |
 | `agent/src/usage.mjs` | Usage ledger (`usage.jsonl`): one line per model call, summaries and call paging |
-| `app/lib/core` | lookd client (`api.dart`), daemon discovery and startup, app state, models |
-| `app/lib/features/<area>` | Screens: assistant, courses, courseware, downloads, home, library, login, player, profile, schedule, settings |
-| `app/lib/widgets` | Shared widgets, including the Markdown/LaTeX renderer and reader, and statistics charts (`charts.dart`) |
+| `app/lib/core` | lookd client (`api.dart`), daemon discovery and startup, app state, models, study-time tracker (`activity_tracker.dart`) |
+| `app/lib/features/<area>` | Screens: activity, assistant, courses, courseware, downloads, home, library, login, player, profile, schedule, settings |
+| `app/lib/widgets` | Shared widgets, including the Markdown/LaTeX renderer and reader, statistics charts (`charts.dart`) and the activity heatmap (`heatmap.dart`) |
 | `app/lib/theme` | Material 3 theme and spacing/motion tokens |
 
 ## Seams

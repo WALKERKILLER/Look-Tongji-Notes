@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
+import '../../core/activity_tracker.dart';
 import '../../core/api.dart';
 import '../../core/app_state.dart';
 import '../../core/models.dart';
@@ -35,6 +36,7 @@ class LecturePlayer extends ChangeNotifier implements PlayerHandle {
       player.stream.playing.listen((v) {
         playing = v;
         v ? pip?.play() : pip?.pause();
+        v ? _watch?.start() : _watch?.stop();
         notifyListeners();
       }),
       player.stream.buffering.listen((v) {
@@ -65,6 +67,8 @@ class LecturePlayer extends ChangeNotifier implements PlayerHandle {
   @override
   final String lectureId;
   final UiPrefs prefs;
+
+  late final _watch = ActivityTracker.instance?.clock('watch', lectureId: lectureId);
 
   final player = Player(configuration: const PlayerConfiguration(title: 'Look Studio', bufferSize: 64 * 1024 * 1024));
   late final video = VideoController(player);
@@ -383,6 +387,7 @@ class LecturePlayer extends ChangeNotifier implements PlayerHandle {
   }
 
   Future<void> close() async {
+    _watch?.stop();
     await save();
     _disposed = true;
     _saver?.cancel();

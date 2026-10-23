@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import '../../core/activity_tracker.dart';
 import '../../core/api.dart';
 import '../../core/app_state.dart';
 import '../../core/format.dart';
@@ -281,6 +282,7 @@ class AssistantController extends ChangeNotifier {
   Future<void> send(String text) async {
     final msg = text.trim();
     if (msg.isEmpty || busy || !ready) return;
+    ActivityTracker.instance?.count('ask', lectureId: players.value?.lectureId ?? '');
     final reply = ChatMessage.assistant()..streaming = true;
     messages = [...messages, ChatMessage.user(msg), reply];
     notifyListeners();
