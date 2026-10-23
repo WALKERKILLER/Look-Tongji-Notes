@@ -62,15 +62,17 @@ Needs Xcode and CocoaPods. The `macos/` runner is not committed yet. Flutter's g
 ./app/build/macos/Build/Products/Release/look_studio.app/Contents/MacOS/look_studio
 ```
 
-### Android — UI only
+### Android — arm64 and x86_64, Android 7+
 
-Needs the Android SDK (`flutter doctor --android-licenses`).
+Needs the Android SDK and NDK (`flutter doctor --android-licenses`), Go and Python 3. `prepare.py` downloads the pinned Termux proot build and builds `lookd` for the APK; on first run the app downloads an Ubuntu base system and runs `lookd` and the assistant inside it (see [decision 0013](docs/decisions/0013-android-runs-lookd-in-a-proot-ubuntu-workspace.md)).
 
 ```sh
-(cd app && flutter build apk --release)   # app/build/app/outputs/flutter-apk/app-release.apk
+python3 app/android/workspace/prepare.py --abi arm64-v8a,x86_64
+(cd app && flutter build apk --release --split-per-abi --target-platform android-arm64,android-x64)
+# app/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk, app-x86_64-release.apk
 ```
 
-The APK contains only the Flutter UI and is signed with the debug key. `lookd` and the agent are not packaged for Android, so the app reports that it cannot find `lookd`.
+Without `app/android/key.properties` (`storeFile`, `storePassword`, `keyAlias`, `keyPassword`) the APK is signed with the debug key, and installing a build signed with another key needs an uninstall first, which deletes the app's library. Release APKs are attached to `studio-v*` releases.
 
 ## Contributing
 

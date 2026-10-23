@@ -374,6 +374,9 @@ func (m *Manager) installNode(ctx context.Context, mr Mirror) (string, error) {
 	if err := os.Rename(tmp, dest); err != nil {
 		return "", err
 	}
+	if n := PruneNode(dest); n > 0 {
+		m.logf("已移除用不到的头文件和文档 %d MB", n>>20)
+	}
 	bin := filepath.Join(dest, "bin", "node")
 	if strings.HasSuffix(name, ".zip") {
 		bin = filepath.Join(dest, "node.exe")
@@ -675,6 +678,9 @@ func (m *Manager) installDeps(ctx context.Context, node, registry string) error 
 	}
 	if !m.depsOK() {
 		return errors.New("npm 已完成，但没有找到 Pi SDK")
+	}
+	if n := PruneModules(filepath.Join(m.AgentDir, "node_modules")); n > 0 {
+		m.logf("已移除类型声明和 source map %d MB", n>>20)
 	}
 	m.update(func(in *Install) { in.Progress = 1 })
 	return nil

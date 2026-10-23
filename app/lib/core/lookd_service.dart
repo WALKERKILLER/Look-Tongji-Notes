@@ -6,11 +6,20 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 
-enum DaemonState { starting, ready, failed }
+import 'workspace.dart';
 
-/// Starts and supervises the Go daemon (lookd) on desktop. The daemon in turn
-/// supervises the Node.js Pi agent host.
+/// [setup]: on Android, the Linux workspace lookd runs in is not installed.
+enum DaemonState { setup, starting, ready, failed }
+
+/// Starts and supervises the Go daemon (lookd): next to the app on desktop,
+/// in the Linux workspace on Android. The daemon in turn supervises the
+/// Node.js Pi agent host.
 class LookdService extends ChangeNotifier {
+  LookdService({Workspace? workspace}) : workspace = workspace ?? (Platform.isAndroid ? Workspace() : null);
+
+  /// The Android Linux workspace; null on desktop.
+  final Workspace? workspace;
+
   DaemonState state = DaemonState.starting;
   String? error;
   late String token;
@@ -82,7 +91,15 @@ class LookdService extends ChangeNotifier {
     await _spawn();
   }
 
+  /// Starts lookd once the workspace has been installed.
+  Future<void> afterSetup() async {
+    _ready = Completer();
+    await _spawn();
+  }
+
   Future<void> _spawn() async {
+    final ws = workspace;
+    if (ws != null) return _spawnInWorkspace(ws);
     final bin = _find('LOOKD_BIN', ['lookd', 'lib/lookd'], ['look-studio/lookd/bin/lookd', 'lookd/bin/lookd']);
     if (bin == null) {
       _fail('找不到 lookd 守护进程。请先构建 look-studio/lookd（go build -o bin/lookd ./cmd/lookd）。');
@@ -95,10 +112,43 @@ class LookdService extends ChangeNotifier {
     final args = ['-exit-on-stdin-eof'];
     if (agent != null) args.addAll(['-agent', agent]);
     if (node != null) args.addAll(['-node', node]);
+    await _launch(bin, args, {'LOOKD_TOKEN': token});
+  }
+
+  Future<void> _spawnInWorkspace(Workspace ws) async {
+    try {
+      await ws.load();
+    } catch (e) {
+      _fail('无法读取应用目录：$e');
+      return;
+    }
+    if (!ws.installed) {
+      state = DaemonState.setup;
+      notifyListeners();
+      return;
+    }
     state = DaemonState.starting;
     notifyListeners();
     try {
-      _proc = await Process.start(bin, args, environment: {'LOOKD_TOKEN': token});
+      await ws.ensureAgent();
+    } catch (e) {
+      _log('agent sources: $e');
+    }
+    final (exe, args, env) = ws.guest([
+      '${Workspace.guestNative}/liblookd.so',
+      '-exit-on-stdin-eof',
+      '-data', ws.dataDir,
+      '-library', ws.library,
+      '-agent', '${ws.agentDir}/src/host.mjs',
+    ], env: {'LOOKD_TOKEN': token, if (ws.device.isNotEmpty) 'LOOK_DEVICE': ws.device});
+    await _launch(exe, args, env);
+  }
+
+  Future<void> _launch(String exe, List<String> args, Map<String, String> env) async {
+    state = DaemonState.starting;
+    notifyListeners();
+    try {
+      _proc = await Process.start(exe, args, environment: env);
     } catch (e) {
       _fail('无法启动 lookd：$e');
       return;
@@ -146,7 +196,10 @@ class LookdService extends ChangeNotifier {
   void _fail(String msg) {
     state = DaemonState.failed;
     error = msg;
-    if (!_ready.isCompleted) _ready.completeError(msg);
+    if (!_ready.isCompleted) {
+      _ready.future.ignore(); // the failed state already reports it
+      _ready.completeError(msg);
+    }
     notifyListeners();
   }
 

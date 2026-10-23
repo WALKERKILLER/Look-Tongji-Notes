@@ -12,3 +12,8 @@ GeneratedPluginRegistrant.java
 key.properties
 **/*.keystore
 **/*.jks
+
+# Linux workspace built by workspace/prepare.py
+/app/src/main/jniLibs/
+/app/src/main/assets/look/
+/workspace/.cache/

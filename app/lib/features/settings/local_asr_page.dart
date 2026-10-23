@@ -374,16 +374,20 @@ class _Storage extends StatelessWidget {
           ],
           const SizedBox(height: Space.lg),
           Wrap(spacing: Space.sm, runSpacing: Space.sm, children: [
-            FilledButton.tonalIcon(
-              onPressed: running ? null : onChange,
-              icon: const Icon(Icons.drive_file_move_outline, size: 18),
-              label: const Text('更改位置'),
-            ),
-            TextButton.icon(
-              onPressed: dir.isEmpty ? null : () => openPath(dir),
-              icon: const Icon(Icons.open_in_new_rounded, size: 18),
-              label: const Text('在文件管理器中打开'),
-            ),
+            // Android keeps models inside the app, where no other folder is
+            // reachable.
+            if (canOpenFolders) ...[
+              FilledButton.tonalIcon(
+                onPressed: running ? null : onChange,
+                icon: const Icon(Icons.drive_file_move_outline, size: 18),
+                label: const Text('更改位置'),
+              ),
+              TextButton.icon(
+                onPressed: dir.isEmpty ? null : () => openPath(dir),
+                icon: const Icon(Icons.open_in_new_rounded, size: 18),
+                label: const Text('在文件管理器中打开'),
+              ),
+            ],
             if (custom) TextButton(onPressed: running ? null : onReset, child: const Text('恢复默认')),
           ]),
           if (running && !moving) ...[

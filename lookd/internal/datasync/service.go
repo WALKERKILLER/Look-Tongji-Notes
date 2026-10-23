@@ -159,7 +159,12 @@ func (s *Service) changed(ctx context.Context, library, data bool) {
 	}
 }
 
+// deviceName labels this device in the remote manifest and in backups;
+// the Android app passes the phone's model since the guest has no hostname.
 func (s *Service) deviceName() string {
+	if d := os.Getenv("LOOK_DEVICE"); d != "" {
+		return d
+	}
 	h, _ := os.Hostname()
 	return h
 }

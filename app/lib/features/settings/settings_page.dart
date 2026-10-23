@@ -17,6 +17,7 @@ import '../../widgets/user_avatar.dart';
 import '../assistant/assistant_controller.dart';
 import '../plugins/plugins_page.dart';
 import '../profile/profile_dialog.dart';
+import '../setup/workspace_setup_page.dart';
 import '../../shell.dart';
 import '../assistant/bot_avatar.dart';
 import '../assistant/bot_page.dart';
@@ -910,7 +911,13 @@ class _Diagnostics extends StatelessWidget {
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       row('lookd 后台', daemon.state == DaemonState.ready ? 'v${h['version'] ?? ''} · 端口 ${daemon.port}' : daemon.error ?? '启动中',
           ok: daemon.state == DaemonState.ready),
+      if (daemon.workspace != null) row('Linux 工作区', 'Ubuntu 24.04 · proot'),
       row('ffmpeg（转写用）', h['ffmpeg'] == true ? '已安装' : '未找到', ok: h['ffmpeg'] == true),
+      if (daemon.workspace != null && h['ffmpeg'] != true)
+        Padding(
+          padding: const EdgeInsets.only(left: 26, top: Space.xs, bottom: Space.xs),
+          child: Align(alignment: Alignment.centerLeft, child: WorkspaceFFmpegButton(workspace: daemon.workspace!, onDone: app.refreshHealth)),
+        ),
       row('Pi Agent', '${agent['state']}${agent['error'] != null && '${agent['error']}'.isNotEmpty ? ' · ${agent['error']}' : ''}', ok: app.agentReady),
       const SizedBox(height: Space.md),
       Wrap(spacing: Space.sm, runSpacing: Space.sm, children: [

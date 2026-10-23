@@ -16,7 +16,7 @@ app (Flutter) ── HTTP + SSE on 127.0.0.1, per-run token ──▶ lookd (Go 
 agent ── HTTP with LOOKD_URL / LOOKD_TOKEN ──▶ lookd (its only data source)
 ```
 
-The app starts lookd ([lookd_service.dart](../app/lib/core/lookd_service.dart) searches `LOOKD_BIN`/`LOOK_AGENT`/`LOOK_NODE`, then next to the executable, then the development tree); lookd starts the agent.
+The app starts lookd ([lookd_service.dart](../app/lib/core/lookd_service.dart) searches `LOOKD_BIN`/`LOOK_AGENT`/`LOOK_NODE`, then next to the executable, then the development tree); lookd starts the agent. On Android the same lookd and agent run in an Ubuntu workspace started with proot from the APK's native library folder ([workspace.dart](../app/lib/core/workspace.dart), [decision 0013](decisions/0013-android-runs-lookd-in-a-proot-ubuntu-workspace.md), [draft spec](specs/draft-android-app.md)).
 
 ## Modules
 
@@ -41,7 +41,8 @@ The app starts lookd ([lookd_service.dart](../app/lib/core/lookd_service.dart) s
 | `lookd/internal/store` | SQLite schema and FTS index ([schema.sql](../lookd/internal/store/schema.sql)); rebuildable from library files (schedule and activity via their JSON mirrors) |
 | `lookd/internal/events` | SSE event fan-out |
 | `lookd/internal/agent` | Supervises the Node agent host and proxies `/agent/*` |
-| `lookd/internal/agentenv` | Installs Node.js and the agent's npm dependencies into the data directory ([spec 0008](specs/0008-assistant-runtime-setup.md)) |
+| `lookd/internal/agentenv` | Installs Node.js and the agent's npm dependencies into the data directory and prunes what they never read at run time ([spec 0008](specs/0008-assistant-runtime-setup.md)) |
+| `lookd/internal/rootfs` | Unpacks the Android workspace's Ubuntu base (`lookd unpack`), refusing entries that escape it |
 | `agent/src/host.mjs` | Agent host: HTTP endpoints, system prompt, sessions |
 | `agent/src/http.mjs` | Request body reading with the 1 MiB limit and 30 s deadline, HTTP error replies |
 | `agent/src/tools.mjs` | Tool groups, `find_tools`, note playbook, write guards |
@@ -55,8 +56,9 @@ The app starts lookd ([lookd_service.dart](../app/lib/core/lookd_service.dart) s
 | `agent/src/operate.mjs` | The bot's app operations: settings registry, operate tools, proposal ops and undo |
 | `agent/src/plugins.mjs` | Plugin host: manifests, install state (`plugins.json`), catalogs, loading plugins as Pi extensions, the permission-gated Look API, actions |
 | `agent/plugins/` | Official plugins and their catalog; the [plugin author guide](../agent/plugins/README.md) |
-| `app/lib/core` | lookd client (`api.dart`), daemon discovery and startup, app state, models, study-time tracker (`activity_tracker.dart`), installed plugins and their contributions (`plugins.dart`) |
-| `app/lib/features/<area>` | Screens: activity, assistant, courses, courseware, downloads, home, library, login, notifications, player, plugins, practice, profile, schedule, settings |
+| `app/lib/core` | lookd client (`api.dart`), daemon discovery and startup, the Android workspace and platform bridge (`workspace.dart`, `android_bridge.dart`, `background_work.dart`), app state, models, study-time tracker (`activity_tracker.dart`), installed plugins and their contributions (`plugins.dart`) |
+| `app/lib/features/<area>` | Screens: activity, assistant, courses, courseware, downloads, home, library, login, notifications, player, plugins, practice, profile, schedule, settings, setup (Android workspace) |
+| `app/android/workspace/prepare.py` | Fetches the pinned Termux proot build and builds `liblookd.so` and the agent's sources for the APK; [NOTICE](../app/android/workspace/NOTICE) for the shipped programs |
 | `app/lib/widgets` | Shared widgets, including the Markdown/LaTeX renderer and reader, statistics charts (`charts.dart`) and the activity heatmap (`heatmap.dart`) |
 | `app/lib/theme` | Material 3 theme and spacing/motion tokens |
 
@@ -70,6 +72,7 @@ The app starts lookd ([lookd_service.dart](../app/lib/core/lookd_service.dart) s
 - **Library on disk**: layout owned by `lookd/internal/library`; `library.db` is an index over it, not the source of truth.
 - **`lookstudio://` deep links**: produced by `lookd/internal/portable` for exported Markdown; received by the app over the `look/links` method channel (Linux runner, Android `MainActivity`).
 - **Release package**: [release.yml](../.github/workflows/release.yml) places `lookd` and `agent/` next to the app executable, matching the discovery order above.
+- **Android guest**: every program in the workspace runs through `Workspace.guest` (proot, `env -i`, the files folder bound at its own path, native programs at `/opt/look`); paths lookd reports are valid in the app.
 
 ## Conventions
 

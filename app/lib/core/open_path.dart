@@ -1,9 +1,23 @@
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
+import 'package:url_launcher/url_launcher.dart';
 
-/// Opens a file or folder with the platform's default handler.
+import 'android_bridge.dart';
+
+/// Whether folders can be shown in a file manager. Android apps keep their
+/// files private, so there is none to show them in.
+bool get canOpenFolders => !Platform.isAndroid;
+
+/// Opens a file or folder with the platform's default handler. On Android
+/// files open in another app, web addresses in the browser, folders not at
+/// all.
 Future<bool> openPath(String path) async {
+  if (Platform.isAndroid) {
+    final uri = Uri.tryParse(path);
+    if (uri != null && (uri.scheme == 'http' || uri.scheme == 'https')) return launchUrl(uri, mode: LaunchMode.externalApplication);
+    return AndroidBridge.openFile(p.normalize(path));
+  }
   path = p.normalize(path);
   try {
     if (Platform.isWindows) {
@@ -28,6 +42,7 @@ Future<bool> openPath(String path) async {
 /// back to opening the parent folder.
 Future<bool> revealPath(String path) async {
   path = p.normalize(path);
+  if (Platform.isAndroid) return AndroidBridge.openFile(path);
   try {
     if (Platform.isMacOS) return (await Process.run('open', ['-R', path])).exitCode == 0;
     if (Platform.isWindows) {

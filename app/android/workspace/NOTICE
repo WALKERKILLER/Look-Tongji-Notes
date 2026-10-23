@@ -1,0 +1,35 @@
+Third-party programs in the Look Studio Android app
+
+The APK carries these unmodified Termux builds as native libraries
+(lib/<abi>/), downloaded and verified by android/workspace/prepare.py:
+
+  libproot.so, libproot_loader.so
+    PRoot 5.1.107.98 (Termux package proot_5.1.107.98)
+    GNU General Public License, version 2
+    Copyright (C) the PRoot authors (STMicroelectronics and contributors)
+    Source: https://github.com/termux/proot/archive/v5.1.107.98.zip
+    Build recipe: https://github.com/termux/termux-packages/tree/master/packages/proot
+
+  libtalloc.so
+    talloc 2.5.0 (Termux package libtalloc_2.5.0)
+    GNU Lesser General Public License, version 3 or later (the Termux
+    package lists GPL-3.0; the source offer below covers both)
+    Copyright (C) Andrew Tridgell, Stefan Metzmacher and the Samba team
+    Source: https://www.samba.org/ftp/talloc/talloc-2.5.0.tar.gz
+    Build recipe: https://github.com/termux/termux-packages/tree/master/packages/libtalloc
+    The library's DT_NEEDED name in libproot.so is changed from
+    libtalloc.so.2 to libtalloc.so so that Android can load it; no code
+    is changed. You may replace libtalloc.so with your own build.
+
+  libandroid-shmem.so
+    libandroid-shmem 0.7 (Termux package libandroid-shmem_0.7)
+    BSD 3-Clause License
+    Source: https://github.com/termux/libandroid-shmem/archive/refs/tags/v0.7.tar.gz
+
+The Ubuntu base system (ubuntu-base 24.04) is not part of the APK; the app
+downloads it from an Ubuntu mirror the user chooses, and its packages keep
+their own licenses (/usr/share/doc/*/copyright in the workspace).
+
+For three years from each release, the maintainers provide the exact
+sources of these programs on request:
+https://github.com/WALKERKILLER/Look-Tongji-Notes/issues

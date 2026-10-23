@@ -363,7 +363,7 @@ class _WebDavPageState extends State<WebDavPage> {
           _Notice(
             icon: Icons.difference_outlined,
             text: '${last['conflicts']} 个文件在两台设备上都改过，保留了较新的版本，另一份在冲突文件夹里',
-            action: '查看',
+            action: canOpenFolders ? '查看' : null,
             onAction: () => revealPath(conflictDir),
           ),
         if (!running && errors.isNotEmpty) _Notice(icon: Icons.error_outline_rounded, text: '${errors.length} 个文件没有同步成功：${errors.first}', error: true),
