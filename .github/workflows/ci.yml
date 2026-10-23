@@ -85,6 +85,12 @@ jobs:
       - run: go vet ./...
       - run: go test -count=1 -race ./...
       - run: go build -trimpath -ldflags='-s -w' -o bin/lookd ./cmd/lookd
+      # Release packages also ship lookd for Windows and macOS.
+      - name: Cross-compile for Windows and macOS
+        run: |
+          for t in windows/amd64 darwin/arm64 darwin/amd64; do
+            CGO_ENABLED=0 GOOS=${t%/*} GOARCH=${t#*/} go build -o /dev/null ./cmd/lookd
+          done
 
   agent:
     name: agent (Node)

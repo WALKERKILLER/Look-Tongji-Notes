@@ -1,27 +1,136 @@
 name: Studio release
 
+# Publishing a release or pre-release of the app builds Linux, Windows and
+# macOS packages and Android APKs and attaches them to it. Create it on GitHub (Releases ->
+# Draft a new release) or with
+#   gh release create studio-v0.2.0 --target app --prerelease --generate-notes
+# A new tag is created on the target when the release is published. Releases
+# count as the app's when the tag starts with studio-v or the target is the
+# app branch; the main branch's releases are left alone. The workflow file is
+# read from the tagged commit, so this runs from the app branch.
+
 on:
-  push:
-    tags: ["studio-v*"]
-  workflow_dispatch:
+  release:
+    types: [published]
 
 permissions:
   contents: write
 
+concurrency:
+  group: studio-release-${{ github.event.release.tag_name }}
+
 env:
   FLUTTER_VERSION: "3.47.7"
-  PACKAGE: look-studio-linux-x64
+  NFPM_VERSION: "v2.48.0"
 
 jobs:
-  linux:
-    name: Linux package
+  prepare:
+    name: Version
+    if: startsWith(github.event.release.tag_name, 'studio-v') || github.event.release.target_commitish == 'app'
     runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+      version: ${{ steps.tag.outputs.version }}
+      build_name: ${{ steps.tag.outputs.build_name }}
+    steps:
+      - id: tag
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+          version=${TAG#studio-v}
+          version=${version#v}
+          if ! [[ $version =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::Tag '$TAG' should be studio-v<version>, e.g. studio-v0.2.0 or studio-v0.2.0-beta.1"
+            exit 1
+          fi
+          {
+            echo "tag=$TAG"
+            echo "version=$version"
+            echo "build_name=${version%%-*}"   # platforms want plain x.y.z
+          } >> "$GITHUB_OUTPUT"
+
+  linux:
+    name: Linux ${{ matrix.arch }}
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { arch: x64, runner: ubuntu-22.04 }
+          - { arch: arm64, runner: ubuntu-22.04-arm }
+    runs-on: ${{ matrix.runner }}
+    env:
+      VERSION: ${{ needs.prepare.outputs.version }}
     steps:
       - uses: actions/checkout@v7
-      - name: Linux build dependencies
+      - name: Build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libmpv-dev
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libmpv-dev file
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: lookd/go.mod
+          cache-dependency-path: lookd/go.sum
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: agent/package-lock.json
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - name: Packaging tools
+        run: |
+          mkdir -p "$HOME/bin"
+          GOBIN="$HOME/bin" go install "github.com/goreleaser/nfpm/v2/cmd/nfpm@$NFPM_VERSION"
+          curl -fsSL -o "$HOME/bin/linuxdeploy" "https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-$(uname -m).AppImage"
+          chmod +x "$HOME/bin/linuxdeploy"
+          echo "$HOME/bin" >> "$GITHUB_PATH"
+
+      - name: Build
+        run: |
+          (cd lookd && CGO_ENABLED=0 go build -trimpath -ldflags="-s -w -X lookstudio/lookd/internal/server.Version=$VERSION" -o bin/lookd ./cmd/lookd)
+          (cd app && flutter pub get && flutter build linux --release --build-name '${{ needs.prepare.outputs.build_name }}' --build-number "$GITHUB_RUN_NUMBER")
+
+      # The app looks for lookd and agent/src/host.mjs next to its executable.
+      - name: Stage
+        run: |
+          bundle=$(ls -d app/build/linux/*/release/bundle)
+          cp lookd/bin/lookd "$bundle/"
+          mkdir -p "$bundle/agent"
+          cp -r agent/src agent/plugins agent/package.json agent/package-lock.json "$bundle/agent/"
+          (cd "$bundle/agent" && npm ci --omit=dev)
+          lookd/bin/lookd prune "$bundle/agent/node_modules"   # declarations and source maps
+          cp LICENSE "$bundle/"
+          echo "BUNDLE=$bundle" >> "$GITHUB_ENV"
+
+      - name: Package
+        run: app/linux/packaging/package.sh "$VERSION" "$BUNDLE" dist
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: look-studio-linux-${{ matrix.arch }}
+          path: dist/*
+          retention-days: 14
+      - name: Attach to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload '${{ needs.prepare.outputs.tag }}' dist/* --clobber --repo "$GITHUB_REPOSITORY"
+
+  windows:
+    name: Windows x64
+    needs: prepare
+    runs-on: windows-latest
+    env:
+      VERSION: ${{ needs.prepare.outputs.version }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
         with:
           go-version-file: lookd/go.mod
@@ -39,34 +148,184 @@ jobs:
 
       - name: Build
         run: |
-          (cd lookd && go build -trimpath -ldflags='-s -w' -o bin/lookd ./cmd/lookd)
-          (cd app && flutter pub get && flutter build linux --release)
+          (cd lookd && CGO_ENABLED=0 go build -trimpath -ldflags="-s -w -X lookstudio/lookd/internal/server.Version=$VERSION" -o bin/lookd.exe ./cmd/lookd)
+          (cd app && flutter pub get && flutter build windows --release --build-name '${{ needs.prepare.outputs.build_name }}' --build-number "$GITHUB_RUN_NUMBER")
 
-      # The app looks for lookd and agent/src/host.mjs next to its executable.
-      - name: Package
+      - name: Stage
         run: |
-          cp -r app/build/linux/x64/release/bundle "$PACKAGE"
-          cp lookd/bin/lookd "$PACKAGE/"
-          mkdir -p "$PACKAGE/agent"
-          cp -r agent/src agent/package.json agent/package-lock.json "$PACKAGE/agent/"
-          (cd "$PACKAGE/agent" && npm ci --omit=dev)
-          cp LICENSE "$PACKAGE/"
-          tar -czf "$PACKAGE.tar.gz" "$PACKAGE"
+          stage=app/build/windows/x64/runner/Release
+          cp lookd/bin/lookd.exe "$stage/"
+          mkdir -p "$stage/agent"
+          cp -r agent/src agent/plugins agent/package.json agent/package-lock.json "$stage/agent/"
+          (cd "$stage/agent" && npm ci --omit=dev)
+          lookd/bin/lookd.exe prune "$stage/agent/node_modules"
+          cp LICENSE "$stage/"
+
+      - name: Package
+        shell: pwsh
+        run: |
+          $name = "look-studio-$env:VERSION-windows-x64"
+          $stage = Resolve-Path app/build/windows/x64/runner/Release
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Compress-Archive -Path "$stage\*" -DestinationPath "dist\$name.zip"
+          $iscc = Get-Command iscc -ErrorAction SilentlyContinue
+          if (-not $iscc) {
+            if (-not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) { choco install innosetup -y --no-progress }
+            $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          }
+          & $iscc /Qp "/DAppVersion=$env:VERSION" "/DSourceDir=$stage" "/DOutputDir=$(Resolve-Path dist)" "/DOutputName=$name-setup" app/windows/packaging/look-studio.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - uses: actions/upload-artifact@v7
         with:
-          name: ${{ env.PACKAGE }}
-          path: ${{ env.PACKAGE }}.tar.gz
+          name: look-studio-windows-x64
+          path: dist/*
           retention-days: 14
-
-      - name: Publish pre-release
-        if: startsWith(github.ref, 'refs/tags/')
+      - name: Attach to the release
         env:
           GH_TOKEN: ${{ github.token }}
+        run: gh release upload '${{ needs.prepare.outputs.tag }}' dist/* --clobber --repo "$GITHUB_REPOSITORY"
+
+  macos:
+    name: macOS universal
+    needs: prepare
+    runs-on: macos-latest
+    env:
+      VERSION: ${{ needs.prepare.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: lookd/go.mod
+          cache-dependency-path: lookd/go.sum
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: agent/package-lock.json
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Build
         run: |
-          gh release create "$GITHUB_REF_NAME" "$PACKAGE.tar.gz" \
-            --repo "$GITHUB_REPOSITORY" \
-            --title "Look Studio $GITHUB_REF_NAME" \
-            --prerelease \
-            --verify-tag \
-            --generate-notes
+          cd lookd
+          for a in arm64 amd64; do
+            CGO_ENABLED=0 GOOS=darwin GOARCH=$a go build -trimpath -ldflags="-s -w -X lookstudio/lookd/internal/server.Version=$VERSION" -o "bin/lookd-$a" ./cmd/lookd
+          done
+          lipo -create -output bin/lookd bin/lookd-arm64 bin/lookd-amd64
+          cd ../app
+          flutter pub get
+          flutter build macos --release --build-name '${{ needs.prepare.outputs.build_name }}' --build-number "$GITHUB_RUN_NUMBER"
+
+      # Not notarized: the app is signed ad hoc after lookd and the agent
+      # are added, so it runs once the user allows it (see the README).
+      - name: Stage and sign
+        run: |
+          app="app/build/macos/Build/Products/Release/Look Studio.app"
+          res="$app/Contents/Resources"
+          # lookd is code and sits beside the executable; the agent is data.
+          cp lookd/bin/lookd "$app/Contents/MacOS/"
+          mkdir -p "$res/agent"
+          cp -r agent/src agent/plugins agent/package.json agent/package-lock.json "$res/agent/"
+          (cd "$res/agent" && npm ci --omit=dev)
+          lookd/bin/lookd prune "$res/agent/node_modules"
+          cp LICENSE "$res/"
+          codesign --force --deep --sign - "$app"
+          codesign --verify --deep --strict "$app"
+          echo "APP=$app" >> "$GITHUB_ENV"
+
+      - name: Package
+        run: |
+          name="look-studio-$VERSION-macos-universal"
+          mkdir -p dist dmg
+          cp -R "$APP" dmg/
+          ln -s /Applications dmg/Applications
+          hdiutil create -volname "Look Studio" -srcfolder dmg -fs HFS+ -format UDZO "dist/$name.dmg"
+          ditto -c -k --keepParent "$APP" "dist/$name.zip"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: look-studio-macos-universal
+          path: dist/*
+          retention-days: 14
+      - name: Attach to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload '${{ needs.prepare.outputs.tag }}' dist/* --clobber --repo "$GITHUB_REPOSITORY"
+
+  # One APK per ABI. lookd, proot and the agent's sources are packaged by
+  # prepare.py; the app downloads its Ubuntu workspace on first run
+  # (docs/decisions/0013-android-runs-lookd-in-a-proot-ubuntu-workspace.md).
+  android:
+    name: Android
+    needs: prepare
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ needs.prepare.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: lookd/go.mod
+          cache-dependency-path: lookd/go.sum
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Native programs
+        run: python3 app/android/workspace/prepare.py --abi arm64-v8a,x86_64 --version "$VERSION"
+
+      # Without the secrets the APKs carry a throwaway debug signature, and
+      # installing the next release needs an uninstall (which deletes data).
+      - name: Signing key
+        env:
+          KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -z "$KEYSTORE" ]; then
+            echo "::warning::ANDROID_KEYSTORE_BASE64 is not set; the APKs are signed with a debug key."
+            exit 0
+          fi
+          echo "$KEYSTORE" | base64 -d > "$RUNNER_TEMP/release.jks"
+          printf 'storeFile=%s\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n' \
+            "$RUNNER_TEMP/release.jks" "$STORE_PASSWORD" "$KEY_ALIAS" "${KEY_PASSWORD:-$STORE_PASSWORD}" > app/android/key.properties
+
+      - name: Build
+        run: |
+          cd app
+          flutter pub get
+          flutter build apk --release --split-per-abi --target-platform android-arm64,android-x64 \
+            --obfuscate --split-debug-info=build/symbols \
+            --build-name '${{ needs.prepare.outputs.build_name }}' --build-number "$GITHUB_RUN_NUMBER"
+          mkdir -p ../dist
+          for abi in arm64-v8a x86_64; do
+            cp "build/app/outputs/flutter-apk/app-$abi-release.apk" "../dist/look-studio-$VERSION-android-$abi.apk"
+          done
+          rm -f android/key.properties
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: look-studio-android
+          path: dist/*
+          retention-days: 14
+      # Needed to read crash stack traces of the obfuscated build.
+      - uses: actions/upload-artifact@v7
+        with:
+          name: look-studio-android-symbols
+          path: app/build/symbols
+          retention-days: 90
+      - name: Attach to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload '${{ needs.prepare.outputs.tag }}' dist/* --clobber --repo "$GITHUB_REPOSITORY"

@@ -36,7 +36,8 @@ import (
 	"lookstudio/lookd/internal/tongji"
 )
 
-const Version = "0.1.0"
+// Version is set at release builds with -ldflags "-X lookstudio/lookd/internal/server.Version=…".
+var Version = "0.1.0"
 
 type Server struct {
 	Token string

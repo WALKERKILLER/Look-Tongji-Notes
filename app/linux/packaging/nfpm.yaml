@@ -1,0 +1,57 @@
+# deb, rpm and Arch packages from the staged bundle; see package.sh.
+name: look-studio
+arch: ${NFPM_ARCH}
+platform: linux
+version: ${VERSION}
+section: education
+priority: optional
+maintainer: Look Studio contributors <noreply@github.com>
+description: |
+  Look Studio: watch Tongji lecture replays, transcribe them and take notes
+  with a resident assistant. Bundles the lookd daemon and the assistant host.
+vendor: Look Studio
+homepage: https://github.com/WALKERKILLER/Look-Tongji-Notes/tree/app
+license: MIT
+
+contents:
+  - src: ${STAGE}/
+    dst: /opt/look-studio/
+    type: tree
+  - src: /opt/look-studio/look_studio
+    dst: /usr/bin/look-studio
+    type: symlink
+  - src: ${PACKAGING}/cn.lookstudio.look_studio.desktop
+    dst: /usr/share/applications/cn.lookstudio.look_studio.desktop
+  - src: ${ICONS}/
+    dst: /usr/share/icons/hicolor/
+    type: tree
+
+overrides:
+  deb:
+    depends:
+      - libgtk-3-0t64 | libgtk-3-0
+      - libmpv2 | libmpv1
+    recommends:
+      - ffmpeg
+      - nodejs
+  rpm:
+    depends:
+      - gtk3
+      - mpv-libs
+    recommends:
+      - ffmpeg
+      - nodejs
+  archlinux:
+    depends:
+      - gtk3
+      - mpv
+    optdepends:
+      - "ffmpeg: transcription"
+      - "nodejs: the assistant"
+
+deb:
+  fields:
+    Bugs: https://github.com/WALKERKILLER/Look-Tongji-Notes/issues
+rpm:
+  group: Applications/Education
+  compression: zstd

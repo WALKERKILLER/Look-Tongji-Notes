@@ -1,0 +1,12 @@
+#!/bin/sh
+# AppImage entry point. libmpv and its libraries are bundled under usr/lib;
+# media_kit is pointed at them directly instead of through LD_LIBRARY_PATH,
+# so lookd's ffmpeg and other child processes keep the system libraries.
+HERE="$(dirname "$(readlink -f "$0")")"
+for lib in "$HERE"/usr/lib/libmpv.so.2 "$HERE"/usr/lib/libmpv.so.1; do
+  if [ -e "$lib" ]; then
+    export LIBMPV_LIBRARY_PATH="$lib"
+    break
+  fi
+done
+exec "$HERE/look-studio/look_studio" "$@"

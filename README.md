@@ -1,3 +1,5 @@
+<img src="app/branding/icon-512.png" width="96" alt="Look Studio icon">
+
 # Look Studio
 
 > 🚧 开发中 / Work in progress — UI, APIs and data layout may change without notice.
@@ -10,7 +12,21 @@ Desktop client for Tongji's lecture-recording platform (look.tongji.edu.cn), bui
 | `lookd/` | Go daemon: login, Look API, downloads, transcription, SQLite index |
 | `agent/` | Node.js host for the assistant (Pi Agent SDK) |
 
-The app starts `lookd`, and `lookd` starts the agent. The app finds them through `LOOKD_BIN`, `LOOK_AGENT` and `LOOK_NODE`, then next to its executable, then by walking up to `lookd/bin/lookd` and `agent/src/host.mjs` in a source checkout.
+The app starts `lookd`, and `lookd` starts the agent. The app finds them through `LOOKD_BIN`, `LOOK_AGENT` and `LOOK_NODE`, then next to its executable (`Contents/Resources/agent` in the macOS app), then by walking up to `lookd/bin/lookd` and `agent/src/host.mjs` in a source checkout.
+
+## Download
+
+Each `studio-v*` release on the [releases page](https://github.com/WALKERKILLER/Look-Tongji-Notes/releases) carries:
+
+| Platform | Files |
+| --- | --- |
+| Linux x64 and arm64 | `.deb` (Debian, Ubuntu), `.rpm` (Fedora, openSUSE), `.pkg.tar.zst` (Arch: `sudo pacman -U`), `.AppImage`, `.tar.gz` |
+| Windows x64 | `-setup.exe` (per-user install, no admin rights) and a portable `.zip` |
+| macOS (Apple silicon and Intel) | `.dmg` and `.zip` |
+
+Install `ffmpeg` for transcription and Node.js 22+ for the assistant (or let the app install the assistant's runtime). The deb, rpm and Arch packages depend on GTK 3 and libmpv; the AppImage carries its own libmpv.
+
+The builds are not code-signed yet. Windows SmartScreen may warn: choose "More info" → "Run anyway". On macOS, open the app once with right-click → Open, or run `xattr -dr com.apple.quarantine "/Applications/Look Studio.app"`.
 
 ## Build from source
 
@@ -32,35 +48,33 @@ sudo apt-get install clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev
 ./app/build/linux/x64/release/bundle/look_studio
 ```
 
-Prebuilt bundles: the `look-studio-linux-bundle` artifact of each CI run, and `studio-v*` pre-releases.
+Prebuilt bundles: the `look-studio-linux-bundle` artifact of each CI run, and the release packages above. `app/linux/packaging/package.sh` builds the same packages locally (it needs `nfpm` and `linuxdeploy` for the deb, rpm, Arch and AppImage formats).
 
-### Windows — experimental, untested
+### Windows — built for releases, lightly tested
 
-Needs Visual Studio 2022 with "Desktop development with C++". The `windows/` runner is not committed yet, so generate it first. Automatic discovery assumes Unix names, so point the app at the daemon, agent and Node explicitly (PowerShell):
+Needs Visual Studio 2022 with "Desktop development with C++" (PowerShell):
 
 ```powershell
 cd lookd; go build -trimpath -o bin\lookd.exe .\cmd\lookd; cd ..
 cd agent; npm ci; cd ..
-cd app; flutter create --platforms=windows .; flutter build windows --release; cd ..
-$env:LOOKD_BIN  = "$PWD\lookd\bin\lookd.exe"
-$env:LOOK_AGENT = "$PWD\agent\src\host.mjs"
-$env:LOOK_NODE  = (Get-Command node).Source
+cd app; flutter build windows --release; cd ..
 .\app\build\windows\x64\runner\Release\look_studio.exe
 ```
 
-### macOS — experimental, untested
+From a source checkout the app finds `lookd\bin\lookd.exe` and `agent\src\host.mjs` by itself, and Node.js on `PATH` or in `Program Files\nodejs`.
 
-Needs Xcode and CocoaPods. The `macos/` runner is not committed yet. Flutter's generated runner is sandboxed, which blocks starting `lookd`; set `com.apple.security.app-sandbox` to `false` in `app/macos/Runner/DebugProfile.entitlements` and `Release.entitlements` before building.
+### macOS — built for releases, lightly tested
+
+Needs Xcode and CocoaPods. The runner is not sandboxed, because the app starts `lookd`, which reads and writes `~/LookStudio`.
 
 ```sh
 (cd lookd && go build -trimpath -o bin/lookd ./cmd/lookd)
 (cd agent && npm ci)
-(cd app && flutter create --platforms=macos .)
-# edit the two entitlements files as described above
 (cd app && flutter build macos --release)
-# start from a terminal so the app inherits PATH (Node, ffmpeg)
-./app/build/macos/Build/Products/Release/look_studio.app/Contents/MacOS/look_studio
+open "app/build/macos/Build/Products/Release/Look Studio.app"
 ```
+
+Node.js is found on `PATH`, in `/usr/local/bin` or in `/opt/homebrew/bin`.
 
 ### Android — arm64 and x86_64, Android 7+
 
