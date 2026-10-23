@@ -13,6 +13,7 @@ import '../../widgets/states.dart';
 import '../courses/course_page.dart';
 import '../library/note_reader.dart';
 import '../player/player_page.dart';
+import '../practice/practice_page.dart';
 
 /// Timed kinds in display order.
 const kActivityKinds = ['watch', 'read', 'practice'];
@@ -45,12 +46,13 @@ class ActivityDay {
   int get notesCreated => _int(j['notes_created']);
   int get notesEdited => _int(j['notes_edited']);
   int get transcripts => _int(j['transcripts']);
+  int get quizzes => _int(j['quizzes']);
 
   /// Minutes per timed kind.
   int kindMinutes(String k) => (_int((j['by_kind'] as Map?)?[k]) / 60).round();
 
   /// Same rule as lookd's ActivityDay.Active: study time or any event.
-  bool get active => minutes >= 1 || asks > 0 || notesCreated > 0 || notesEdited > 0 || transcripts > 0;
+  bool get active => minutes >= 1 || asks > 0 || notesCreated > 0 || notesEdited > 0 || transcripts > 0 || quizzes > 0;
 
   /// Heatmap intensity: minutes, with days of only events (questions, notes,
   /// transcripts) shown at the lowest step so they match the streak.
@@ -64,8 +66,12 @@ class ActivityDay {
         [
           if (!active) '没有学习记录' else if (minutes > 0) '学习 ${fmtMinutes(minutes)}',
           if (minutes > 0) [for (final k in kActivityKinds) if (kindMinutes(k) > 0) '${activityKindLabel(k)} ${kindMinutes(k)}'].join(' · '),
-          if (asks > 0 || notesCreated + notesEdited > 0)
-            [if (asks > 0) '提问 $asks 次', if (notesCreated + notesEdited > 0) '笔记 ${notesCreated + notesEdited} 篇'].join(' · '),
+          if (asks > 0 || notesCreated + notesEdited > 0 || quizzes > 0)
+            [
+              if (quizzes > 0) '练习 $quizzes 组',
+              if (asks > 0) '提问 $asks 次',
+              if (notesCreated + notesEdited > 0) '笔记 ${notesCreated + notesEdited} 篇',
+            ].join(' · '),
         ],
       );
 
@@ -354,10 +360,11 @@ class _ActivityPageState extends State<ActivityPage> with _LiveActivity {
   Widget _kinds(ActivityData d) {
     final totals = {for (final k in kActivityKinds) k: d.days.values.fold<int>(0, (s, day) => s + _int((day.j['by_kind'] as Map?)?[k]))};
     final top = totals.values.fold<int>(1, math.max);
-    var asks = 0, notes = 0;
+    var asks = 0, notes = 0, quizzes = 0;
     for (final day in d.days.values) {
       asks += day.asks;
       notes += day.notesCreated;
+      quizzes += day.quizzes;
     }
     final tt = Theme.of(context).textTheme;
     final cs = Theme.of(context).colorScheme;
@@ -365,7 +372,7 @@ class _ActivityPageState extends State<ActivityPage> with _LiveActivity {
       for (final k in kActivityKinds) RankedRow(label: activityKindLabel(k), fraction: totals[k]! / top, trailing: fmtMinutes(totals[k]! / 60)),
       Padding(
         padding: const EdgeInsets.only(top: Space.sm),
-        child: Text('向助手提问 $asks 次 · 新建笔记 $notes 篇', style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+        child: Text('完成练习 $quizzes 组 · 向助手提问 $asks 次 · 新建笔记 $notes 篇', style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
       ),
     ]);
   }
@@ -420,7 +427,9 @@ class _DaySheet extends StatelessWidget {
           final lectures = _byLecture(j['lectures'] as List? ?? const []);
           final notes = [for (final n in (j['notes'] as List? ?? const [])) (n as Map).cast<String, dynamic>()];
           final transcribed = [for (final t in (j['transcribed'] as List? ?? const [])) (t as Map).cast<String, dynamic>()];
+          final attempts = [for (final a in (j['attempts'] as List? ?? const [])) (a as Map).cast<String, dynamic>()];
           final counts = [
+            if (d.quizzes > 0) '完成练习 ${d.quizzes} 组',
             if (d.asks > 0) '提问 ${d.asks} 次',
             if (d.notesCreated > 0) '新建笔记 ${d.notesCreated} 篇',
             if (d.notesEdited > 0) '编辑笔记 ${d.notesEdited} 篇',
@@ -459,6 +468,16 @@ class _DaySheet extends StatelessWidget {
                   title: Text('${l['title']}', maxLines: 1, overflow: TextOverflow.ellipsis),
                   subtitle: Text([if ('${l['course_title'] ?? ''}'.isNotEmpty) '${l['course_title']}', l['detail']].join(' · '), maxLines: 1, overflow: TextOverflow.ellipsis),
                   onTap: () => open(PlayerPage(lectureId: '${l['lecture_id']}')),
+                ),
+            ],
+            if (attempts.isNotEmpty) ...[
+              _subheader(context, '练习'),
+              for (final a in attempts)
+                ListTile(
+                  leading: const Icon(Icons.quiz_outlined),
+                  title: Text('${a['title']}', maxLines: 1, overflow: TextOverflow.ellipsis),
+                  trailing: Text('${a['correct']}/${a['total']}', style: tt.titleSmall?.copyWith(fontFeatures: const [FontFeature.tabularFigures()])),
+                  onTap: () => open(PracticePage(quizId: '${a['quiz_id']}')),
                 ),
             ],
             if (notes.isNotEmpty) ...[

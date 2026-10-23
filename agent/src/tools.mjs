@@ -7,6 +7,7 @@
 // context of every request.
 import { Type } from "typebox";
 import { api, get } from "./lookd.mjs";
+import { checkQuiz, QUIZ_PLAYBOOK } from "./practice.mjs";
 import { generateTimeline } from "./timeline.mjs";
 import { seeImages } from "./vision.mjs";
 
@@ -61,6 +62,12 @@ export const GROUPS = {
 		label: "PPT 与课件",
 		tools: ["view_slides", "list_courseware", "search_courseware", "read_courseware", "view_images"],
 		words: "ppt 幻灯片 截图 板书 图片 看图 课件 讲义 pdf 教材 资料 文档 courseware slides image",
+	},
+	practice: {
+		label: "练习题",
+		tools: ["create_quiz", "list_quizzes", "read_quiz_results", "lecture_info"],
+		with: ["materials"],
+		words: "出题 练习 测验 自测 题目 选择题 考考 刷题 错题 quiz test practice",
 	},
 	help: { label: "应用帮助", tools: ["app_guide"], words: "怎么 如何 功能 设置 帮助 使用 下载 登录 转写 模型 help" },
 };
@@ -216,7 +223,7 @@ export function createTools(conv) {
 					.map(([id, g]) => `${id} (${g.label}: ${g.tools.join(", ")})`)
 					.join("; ") +
 				". Pass groups directly when you know them, or a query in the user's words. Loaded tools are callable from your next step.",
-			promptSnippet: "find_tools(groups|query): load tool groups (course, notes, schedule, outline, materials, help)",
+			promptSnippet: "find_tools(groups|query): load tool groups (course, notes, schedule, outline, materials, practice, help)",
 			parameters: Type.Object({
 				groups: Type.Optional(Type.Array(Type.Union(Object.keys(GROUPS).map((k) => Type.Literal(k))))),
 				query: Type.Optional(Type.String({ description: "What you need to do, e.g. 标记作业截止日期" })),
@@ -231,7 +238,7 @@ export function createTools(conv) {
 					const t = tools.find((x) => x.name === n);
 					return `- ${n}: ${t.description.split(/(?<=\.)\s/)[0]}`;
 				});
-				const playbook = ids.includes("notes") ? `\n\n${NOTE_PLAYBOOK}` : "";
+				const playbook = [ids.includes("notes") && NOTE_PLAYBOOK, ids.includes("practice") && QUIZ_PLAYBOOK].filter(Boolean).map((p) => `\n\n${p}`).join("");
 				return text(`已加载 ${ids.map((id) => GROUPS[id].label).join("、")}，下一步即可调用：\n${lines.join("\n")}${playbook}`, { loaded: names });
 			},
 		},
@@ -673,6 +680,76 @@ export function createTools(conv) {
 				);
 				const embed = clean.map((x) => `![插图](look://file/${x})`).join("\n");
 				return { content: [...seen.content, { type: "text", text: `\n在笔记里嵌入时使用：\n${embed}` }], details: { mode: seen.mode } };
+			},
+		},
+		{
+			name: "create_quiz",
+			label: "生成练习",
+			description:
+				"Save a multiple-choice practice set grounded in the lecture material; it shows in chat as a card the user can start. Read the transcript first (whole lecture unless partial), then write every question with one correct answer, a rationale for every option and a ref to its source. " +
+				"Refs: look://lecture/<id>?t=<sec> (a transcript position you read), look://slide/<id>/<idx>, or a courseware link from search_courseware.",
+			parameters: Type.Object({
+				title: Type.String({ description: "Short, e.g. 第 3 讲 傅里叶变换 · 自测" }),
+				lecture_id: Type.Optional(Type.String()),
+				course_id: Type.Optional(Type.String({ description: "Only for a course-wide set without lecture_id" })),
+				difficulty: Type.Union(["easy", "medium", "hard"].map((k) => Type.Literal(k))),
+				partial: Type.Optional(Type.Boolean({ description: "The set covers only part of the lecture, or the lecture has no transcript" })),
+				questions: Type.Array(
+					Type.Object({
+						stem: Type.String({ description: "Markdown, LaTeX allowed" }),
+						options: Type.Array(Type.Object({ text: Type.String(), rationale: Type.String({ description: "Why this option is right or wrong" }) }), {
+							minItems: 2,
+							maxItems: 6,
+						}),
+						answer: Type.Integer({ description: "Index of the correct option, from 0" }),
+						hint: Type.Optional(Type.String({ description: "Points the way without giving the answer" })),
+						topic: Type.Optional(Type.String({ description: "2–6 字的知识点" })),
+						ref: Type.String({ description: "look:// link to the evidence" }),
+					}),
+					{ minItems: 1, maxItems: 30 },
+				),
+			}),
+			execute: async (_id, p) => {
+				const coverage = p.lecture_id ? await unread(conv, p.lecture_id) : null;
+				const problem = checkQuiz(p, conv.reads, coverage);
+				if (problem) throw new Error(problem);
+				const { partial: _, ...body } = p;
+				const q = await api("POST", "/api/quizzes", { ...body, source: "agent" });
+				return text(`已保存练习「${q.title}」${q.count} 题（id ${q.id}）。聊天里会显示练习卡片，用户点“开始练习”即可作答。`, {
+					quiz: { id: q.id, title: q.title, count: q.count, difficulty: q.difficulty, lecture_id: q.lecture_id, lecture_title: q.lecture_title ?? "" },
+				});
+			},
+		},
+		{
+			name: "list_quizzes",
+			label: "练习列表",
+			description: "List saved practice sets with their best and last scores, optionally for a course or lecture.",
+			parameters: Type.Object({ course_id: Type.Optional(Type.String()), lecture_id: Type.Optional(Type.String()) }),
+			execute: async (_id, { course_id = "", lecture_id = "" }) => {
+				const qs = await get(`/api/quizzes?course_id=${enc(course_id)}&lecture_id=${enc(lecture_id)}`);
+				const score = (s) => (s ? `${s.correct}/${s.total}` : "未作答");
+				const rows = qs.map((q) => `- ${q.title} · ${q.count} 题 · ${q.difficulty} · 最好 ${score(q.best)} · 最近 ${score(q.last)} · 已练 ${q.attempts} 次 (id ${q.id})`);
+				return text(rows.join("\n") || "还没有练习");
+			},
+		},
+		{
+			name: "read_quiz_results",
+			label: "查看作答",
+			description: "Read the student's latest attempt at a practice set: score, and each missed question with their choice and the correct answer. Use before explaining mistakes or writing a follow-up set on them.",
+			parameters: Type.Object({ quiz_id: Type.String() }),
+			execute: async (_id, { quiz_id }) => {
+				const q = await get(`/api/quizzes/${enc(quiz_id)}`);
+				if (!q.last?.answers) return text(`「${q.title}」还没有作答记录。`);
+				const L = (i) => String.fromCharCode(65 + i);
+				const missed = q.questions
+					.map((x, i) => ({ x, i, a: q.last.answers[i] }))
+					.filter(({ x, a }) => a !== x.answer)
+					.map(({ x, i, a }) => {
+						const chose = a < 0 ? "未作答" : `选了 ${L(a)}「${x.options[a].text}」`;
+						return `第 ${i + 1} 题${x.topic ? `［${x.topic}］` : ""} ${x.stem}\n  ${chose}；正确 ${L(x.answer)}「${x.options[x.answer].text}」 出处 ${x.ref ?? "无"}`;
+					});
+				const head = `「${q.title}」最近一次 ${q.last.correct}/${q.last.total}，最好 ${q.best.correct}/${q.best.total}，共练 ${q.attempts} 次。`;
+				return text(missed.length ? `${head}\n做错的题：\n${missed.join("\n")}` : `${head}\n最近一次全部答对。`, { quiz_id });
 			},
 		},
 		{
