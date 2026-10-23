@@ -146,10 +146,12 @@ class _LibraryPageState extends State<LibraryPage> {
                   SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
                     child: Row(children: [
-                      for (final (k, l) in const [('', '全部'), ('segment', '文字稿'), ('note', '笔记')]) ...[
-                        ChoiceChip(label: Text(l), selected: _kind == k, onSelected: (_) => setState(() => _kind = k)),
-                        const SizedBox(width: Space.sm),
-                      ],
+                      // The kinds filter search results; the course filter also applies to the notes below.
+                      if (_q.text.trim().isNotEmpty)
+                        for (final (k, l) in const [('', '全部'), ('segment', '文字稿'), ('note', '笔记')]) ...[
+                          ChoiceChip(label: Text(l), selected: _kind == k, onSelected: (_) => setState(() => _kind = k)),
+                          const SizedBox(width: Space.sm),
+                        ],
                       if (courses.isNotEmpty)
                         MenuAnchor(
                           menuChildren: [
@@ -234,21 +236,22 @@ class _LibraryPageState extends State<LibraryPage> {
     final tt = Theme.of(context).textTheme;
     final app = context.read<AppState>();
     final st = (_lib?['stats'] as Map?) ?? {};
+    final notes = _courseId.isEmpty ? _notes : _notes.where((n) => n.courseId == _courseId).toList();
     return [
       SliverToBoxAdapter(
         child: ContentWidth(
           child: Padding(
             padding: EdgeInsets.fromLTRB(pad, Space.lg, pad, Space.sm),
-            child: Text('笔记 · ${_notes.length}', style: tt.titleLarge),
+            child: Text('笔记 · ${notes.length}', style: tt.titleLarge),
           ),
         ),
       ),
-      if (_notes.isEmpty)
+      if (notes.isEmpty)
         SliverToBoxAdapter(
           child: ContentWidth(
             child: Padding(
               padding: EdgeInsets.symmetric(horizontal: pad),
-              child: Text('在播放器里边看边记，或让助手根据文字稿整理笔记。', style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
+              child: Text(_courseId.isEmpty || _notes.isEmpty ? '在播放器里边看边记，或让助手根据文字稿整理笔记。' : '这门课还没有笔记。', style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
             ),
           ),
         )
@@ -261,7 +264,7 @@ class _LibraryPageState extends State<LibraryPage> {
                 final cols = (c.maxWidth / 300).floor().clamp(1, 3);
                 final w = (c.maxWidth - Space.md * (cols - 1)) / cols;
                 return Wrap(spacing: Space.md, runSpacing: Space.md, children: [
-                  for (final n in _notes)
+                  for (final n in notes)
                     SizedBox(
                       width: w,
                       child: Card(

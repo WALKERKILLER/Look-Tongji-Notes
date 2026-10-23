@@ -74,6 +74,10 @@ class _NotePageState extends State<NotePage> {
   String get _lectureId => _note?.lectureId ?? '';
 
   void _open(LookRef ref, bool wide) {
+    if (ref is LectureRef || ref is FileRef) {
+      openRef(context, ref);
+      return;
+    }
     if (wide) {
       setState(() => _ref = ref);
       return;
@@ -310,6 +314,8 @@ class SourcePane extends StatelessWidget {
       TimeRef() => _MomentSource(lectureId: r.lectureId.isNotEmpty ? r.lectureId : lectureId, ms: r.seconds * 1000, onClose: onClose),
       SlideRef() => _MomentSource(lectureId: r.lectureId, slideIdx: r.idx, onClose: onClose),
       CoursewareRef() => CoursewareSource(lectureId: r.lectureId, file: r.file, query: r.query, onClose: onClose),
+      // Lectures and files open in place of a pane (openRef).
+      LectureRef() || FileRef() => const SizedBox.shrink(),
     };
   }
 }
@@ -523,6 +529,7 @@ class _CoursewareSourceState extends State<CoursewareSource> {
                         baseDir: p.posix.dirname(d.$1.mdPath),
                         lectureId: widget.lectureId,
                         initialQuery: widget.query,
+                        onRef: (r) => openRef(context, r, lectureId: widget.lectureId),
                         padding: const EdgeInsets.fromLTRB(Space.md, 0, Space.md, Space.xl),
                       ),
           ),
@@ -616,6 +623,7 @@ class _CoursewareReaderPageState extends State<_CoursewareReaderPage> {
                                 lectureId: widget.lectureId,
                                 baseDir: p.posix.dirname(d!.$1.mdPath),
                                 initialQuery: widget.query,
+                                onRef: (r) => openRef(context, r, lectureId: widget.lectureId),
                                 maxWidth: 820,
                               ),
                             ),
@@ -630,8 +638,17 @@ class _CoursewareReaderPageState extends State<_CoursewareReaderPage> {
 }
 
 /// Opens a reference where no supporting pane exists (chat, player panel):
-/// timestamps seek, slides and courseware open in a sheet.
+/// timestamps seek, slides and courseware open in a sheet, lectures in the
+/// player and library files in the viewer or the system's app.
 void openRef(BuildContext context, LookRef ref, {String lectureId = '', void Function(TimeRef)? onSeek}) {
+  if (ref is LectureRef) {
+    Navigator.of(context, rootNavigator: true).push(MaterialPageRoute(builder: (_) => PlayerPage(lectureId: ref.lectureId)));
+    return;
+  }
+  if (ref is FileRef) {
+    openLibraryFile(context, ref.path);
+    return;
+  }
   if (ref is TimeRef) {
     if (onSeek != null) {
       onSeek(ref);

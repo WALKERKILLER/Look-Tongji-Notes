@@ -168,6 +168,13 @@ class AppState extends ChangeNotifier {
     }
   }
 
+  /// Pauses every queued or running job, resumes every paused one, or retries
+  /// every failed one ([ids] limits it); returns how many changed.
+  Future<int> bulkJobs(String action, {List<String>? ids}) async {
+    final r = await api.post('/api/jobs/bulk', {'action': action, 'ids': ?ids});
+    return r is Map ? (r['changed'] as num?)?.toInt() ?? 0 : 0;
+  }
+
   /// Clears finished records; with [files] the downloaded files go too.
   /// Returns the number of bytes freed.
   Future<int> clearFinished({bool files = false}) async {

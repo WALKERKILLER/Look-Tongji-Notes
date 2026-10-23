@@ -96,6 +96,8 @@ void main() {
               'items': [
                 {'text': '实现栈', 'done': true},
                 {'text': '写测试', 'note': '覆盖空栈'},
+                {'text': '能编译', 'state': 'done', 'evidence': 'build.log'},
+                {'text': '通过评测', 'state': 'failed'},
               ],
             },
           }),
@@ -104,8 +106,12 @@ void main() {
       ),
     ));
     expect(find.text('作业要求'), findsOneWidget);
-    expect(find.text('1 / 2'), findsOneWidget);
+    expect(find.text('2 / 4'), findsOneWidget);
     expect(find.text('覆盖空栈'), findsOneWidget);
+    expect(find.text('build.log'), findsOneWidget);
+    expect(find.byIcon(Icons.error_rounded), findsOneWidget);
+    // Read-only status marks: nothing that looks like an unticked checkbox.
+    expect(find.byIcon(Icons.radio_button_unchecked_rounded), findsNothing);
     expect(find.text('「graph」视图'), findsOneWidget);
   });
 

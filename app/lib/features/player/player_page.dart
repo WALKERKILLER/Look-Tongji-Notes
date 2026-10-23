@@ -18,12 +18,22 @@ import 'lecture_player.dart';
 import 'player_view.dart';
 import 'side_panel.dart';
 
-/// Seeks the open player when it shows [lectureId] (any lecture when empty);
-/// otherwise opens that lecture at [seconds].
+/// The page route of each open player, so a seek can bring it back on top.
+final _playerRoutes = Expando<ModalRoute<dynamic>>('playerRoute');
+
+/// Closes the pages that cover [p]'s player (a note or practice opened from it).
+void revealPlayer(PlayerHandle p) {
+  final r = _playerRoutes[p];
+  if (r != null && r.isActive && !r.isCurrent) r.navigator?.popUntil((x) => x == r);
+}
+
+/// Seeks the open player when it shows [lectureId] (any lecture when empty)
+/// and brings it on top; otherwise opens that lecture at [seconds].
 void seekOrOpen(BuildContext context, String lectureId, int seconds) {
   final p = context.read<PlayerHub>().value;
   if (p != null && (lectureId.isEmpty || p.lectureId == lectureId)) {
     p.seekTo(seconds * 1000);
+    revealPlayer(p);
     return;
   }
   if (lectureId.isEmpty) {
@@ -87,6 +97,12 @@ class _PlayerPageState extends State<PlayerPage> {
         }
       }
     });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _playerRoutes[ctl] = ModalRoute.of(context);
   }
 
   void _onCtl() {

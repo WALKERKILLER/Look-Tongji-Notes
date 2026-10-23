@@ -29,6 +29,12 @@ enum OrganicShape {
   oval,
   arch,
   heart,
+  pebble,
+  mochi,
+  bean,
+  capsule,
+  droplet,
+  ghost,
 }
 
 const int kShapeSamples = 180;
@@ -130,6 +136,28 @@ List<Offset> _outline(OrganicShape s) {
       return polar((t) => 1 / math.sqrt(math.pow(math.cos(t) / 1.0, 2) + math.pow(math.sin(t) / 0.72, 2)));
     case OrganicShape.arch:
       return _arch();
+    // Mascot bodies: smooth everywhere (no lobes or cusps), so they stay
+    // calm at any size.
+    case OrganicShape.pebble:
+      // A river stone: wider than tall, a little lopsided.
+      return polar((t) => (1 + 0.035 * math.sin(2 * t + 0.6)) / math.sqrt(math.pow(math.cos(t), 2) + math.pow(math.sin(t) / 0.8, 2)));
+    case OrganicShape.mochi:
+      // A soft square that settles toward its base.
+      return polar((t) => _superellipse(t, 1, 0.86, 2.7) * (1 - 0.04 * math.cos(t)));
+    case OrganicShape.bean:
+      // A lying bean: an oval with a shallow dip on top.
+      return polar((t) {
+        final a = math.atan2(math.sin(t), math.cos(t));
+        return _superellipse(t, 1, 0.72, 2.2) * (1 - 0.1 * math.exp(-a * a / 0.22));
+      });
+    case OrganicShape.capsule:
+      return _stadium(1, 0.74);
+    case OrganicShape.droplet:
+      // Round below, drawn up to a softly rounded tip.
+      return polar((t) => 0.74 + 0.26 * math.pow((1 + math.cos(t)) / 2, 3));
+    case OrganicShape.ghost:
+      // A dome over a softly squared base.
+      return polar((t) => math.cos(t) > 0 ? 0.86 : _superellipse(t, 0.86, 0.98, 3.4));
     case OrganicShape.heart:
       return [
         for (var i = 0; i < n; i++)
@@ -206,6 +234,11 @@ List<Offset> _arch() {
   }
   return out;
 }
+
+/// Radius of a superellipse with half-axes [a] (across) and [b] (up and down)
+/// at polar angle [t] measured from the top.
+double _superellipse(double t, double a, double b, double n) =>
+    math.pow(math.pow((math.sin(t) / a).abs(), n) + math.pow((math.cos(t) / b).abs(), n), -1 / n).toDouble();
 
 // ---------------------------------------------------------------- resampling
 

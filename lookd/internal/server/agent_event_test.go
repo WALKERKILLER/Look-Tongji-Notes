@@ -18,6 +18,7 @@ func TestAgentEventTypes(t *testing.T) {
 	}{
 		{`{"type":"agent_task","data":{"phase":"finished"}}`, false},
 		{`{"type":"plugin_event","data":{"plugin":"socratic","kind":"notify","text":"hi"}}`, false},
+		{`{"type":"bot_event","data":{"kind":"consolidated","changes":[]}}`, false},
 		{`{"type":"notes_changed","data":{}}`, true},
 		{`{"type":"plugin_event","data":[1]}`, true},
 		{`{"type":"plugin_event","data":{"text":"` + strings.Repeat("x", 70<<10) + `"}}`, true},
@@ -28,7 +29,7 @@ func TestAgentEventTypes(t *testing.T) {
 			t.Errorf("%.60s: err=%v", c.body, err)
 		}
 	}
-	if got := len(ch); got != 2 {
-		t.Fatalf("published %d events, want 2", got)
+	if got := len(ch); got != 3 {
+		t.Fatalf("published %d events, want 3", got)
 	}
 }

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -29,6 +30,11 @@ import '../settings/models_page.dart';
 import '../settings/provider_presets.dart';
 import '../usage/usage_page.dart';
 import 'assistant_controller.dart';
+import 'bot_avatar.dart';
+import 'bot_ops.dart';
+import 'bot_page.dart';
+import 'bot_widgets.dart';
+import 'runtime_setup.dart';
 
 const _toolLabels = {
   'app_guide': ('查阅功能说明', Icons.menu_book_outlined),
@@ -57,7 +63,43 @@ const _toolLabels = {
   'create_quiz': ('生成练习', Icons.quiz_outlined),
   'list_quizzes': ('查看练习', Icons.quiz_outlined),
   'read_quiz_results': ('查看作答', Icons.fact_check_outlined),
+  'open_page': ('打开页面', Icons.open_in_new_rounded),
+  'player': ('控制播放', Icons.smart_display_outlined),
+  'read_settings': ('读取设置', Icons.tune_rounded),
+  'change_settings': ('调整设置', Icons.tune_rounded),
+  'manage_downloads': ('管理下载', Icons.downloading_rounded),
+  'download': ('准备下载', Icons.download_outlined),
+  'delete_files': ('准备删除文件', Icons.delete_sweep_outlined),
+  'manage_course': ('整理课程', Icons.school_outlined),
+  'sync_courses': ('同步课程', Icons.sync_rounded),
+  'propose_task': ('准备定时任务', Icons.schedule_rounded),
+  'toggle_plugin': ('准备开关插件', Icons.extension_outlined),
+  'memory_list': ('翻看记忆', Icons.psychology_alt_outlined),
+  'memory_read': ('回想', Icons.psychology_alt_outlined),
+  'memory_write': ('记下来', Icons.edit_note_rounded),
+  'memory_edit': ('改记忆', Icons.edit_note_rounded),
+  'memory_append': ('记下来', Icons.edit_note_rounded),
+  'memory_delete': ('忘掉', Icons.auto_delete_outlined),
 };
+
+/// Opens the assistant: docks it on wide windows, full screen on phones.
+void openAssistantPanel(BuildContext context) {
+  if (context.sizeClass.index >= SizeClass.expanded.index) {
+    context.read<UiPrefs>().update((p) => p.assistantDocked = true);
+    return;
+  }
+  Navigator.of(context, rootNavigator: true).push(MaterialPageRoute(
+    fullscreenDialog: true,
+    builder: (_) => const Scaffold(body: SafeArea(child: AssistantPanel(docked: false))),
+  ));
+}
+
+/// Opens a course's agent in the assistant (the course page's 课程助手).
+Future<void> openCourseAssistant(BuildContext context, String courseId, String title) async {
+  final a = context.read<AssistantController>();
+  openAssistantPanel(context);
+  await a.openCourseAgent(courseId, title);
+}
 
 /// Shows the assistant over the current screen in a sheet, so the user keeps
 /// their place (practice, task history).
@@ -90,10 +132,22 @@ class _AssistantPanelState extends State<AssistantPanel> {
   final _focus = FocusNode();
   bool _history = false;
   bool _atBottom = true;
+  StreamSubscription? _ops;
 
   @override
   void initState() {
     super.initState();
+    final assistant = context.read<AssistantController>();
+    _focus.addListener(() => assistant.setComposerFocused(_focus.hasFocus));
+    // A full-screen panel steps aside when the bot opens a tab behind it.
+    if (!widget.docked && !widget.embedded) {
+      _ops = assistant.appOps.listen((op) {
+        const tabs = {'home', 'courses', 'course', 'note', 'schedule', 'downloads', 'library', 'tasks', 'plugins', 'settings'};
+        if (!mounted || op['op'] != 'open' || !tabs.contains(op['target'])) return;
+        final route = ModalRoute.of(context);
+        if (route != null) Navigator.of(context).removeRoute(route);
+      });
+    }
     _scroll.addListener(() {
       final b = !_scroll.hasClients || _scroll.position.pixels <= 48;
       if (b != _atBottom) setState(() => _atBottom = b);
@@ -105,6 +159,7 @@ class _AssistantPanelState extends State<AssistantPanel> {
 
   @override
   void dispose() {
+    _ops?.cancel();
     _scroll.dispose();
     _input.dispose();
     _focus.dispose();
@@ -126,7 +181,9 @@ class _AssistantPanelState extends State<AssistantPanel> {
 
   void runAction(Map<String, dynamic> act) {
     final players = context.read<PlayerHub>();
-    final lectureId = '${act['lecture_id'] ?? ''}';
+    // Without its own lecture an action belongs to the open player, else the lecture on screen.
+    final own = '${act['lecture_id'] ?? ''}';
+    final lectureId = own.isNotEmpty ? own : context.read<ScreenContext>().value['lecture_id'] ?? '';
     final courseId = '${act['course_id'] ?? ''}';
     final secs = (act['seconds'] as num?)?.toInt();
     final root = Navigator.of(context, rootNavigator: true);
@@ -137,35 +194,40 @@ class _AssistantPanelState extends State<AssistantPanel> {
     switch (act['kind']) {
       case 'seek':
         final p = players.value;
-        if (p != null && (lectureId.isEmpty || p.lectureId == lectureId)) {
+        if (p != null && (own.isEmpty || p.lectureId == own)) {
           p.seekTo((secs ?? 0) * 1000);
           leaveFullscreenPanel();
+          revealPlayer(p);
         } else if (lectureId.isNotEmpty) {
           leaveFullscreenPanel();
           root.push(MaterialPageRoute(builder: (_) => PlayerPage(lectureId: lectureId, startMs: (secs ?? 0) * 1000)));
+        } else {
+          showSnack(context, '这个时间点没有对应的课次');
         }
       case 'open_lecture':
-        if (lectureId.isEmpty) return;
+        if (lectureId.isEmpty) return showSnack(context, '没有指明要打开哪一节课');
         leaveFullscreenPanel();
         root.push(MaterialPageRoute(builder: (_) => PlayerPage(lectureId: lectureId, startMs: secs == null ? null : secs * 1000)));
       case 'open_course':
-        if (courseId.isEmpty) return;
+        if (courseId.isEmpty) return showSnack(context, '没有指明要打开哪门课');
         leaveFullscreenPanel();
         if (widget.embedded) root.maybePop();
         ShellNav.push(Tabs.courses, CoursePage(courseId: courseId));
       case 'open_note':
         final id = '${act['note_id'] ?? ''}';
-        if (id.isEmpty) return;
+        if (id.isEmpty) return showSnack(context, '没有指明要打开哪篇笔记');
         leaveFullscreenPanel();
         if (widget.embedded) root.maybePop();
         ShellNav.push(Tabs.library, NotePage(noteId: id));
       case 'download':
-        if (lectureId.isEmpty) return;
-        showDownloadSheet(context, [lectureId]);
+        if (lectureId.isEmpty) return showSnack(context, '没有指明要下载哪一节课');
+        showDownloadSheet(context, [lectureId], kinds: [for (final k in (act['kinds'] as List?) ?? const []) '$k']);
       case 'open_schedule':
         leaveFullscreenPanel();
         if (widget.embedded) root.maybePop();
         ShellNav.goTo(Tabs.schedule);
+      default:
+        showSnack(context, '这个版本还不支持该操作');
     }
   }
 
@@ -208,28 +270,45 @@ class _AssistantPanelState extends State<AssistantPanel> {
   Widget _header(BuildContext context, AssistantController a) {
     final tt = Theme.of(context).textTheme;
     final cs = Theme.of(context).colorScheme;
+    final isBot = a.view == 'bot';
+    final course = a.course ?? a.pendingCourse;
     return Padding(
       padding: const EdgeInsets.fromLTRB(Space.sm, Space.sm, Space.sm, Space.xs),
-      child: Row(children: [
-        IconButton(
-          tooltip: '历史对话',
-          isSelected: _history,
-          onPressed: () {
-            setState(() => _history = !_history);
-            if (_history) a.refreshSessions();
-          },
-          icon: const Icon(Icons.history_rounded),
-        ),
-        if (!widget.embedded) ...[
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
           const SizedBox(width: Space.xs),
-          Text('助手', style: tt.titleMedium),
-        ],
-        const SizedBox(width: Space.sm),
-        Flexible(child: _ModelChip(a: a)),
-        if (a.stats?['context'] is Map) _ContextMeter(a: a),
-        const Spacer(),
-        IconButton(tooltip: '新对话', onPressed: a.busy ? null : a.newChat, icon: const Icon(Icons.add_comment_outlined)),
-        if (!widget.embedded)
+          Tooltip(
+            message: '${a.botName} · ${kBotMoodLabels[a.mood]}',
+            child: InkWell(
+              customBorder: const CircleBorder(),
+              onTap: () => Navigator.of(context, rootNavigator: true).push(MaterialPageRoute(builder: (_) => const BotPage())),
+              child: Padding(
+                padding: const EdgeInsets.all(Space.xs),
+                child: BotAvatar(size: 36, shape: a.botShape, color: a.botColor, mood: a.mood),
+              ),
+            ),
+          ),
+          const SizedBox(width: Space.xs),
+          Flexible(
+            child: SegmentedButton<String>(
+              showSelectedIcon: false,
+              style: const ButtonStyle(visualDensity: VisualDensity.compact, tapTargetSize: MaterialTapTargetSize.shrinkWrap),
+              segments: [
+                ButtonSegment(value: 'bot', label: Text(a.botName, maxLines: 1, overflow: TextOverflow.ellipsis)),
+                const ButtonSegment(value: 'sessions', label: Text('会话')),
+              ],
+              selected: {a.view},
+              onSelectionChanged: a.busy
+                  ? null
+                  : (v) {
+                      setState(() => _history = false);
+                      v.first == 'bot' ? a.showBot() : a.showSessions();
+                    },
+            ),
+          ),
+          const Spacer(),
+          if (!isBot) IconButton(tooltip: '新会话', onPressed: a.busy ? null : a.newChat, icon: const Icon(Icons.add_comment_outlined)),
+          if (!widget.embedded)
           IconButton(
             tooltip: widget.docked ? '收起' : '关闭',
             onPressed: () {
@@ -241,6 +320,39 @@ class _AssistantPanelState extends State<AssistantPanel> {
             },
             icon: Icon(widget.docked ? Icons.last_page_rounded : Icons.close_rounded, color: cs.onSurfaceVariant),
           ),
+        ]),
+        const SizedBox(height: Space.xs),
+        Row(children: [
+          if (!isBot)
+            IconButton(
+              tooltip: '全部会话',
+              isSelected: _history,
+              visualDensity: VisualDensity.compact,
+              onPressed: () {
+                setState(() => _history = !_history);
+                if (_history) a.refreshSessions();
+              },
+              icon: const Icon(Icons.forum_outlined),
+            )
+          else
+            const SizedBox(width: Space.sm),
+          if (!isBot && course != null)
+            Flexible(
+              child: Padding(
+                padding: const EdgeInsets.only(right: Space.sm),
+                child: Chip(
+                  avatar: Icon(Icons.school_outlined, size: 16, color: cs.onSecondaryContainer),
+                  label: Text(course.title.isEmpty ? '课程助手' : course.title, overflow: TextOverflow.ellipsis),
+                  backgroundColor: cs.secondaryContainer,
+                  labelStyle: tt.labelMedium?.copyWith(color: cs.onSecondaryContainer),
+                  side: BorderSide.none,
+                  visualDensity: VisualDensity.compact,
+                ),
+              ),
+            ),
+          Flexible(child: _ModelChip(a: a)),
+          if (a.stats?['context'] is Map) _ContextMeter(a: a),
+        ]),
       ]),
     );
   }
@@ -257,52 +369,82 @@ class _AssistantPanelState extends State<AssistantPanel> {
         Padding(
           padding: const EdgeInsets.fromLTRB(Space.lg, Space.md, Space.sm, Space.sm),
           child: Row(children: [
-            Expanded(child: Text('历史对话', style: tt.titleSmall)),
+            Expanded(child: Text('全部会话', style: tt.titleSmall)),
             IconButton(onPressed: () => setState(() => _history = false), icon: const Icon(Icons.close_rounded)),
           ]),
         ),
-        Expanded(
-          child: a.sessions.isEmpty
-              ? Center(child: Text('还没有对话', style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant)))
-              : ListView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: Space.sm),
-                  itemCount: a.sessions.length,
-                  itemBuilder: (context, i) {
-                    final s = a.sessions[i];
-                    final on = s.id == a.sessionId;
-                    return ListTile(
-                      selected: on,
-                      selectedTileColor: cs.secondaryContainer,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Corners.full)),
-                      title: Text(s.title, maxLines: 1, overflow: TextOverflow.ellipsis),
-                      subtitle: Text('${fmtRelative(s.modified)} · ${s.messages} 条'),
-                      trailing: IconButton(
-                        icon: const Icon(Icons.delete_outline_rounded, size: 20),
-                        tooltip: '删除',
-                        onPressed: () => a.deleteSession(s.id),
-                      ),
-                      onTap: () {
-                        a.openSession(s.id);
-                        setState(() => _history = false);
-                      },
-                    );
-                  },
-                ),
-        ),
+        Expanded(child: _sessionList(context, a)),
       ]),
+    );
+  }
+
+  /// Course agents grouped by course, then other chats and scheduled runs.
+  Widget _sessionList(BuildContext context, AssistantController a) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+    final groups = <String, List<ChatSession>>{};
+    for (final s in a.sessions.where((s) => s.kind != 'bot')) {
+      final g = switch (s.kind) {
+        'course' => s.course.isEmpty ? '课程助手' : s.course,
+        'task' => '定时任务',
+        _ => '其他对话',
+      };
+      groups.putIfAbsent(g, () => []).add(s);
+    }
+    final order = [
+      ...groups.keys.where((k) => k != '其他对话' && k != '定时任务'),
+      if (groups.containsKey('其他对话')) '其他对话',
+      if (groups.containsKey('定时任务')) '定时任务',
+    ];
+    if (order.isEmpty) return Center(child: Text('还没有会话', style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant)));
+    return ListView(
+      padding: const EdgeInsets.symmetric(horizontal: Space.sm),
+      children: [
+        for (final g in order) ...[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(Space.md, Space.md, Space.md, Space.xs),
+            child: Text(g, style: tt.labelLarge?.copyWith(color: cs.primary), maxLines: 1, overflow: TextOverflow.ellipsis),
+          ),
+          for (final s in groups[g]!) _sessionTile(context, a, s),
+        ],
+      ],
+    );
+  }
+
+  Widget _sessionTile(BuildContext context, AssistantController a, ChatSession s) {
+    final cs = Theme.of(context).colorScheme;
+    final on = s.id == a.sessionId;
+    return ListTile(
+      selected: on,
+      selectedTileColor: cs.secondaryContainer,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Corners.full)),
+      title: Text(s.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+      subtitle: Text('${fmtRelative(s.modified)} · ${s.messages} 条'),
+      trailing: IconButton(
+        icon: const Icon(Icons.delete_outline_rounded, size: 20),
+        tooltip: '删除',
+        onPressed: () => a.deleteSession(s.id),
+      ),
+      onTap: () {
+        a.openSession(s.id);
+        setState(() => _history = false);
+      },
     );
   }
 
   Widget _body(BuildContext context, AssistantController a) {
     if (!a.ready) {
-      final failed = a.agentState == 'failed' || a.agentState == 'stopped';
-      return failed
-          ? EmptyState(
-              icon: Icons.smart_toy_outlined,
-              title: '助手没有启动',
-              body: a.agentError.isEmpty ? '需要 Node.js 运行内置的 Pi Agent。' : a.agentError,
-            )
-          : const CenteredLoader(label: '正在启动助手');
+      if (a.agentState != 'disabled' && a.agentState != 'crashed') return const CenteredLoader(label: '正在启动助手');
+      final cs = Theme.of(context).colorScheme;
+      return ListView(padding: const EdgeInsets.all(Space.lg), children: [
+        Text('助手没有启动', style: Theme.of(context).textTheme.titleMedium),
+        if (a.agentError.isNotEmpty) ...[
+          const SizedBox(height: Space.xs),
+          Text(a.agentError, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+        ],
+        const SizedBox(height: Space.lg),
+        const Center(child: RuntimeSetupCard()),
+      ]);
     }
     if (a.models != null && a.selected == null) {
       return EmptyState(
@@ -345,33 +487,64 @@ class _AssistantPanelState extends State<AssistantPanel> {
     final tt = Theme.of(context).textTheme;
     final screen = context.watch<ScreenContext>().value;
     final inPlayer = context.watch<PlayerHub>().value != null;
-    final suggestions = [
-      if (inPlayer) ...['总结这节课到目前为止讲了什么', '把这节课整理成一份复习笔记', '刚才提到的概念在哪些课里出现过？'],
-      if (!inPlayer && screen['screen'] == '课程详情') ...['这门课最近几节讲了什么？', '帮我挑出还没看的课'],
-      '这个 App 能帮我做什么？',
-      '最近有哪些课还没看？',
-      '在我的课程库里搜索“期中”',
-    ];
+    final isBot = a.view == 'bot';
+    final course = a.pendingCourse ?? a.course;
+    final suggestions = isBot
+        ? [
+            if (inPlayer) '把播放速度调到 1.5 倍',
+            if ((screen['course_id'] ?? '').isNotEmpty) '下载这门课最近三节的视频和转写',
+            '把界面字号调大一点',
+            '记住：我更喜欢先给结论的简短回答',
+            '每周日晚上帮我复习本周的课',
+            '暂停所有下载',
+          ]
+        : [
+            if (inPlayer) ...['总结这节课到目前为止讲了什么', '把这节课整理成一份复习笔记', '刚才提到的概念在哪些课里出现过？'],
+            if (!inPlayer && course != null) ...['这门课最近几节讲了什么？', '帮我挑出还没看的课', '出一组题考考我这门课的重点'],
+            '这个 App 能帮我做什么？',
+            '最近有哪些课还没看？',
+            '在我的课程库里搜索“期中”',
+          ];
+    final (title, body) = isBot
+        ? ('我是 ${a.botName}', '我会记住你告诉我的事，也能替你在应用里动手：调设置、整理课程、管理下载、安排定时任务。下载和删除这类操作会先给你一张卡片确认。')
+        : course != null
+            ? ('${course.title.isEmpty ? '课程' : '《${course.title}》'}助手', '这个会话只围绕这门课：讲解、找知识点、整理笔记、出题。关于你的偏好来自 ${a.botName} 的记忆。')
+            : ('有什么可以帮你？', '我能读取课表、文字稿和笔记，帮你整理内容、定位知识点。下载由你点按钮决定。');
     return ListView(padding: const EdgeInsets.all(Space.xl), children: [
-      const SizedBox(height: Space.xl),
+      const SizedBox(height: Space.lg),
       Center(
-        child: Container(
-          width: 72,
-          height: 72,
-          decoration: ShapeDecoration(
-            color: cs.tertiaryContainer,
-            shape: const StarBorder(points: 6, innerRadiusRatio: 0.72, pointRounding: 0.6, valleyRounding: 0.4),
-          ),
-          child: Icon(Icons.auto_awesome_rounded, color: cs.onTertiaryContainer, size: 30),
-        ),
+        child: isBot
+            ? GestureDetector(
+                onTap: () => Navigator.of(context, rootNavigator: true).push(MaterialPageRoute(builder: (_) => const BotPage())),
+                child: BotAvatar(size: 112, shape: a.botShape, color: a.botColor, mood: a.mood),
+              )
+            : Container(
+                width: 72,
+                height: 72,
+                decoration: ShapeDecoration(
+                  color: course != null ? cs.secondaryContainer : cs.tertiaryContainer,
+                  shape: const StarBorder(points: 6, innerRadiusRatio: 0.72, pointRounding: 0.6, valleyRounding: 0.4),
+                ),
+                child: Icon(course != null ? Icons.school_rounded : Icons.auto_awesome_rounded,
+                    color: course != null ? cs.onSecondaryContainer : cs.onTertiaryContainer, size: 30),
+              ),
       ),
       const SizedBox(height: Space.lg),
-      Text('有什么可以帮你？', style: tt.headlineSmall, textAlign: TextAlign.center),
+      Text(title, style: tt.headlineSmall, textAlign: TextAlign.center),
       const SizedBox(height: Space.xs),
-      Text('我能读取课表、文字稿和笔记，帮你整理内容、定位知识点。下载由你点按钮决定。',
-          style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant), textAlign: TextAlign.center),
+      Text(body, style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant, height: 1.5), textAlign: TextAlign.center),
+      if (!isBot && course == null && (screen['course_id'] ?? '').isNotEmpty) ...[
+        const SizedBox(height: Space.md),
+        Center(
+          child: FilledButton.tonalIcon(
+            onPressed: () => a.openCourseAgent(screen['course_id']!, screen['course'] ?? '', fresh: true),
+            icon: const Icon(Icons.school_outlined, size: 18),
+            label: Text('改为「${screen['course'] ?? '当前课程'}」的课程助手', overflow: TextOverflow.ellipsis),
+          ),
+        ),
+      ],
       const SizedBox(height: Space.xl),
-      for (final s in suggestions.take(5))
+      for (final s in suggestions.take(isBot ? 4 : 5))
         Padding(
           padding: const EdgeInsets.only(bottom: Space.sm),
           child: Material(
@@ -547,7 +720,6 @@ class _ModeChips extends StatelessWidget {
                     visualDensity: VisualDensity.compact,
                     deleteButtonTooltipMessage: '关闭',
                     onDeleted: () => runPluginEntry(context, e, context_),
-                    onPressed: () {},
                   ),
               ]),
             ),
@@ -761,6 +933,19 @@ class _AssistantTurn extends StatelessWidget {
           children.add(_ToolCard(block: b));
           if (b.actions.isNotEmpty) children.add(_Actions(actions: b.actions, onAction: onAction));
           final d = b.details;
+          final op = b.appOp;
+          if (op != null && !b.error) children.add(_appChip(context, b, op));
+          final proposal = b.proposal;
+          if (proposal != null) {
+            final a = context.read<AssistantController>();
+            children.add(ProposalCard(
+              key: ValueKey(proposal['id']),
+              proposal: proposal,
+              onApply: () => a.applyProposal(b),
+              onDismiss: () => a.dismissProposal(b),
+              onUndo: () => a.undoProposal(b),
+            ));
+          }
           if (d?['schedule'] is Map && b.name == 'mark_schedule') {
             children.add(ScheduleChatCard(data: (d!['schedule'] as Map).cast<String, dynamic>(), duplicate: d['duplicate'] == true));
           }
@@ -784,9 +969,11 @@ class _AssistantTurn extends StatelessWidget {
               b.text,
               style: tt.bodyMedium?.copyWith(height: 1.65),
               lectureId: ctxLecture,
-              onRef: (r) => openRef(context, r,
-                  lectureId: ctxLecture,
-                  onSeek: (t) => onAction({'kind': 'seek', 'lecture_id': t.lectureId.isNotEmpty ? t.lectureId : ctxLecture, 'seconds': t.seconds})),
+              onRef: (r) => r is LectureRef
+                  ? onAction({'kind': 'open_lecture', 'lecture_id': r.lectureId})
+                  : openRef(context, r,
+                      lectureId: ctxLecture,
+                      onSeek: (t) => onAction({'kind': 'seek', 'lecture_id': t.lectureId.isNotEmpty ? t.lectureId : ctxLecture, 'seconds': t.seconds})),
               isStreaming: live,
               animation: prefs.reduceMotion ? GptMarkdownAnimation.none : prefs.streamAnimation,
               codeBuilder: (context, name, code, closed) => (closed ? lookViewBlock(context, name, code) : null) ?? _CodeBlock(lang: name, code: code),
@@ -840,6 +1027,28 @@ class _AssistantTurn extends StatelessWidget {
           : content,
     );
   }
+}
+
+Widget _appChip(BuildContext context, ChatBlock b, Map<String, dynamic> op) {
+  final a = context.read<AssistantController>();
+  final undoable = '${op['proposal_id'] ?? ''}'.isNotEmpty;
+  final icon = switch (op['op']) {
+    'open' => Icons.open_in_new_rounded,
+    'player' => Icons.smart_display_outlined,
+    _ => Icons.check_circle_outline_rounded,
+  };
+  return AppOpChip(
+    label: appOpLabel(op),
+    icon: icon,
+    done: op['undone'] == true,
+    actionLabel: op['op'] == 'open' ? '返回' : '撤销',
+    doneLabel: op['op'] == 'open' ? '已返回' : '已撤销',
+    onAction: op['op'] == 'open'
+        ? (BotOps.canGoBackFrom(op) ? () async => BotOps.back() : null)
+        : undoable
+            ? () => a.undoApplied(b)
+            : null,
+  );
 }
 
 class _Footer extends StatelessWidget {

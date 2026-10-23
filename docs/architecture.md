@@ -32,6 +32,7 @@ The app starts lookd ([lookd_service.dart](../app/lib/core/lookd_service.dart) s
 | `lookd/internal/store` | SQLite schema and FTS index ([schema.sql](../lookd/internal/store/schema.sql)); rebuildable from library files (schedule and activity via their JSON mirrors) |
 | `lookd/internal/events` | SSE event fan-out |
 | `lookd/internal/agent` | Supervises the Node agent host and proxies `/agent/*` |
+| `lookd/internal/agentenv` | Installs Node.js and the agent's npm dependencies into the data directory ([spec 0008](specs/0008-assistant-runtime-setup.md)) |
 | `agent/src/host.mjs` | Agent host: HTTP endpoints, system prompt, sessions |
 | `agent/src/http.mjs` | Request body reading with the 1 MiB limit and 30 s deadline, HTTP error replies |
 | `agent/src/tools.mjs` | Tool groups, `find_tools`, note playbook, write guards |
@@ -40,6 +41,9 @@ The app starts lookd ([lookd_service.dart](../app/lib/core/lookd_service.dart) s
 | `agent/src/usage.mjs` | Usage ledger (`usage.jsonl`): one line per model call, summaries and call paging |
 | `agent/src/practice.mjs` | Quiz grounding checks and playbook for `create_quiz` |
 | `agent/src/tasks.mjs` | Scheduled tasks: validation, next-run computation, queue and run history (`tasks.json`, `tasks-runs.jsonl`) |
+| `agent/src/bot.mjs` | The resident bot: identity (`bot.json`), conversation kinds (`sessions-meta.json`), proposals, consolidation scheduling and transcripts |
+| `agent/src/memory.mjs` | Bot memory files: paths, limits, sensitive-value guard, hash-checked writes, prompt injection and memory tools |
+| `agent/src/operate.mjs` | The bot's app operations: settings registry, operate tools, proposal ops and undo |
 | `agent/src/plugins.mjs` | Plugin host: manifests, install state (`plugins.json`), catalogs, loading plugins as Pi extensions, the permission-gated Look API, actions |
 | `agent/plugins/` | Official plugins and their catalog; the [plugin author guide](../agent/plugins/README.md) |
 | `app/lib/core` | lookd client (`api.dart`), daemon discovery and startup, app state, models, study-time tracker (`activity_tracker.dart`), installed plugins and their contributions (`plugins.dart`) |
@@ -53,6 +57,7 @@ The app starts lookd ([lookd_service.dart](../app/lib/core/lookd_service.dart) s
 - **`look://` links**: parsed by `LookRef` in [look_markdown.dart](../app/lib/widgets/look_markdown.dart), produced by agent tools, documented for AI tools in [readme.go](../lookd/internal/library/readme.go).
 - **Markdown rendering**: every Markdown surface uses `LookMarkdown` in [look_markdown.dart](../app/lib/widgets/look_markdown.dart).
 - **Plugins**: a plugin is a package with a `lookStudio` manifest whose agent module is loaded as a Pi extension per conversation ([decision 0005](decisions/0005-plugins-as-pi-extensions-with-declarative-views.md), [spec 0004](specs/0004-plugin-platform.md)). Its tools reach the model through `find_tools` groups `plugin:<id>`; its results are data for views the app draws (`pluginViewBuilders` in [plugin_views.dart](../app/lib/features/plugins/plugin_views.dart)); its contributions appear through `PluginMenuButton` on the note toolbar, lecture side panel, course page and schedule items, and the composer's "+" menu.
+- **Bot and conversation kinds**: the agent host keeps one bot thread and course agents, told apart by `sessions-meta.json` ([decision 0006](decisions/0006-resident-bot-with-file-memory.md), [spec 0007](specs/0007-resident-bot-and-course-agents.md)). Bot memory lives in Markdown files the host injects into prompts; app operations come back as `details.app` (run by `BotOps` in [bot_ops.dart](../app/lib/features/assistant/bot_ops.dart)) or as proposals the host applies through `/agent/proposals/{id}/apply`.
 - **Library on disk**: layout owned by `lookd/internal/library`; `library.db` is an index over it, not the source of truth.
 - **Release package**: [release.yml](../.github/workflows/release.yml) places `lookd` and `agent/` next to the app executable, matching the discovery order above.
 

@@ -6,9 +6,10 @@ import (
 )
 
 // agentEvents are the event types the agent host may publish: scheduled task
-// progress (docs/specs/0003-scheduled-agent-tasks.md) and plugin notices
-// (docs/specs/0004-plugin-platform.md).
-var agentEvents = map[string]bool{"agent_task": true, "plugin_event": true}
+// progress (docs/specs/0003-scheduled-agent-tasks.md), plugin notices
+// (docs/specs/0004-plugin-platform.md) and the bot's memory runs
+// (docs/specs/0007-resident-bot-and-course-agents.md).
+var agentEvents = map[string]bool{"agent_task": true, "plugin_event": true, "bot_event": true}
 
 // agentEvent relays agent host events to app clients over the event bus.
 func (s *Server) agentEvent(_ http.ResponseWriter, r *http.Request) (any, error) {
@@ -20,7 +21,7 @@ func (s *Server) agentEvent(_ http.ResponseWriter, r *http.Request) (any, error)
 		return nil, err
 	}
 	if !agentEvents[in.Type] {
-		return nil, badRequest("type 只能是 agent_task 或 plugin_event")
+		return nil, badRequest("type 只能是 agent_task、plugin_event 或 bot_event")
 	}
 	if len(in.Data) > 64<<10 {
 		return nil, badRequest("data 过大")

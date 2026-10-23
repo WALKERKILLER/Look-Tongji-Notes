@@ -2,14 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:gpt_markdown/gpt_markdown.dart';
 import 'package:path/path.dart' as p;
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:val_latex_flutter/val_latex_flutter.dart';
 
 import '../core/app_state.dart';
+import '../core/lookd_service.dart';
+import '../core/open_path.dart';
 import '../theme/tokens.dart';
+import 'states.dart';
 import 'timestamp_links.dart';
 
 /// A `look://` reference inside Markdown: a moment of a lecture, one of its
-/// slides, or a passage of uploaded courseware.
+/// slides, a passage of uploaded courseware, a whole lecture or a file in
+/// the course library.
 sealed class LookRef {
   const LookRef();
 
@@ -26,6 +31,8 @@ sealed class LookRef {
     if (u.host == 'courseware' && seg.isNotEmpty) {
       return CoursewareRef(seg[0], u.queryParameters['file'] ?? '', u.queryParameters['q'] ?? '');
     }
+    if (u.host == 'lecture' && seg.isNotEmpty) return LectureRef(seg[0]);
+    if (u.host == 'file' && seg.isNotEmpty) return FileRef(seg.join('/'));
     return null;
   }
 }
@@ -45,6 +52,45 @@ class SlideRef extends LookRef {
 class CoursewareRef extends LookRef {
   const CoursewareRef(this.lectureId, this.file, this.query);
   final String lectureId, file, query;
+}
+
+/// A lecture without a time: opens the player where the user left off.
+class LectureRef extends LookRef {
+  const LectureRef(this.lectureId);
+  final String lectureId;
+}
+
+/// A file in the course library, by its library-relative path.
+class FileRef extends LookRef {
+  const FileRef(this.path);
+  final String path;
+}
+
+const _imageExts = {'.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp'};
+
+/// Opens a library file: images in the viewer, anything else with the
+/// system's default app.
+Future<void> openLibraryFile(BuildContext context, String path) async {
+  final rel = p.posix.normalize(path);
+  if (rel.startsWith('..') || p.posix.isAbsolute(rel)) {
+    showSnack(context, '这个文件不在课程库里');
+    return;
+  }
+  if (_imageExts.contains(p.posix.extension(rel).toLowerCase())) {
+    await showImageViewer(context, context.read<AppState>().api.fileUrl(rel));
+    return;
+  }
+  final root = context.read<LookdService>().libraryRoot;
+  final ok = root.isNotEmpty && await openPath(p.join(root, rel));
+  if (!ok && context.mounted) showSnack(context, '没能打开 ${p.posix.basename(rel)}');
+}
+
+/// Opens a link that is not a `look://` reference: web and mail links in
+/// the system's handler; anything else says why nothing happens.
+Future<void> openPlainLink(BuildContext context, String url) async {
+  final u = Uri.tryParse(url.trim());
+  final ok = u != null && const {'http', 'https', 'mailto'}.contains(u.scheme) && await launchUrl(u, mode: LaunchMode.externalApplication);
+  if (!ok && context.mounted) showSnack(context, '这个链接无法打开');
 }
 
 // Regions that must reach the renderer untouched, in priority order, plus the
@@ -167,6 +213,10 @@ class LookMarkdown extends StatelessWidget {
           onError: (_, _) => Text(d.source, style: d.style.copyWith(fontFamily: 'monospace', color: cs.error)),
         ),
       ),
+      onLinkTap: (url, _) {
+        final ref = LookRef.parse(url);
+        ref != null && onRef != null ? onRef!(ref) : openPlainLink(context, url);
+      },
       inlineLinkBuilder: (d) {
         final ref = LookRef.parse(d.url);
         if (ref == null || onRef == null) return d.defaultSpan();
@@ -176,6 +226,8 @@ class LookMarkdown extends StatelessWidget {
             TimeRef(:final lectureId) => TimestampChip(label: d.label, external: lectureId.isNotEmpty && lectureId != this.lectureId, onTap: () => onRef!(ref)),
             SlideRef() => RefChip(icon: Icons.slideshow_outlined, label: d.label, onTap: () => onRef!(ref)),
             CoursewareRef() => RefChip(icon: Icons.description_outlined, label: d.label, onTap: () => onRef!(ref)),
+            LectureRef() => RefChip(icon: Icons.ondemand_video_rounded, label: d.label, onTap: () => onRef!(ref)),
+            FileRef() => RefChip(icon: Icons.attach_file_rounded, label: d.label, onTap: () => onRef!(ref)),
           },
         );
       },

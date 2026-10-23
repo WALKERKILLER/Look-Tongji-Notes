@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"lookstudio/lookd/internal/agent"
+	"lookstudio/lookd/internal/agentenv"
 	"lookstudio/lookd/internal/asr"
 	"lookstudio/lookd/internal/dl"
 	"lookstudio/lookd/internal/events"
@@ -127,12 +128,19 @@ func run(dataDir, libRoot, addr, node, agentScript string, watchStdin bool) erro
 	port := ln.Addr().(*net.TCPAddr).Port
 	base := fmt.Sprintf("http://127.0.0.1:%d", port)
 
+	rt := &agentenv.Manager{Dir: filepath.Join(dataDir, "runtime"), FlagNode: node,
+		Publish: func(in agentenv.Install) { bus.Publish("runtime", in) }}
+	if agentScript != "" {
+		rt.AgentDir = filepath.Dir(filepath.Dir(agentScript)) // agent/src/host.mjs → agent
+	}
+	node, _ = rt.Node() // -node, else the Node.js an in-app install left
 	sup := &agent.Supervisor{Node: node, Script: agentScript, Env: []string{
 		"LOOKD_URL=" + base, "LOOKD_TOKEN=" + token,
 		"AGENT_DATA_DIR=" + filepath.Join(dataDir, "agent"), "LIBRARY_ROOT=" + cfg.LibraryRoot,
 	}}
 	mgr.MinerU = mineru.NewService(filepath.Join(dataDir, "mineru.json"), tongji.Seal, tongji.Unseal)
-	srv := &server.Server{Token: token, Sess: sess, Cl: client, St: st, Lib: lib, Jobs: mgr, Eng: eng, Bus: bus, Agent: sup, MinerU: mgr.MinerU}
+	rt.Restart = sup.Restart
+	srv := &server.Server{Token: token, Sess: sess, Cl: client, St: st, Lib: lib, Jobs: mgr, Eng: eng, Bus: bus, Agent: sup, Runtime: rt, Ctx: ctx, MinerU: mgr.MinerU}
 	srv.ApplySettings(ctx)
 
 	go sess.Run(ctx)

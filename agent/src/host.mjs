@@ -18,6 +18,9 @@ import { api } from "./lookd.mjs";
 import { fmtStamp, TASK_WRITES, TaskScheduler } from "./tasks.mjs";
 import { httpError, readJson, replyError } from "./http.mjs";
 import { entryFrom, UsageLedger } from "./usage.mjs";
+import { Bot, CONSOLIDATE_CALLS, CONSOLIDATE_PROMPT, CONSOLIDATE_TIMEOUT_MS, Consolidator, turnsOf } from "./bot.mjs";
+import { MemoryStore, memoryTools } from "./memory.mjs";
+import { MEMORY_GROUP, OPERATE_GROUP, operateTools, runOp, SETTINGS } from "./operate.mjs";
 
 const TOKEN = process.env.LOOKD_TOKEN ?? "";
 const CWD = process.env.LIBRARY_ROOT ?? process.cwd();
@@ -36,6 +39,15 @@ try {
 }
 setInterval(() => usage.prune().catch((e) => console.error(`usage prune: ${e.message}`)), 86_400_000).unref();
 
+// The resident bot (docs/specs/0007-resident-bot-and-course-agents.md).
+const bot = new Bot(DATA_DIR);
+await bot.load();
+const memory = new MemoryStore(join(DATA_DIR, "bot", "memory"));
+await memory.init();
+/** The app's preferences (registry keys only), pushed with PUT /app-state. */
+let appState = null;
+const botEvent = (data) => api("POST", "/api/agent/event", { type: "bot_event", data }).catch(() => {});
+
 const SYSTEM = `你是 Look Studio 的常驻助手，帮助同济大学学生使用 Look 录课平台的课程录像。
 你能做的：介绍应用功能、查看课程与节次、阅读转写稿、看 PPT 与课件、全文搜索、整理与保存笔记、生成时间轴大纲、标记日程、出复习题。
 工具：
@@ -52,6 +64,55 @@ const SYSTEM = `你是 Look Studio 的常驻助手，帮助同济大学学生使
 - 用户要练习、出题、自测时，先 find_tools(groups:["practice"])，按出题流程读材料后用 create_quiz 保存一组选择题（聊天里会显示练习卡片），不要把题目直接写在回复里。用户问某道题为什么错时，用 read_quiz_results 看作答记录再讲解。
 - 公式用 LaTeX：行内 $...$，独立公式 $$...$$；引用课堂内容附时间戳。
 - 回答简洁、中文为主；专有名词可保留英文。不要索要或复述密码。`;
+
+const BODY = SYSTEM.slice(SYSTEM.indexOf("\n") + 1);
+
+const BOT_RULES = `作为常驻 bot，你和用户长期相处：记得用户告诉过你的事，也能代用户在应用里完成操作。
+操作应用：
+- open_page 直接打开页面（课程、节次、笔记、日程、下载、设置等）。其他操作先 find_tools(groups:["operate"])：控制播放器、读取与修改设置、暂停/继续/重试下载、下载、删除本地文件、置顶/隐藏/改名/配色课程、同步课程、创建定时任务、开关插件。
+- 外观与播放设置、课程整理、下载的暂停继续会立即生效，用户可以撤销；下载、删除文件、下载与转写设置、模型设置、定时任务、插件开关会生成卡片，用户点“应用”后才执行。生成卡片后请用户在卡片上确认，不要声称已经完成。
+- 不能登录登出、修改账户、密码或密钥、安装插件、更改课程库位置；这些请用户自己操作，可以用 open_page 打开对应页面。
+记忆：
+- <memory> 是你记得的关于用户的事，回答时自然地用上，不必复述。
+- 只有用户明确要你记住、忘掉或更正某件事时才修改记忆（find_tools(groups:["memory"])），先读后改；其他的由后台沉淀自动整理。
+- 记忆里不保存密码、证件号、银行卡号、手机号、密钥。`;
+
+/** The system prompt of a conversation for its kind, with memory and plugins. */
+async function systemPrompt(conv) {
+	const parts = [];
+	if (conv.kind === "bot") {
+		const id = bot.identity();
+		parts.push(`你是「${id.name}」，Look Studio 的常驻 bot，帮助同济大学学生使用 Look 录课平台的课程录像。`, BODY, BOT_RULES);
+		if (id.persona) parts.push(`用户希望你这样相处：${id.persona}`);
+		const mem = await memory.prompt();
+		if (mem) parts.push(`<memory>\n${mem}\n</memory>`);
+	} else {
+		if (conv.kind === "course" && conv.course_id) {
+			parts.push(
+				`你是课程「${conv.course ?? conv.course_id}」（course_id ${conv.course_id}）的课程助手，帮助同济大学学生学习这门课的录像。本对话只围绕这门课：找节次、读文字稿、笔记、大纲、练习都默认限定在这门课，用户明确提到别的课程时再换。`,
+			);
+		} else {
+			parts.push(SYSTEM.slice(0, SYSTEM.indexOf("\n")));
+		}
+		parts.push(BODY);
+		if (conv.kind !== "task") {
+			parts.push("需要时可以用 open_page 直接打开应用里的页面（课程、节次、笔记、日程等）。");
+			const mem = await memory.prompt({ pinnedOnly: true });
+			if (mem) parts.push(`关于用户（只读，来自常驻 bot 的记忆）：\n${mem}`);
+		}
+	}
+	if (conv.pluginLines?.length) parts.push(`已启用的插件（按需用 find_tools 加载）：\n${conv.pluginLines.join("\n")}`);
+	if (pipeline.prefs.persona) parts.push(`用户偏好：${pipeline.prefs.persona}`);
+	return parts.join("\n\n");
+}
+
+/** Rebuilds the system prompt of an open conversation when memory or identity changed. */
+async function refreshPrompt(conv) {
+	const next = await systemPrompt(conv);
+	if (next === conv.system) return;
+	conv.system = next;
+	conv.session.setActiveToolsByName(conv.session.getActiveToolNames());
+}
 
 // ---- plugins (docs/specs/0004-plugin-platform.md) ----
 
@@ -75,13 +136,30 @@ try {
 const PI_DIR = join(DATA_DIR, "plugins", "pi");
 await mkdir(PI_DIR, { recursive: true });
 
+/** A resource loader with only a system prompt and the given extensions. */
+function plainLoader(getSystem, extensions = { extensions: [], errors: [], runtime: createExtensionRuntime() }) {
+	return {
+		getExtensions: () => extensions,
+		getSkills: () => ({ skills: [], diagnostics: [] }),
+		getPrompts: () => ({ prompts: [], diagnostics: [] }),
+		getThemes: () => ({ themes: [], diagnostics: [] }),
+		getAgentsFiles: () => ({ agentsFiles: [] }),
+		getSystemPrompt: getSystem,
+		getSystemPromptSource: () => undefined,
+		getAppendSystemPrompt: () => [],
+		getAppendSystemPromptSources: () => [],
+		extendResources: () => {},
+		reload: async () => {},
+	};
+}
+
 /**
- * A resource loader for one conversation: our system prompt, no Pi skills or
- * context files, and the enabled plugins as inline extensions. Each
- * conversation loads its own extension runtime because Pi binds a runtime to
- * a single session.
+ * A resource loader for one conversation: its system prompt (conv.system), no
+ * Pi skills or context files, and the enabled plugins as inline extensions.
+ * Each conversation loads its own extension runtime because Pi binds a
+ * runtime to a single session.
  */
-async function sessionResources() {
+async function sessionResources(conv) {
 	const factories = plugins.extensionFactories();
 	let extensions = { extensions: [], errors: [], runtime: createExtensionRuntime() };
 	if (factories.length) {
@@ -99,32 +177,62 @@ async function sessionResources() {
 		extensions = loader.getExtensions();
 		for (const e of extensions.errors) console.error(`plugin ${e.path}: ${e.error}`);
 	}
-	const lines = plugins.promptLines();
-	const system = lines.length ? `${SYSTEM}\n\n已启用的插件（按需用 find_tools 加载）：\n${lines.join("\n")}` : SYSTEM;
+	conv.pluginLines = plugins.promptLines();
+	conv.system = await systemPrompt(conv);
 	return {
 		groups: plugins.groups(),
 		hasExtensions: factories.length > 0,
-		loader: {
-			getExtensions: () => extensions,
-			getSkills: () => ({ skills: [], diagnostics: [] }),
-			getPrompts: () => ({ prompts: [], diagnostics: [] }),
-			getThemes: () => ({ themes: [], diagnostics: [] }),
-			getAgentsFiles: () => ({ agentsFiles: [] }),
-			getSystemPrompt: () => (pipeline.prefs.persona ? `${system}\n\n用户偏好：${pipeline.prefs.persona}` : system),
-			getSystemPromptSource: () => undefined,
-			getAppendSystemPrompt: () => [],
-			getAppendSystemPromptSources: () => [],
-			extendResources: () => {},
-			reload: async () => {},
-		},
+		loader: plainLoader(() => conv.system, extensions),
 	};
+}
+
+const opDeps = {
+	bot,
+	api,
+	appState: () => appState,
+	pipeline,
+	plugins,
+	get tasks() {
+		return tasks;
+	},
+	changed: () => closeIdle(),
+};
+
+/** The bot's and course agents' own tools for createTools. */
+function extraTools(conv) {
+	if (conv.kind === "task") return {};
+	const operate = operateTools(opDeps);
+	if (conv.kind !== "bot") return { tools: operate.filter((t) => t.name === "open_page"), core: ["open_page"] };
+	return {
+		tools: [...operate, ...memoryTools(memory, { onChange: (r) => botEvent({ kind: "memory_changed", path: r.path, action: r.action }) })],
+		groups: { operate: OPERATE_GROUP, memory: MEMORY_GROUP },
+		core: ["open_page"],
+	};
+}
+
+let courseTitles = { at: 0, map: new Map() };
+/** Course titles by id (aliases first), cached for a minute; empty when lookd is unreachable. */
+async function courseNames() {
+	if (Date.now() - courseTitles.at > 60_000) {
+		try {
+			const list = (await api("GET", "/api/courses")) ?? [];
+			courseTitles = { at: Date.now(), map: new Map(list.map((c) => [c.id, c.alias || c.title])) };
+		} catch {
+			// keep the previous names
+		}
+	}
+	return courseTitles.map;
 }
 
 // ---- conversations ----
 
 const MAX_LIVE = 4;
 
-async function openConversation(id) {
+/**
+ * Opens a conversation by id, or creates one of init.kind ("bot", "course"
+ * with init.course_id, "chat", "task") when id is undefined.
+ */
+async function openConversation(id, init = { kind: "chat" }) {
 	if (id && live.has(id)) {
 		const c = live.get(id);
 		c.used = Date.now();
@@ -151,13 +259,15 @@ async function openConversation(id) {
 		// Ledger attribution; scheduled runs set purpose "task" and taskId.
 		purpose: "chat",
 		taskId: null,
+		...(id ? bot.kindOf(id) : init),
 		// find_tools: declare more tools from the next model call on.
 		load(names) {
 			const active = conv.session.getActiveToolNames();
 			conv.session.setActiveToolsByName([...new Set([...active, ...names])]);
 		},
 	};
-	const resources = await sessionResources();
+	if (conv.course_id) conv.course = (await courseNames()).get(conv.course_id);
+	const resources = await sessionResources(conv);
 	const { session } = await createAgentSession({
 		cwd: CWD,
 		agentDir: DATA_DIR,
@@ -168,9 +278,11 @@ async function openConversation(id) {
 		sessionManager,
 		settingsManager: SettingsManager.inMemory({ compaction: { enabled: true }, retry: { enabled: true, maxRetries: 2 } }),
 		noTools: "builtin",
-		customTools: createTools(conv, resources.groups),
+		customTools: createTools(conv, resources.groups, extraTools(conv)),
 	});
 	conv.session = session;
+	if (!id && conv.kind === "bot") await bot.setSession(session.sessionId);
+	else if (!id && conv.kind !== "chat") await bot.setKind(session.sessionId, { kind: conv.kind, course_id: conv.course_id });
 	if (resources.hasExtensions) {
 		await session.bindExtensions({ onError: (e) => console.error(`plugin ${e.extensionPath}: ${e.error}`) });
 	}
@@ -371,26 +483,47 @@ route("GET", "/usage/calls", async (req) => {
 
 route("GET", "/sessions", async () => {
 	const list = await SessionManager.list(CWD, SESSIONS);
+	const names = await courseNames();
 	return list
 		.sort((a, b) => b.modified - a.modified)
 		.slice(0, 200)
-		.map((s) => ({
-			id: s.id,
-			title: sessionTitle(s),
-			modified: s.modified,
-			messages: s.messageCount,
-			busy: live.get(s.id)?.busy ?? false,
-		}));
+		.map((s) => {
+			const k = bot.kindOf(s.id);
+			return {
+				id: s.id,
+				title: sessionTitle(s),
+				modified: s.modified,
+				messages: s.messageCount,
+				busy: live.get(s.id)?.busy ?? false,
+				kind: k.kind,
+				...(k.course_id ? { course_id: k.course_id, course: names.get(k.course_id) ?? null } : {}),
+			};
+		});
 });
+
+/** A proposal's current state replaces the one recorded when its tool ran. */
+function withProposalState(view) {
+	const p = view?.role === "tool" && view.details?.proposal;
+	if (!p?.id) return view;
+	try {
+		return { ...view, details: { ...view.details, proposal: bot.view(bot.proposal(p.id)) } };
+	} catch {
+		return view;
+	}
+}
+
 route("GET", "/sessions/([^/]+)", async (_req, [id]) => {
 	const conv = await openConversation(id);
 	const s = conv.session;
 	return {
 		id: s.sessionId,
+		kind: conv.kind,
+		course_id: conv.course_id ?? null,
+		course: conv.course ?? null,
 		model: s.model ? `${s.model.provider}/${s.model.id}` : null,
 		busy: conv.busy,
 		stats: sessionStats(s),
-		messages: s.messages.map(messageView).filter(Boolean),
+		messages: s.messages.map(messageView).filter(Boolean).map(withProposalState),
 	};
 });
 route("POST", "/sessions/([^/]+)/compact", async (_req, [id]) => {
@@ -413,6 +546,7 @@ route("DELETE", "/sessions/([^/]+)", async (_req, [id]) => {
 	}
 	const path = SessionManager.findById(CWD, id, SESSIONS);
 	if (path) await rm(path, { force: true });
+	await bot.forget(id);
 	return { ok: true };
 });
 route("POST", "/sessions/([^/]+)/abort", async (_req, [id]) => {
@@ -422,19 +556,26 @@ route("POST", "/sessions/([^/]+)/abort", async (_req, [id]) => {
 
 // POST /chat streams Server-Sent Events for one prompt.
 route("POST", "/chat", async (req, _m, res) => {
-	const { session_id, message, context } = await body(req);
+	const { session_id, message, context, agent, course_id } = await body(req);
 	if (!message?.trim()) throw httpError(400, "消息为空");
-	const conv = await openConversation(session_id || undefined);
+	let conv;
+	if (session_id) conv = await openConversation(session_id);
+	else if (agent === "bot") {
+		const sid = bot.state.session_id;
+		conv = sid && (live.has(sid) || SessionManager.findById(CWD, sid, SESSIONS)) ? await openConversation(sid) : await openConversation(undefined, { kind: "bot" });
+	} else if (course_id) conv = await openConversation(undefined, { kind: "course", course_id: String(course_id) });
+	else conv = await openConversation(undefined, { kind: "chat" });
 	const s = conv.session;
 	if (conv.busy) throw httpError(409, "这个对话正在回复中");
 	conv.busy = true;
 	conv.context = context ?? null;
 	conv.calls = 0;
 	conv.lastUser = message;
+	await refreshPrompt(conv);
 
 	res.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", "X-Accel-Buffering": "no" });
 	const emit = (type, data = {}) => res.write(`data: ${JSON.stringify({ type, ...data })}\n\n`);
-	emit("start", { session_id: s.sessionId, model: s.model ? `${s.model.provider}/${s.model.id}` : null });
+	emit("start", { session_id: s.sessionId, kind: conv.kind, course_id: conv.course_id ?? null, model: s.model ? `${s.model.provider}/${s.model.id}` : null });
 
 	const unsub = s.subscribe((ev) => {
 		switch (ev.type) {
@@ -483,6 +624,7 @@ route("POST", "/chat", async (req, _m, res) => {
 			s.setSessionName(message.trim().replace(/\s+/g, " ").slice(0, 40));
 		}
 		emit("done", { stats: sessionStats(s) });
+		if (conv.kind === "bot" || bot.state.memory.learn_from_courses) consolidator.touch().catch(() => {});
 	} catch (e) {
 		emit("error", { message: String(e?.message ?? e) });
 	} finally {
@@ -523,7 +665,7 @@ const TASK_TIMEOUT_MS = 15 * 60_000;
 
 // Runs a task as a new conversation with no user present.
 async function runTask(task, signal) {
-	const conv = await openConversation(undefined);
+	const conv = await openConversation(undefined, { kind: "task" });
 	const s = conv.session;
 	Object.assign(conv, { purpose: "task", taskId: task.id, busy: true, calls: 0, context: null, lastUser: task.prompt, writes: task.writes ?? [] });
 	const allowed = (task.writes ?? []).map((w) => TASK_WRITES[w]);
@@ -596,6 +738,153 @@ route("GET", "/tasks/([^/]+)/runs", async (_req, [id]) => {
 	return tasks.runsOf(id);
 });
 
+// ---- the bot: identity, memory, consolidation, proposals ----
+
+/** Conversations with turns after their consolidation mark that the switches allow. */
+async function consolidationCandidates() {
+	const learn = bot.state.memory.learn_from_courses;
+	const week = Date.now() - 7 * 86_400_000;
+	const names = await courseNames();
+	const out = [];
+	const list = (await SessionManager.list(CWD, SESSIONS)).filter((x) => x.modified >= week).sort((a, b) => b.modified - a.modified);
+	for (const info of list.slice(0, 20)) {
+		const k = bot.kindOf(info.id);
+		if (k.kind === "task" || (k.kind !== "bot" && !learn)) continue;
+		if (live.get(info.id)?.busy) continue;
+		const sm = SessionManager.open(info.path, SESSIONS);
+		const messages = sm.getBranch().filter((e) => e.type === "message").map((e) => e.message);
+		const turns = turnsOf(messages).slice(bot.mark(info.id));
+		if (turns.length) out.push({ id: info.id, kind: k.kind, title: sessionTitle(info), course: k.course_id ? names.get(k.course_id) : undefined, turns });
+	}
+	return out;
+}
+
+/** One consolidation run: a memory-only Pi session kept in memory. */
+async function consolidate(transcript) {
+	const model = await pipeline.currentModel();
+	if (!model) throw new Error("没有可用的模型");
+	const changes = new Map();
+	let calls = 0;
+	const tools = memoryTools(memory, {
+		allowDelete: false,
+		onChange: (r) => changes.set(r.path, changes.get(r.path) === "created" ? "created" : r.action),
+	}).map((t) => ({
+		...t,
+		execute: async (...args) => {
+			if (++calls > CONSOLIDATE_CALLS) throw new Error(`已达到 ${CONSOLIDATE_CALLS} 次工具调用上限，请直接总结。`);
+			return t.execute(...args);
+		},
+	}));
+	const { session } = await createAgentSession({
+		cwd: CWD,
+		agentDir: DATA_DIR,
+		modelRuntime: pipeline.runtime,
+		model,
+		thinkingLevel: "off",
+		resourceLoader: plainLoader(() => CONSOLIDATE_PROMPT),
+		sessionManager: SessionManager.inMemory(CWD),
+		settingsManager: SettingsManager.inMemory({ compaction: { enabled: false }, retry: { enabled: true, maxRetries: 2 } }),
+		noTools: "builtin",
+		customTools: tools,
+	});
+	let cost = 0;
+	session.subscribe((ev) => {
+		if (ev.type === "message_end" && ev.message?.role === "assistant") {
+			cost += ev.message.usage?.cost?.total ?? 0;
+			usage.record(entryFrom(ev.message, { purpose: "memory" }));
+		}
+	});
+	const timer = setTimeout(() => session.abort().catch(() => {}), CONSOLIDATE_TIMEOUT_MS);
+	try {
+		const current = await memory.prompt();
+		await session.prompt(`<current_memory>\n${current || "（还没有记忆）"}\n</current_memory>\n\n<transcripts>\n${transcript}</transcripts>\n\n按规则整理记忆。`);
+		const last = [...session.messages].reverse().find((m) => m.role === "assistant");
+		if (last?.stopReason === "error") throw new Error(last.errorMessage ?? "模型出错");
+		if (last?.stopReason === "aborted") throw new Error("整理超过 3 分钟，已中止");
+		const summary = (last?.content ?? []).filter((c) => c.type === "text").map((c) => c.text).join("").trim();
+		return { changes: [...changes].map(([path, action]) => ({ path, action })), cost, summary };
+	} finally {
+		clearTimeout(timer);
+		session.dispose();
+	}
+}
+
+const consolidator = new Consolidator(bot, { candidates: consolidationCandidates, run: consolidate, notify: botEvent });
+
+async function botView() {
+	const runs = await bot.runs();
+	return { ...bot.identity(), consolidating: !!consolidator.running, last_run: runs[0] ?? null };
+}
+
+route("GET", "/bot", botView);
+route("PUT", "/bot", async (req) => {
+	await bot.update(await body(req));
+	return botView();
+});
+route("POST", "/bot/reset", async () => {
+	const sid = bot.state.session_id;
+	const c = sid && live.get(sid);
+	if (c?.busy) throw httpError(409, "正在回复中，稍后再开始新对话");
+	if (c) {
+		c.session.dispose();
+		live.delete(sid);
+	}
+	if (sid) await bot.setKind(sid, { kind: "bot" });
+	await bot.setSession(null);
+	return botView();
+});
+route("GET", "/bot/memory", async () => memory.list());
+route("GET", "/bot/memory/file", async (req) => memory.read(new URL(req.url, "http://x").searchParams.get("path")));
+route("PUT", "/bot/memory/file", async (req) => {
+	const { path, content, base_hash } = await body(req);
+	if (typeof content !== "string") throw httpError(400, "content 应为字符串");
+	return memory.write(path, content, base_hash);
+});
+route("DELETE", "/bot/memory/file", async (req) => memory.remove(new URL(req.url, "http://x").searchParams.get("path")));
+route("POST", "/bot/memory/consolidate", async () => {
+	consolidator.now().catch((e) => console.error(`consolidate: ${e.message}`));
+	return botView();
+});
+route("GET", "/bot/memory/runs", async () => bot.runs());
+
+route("PUT", "/app-state", async (req) => {
+	const b = await body(req);
+	if (!b || typeof b !== "object" || Array.isArray(b)) throw httpError(400, "请求体应为对象");
+	appState = Object.fromEntries(Object.entries(b).filter(([k]) => SETTINGS[k]?.where === "app"));
+	return { ok: true };
+});
+
+const proposalRefusal = (state) =>
+	({ applied: "这张卡片已经应用过了", dismissed: "这张卡片已忽略", expired: "这张卡片已过期，请让助手重新生成", failed: "这张卡片执行失败过，请让助手重新生成", undone: "已经撤销过了" })[state] ?? `卡片状态为 ${state}`;
+
+route("GET", "/proposals/([^/]+)", async (_req, [id]) => bot.view(bot.proposal(id)));
+route("POST", "/proposals/([^/]+)/apply", async (_req, [id]) =>
+	bot.transition(
+		id,
+		["pending"],
+		"applied",
+		async (p) => {
+			const r = await runOp(p.op, opDeps);
+			if (p.op.type === "task" && r.task_id) p.undo = { type: "delete_task", id: r.task_id };
+			return r;
+		},
+		proposalRefusal,
+	),
+);
+route("POST", "/proposals/([^/]+)/dismiss", async (_req, [id]) => bot.transition(id, ["pending"], "dismissed", null, proposalRefusal));
+route("POST", "/proposals/([^/]+)/undo", async (_req, [id]) =>
+	bot.transition(
+		id,
+		["applied"],
+		"undone",
+		async (p) => {
+			if (!p.undo) throw httpError(409, "这个操作不能撤销");
+			return runOp(p.undo, opDeps);
+		},
+		proposalRefusal,
+	),
+);
+
 const server = createServer(async (req, res) => {
 	if (req.headers.authorization !== `Bearer ${TOKEN}`) return send(res, 401, { error: "unauthorized" });
 	const url = new URL(req.url, "http://x");
@@ -623,6 +912,7 @@ for (const sig of ["SIGINT", "SIGTERM"]) {
 		if (stopping) return;
 		stopping = true;
 		for (const c of live.values()) c.session.dispose();
+		consolidator.stop();
 		server.close();
 		// Finished model calls reach the ledger and plugin cleanups (spawned
 		// processes) run first; lookd allows 5 s before killing us.

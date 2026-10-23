@@ -78,6 +78,8 @@ class _DownloadsPageState extends State<DownloadsPage> {
     final done = jobs.where((j) => j.state == 'done' || j.state == 'canceled').toList();
     final speed = jobs.where((j) => j.state == 'running').fold<int>(0, (s, j) => s + j.speed);
     final running = jobs.where((j) => j.state == 'running').length;
+    final pausable = jobs.where((j) => j.active).length;
+    final paused = jobs.where((j) => j.state == 'paused').length;
 
     final header = SliverToBoxAdapter(
       child: ContentWidth(
@@ -106,6 +108,10 @@ class _DownloadsPageState extends State<DownloadsPage> {
                 onSelectionChanged: (v) => setState(() => _view = v.first),
               ),
               const Spacer(),
+              if (_view == 0 && pausable > 0)
+                TextButton.icon(onPressed: () => _bulk('pause'), icon: const Icon(Icons.pause_rounded, size: 18), label: const Text('全部暂停')),
+              if (_view == 0 && paused > 0)
+                TextButton.icon(onPressed: () => _bulk('resume'), icon: const Icon(Icons.play_arrow_rounded, size: 18), label: Text('全部继续 $paused')),
               AnimatedSwitcher(
                 duration: Motion.short4,
                 child: _view == 0 && done.isNotEmpty
@@ -134,21 +140,36 @@ class _DownloadsPageState extends State<DownloadsPage> {
                   ),
                 ),
               ..._section(context, '进行中', active, pad),
-              ..._section(context, '失败', failed, pad),
+              ..._section(context, '失败', failed, pad, action: TextButton.icon(onPressed: () => _bulk('retry'), icon: const Icon(Icons.refresh_rounded, size: 18), label: const Text('全部重试'))),
               ..._section(context, '已完成', done, pad),
               const SliverToBoxAdapter(child: SizedBox(height: Space.huge)),
             ]),
     );
   }
 
-  List<Widget> _section(BuildContext context, String title, List<Job> list, double pad) {
+  Future<void> _bulk(String action) async {
+    final app = context.read<AppState>();
+    try {
+      final n = await app.bulkJobs(action);
+      if (mounted && n > 0) showSnack(context, '${const {'pause': '已暂停', 'resume': '已继续', 'retry': '已重试'}[action]} $n 个任务');
+    } catch (e) {
+      if (mounted) showSnack(context, '操作失败：$e');
+    }
+  }
+
+  List<Widget> _section(BuildContext context, String title, List<Job> list, double pad, {Widget? action}) {
     if (list.isEmpty) return const [];
     return [
       SliverToBoxAdapter(
         child: ContentWidth(
           child: Padding(
-            padding: EdgeInsets.fromLTRB(pad, Space.lg, pad, Space.sm),
-            child: Text('$title · ${list.length}', style: Theme.of(context).textTheme.titleSmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+            padding: EdgeInsets.fromLTRB(pad, Space.lg, pad - Space.sm, action == null ? Space.sm : 0),
+            child: Row(children: [
+              Expanded(
+                child: Text('$title · ${list.length}', style: Theme.of(context).textTheme.titleSmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+              ),
+              ?action,
+            ]),
           ),
         ),
       ),
@@ -475,8 +496,11 @@ class _JobTile extends StatelessWidget {
     final course = context.select<AppState, Course?>((a) => a.course(job.courseId));
     final failed = job.state == 'failed';
     final done = job.state == 'done';
+    final retryAt = job.state == 'queued' ? job.retryAt : null;
     final stateText = switch (job.state) {
       'running' => job.stage.isNotEmpty ? job.stage : '下载中',
+      'queued' when retryAt != null => '网络中断 · ${fmtClockTime(retryAt)} 自动重试',
+      'queued' when job.progress > 0 => '排队中 · 将从 ${(job.progress * 100).round()}% 继续',
       'queued' => '排队中',
       'paused' => '已暂停',
       'failed' => '失败',
@@ -523,7 +547,7 @@ class _JobTile extends StatelessWidget {
                     tween: Tween(end: job.progress),
                     duration: Motion.medium2,
                     builder: (_, v, _) => LinearProgressIndicator(
-                      value: job.state == 'queued' ? null : v,
+                      value: job.state == 'queued' && job.progress == 0 ? null : v,
                       borderRadius: BorderRadius.circular(4),
                       color: job.state == 'paused' ? cs.outline : null,
                     ),

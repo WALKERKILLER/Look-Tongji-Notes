@@ -588,6 +588,8 @@ type Job struct {
 	Speed int64  `json:"speed"`
 	Conns int    `json:"conns"`
 	Stage string `json:"stage,omitempty"`
+	// RetryAt is when a queued job retries after a transient failure (Unix s).
+	RetryAt int64 `json:"retry_at,omitempty"`
 }
 
 func (s *Store) PutJob(ctx context.Context, j Job) error {

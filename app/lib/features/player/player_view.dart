@@ -305,6 +305,8 @@ class PlayerViewState extends State<PlayerView> {
             padding: const EdgeInsets.only(bottom: 2),
             child: TextButton(
               onPressed: () {
+                // The outline lives in the side panel: bring it into view first.
+                if (widget.fullscreen) widget.onFullscreen();
                 if (widget.panelOpen == false) widget.onTogglePanel?.call();
                 ctl.panelTab.value = 'outline';
               },

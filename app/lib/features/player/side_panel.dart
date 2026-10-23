@@ -47,9 +47,12 @@ class _PlayerSidePanelState extends State<PlayerSidePanel> with SingleTickerProv
   void initState() {
     super.initState();
     widget.ctl.panelTab.addListener(_onRequest);
+    // A tab asked for while the panel was hidden (collapsed, fullscreen).
+    if (widget.ctl.panelTab.value != null) WidgetsBinding.instance.addPostFrameCallback((_) => mounted ? _onRequest() : null);
   }
 
   void _onRequest() {
+    if (widget.ctl.panelTab.value == null) return;
     final i = _names.indexOf(widget.ctl.panelTab.value ?? '');
     if (i >= 0 && i < _tabs.length) _tabs.animateTo(i);
     widget.ctl.panelTab.value = null;
@@ -255,8 +258,11 @@ class _SlidesTabState extends State<_SlidesTab> with AutomaticKeepAliveClientMix
       Padding(
         padding: const EdgeInsets.fromLTRB(Space.md, Space.sm, Space.md, 0),
         child: Row(children: [
-          FilterChip(label: const Text('仅换页'), selected: _keyOnly, onSelected: (v) => setState(() => _keyOnly = v)),
-          const SizedBox(width: Space.sm),
+          // Without page-change marks there is nothing to filter.
+          if (ctl.slides.any((s) => s.isKey)) ...[
+            FilterChip(label: const Text('仅换页'), selected: _keyOnly, onSelected: (v) => setState(() => _keyOnly = v)),
+            const SizedBox(width: Space.sm),
+          ],
           FilterChip(
             label: const Text('跟随播放'),
             selected: prefs.slideFollow,

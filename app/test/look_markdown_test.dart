@@ -63,4 +63,31 @@ void main() {
     expect(prose.contains(r'$'), isFalse, reason: text);
     expect(text.contains(r'\begin'), isFalse);
   });
+
+  test('lecture and library-file links parse as references', () {
+    expect((LookRef.parse('look://lecture/L1') as LectureRef).lectureId, 'L1');
+    expect(LookRef.parse('look://lecture/L1?t=30'), isA<TimeRef>());
+    expect((LookRef.parse('look://file/课程/a%20b.png') as FileRef).path, '课程/a b.png');
+    expect(LookRef.parse('look://nothing/x'), isNull);
+    expect(LookRef.parse('https://example.com'), isNull);
+  });
+
+  testWidgets('every link in a message responds to a tap', (t) async {
+    final refs = <LookRef>[];
+    await t.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: Column(children: [
+          LookMarkdown('打开 [第 3 节](look://lecture/L3)，插图 [图 1](look://file/a/b.png)。', onRef: refs.add),
+          LookMarkdown('[未知链接未知链接](look://nothing/x)', onRef: refs.add),
+        ]),
+      ),
+    ));
+    await t.tap(find.text('第 3 节'));
+    await t.tap(find.text('图 1'));
+    expect(refs.map((r) => r.runtimeType), [LectureRef, FileRef]);
+    // A link the app cannot open says so instead of doing nothing.
+    await t.tap(find.textContaining('未知链接', findRichText: true));
+    await t.pump();
+    expect(find.text('这个链接无法打开'), findsOneWidget);
+  });
 }

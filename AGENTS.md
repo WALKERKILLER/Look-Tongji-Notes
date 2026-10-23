@@ -44,7 +44,7 @@ Run relevant tests while working and the shared gate runner before every commit.
 ## Project rules
 
 - Credentials stay inside lookd: the Tongji session and password, the MinerU token and provider API keys are never logged, committed, or returned by an API (the MinerU token only as its last 4 characters). User data under `~/LookStudio/` and `~/.local/share/look-studio/` never enters the repository.
-- The assistant writes only notes, schedule marks and outlines; downloads start from a user click. Note overwrite and transcript-coverage guards in `agent/src/tools.mjs` change only through an Approved spec.
+- Course agents and chats write only notes, schedule marks, outlines and quizzes. The resident bot also keeps memory files and operates the app as [spec 0007](docs/specs/0007-resident-bot-and-course-agents.md) defines: downloads, file deletion, scheduled tasks, plugin switches and download, transcription or model settings run only when the user applies a card. Note overwrite and transcript-coverage guards in `agent/src/tools.mjs`, the memory guard in `agent/src/memory.mjs` and the card operations in `agent/src/operate.mjs` change only through an Approved spec.
 - Do not copy code from GPL/AGPL projects; reimplement from protocols and documentation with provenance, and keep third-party asset `NOTICE` files.
 - A lookd route or JSON field change updates both clients (`app/lib/core/api.dart`, `agent/src/lookd.mjs`) in the same change.
 

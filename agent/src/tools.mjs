@@ -217,9 +217,13 @@ async function unread(conv, lectureId) {
  * @param {object} conv the conversation (see host.mjs)
  * @param {Record<string, {label: string, tools: string[], descriptions: Record<string, string>, playbook: string, words: string}>} [pluginGroups]
  *   groups of the plugins loaded when the conversation opened (plugins.mjs)
+ * @param {{tools?: any[], groups?: Record<string, any>, core?: string[]}} [extra]
+ *   the bot's tools (operate.mjs, memory.mjs): more groups and core tools
  */
-export function createTools(conv, pluginGroups = {}) {
-	const all = { ...GROUPS, ...pluginGroups };
+export function createTools(conv, pluginGroups = {}, extra = {}) {
+	const own = { ...GROUPS, ...(extra.groups ?? {}) };
+	const all = { ...own, ...pluginGroups };
+	const core = [...CORE, ...(extra.core ?? [])];
 	const plugins = Object.entries(pluginGroups);
 	const tools = [
 		{
@@ -227,12 +231,12 @@ export function createTools(conv, pluginGroups = {}) {
 			label: "加载工具",
 			description:
 				"Load more tools before using them. Groups: " +
-				Object.entries(GROUPS)
+				Object.entries(own)
 					.map(([id, g]) => `${id} (${g.label}: ${g.tools.join(", ")})`)
 					.join("; ") +
 				(plugins.length ? `. Plugin groups: ${plugins.map(([id, g]) => `${id} (${g.label})`).join("; ")}` : "") +
 				". Pass groups directly when you know them, or a query in the user's words. Loaded tools are callable from your next step.",
-			promptSnippet: "find_tools(groups|query): load tool groups (course, notes, schedule, outline, materials, practice, help)",
+			promptSnippet: `find_tools(groups|query): load tool groups (${Object.keys(own).join(", ")})`,
 			parameters: Type.Object({
 				groups: Type.Optional(Type.Array(Type.Union(Object.keys(all).map((k) => Type.Literal(k))))),
 				query: Type.Optional(Type.String({ description: "What you need to do, e.g. 标记作业截止日期" })),
@@ -784,7 +788,8 @@ export function createTools(conv, pluginGroups = {}) {
 			execute: async (_id, { actions }) => text(`已向用户展示 ${actions.length} 个操作按钮。`, { actions }),
 		},
 	];
-	return tools.map((t) => guard(conv, { ...t, exposure: CORE.includes(t.name) ? undefined : "deferred" }));
+	tools.push(...(extra.tools ?? []));
+	return tools.map((t) => guard(conv, { ...t, exposure: core.includes(t.name) ? undefined : "deferred" }));
 }
 
 // ---- harness ----

@@ -506,6 +506,8 @@ class ScheduleChatCard extends StatelessWidget {
               TextButton(
                 onPressed: () {
                   context.read<ScheduleFocus>().value = it.day;
+                  // The card can sit in a full-screen assistant or the player: show the tab on top.
+                  Navigator.of(context, rootNavigator: true).popUntil((r) => r.isFirst);
                   ShellNav.goTo(Tabs.schedule);
                 },
                 child: const Text('查看日程'),

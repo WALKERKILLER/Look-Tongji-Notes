@@ -12,11 +12,13 @@ const _kinds = [
   ('transcript', Icons.subject_rounded, '语音转写', '必剪 / 剪映免费识别，分段并行，带时间戳'),
 ];
 
-/// Lets the user pick what to fetch for one or more lectures.
-Future<void> showDownloadSheet(BuildContext context, List<String> lectureIds, {String? title}) async {
+/// Lets the user pick what to fetch for one or more lectures; [kinds]
+/// preselects the options (else the last choice).
+Future<void> showDownloadSheet(BuildContext context, List<String> lectureIds, {String? title, List<String> kinds = const []}) async {
   final sp = await SharedPreferences.getInstance();
   if (!context.mounted) return;
-  final saved = sp.getStringList('download.kinds') ?? ['video', 'slides'];
+  final suggested = kinds.where((k) => _kinds.any((e) => e.$1 == k)).toList();
+  final saved = suggested.isNotEmpty ? suggested : sp.getStringList('download.kinds') ?? ['video', 'slides'];
   var deleteVideo = false;
   try {
     final st = await context.read<AppState>().api.get('/api/settings');
@@ -59,6 +61,8 @@ class _SheetState extends State<_Sheet> {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
     final ffmpeg = context.select<AppState, bool>((a) => a.health['ffmpeg'] != false);
+    // Options that cannot run show as off and are not sent.
+    final picked = [for (final (k, _, _, _) in _kinds) if (_sel.contains(k) && (k != 'transcript' || ffmpeg)) k];
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(Space.xl, 0, Space.xl, Space.lg),
@@ -112,9 +116,9 @@ class _SheetState extends State<_Sheet> {
           ),
           const SizedBox(height: Space.lg),
           FilledButton.icon(
-            onPressed: _sel.isEmpty ? null : () => Navigator.pop(context, _kinds.map((e) => e.$1).where(_sel.contains).toList()),
+            onPressed: picked.isEmpty ? null : () => Navigator.pop(context, picked),
             icon: const Icon(Icons.download_rounded),
-            label: Text(_sel.isEmpty ? '选择要下载的内容' : '开始下载'),
+            label: Text(picked.isEmpty ? '选择要下载的内容' : '开始下载'),
             style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
           ),
         ]),
