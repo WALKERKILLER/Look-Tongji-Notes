@@ -27,6 +27,7 @@ import 'theme/tokens.dart';
 import 'widgets/organic_shapes.dart';
 import 'widgets/states.dart';
 import 'widgets/user_avatar.dart';
+import 'l10n/l10n.dart';
 
 class _Dest {
   const _Dest(this.label, this.icon, this.selected, this.screen);
@@ -41,15 +42,15 @@ abstract final class Tabs {
   static const home = 0, courses = 1, schedule = 2, downloads = 3, library = 4, tasks = 5, plugins = 6, settings = 7;
 }
 
-const _dests = [
-  _Dest('首页', Icons.home_outlined, Icons.home_rounded, '首页'),
-  _Dest('课程', Icons.school_outlined, Icons.school_rounded, '课程列表'),
-  _Dest('日程', Icons.event_note_outlined, Icons.event_note_rounded, '日程'),
-  _Dest('下载', Icons.download_outlined, Icons.download_rounded, '下载管理'),
-  _Dest('资料库', Icons.auto_stories_outlined, Icons.auto_stories_rounded, '资料库'),
-  _Dest('定时', Icons.schedule_outlined, Icons.schedule_rounded, '定时任务'),
-  _Dest('插件', Icons.extension_outlined, Icons.extension_rounded, '插件'),
-  _Dest('设置', Icons.tune_outlined, Icons.tune_rounded, '设置'),
+final _dests = [
+  _Dest(l10n.screenHome, Icons.home_outlined, Icons.home_rounded, l10n.screenHome),
+  _Dest(l10n.commonCourses, Icons.school_outlined, Icons.school_rounded, l10n.navCourses),
+  _Dest(l10n.commonSchedule, Icons.event_note_outlined, Icons.event_note_rounded, l10n.commonSchedule),
+  _Dest(l10n.commonDownload, Icons.download_outlined, Icons.download_rounded, l10n.screenDownloads),
+  _Dest(l10n.screenLibrary, Icons.auto_stories_outlined, Icons.auto_stories_rounded, l10n.screenLibrary),
+  _Dest(l10n.navTasks, Icons.schedule_outlined, Icons.schedule_rounded, l10n.commonScheduledTasks),
+  _Dest(l10n.commonPlugins, Icons.extension_outlined, Icons.extension_rounded, l10n.commonPlugins),
+  _Dest(l10n.commonSettings, Icons.tune_outlined, Icons.tune_rounded, l10n.commonSettings),
 ];
 
 /// The bottom bar leaves out 定时 and 插件, reached from 设置 and the
@@ -129,7 +130,7 @@ class _AppShellState extends State<AppShell> {
     _daemonNotes = context.read<AppState>().events.where((e) => e['type'] == 'notification').listen((e) {
       if (!mounted) return;
       final n = (e['data'] as Map).cast<String, dynamic>();
-      showSnack(context, '${n['title']}', action: '查看', onAction: () => openNotification(context, n));
+      showSnack(context, '${n['title']}', action: l10n.commonView, onAction: () => openNotification(context, n));
     });
     _prefs.addListener(_pushPrefs);
     _pushPrefs();
@@ -257,7 +258,7 @@ class _AppShellState extends State<AppShell> {
               const NotificationBell(),
               const SizedBox(height: Space.md),
               Tooltip(
-                message: '${userDisplayName(context)} · 个人资料',
+                message: l10n.shellProfileTooltip(userDisplayName(context)),
                 child: InkWell(customBorder: const CircleBorder(), onTap: () => showProfileDialog(context), child: const UserAvatar(size: 40)),
               ),
             ]),
@@ -382,7 +383,7 @@ class _AssistantFab extends StatelessWidget {
     final a = context.watch<AssistantController>();
     final cs = Theme.of(context).colorScheme;
     return Semantics(
-      label: '${a.botName}，${kBotMoodLabels[a.mood]}',
+      label: l10n.botMoodLabel(a.botName, kBotMoodLabels[a.mood]!),
       child: FloatingActionButton(
         heroTag: 'assistant',
         tooltip: a.botName,
@@ -414,7 +415,7 @@ class _ReauthBanner extends StatelessWidget {
             Icon(Icons.lock_clock_outlined, color: cs.onErrorContainer),
             const SizedBox(width: Space.md),
             Expanded(
-              child: Text('登录已过期，自动续期未成功。点此重新登录。', style: TextStyle(color: cs.onErrorContainer)),
+              child: Text(l10n.shellSessionExpired, style: TextStyle(color: cs.onErrorContainer)),
             ),
             Icon(Icons.chevron_right_rounded, color: cs.onErrorContainer),
           ]),

@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 
 import 'workspace.dart';
+import '../l10n/l10n.dart';
 
 /// [setup]: on Android, the Linux workspace lookd runs in is not installed.
 enum DaemonState { setup, starting, ready, failed }
@@ -102,7 +103,7 @@ class LookdService extends ChangeNotifier {
     if (ws != null) return _spawnInWorkspace(ws);
     final bin = _find('LOOKD_BIN', ['lookd', 'lib/lookd'], ['look-studio/lookd/bin/lookd', 'lookd/bin/lookd']);
     if (bin == null) {
-      _fail('找不到 lookd 守护进程。请先构建 look-studio/lookd（go build -o bin/lookd ./cmd/lookd）。');
+      _fail(l10n.daemonNotFound);
       return;
     }
     final agent = _find('LOOK_AGENT', ['agent/src/host.mjs'], ['look-studio/agent/src/host.mjs', 'agent/src/host.mjs']);
@@ -119,7 +120,7 @@ class LookdService extends ChangeNotifier {
     try {
       await ws.load();
     } catch (e) {
-      _fail('无法读取应用目录：$e');
+      _fail(l10n.daemonCannotReadAppDir(e));
       return;
     }
     if (!ws.installed) {
@@ -150,7 +151,7 @@ class LookdService extends ChangeNotifier {
     try {
       _proc = await Process.start(exe, args, environment: env);
     } catch (e) {
-      _fail('无法启动 lookd：$e');
+      _fail(l10n.daemonCannotStart(e));
       return;
     }
     final proc = _proc!;
@@ -176,7 +177,7 @@ class LookdService extends ChangeNotifier {
       notifyListeners();
       _restarts++;
       if (_restarts > 5) {
-        _fail('lookd 反复退出（代码 $code），请查看诊断日志。');
+        _fail(l10n.daemonKeepsExiting(code));
         return;
       }
       await Future.delayed(Duration(milliseconds: 400 * _restarts * _restarts));

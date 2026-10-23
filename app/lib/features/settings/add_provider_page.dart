@@ -7,6 +7,7 @@ import '../assistant/assistant_controller.dart';
 import 'models_page.dart';
 import 'provider_presets.dart';
 import 'provider_setup_page.dart';
+import '../../l10n/l10n.dart';
 
 /// Step 1 of the guided flow: pick a provider from curated presets, the
 /// models.dev directory, or start a blank compatible endpoint.
@@ -56,7 +57,7 @@ class _AddProviderPageState extends State<AddProviderPage> {
     final moreCount = (_catalog?.length ?? 0) - presetCatalogIds.length;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('添加服务商')),
+      appBar: AppBar(title: Text(l10n.modelsAddProvider)),
       body: CustomScrollView(slivers: [
         SliverToBoxAdapter(
           child: ContentWidth(
@@ -67,7 +68,7 @@ class _AddProviderPageState extends State<AddProviderPage> {
                 SearchBar(
                   controller: _q,
                   autoFocus: true,
-                  hintText: '搜索服务商，例如 硅基、qwen、groq',
+                  hintText: l10n.addProviderSearchHint,
                   leading: const Icon(Icons.search_rounded),
                   trailing: [if (q.isNotEmpty) IconButton(onPressed: () => setState(_q.clear), icon: const Icon(Icons.close_rounded))],
                   onChanged: (_) => setState(() {}),
@@ -76,7 +77,7 @@ class _AddProviderPageState extends State<AddProviderPage> {
                 ),
                 const SizedBox(height: Space.md),
                 Wrap(spacing: Space.sm, children: [
-                  ChoiceChip(label: const Text('全部'), selected: _region == null, onSelected: (_) => setState(() => _region = null)),
+                  ChoiceChip(label: Text(l10n.commonAll), selected: _region == null, onSelected: (_) => setState(() => _region = null)),
                   for (final r in Region.values) ChoiceChip(label: Text(r.label), selected: _region == r, onSelected: (_) => setState(() => _region = r)),
                 ]),
               ]),
@@ -110,12 +111,12 @@ class _AddProviderPageState extends State<AddProviderPage> {
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.all(Space.xl),
-              child: Text(_catalog == null ? '没有匹配的预设，正在加载 models.dev 目录…' : '没有找到“$q”。可以用下方“自定义服务”手动填写。',
+              child: Text(_catalog == null ? l10n.addProviderLoadingCatalog : l10n.addProviderNoMatch(q),
                   textAlign: TextAlign.center, style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
             ),
           ),
         if (more.isNotEmpty) ...[
-          _header(context, 'models.dev 目录', '${more.length} 个匹配'),
+          _header(context, l10n.addProviderCatalog, l10n.addProviderMatches(more.length)),
           SliverList.builder(
             itemCount: more.length,
             itemBuilder: (context, i) {
@@ -128,7 +129,7 @@ class _AddProviderPageState extends State<AddProviderPage> {
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Corners.lg)),
                     leading: ProviderLogo(providerId: '${c['id']}', name: '${c['name']}', networkLogo: '${c['logo']}'),
                     title: Text('${c['name']}'),
-                    subtitle: Text('${c['models']} 个模型 · ${c['base_url']}', maxLines: 1, overflow: TextOverflow.ellipsis),
+                    subtitle: Text(l10n.addProviderCatalogEntry(c['models'], c['base_url']), maxLines: 1, overflow: TextOverflow.ellipsis),
                     trailing: configured.contains(c['id']) ? Icon(Icons.check_circle_rounded, color: cs.primary) : const Icon(Icons.chevron_right_rounded),
                     onTap: () => _open(ProviderSetupPage.catalog(entry: c)),
                   ),
@@ -137,7 +138,7 @@ class _AddProviderPageState extends State<AddProviderPage> {
             },
           ),
         ],
-        _header(context, '找不到？', null),
+        _header(context, l10n.addProviderNotFound, null),
         SliverToBoxAdapter(
           child: ContentWidth(
             max: 960,
@@ -150,18 +151,18 @@ class _AddProviderPageState extends State<AddProviderPage> {
                   child: ListTile(
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Corners.lg)),
                     leading: CircleAvatar(backgroundColor: cs.tertiaryContainer, child: Icon(Icons.add_link_rounded, color: cs.onTertiaryContainer)),
-                    title: const Text('自定义服务'),
-                    subtitle: const Text('任何兼容 OpenAI / Anthropic / Gemini 接口的地址，包括中转和自建服务'),
+                    title: Text(l10n.providerCustom),
+                    subtitle: Text(l10n.addProviderCompatibleHint),
                     onTap: () => _open(const ProviderSetupPage.blank()),
                   ),
                 ),
                 const SizedBox(height: Space.md),
                 Text(
                   _catalogError != null
-                      ? 'models.dev 目录暂时不可用：$_catalogError'
+                      ? l10n.addProviderCatalogError(_catalogError!)
                       : _catalog == null
-                          ? '正在加载 models.dev 目录…'
-                          : '搜索时还会在 models.dev 收录的另外 $moreCount 家服务商中查找。',
+                          ? l10n.addProviderCatalogLoading
+                          : l10n.addProviderSearchesMore(moreCount),
                   style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                 ),
                 const SizedBox(height: Space.huge),
@@ -229,11 +230,11 @@ class _PresetTileState extends State<_PresetTile> {
                   if (widget.added)
                     Icon(Icons.check_circle_rounded, size: 20, color: cs.primary)
                   else
-                    Text(p.builtin ? '内置' : p.region == Region.local ? '本地' : '兼容接口', style: tt.labelSmall?.copyWith(color: cs.outline)),
+                    Text(p.builtin ? l10n.commonBuiltIn : p.region == Region.local ? l10n.commonLocal : l10n.addProviderCompatible, style: tt.labelSmall?.copyWith(color: cs.outline)),
                 ]),
                 const Spacer(),
                 Text(p.name, style: tt.titleSmall, maxLines: 1, overflow: TextOverflow.ellipsis),
-                Text(p.blurb.isEmpty ? (p.builtin ? 'Pi SDK 内置，只需密钥' : p.baseUrl) : p.blurb,
+                Text(p.blurb.isEmpty ? (p.builtin ? l10n.addProviderBuiltInKeyOnly : p.baseUrl) : p.blurb,
                     style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant), maxLines: 1, overflow: TextOverflow.ellipsis),
               ]),
             ),

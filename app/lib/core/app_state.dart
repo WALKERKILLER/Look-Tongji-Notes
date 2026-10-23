@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'api.dart';
 import 'lookd_service.dart';
 import 'models.dart';
+import '../l10n/l10n.dart';
 
 /// Global app state fed by lookd's SSE event stream.
 class AppState extends ChangeNotifier {
@@ -244,7 +245,7 @@ class AppState extends ChangeNotifier {
 
 /// What the user is looking at, shared with the assistant.
 class ScreenContext extends ChangeNotifier {
-  Map<String, String> value = const {'screen': '首页'};
+  Map<String, String> value = {'screen': l10n.screenHome};
   void set(Map<String, String> v) {
     if (mapEquals(v, value)) return;
     value = v;

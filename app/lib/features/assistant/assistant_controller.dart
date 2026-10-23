@@ -7,6 +7,7 @@ import '../../core/api.dart';
 import '../../core/app_state.dart';
 import '../../core/format.dart';
 import 'bot_avatar.dart';
+import '../../l10n/l10n.dart';
 
 /// One rendered piece of an assistant turn.
 class ChatBlock {
@@ -55,7 +56,7 @@ class ChatSession {
   ChatSession(this.j);
   final Map<String, dynamic> j;
   String get id => '${j['id']}';
-  String get title => '${j['title'] ?? '新对话'}';
+  String get title => '${j['title'] ?? l10n.chatNew}';
   String get kind => '${j['kind'] ?? 'chat'}';
   String get courseId => '${j['course_id'] ?? ''}';
   String get course => '${j['course'] ?? ''}';
@@ -96,7 +97,7 @@ class AssistantController extends ChangeNotifier {
   Map<String, dynamic>? get selected => models?['selected'] as Map<String, dynamic>?;
   String get modelLabel {
     final s = selected;
-    if (s == null) return '未选择模型';
+    if (s == null) return l10n.modelNone;
     return '${s['model']}';
   }
 
@@ -199,14 +200,14 @@ class AssistantController extends ChangeNotifier {
     models = (r['models'] as Map).cast<String, dynamic>();
     notifyListeners();
     final imp = (r['imported'] as Map?) ?? const {};
-    return '导入了 ${imp['providers'] ?? 0} 个服务商、${imp['keys'] ?? 0} 个密钥';
+    return l10n.modelsImported(imp['providers'] ?? 0, imp['keys'] ?? 0);
   }
 
   // ---- the resident bot (docs/specs/0007-resident-bot-and-course-agents.md) ----
 
   /// GET /agent/bot: name, shape, color, persona, session_id, memory switches.
   Map<String, dynamic> bot = const {};
-  String get botName => '${bot['name'] ?? '小 Look'}';
+  String get botName => '${bot['name'] ?? l10n.botDefaultName}';
   String get botShape => '${bot['shape'] ?? 'pebble'}';
   String get botColor => '${bot['color'] ?? 'theme'}';
   bool consolidating = false;
@@ -468,7 +469,7 @@ class AssistantController extends ChangeNotifier {
       course = cid.isEmpty ? null : (id: cid, title: '${r['course'] ?? ''}');
       pendingCourse = null;
     } catch (e) {
-      messages = [ChatMessage.assistant()..error = '无法打开对话：$e'];
+      messages = [ChatMessage.assistant()..error = l10n.chatOpenFailed(e)];
     }
     loadingSession = false;
     notifyListeners();

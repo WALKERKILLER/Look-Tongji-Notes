@@ -5,11 +5,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/app_state.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/states.dart';
+import '../../l10n/l10n.dart';
 
-const _kinds = [
-  ('video', Icons.movie_outlined, '视频', '多路分段并发下载，可断点续传'),
-  ('slides', Icons.slideshow_outlined, 'PPT 截图', '按时间戳命名，可与视频同步'),
-  ('transcript', Icons.subject_rounded, '语音转写', '必剪 / 剪映免费识别，分段并行，带时间戳'),
+final _kinds = [
+  ('video', Icons.movie_outlined, l10n.assetVideo, l10n.downloadVideoHint),
+  ('slides', Icons.slideshow_outlined, l10n.assetSlides, l10n.downloadSlidesHint),
+  ('transcript', Icons.subject_rounded, l10n.assetAsr, l10n.downloadAsrHint),
 ];
 
 /// Lets the user pick what to fetch for one or more lectures; [kinds]
@@ -34,12 +35,13 @@ Future<void> showDownloadSheet(BuildContext context, List<String> lectureIds, {S
     builder: (_) => _Sheet(count: lectureIds.length, title: title, initial: saved.toSet(), deleteVideo: deleteVideo),
   );
   if (picked == null || picked.isEmpty || !context.mounted) return;
+  final app = context.read<AppState>();
   await sp.setStringList('download.kinds', picked);
   try {
-    final jobs = await context.read<AppState>().enqueue(lectureIds, picked);
-    if (context.mounted) showSnack(context, '已加入 ${jobs.length} 个任务');
+    final jobs = await app.enqueue(lectureIds, picked);
+    if (context.mounted) showSnack(context, l10n.downloadQueued(jobs.length));
   } catch (e) {
-    if (context.mounted) showSnack(context, '加入失败：$e');
+    if (context.mounted) showSnack(context, l10n.downloadQueueFailed(e));
   }
 }
 
@@ -67,9 +69,9 @@ class _SheetState extends State<_Sheet> {
       child: Padding(
         padding: const EdgeInsets.fromLTRB(Space.xl, 0, Space.xl, Space.lg),
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Text(widget.count == 1 ? (widget.title ?? '下载这节课') : '下载 ${widget.count} 节课', style: tt.headlineSmall),
+          Text(widget.count == 1 ? (widget.title ?? l10n.downloadThisLecture) : l10n.downloadLectures(widget.count), style: tt.headlineSmall),
           const SizedBox(height: Space.xs),
-          Text('文件保存在课程库里，按课程与日期整理', style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
+          Text(l10n.downloadSavedToLibrary, style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
           const SizedBox(height: Space.lg),
           for (final (k, icon, label, hint) in _kinds)
             Padding(
@@ -77,7 +79,7 @@ class _SheetState extends State<_Sheet> {
               child: _Option(
                 icon: icon,
                 label: label,
-                hint: k == 'transcript' && !ffmpeg ? '需要安装 ffmpeg' : hint,
+                hint: k == 'transcript' && !ffmpeg ? l10n.downloadNeedsFfmpeg : hint,
                 selected: _sel.contains(k),
                 enabled: k != 'transcript' || ffmpeg,
                 onTap: () => setState(() => _sel.contains(k) ? _sel.remove(k) : _sel.add(k)),
@@ -89,7 +91,7 @@ class _SheetState extends State<_Sheet> {
               Icon(Icons.info_outline_rounded, size: 18, color: cs.onSurfaceVariant),
               const SizedBox(width: Space.sm),
               Expanded(
-                child: Text('平台不提供课件。在播放器的「资料 → 课件」里上传，MinerU 会解析成可检索的文字。',
+                child: Text(l10n.downloadNoCourseware,
                     style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
               ),
             ]),
@@ -106,7 +108,7 @@ class _SheetState extends State<_Sheet> {
                       const SizedBox(width: Space.sm),
                       Expanded(
                         child: Text(
-                          _sel.contains('video') ? '已开启「转写完成后删除视频」：视频会在文字稿生成后被删除' : '已开启「转写完成后删除视频」：本地已有的视频会在转写完成后删除',
+                          _sel.contains('video') ? l10n.downloadDeleteVideoAfterAsr : l10n.downloadDeleteLocalVideoAfterAsr,
                           style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                         ),
                       ),
@@ -118,7 +120,7 @@ class _SheetState extends State<_Sheet> {
           FilledButton.icon(
             onPressed: picked.isEmpty ? null : () => Navigator.pop(context, picked),
             icon: const Icon(Icons.download_rounded),
-            label: Text(picked.isEmpty ? '选择要下载的内容' : '开始下载'),
+            label: Text(picked.isEmpty ? l10n.downloadChooseContent : l10n.downloadStart),
             style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
           ),
         ]),

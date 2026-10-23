@@ -6,6 +6,7 @@ import 'package:flutter/scheduler.dart';
 
 import '../../theme/prefs.dart';
 import '../../widgets/organic_shapes.dart';
+import '../../l10n/l10n.dart';
 
 // The resident bot's mascot, built like a desk companion robot: a soft matte
 // shell, a recessed dark face screen and two glowing eyes that carry every
@@ -25,29 +26,29 @@ import '../../widgets/organic_shapes.dart';
 
 enum BotMood { idle, listening, thinking, working, talking, happy, confused, dreaming, notify }
 
-const kBotMoodLabels = <BotMood, String>{
-  BotMood.idle: '在这儿',
-  BotMood.listening: '在听',
-  BotMood.thinking: '在想',
-  BotMood.working: '在做事',
-  BotMood.talking: '在说',
-  BotMood.happy: '完成了',
-  BotMood.confused: '出了点问题',
-  BotMood.dreaming: '在整理记忆',
-  BotMood.notify: '有卡片等你确认',
+final kBotMoodLabels = <BotMood, String>{
+  BotMood.idle: l10n.botMoodIdle,
+  BotMood.listening: l10n.botMoodListening,
+  BotMood.thinking: l10n.botMoodThinking,
+  BotMood.working: l10n.botMoodWorking,
+  BotMood.talking: l10n.botMoodTalking,
+  BotMood.happy: l10n.botMoodHappy,
+  BotMood.confused: l10n.botMoodConfused,
+  BotMood.dreaming: l10n.botMoodDreaming,
+  BotMood.notify: l10n.botMoodNotify,
 };
 
 /// Body shapes by the bot.json key, in picker order (agent/src/bot.mjs SHAPES).
 /// The label names the character the body and its topper make.
-const kBotShapes = <String, (OrganicShape, String)>{
-  'pebble': (OrganicShape.pebble, '天线'),
-  'mochi': (OrganicShape.mochi, '猫耳'),
-  'bean': (OrganicShape.bean, '豆芽'),
-  'circle': (OrganicShape.circle, '兔耳'),
-  'squircle': (OrganicShape.squircle, '触角'),
-  'capsule': (OrganicShape.capsule, '耳机'),
-  'droplet': (OrganicShape.droplet, '水滴'),
-  'ghost': (OrganicShape.ghost, '小幽灵'),
+final kBotShapes = <String, (OrganicShape, String)>{
+  'pebble': (OrganicShape.pebble, l10n.botAccessoryAntenna),
+  'mochi': (OrganicShape.mochi, l10n.botAccessoryCatEars),
+  'bean': (OrganicShape.bean, l10n.botAccessorySprout),
+  'circle': (OrganicShape.circle, l10n.botAccessoryBunnyEars),
+  'squircle': (OrganicShape.squircle, l10n.botAccessoryFeelers),
+  'capsule': (OrganicShape.capsule, l10n.botAccessoryHeadphones),
+  'droplet': (OrganicShape.droplet, l10n.botAccessoryDrop),
+  'ghost': (OrganicShape.ghost, l10n.botAccessoryGhost),
 };
 
 /// Colour keys of bot.json: `theme` follows the app, the rest are kSeedPalette in order.
@@ -55,7 +56,7 @@ const kBotColorKeys = ['theme', 'blue', 'teal', 'green', 'amber', 'red', 'rose',
 
 String botColorLabel(String key) {
   final i = kBotColorKeys.indexOf(key);
-  return i <= 0 ? '跟随主题' : kSeedPalette[i - 1].$1;
+  return i <= 0 ? l10n.commonFollowTheme : kSeedPalette[i - 1].$1;
 }
 
 final _schemes = <(String, Brightness), ColorScheme>{};

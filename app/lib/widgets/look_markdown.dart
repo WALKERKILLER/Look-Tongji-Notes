@@ -11,6 +11,7 @@ import '../core/open_path.dart';
 import '../theme/tokens.dart';
 import 'states.dart';
 import 'timestamp_links.dart';
+import '../l10n/l10n.dart';
 
 /// A `look://` reference inside Markdown: a moment of a lecture, one of its
 /// slides, a passage of uploaded courseware, a whole lecture or a file in
@@ -74,7 +75,7 @@ const _imageExts = {'.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp'};
 Future<void> openLibraryFile(BuildContext context, String path) async {
   final rel = p.posix.normalize(path);
   if (rel.startsWith('..') || p.posix.isAbsolute(rel)) {
-    showSnack(context, '这个文件不在课程库里');
+    showSnack(context, l10n.linkNotInLibrary);
     return;
   }
   if (_imageExts.contains(p.posix.extension(rel).toLowerCase())) {
@@ -83,7 +84,7 @@ Future<void> openLibraryFile(BuildContext context, String path) async {
   }
   final root = context.read<LookdService>().libraryRoot;
   final ok = root.isNotEmpty && await openPath(p.join(root, rel));
-  if (!ok && context.mounted) showSnack(context, '没能打开 ${p.posix.basename(rel)}');
+  if (!ok && context.mounted) showSnack(context, l10n.linkCannotOpenFile(p.posix.basename(rel)));
 }
 
 /// Opens a link that is not a `look://` reference: web and mail links in
@@ -91,7 +92,7 @@ Future<void> openLibraryFile(BuildContext context, String path) async {
 Future<void> openPlainLink(BuildContext context, String url) async {
   final u = Uri.tryParse(url.trim());
   final ok = u != null && const {'http', 'https', 'mailto'}.contains(u.scheme) && await launchUrl(u, mode: LaunchMode.externalApplication);
-  if (!ok && context.mounted) showSnack(context, '这个链接无法打开');
+  if (!ok && context.mounted) showSnack(context, l10n.linkCannotOpen);
 }
 
 // Regions that must reach the renderer untouched, in priority order, plus the
@@ -279,7 +280,7 @@ class _MdImage extends StatelessWidget {
                   child: Row(mainAxisSize: MainAxisSize.min, children: [
                     Icon(Icons.broken_image_outlined, size: 18, color: cs.onSurfaceVariant),
                     const SizedBox(width: Space.sm),
-                    Text('图片不可用', style: TextStyle(color: cs.onSurfaceVariant)),
+                    Text(l10n.markdownImageUnavailable, style: TextStyle(color: cs.onSurfaceVariant)),
                   ]),
                 ),
               ),

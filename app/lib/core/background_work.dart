@@ -1,5 +1,6 @@
 import 'android_bridge.dart';
 import 'app_state.dart';
+import '../l10n/l10n.dart';
 
 /// On Android, keeps the app (and lookd in its workspace) running in the
 /// background while there is work: downloads or transcriptions queued or
@@ -29,9 +30,9 @@ class BackgroundWork {
   void _update() {
     final active = app.jobs.values.where((j) => j.state == 'running' || j.state == 'queued').length;
     final text = active > 0
-        ? '正在处理 $active 个下载或转写任务'
+        ? l10n.backgroundJobs(active)
         : _syncing
-            ? '正在同步数据'
+            ? l10n.backgroundSyncing
             : null;
     if (text == _shown) return;
     _shown = text;

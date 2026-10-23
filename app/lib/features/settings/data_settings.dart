@@ -16,13 +16,14 @@ import '../../widgets/pickers.dart';
 import '../../widgets/states.dart';
 import 'settings_common.dart';
 import 'webdav_page.dart';
+import '../../l10n/l10n.dart';
 
 // The 数据与同步 pane: sync between devices, backups, and what takes space.
 // Contract: docs/specs/0014-data-sync-and-backup.md
 
 Map<String, dynamic> _map(Object? v) => v is Map ? v.cast<String, dynamic>() : <String, dynamic>{};
 
-const _backupType = XTypeGroup(label: 'Look Studio 备份', extensions: ['zip'], mimeTypes: ['application/zip'], uniformTypeIdentifiers: ['public.zip-archive']);
+final _backupType = XTypeGroup(label: l10n.backupTypeLabel, extensions: ['zip'], mimeTypes: ['application/zip'], uniformTypeIdentifiers: ['public.zip-archive']);
 
 class DataSettings extends StatefulWidget {
   const DataSettings({super.key, this.api, this.events});
@@ -77,16 +78,16 @@ class _DataSettingsState extends State<DataSettings> {
 
   Future<void> _export() async {
     final now = DateTime.now();
-    final name = 'LookStudio-备份-${now.year}${'${now.month}'.padLeft(2, '0')}${'${now.day}'.padLeft(2, '0')}.zip';
+    final name = l10n.backupFileName(now.year, '${now.month}'.padLeft(2, '0'), '${now.day}'.padLeft(2, '0'));
     // Android saves through the system's document screen after the export.
     final android = Platform.isAndroid;
     final path = android
         ? '${(await AndroidBridge.info())['cacheDir']}/$name'
-        : await pickSavePath(context, suggestedName: name, type: _backupType, confirm: '导出');
+        : await pickSavePath(context, suggestedName: name, type: _backupType, confirm: l10n.commonExport);
     if (path == null || !mounted) return;
     final e = _estimate ?? {};
     setState(() {
-      _task = '正在导出';
+      _task = l10n.commonExporting;
       _done = 0;
       _total = ((e['bytes'] as num? ?? 0) + (_media ? e['media_bytes'] as num? ?? 0 : 0)).toInt();
     });
@@ -97,12 +98,12 @@ class _DataSettingsState extends State<DataSettings> {
       if (android) {
         final saved = await AndroidBridge.saveAs(path, name: name, mime: 'application/zip');
         await File(path).delete().catchError((_) => File(path));
-        if (mounted) showSnack(context, saved ? '备份已保存（${fmtBytes(_done)}）' : '没有保存备份');
+        if (mounted) showSnack(context, saved ? l10n.backupSaved(fmtBytes(_done)) : l10n.backupNotSaved);
         return;
       }
-      showSnack(context, '备份已保存（${fmtBytes(_done)}）', action: '在文件夹中显示', onAction: () => revealPath(path));
+      showSnack(context, l10n.backupSaved(fmtBytes(_done)), action: l10n.commonShowInFolder, onAction: () => revealPath(path));
     } catch (err) {
-      if (mounted) showSnack(context, '导出失败：$err');
+      if (mounted) showSnack(context, l10n.backupExportFailed(err));
     } finally {
       if (mounted) setState(() => _task = null);
     }
@@ -111,16 +112,16 @@ class _DataSettingsState extends State<DataSettings> {
   Future<void> _restore() async {
     XFile? file;
     try {
-      file = await openFile(acceptedTypeGroups: const [_backupType]);
+      file = await openFile(acceptedTypeGroups: [_backupType]);
     } on PlatformException catch (e) {
-      if (mounted) showSnack(context, '无法打开文件选择器：${e.message}');
+      if (mounted) showSnack(context, l10n.commonFilePickerFailed(e.message ?? e.code));
       return;
     }
     if (file == null || !mounted) return;
     final api = context.read<AppState>().api;
     final length = await file.length();
     setState(() {
-      _task = '正在读取备份';
+      _task = l10n.backupReading;
       _done = 0;
       _total = length;
     });
@@ -150,7 +151,7 @@ class _DataSettingsState extends State<DataSettings> {
     }
     if (!mounted) return;
     setState(() {
-      _task = '正在恢复';
+      _task = l10n.backupRestoring;
       _done = _total = 0;
     });
     try {
@@ -159,13 +160,13 @@ class _DataSettingsState extends State<DataSettings> {
       final conflict = '${r['conflict'] ?? ''}';
       showSnack(
         context,
-        r['written'] == 0 ? '没有需要恢复的文件，本机已是最新' : '已恢复 ${r['written']} 个文件（${fmtBytes(r['bytes'] as num? ?? 0)}）',
-        action: conflict.isEmpty || !canOpenFolders ? null : '查看被替换的文件',
+        r['written'] == 0 ? l10n.backupNothingToRestore : l10n.backupRestored(r['written'], fmtBytes(r['bytes'] as num? ?? 0)),
+        action: conflict.isEmpty || !canOpenFolders ? null : l10n.backupViewReplaced,
         onAction: conflict.isEmpty || !canOpenFolders ? null : () => revealPath(conflict),
       );
       unawaited(_load());
     } catch (e) {
-      if (mounted) showSnack(context, '恢复失败：$e');
+      if (mounted) showSnack(context, l10n.backupRestoreFailed(e));
     } finally {
       if (mounted) setState(() => _task = null);
     }
@@ -178,11 +179,11 @@ class _DataSettingsState extends State<DataSettings> {
       final ok = await showDialog<bool>(
         context: context,
         builder: (c) => AlertDialog(
-          title: const Text('清空同步冲突与回收站？'),
-          content: const Text('其中是同步时被替换或在其他设备上删除的文件副本，清空后无法找回。'),
+          title: Text(l10n.storageCleanSyncTitle),
+          content: Text(l10n.storageCleanSyncBody),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('取消')),
-            FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('清空')),
+            TextButton(onPressed: () => Navigator.pop(c, false), child: Text(l10n.commonCancel)),
+            FilledButton(onPressed: () => Navigator.pop(c, true), child: Text(l10n.commonEmpty)),
           ],
         ),
       );
@@ -192,9 +193,9 @@ class _DataSettingsState extends State<DataSettings> {
     setState(() => _task = done);
     try {
       final r = _map(await _call('POST', '/api/storage/clean', {what: true}));
-      if (mounted) showSnack(context, '已释放 ${fmtBytes(r['freed'] as num? ?? 0)}');
+      if (mounted) showSnack(context, l10n.storageFreed(fmtBytes(r['freed'] as num? ?? 0)));
     } catch (e) {
-      if (mounted) showSnack(context, '清理失败：$e');
+      if (mounted) showSnack(context, l10n.storageCleanFailed(e));
     } finally {
       if (mounted) setState(() => _task = null);
       unawaited(_load());
@@ -212,7 +213,7 @@ class _DataSettingsState extends State<DataSettings> {
     final e = _estimate;
     final busy = _task != null;
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      SettingsGroup(title: '多端同步', icon: Icons.devices_rounded, padding: const EdgeInsets.symmetric(vertical: Space.sm), children: [
+      SettingsGroup(title: l10n.dataSyncTitle, icon: Icons.devices_rounded, padding: const EdgeInsets.symmetric(vertical: Space.sm), children: [
         ListTile(
           contentPadding: const EdgeInsets.symmetric(horizontal: Space.xl, vertical: Space.xs),
           leading: Container(
@@ -223,20 +224,20 @@ class _DataSettingsState extends State<DataSettings> {
                 ? Padding(padding: const EdgeInsets.all(10), child: CircularProgressIndicator(strokeWidth: 2.5, color: cs.onPrimaryContainer))
                 : Icon(Icons.cloud_sync_rounded, color: cs.onPrimaryContainer),
           ),
-          title: const Text('WebDAV 同步'),
+          title: Text(l10n.webdavTitle),
           subtitle: Text(webdavSummary(_sync), maxLines: 1, overflow: TextOverflow.ellipsis,
               style: syncOn && syncErr.isNotEmpty ? TextStyle(color: cs.error) : null),
           trailing: const Icon(Icons.chevron_right_rounded),
           onTap: _openSync,
         ),
       ]),
-      SettingsGroup(title: '备份与恢复', icon: Icons.inventory_2_outlined, children: [
-        Text('把课程库和助手对话打包成一个 zip，换电脑或重装时恢复。登录状态和密钥不在备份里。', style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+      SettingsGroup(title: l10n.backupTitle, icon: Icons.inventory_2_outlined, children: [
+        Text(l10n.backupIntro, style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
         const SizedBox(height: Space.sm),
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
-          title: const Text('包含视频与录音'),
-          subtitle: Text(e == null ? '…' : (e['media_files'] == 0 ? '课程库里还没有视频' : '${e['media_files']} 个文件，另需 ${fmtBytes(e['media_bytes'] as num? ?? 0)}')),
+          title: Text(l10n.backupIncludeMedia),
+          subtitle: Text(e == null ? '…' : (e['media_files'] == 0 ? l10n.backupNoMedia : l10n.backupMediaSize(e['media_files'], fmtBytes(e['media_bytes'] as num? ?? 0)))),
           value: _media,
           onChanged: busy || e?['media_files'] == 0 ? null : (v) => setState(() => _media = v),
         ),
@@ -260,9 +261,9 @@ class _DataSettingsState extends State<DataSettings> {
           FilledButton.tonalIcon(
             onPressed: busy ? null : _export,
             icon: const Icon(Icons.archive_outlined),
-            label: Text(e == null ? '导出备份' : '导出备份 · 约 ${fmtBytes((e['bytes'] as num? ?? 0) + (_media ? e['media_bytes'] as num? ?? 0 : 0))}'),
+            label: Text(e == null ? l10n.backupExport : l10n.backupExportSize(fmtBytes((e['bytes'] as num? ?? 0) + (_media ? e['media_bytes'] as num? ?? 0 : 0)))),
           ),
-          OutlinedButton.icon(onPressed: busy ? null : _restore, icon: const Icon(Icons.unarchive_outlined), label: const Text('从备份恢复')),
+          OutlinedButton.icon(onPressed: busy ? null : _restore, icon: const Icon(Icons.unarchive_outlined), label: Text(l10n.backupRestoreFrom)),
         ]),
       ]),
       _StorageGroup(report: _storage, busy: busy, onClean: _clean),
@@ -300,27 +301,26 @@ class _RestoreDialogState extends State<_RestoreDialog> {
         );
     return AlertDialog(
       icon: const Icon(Icons.unarchive_outlined),
-      title: const Text('恢复备份'),
+      title: Text(l10n.backupRestore),
       content: SizedBox(
         width: 440,
         child: SingleChildScrollView(
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             Text(
-              '${fmtLectureDate(created)} ${created.hour.toString().padLeft(2, '0')}:${created.minute.toString().padLeft(2, '0')} 导出'
-              '${device.isEmpty ? '' : '自 $device'} · ${n('files')} 个文件 · ${fmtBytes(n('bytes'))}',
+              l10n.backupPreviewMeta(fmtLectureDate(created), created.hour.toString().padLeft(2, '0'), created.minute.toString().padLeft(2, '0'), device.isEmpty ? '' : l10n.backupFromDevice(device), n('files'), fmtBytes(n('bytes'))),
               style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
             ),
             const SizedBox(height: Space.md),
-            row(Icons.add_circle_outline_rounded, '本机没有', n('new'), color: cs.primary),
-            row(Icons.update_rounded, '备份里的较新', n('newer')),
-            row(Icons.history_rounded, '本机的较新', n('older'), color: n('older') > 0 ? cs.tertiary : null),
-            row(Icons.check_rounded, '相同', n('same')),
-            if (n('skipped') > 0) row(Icons.block_rounded, '不会恢复（密钥或无效路径）', n('skipped')),
+            row(Icons.add_circle_outline_rounded, l10n.restoreNew, n('new'), color: cs.primary),
+            row(Icons.update_rounded, l10n.restoreNewer, n('newer')),
+            row(Icons.history_rounded, l10n.restoreOlder, n('older'), color: n('older') > 0 ? cs.tertiary : null),
+            row(Icons.check_rounded, l10n.restoreSame, n('same')),
+            if (n('skipped') > 0) row(Icons.block_rounded, l10n.restoreSkipped, n('skipped')),
             const SizedBox(height: Space.lg),
             SegmentedButton<String>(
-              segments: const [
-                ButtonSegment(value: 'merge', label: Text('合并'), icon: Icon(Icons.merge_rounded)),
-                ButtonSegment(value: 'overwrite', label: Text('以备份为准'), icon: Icon(Icons.restore_rounded)),
+              segments: [
+                ButtonSegment(value: 'merge', label: Text(l10n.restoreMerge), icon: Icon(Icons.merge_rounded)),
+                ButtonSegment(value: 'overwrite', label: Text(l10n.restoreOverwrite), icon: Icon(Icons.restore_rounded)),
               ],
               selected: {_mode},
               onSelectionChanged: (s) => setState(() => _mode = s.first),
@@ -328,16 +328,16 @@ class _RestoreDialogState extends State<_RestoreDialog> {
             const SizedBox(height: Space.sm),
             Text(
               _mode == 'merge'
-                  ? '补上本机没有的文件，更新较旧的文件；本机较新的文件保持不变。'
-                  : '所有文件换成备份里的版本；被替换的较新文件会移到课程库的 .sync-conflicts 文件夹。',
+                  ? l10n.restoreMergeHint
+                  : l10n.restoreOverwriteHint,
               style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
             ),
           ]),
         ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('取消')),
-        FilledButton(onPressed: n('files') == 0 ? null : () => Navigator.pop(context, _mode), child: const Text('恢复')),
+        TextButton(onPressed: () => Navigator.pop(context), child: Text(l10n.commonCancel)),
+        FilledButton(onPressed: n('files') == 0 ? null : () => Navigator.pop(context, _mode), child: Text(l10n.commonRestore)),
       ],
     );
   }
@@ -366,7 +366,7 @@ class _StorageGroup extends StatelessWidget {
     final tt = Theme.of(context).textTheme;
     final r = report;
     if (r == null || r.isEmpty) {
-      return const SettingsGroup(title: '存储空间', icon: Icons.pie_chart_outline_rounded, children: [
+      return SettingsGroup(title: l10n.storageTitle, icon: Icons.pie_chart_outline_rounded, children: [
         Padding(padding: EdgeInsets.all(Space.lg), child: Center(child: CircularProgressIndicator())),
       ]);
     }
@@ -378,17 +378,17 @@ class _StorageGroup extends StatelessWidget {
     final clean = _map(r['cleanable']);
     int bytes(Object? v) => (v as num? ?? 0).toInt();
     final root = '${r['library'] ?? ''}';
-    return SettingsGroup(title: '存储空间', icon: Icons.pie_chart_outline_rounded, children: [
+    return SettingsGroup(title: l10n.storageTitle, icon: Icons.pie_chart_outline_rounded, children: [
       Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
         Text(fmtBytes(total), style: tt.headlineSmall),
         const SizedBox(width: Space.sm),
         Expanded(
           child: Padding(
             padding: const EdgeInsets.only(bottom: 3),
-            child: Text('课程库', style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
+            child: Text(l10n.commonLibrary, style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
           ),
         ),
-        if (root.isNotEmpty && canOpenFolders) IconButton(tooltip: '在文件管理器中打开', onPressed: () => openPath(root), icon: const Icon(Icons.folder_open_rounded)),
+        if (root.isNotEmpty && canOpenFolders) IconButton(tooltip: l10n.commonOpenInFileManager, onPressed: () => openPath(root), icon: const Icon(Icons.folder_open_rounded)),
       ]),
       const SizedBox(height: Space.md),
       if (total > 0) _Bar(parts: [for (final c in cats) (bytes(c['bytes']) / total, _color(cs, '${c['key']}'))]),
@@ -407,30 +407,30 @@ class _StorageGroup extends StatelessWidget {
       const Divider(),
       _CleanTile(
         icon: Icons.cleaning_services_outlined,
-        title: '转写缓存与未完成下载',
-        subtitle: bytes(clean['cache']) > 0 ? '可释放 ${fmtBytes(bytes(clean['cache']))} · 进行中和暂停的任务会保留' : '没有可清理的缓存',
-        action: '清理',
-        onPressed: busy || bytes(clean['cache']) == 0 ? null : () => onClean('cache', '正在清理缓存'),
+        title: l10n.storageCache,
+        subtitle: bytes(clean['cache']) > 0 ? l10n.storageCacheCleanable(fmtBytes(bytes(clean['cache']))) : l10n.storageCacheEmpty,
+        action: l10n.commonClean,
+        onPressed: busy || bytes(clean['cache']) == 0 ? null : () => onClean('cache', l10n.storageCleaningCache),
       ),
       _CleanTile(
         icon: Icons.restore_from_trash_outlined,
-        title: '同步冲突与回收站',
-        subtitle: bytes(clean['sync']) > 0 ? '${fmtBytes(bytes(clean['sync']))} · 同步时替换或删除的文件副本' : '没有文件',
-        action: '清空',
-        onPressed: busy || bytes(clean['sync']) == 0 ? null : () => onClean('sync', '正在清空'),
+        title: l10n.storageSync,
+        subtitle: bytes(clean['sync']) > 0 ? l10n.storageSyncSize(fmtBytes(bytes(clean['sync']))) : l10n.storageNoFiles,
+        action: l10n.commonEmpty,
+        onPressed: busy || bytes(clean['sync']) == 0 ? null : () => onClean('sync', l10n.storageEmptying),
       ),
       _CleanTile(
         icon: Icons.compress_rounded,
-        title: '整理索引',
-        subtitle: '合并写入日志、回收空闲空间，让搜索和列表更快',
-        action: '整理',
-        onPressed: busy ? null : () => onClean('compact', '正在整理索引'),
+        title: l10n.storageCompact,
+        subtitle: l10n.storageCompactHint,
+        action: l10n.storageCompactAction,
+        onPressed: busy ? null : () => onClean('compact', l10n.storageCompacting),
       ),
       const Divider(),
       for (final (label, key, icon) in [
-        ('本地语音模型', 'models', Icons.graphic_eq_rounded),
-        ('助手对话、记忆与插件', 'assistant', Icons.forum_outlined),
-        ('助手运行环境（Node.js 与依赖）', 'runtime', Icons.terminal_rounded),
+        (l10n.storageModels, 'models', Icons.graphic_eq_rounded),
+        (l10n.storageAssistant, 'assistant', Icons.forum_outlined),
+        (l10n.storageRuntime, 'runtime', Icons.terminal_rounded),
       ])
         if (bytes(r[key]) > 0)
           ListTile(

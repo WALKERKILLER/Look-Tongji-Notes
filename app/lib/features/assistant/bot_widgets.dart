@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../theme/tokens.dart';
+import '../../l10n/l10n.dart';
 
 // Chat pieces of the bot operating the app: a chip for an operation done at
 // once, and a card for a change that waits for the user
@@ -18,11 +19,11 @@ const _kindIcons = <String, IconData>{
 
 /// An operation the bot already did, with 返回 (navigation) or 撤销.
 class AppOpChip extends StatefulWidget {
-  const AppOpChip({super.key, required this.label, required this.icon, this.actionLabel, this.doneLabel = '已撤销', this.onAction, this.done = false});
+  const AppOpChip({super.key, required this.label, required this.icon, this.actionLabel, this.doneLabel, this.onAction, this.done = false});
   final String label;
   final IconData icon;
   final String? actionLabel;
-  final String doneLabel;
+  final String? doneLabel;
 
   /// Runs once: after it succeeds the chip shows [doneLabel].
   final Future<void> Function()? onAction;
@@ -54,7 +55,7 @@ class _AppOpChipState extends State<AppOpChip> {
         Icon(done ? Icons.undo_rounded : widget.icon, size: 16, color: fg),
         const SizedBox(width: Space.sm),
         Flexible(
-          child: Text(done ? '${widget.doneLabel} · ${widget.label}' : widget.label,
+          child: Text(done ? '${widget.doneLabel ?? l10n.commonUndone} · ${widget.label}' : widget.label,
               style: tt.labelLarge?.copyWith(color: fg), maxLines: 1, overflow: TextOverflow.ellipsis),
         ),
         if (widget.onAction != null && !done) ...[
@@ -72,7 +73,7 @@ class _AppOpChipState extends State<AppOpChip> {
                       if (mounted) setState(() => _busy = false);
                     }
                   },
-            child: Text(widget.actionLabel ?? '撤销'),
+            child: Text(widget.actionLabel ?? l10n.commonUndo),
           ),
         ] else
           const SizedBox(width: Space.sm),
@@ -118,12 +119,12 @@ class _ProposalCardState extends State<ProposalCard> {
     final pending = state == 'pending';
     final lines = [for (final l in (p['lines'] as List?) ?? const []) '$l'].where((l) => l.isNotEmpty).toList();
     final (outcome, outcomeIcon) = switch (state) {
-      'applied' => ('已应用', Icons.check_circle_rounded),
-      'dismissed' => ('已忽略', Icons.do_not_disturb_on_outlined),
-      'undone' => ('已撤销', Icons.undo_rounded),
-      'expired' => ('已过期，请让助手重新生成', Icons.schedule_rounded),
-      'failed' => ('执行失败', Icons.error_outline_rounded),
-      _ => ('等你确认', Icons.pending_outlined),
+      'applied' => (l10n.proposalApplied, Icons.check_circle_rounded),
+      'dismissed' => (l10n.proposalIgnored, Icons.do_not_disturb_on_outlined),
+      'undone' => (l10n.commonUndone, Icons.undo_rounded),
+      'expired' => (l10n.proposalExpired, Icons.schedule_rounded),
+      'failed' => (l10n.proposalFailed, Icons.error_outline_rounded),
+      _ => (l10n.proposalPending, Icons.pending_outlined),
     };
     return AnimatedContainer(
       duration: Motion.medium2,
@@ -164,19 +165,19 @@ class _ProposalCardState extends State<ProposalCard> {
             const SizedBox(width: Space.xs),
             Expanded(child: Text(outcome, style: tt.labelMedium?.copyWith(color: cs.onSurfaceVariant))),
             if (state == 'applied' && p['undoable'] == true)
-              TextButton(onPressed: _busy != null ? null : () => _run('undo', widget.onUndo), child: const Text('撤销')),
+              TextButton(onPressed: _busy != null ? null : () => _run('undo', widget.onUndo), child: Text(l10n.commonUndo)),
           ] else ...[
             const Spacer(),
             TextButton(
               onPressed: _busy != null ? null : () => _run('dismiss', widget.onDismiss),
-              child: const Text('忽略'),
+              child: Text(l10n.commonIgnore),
             ),
             const SizedBox(width: Space.xs),
             FilledButton(
               onPressed: _busy != null ? null : () => _run('apply', widget.onApply),
               child: _busy == 'apply'
                   ? SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2, color: cs.onPrimary))
-                  : const Text('应用'),
+                  : Text(l10n.commonApply),
             ),
           ],
         ]),

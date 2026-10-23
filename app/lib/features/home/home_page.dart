@@ -26,6 +26,7 @@ import '../profile/profile_dialog.dart';
 import '../schedule/schedule_page.dart';
 import '../schedule/schedule_store.dart';
 import '../schedule/schedule_widgets.dart';
+import '../../l10n/l10n.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -68,11 +69,11 @@ class _HomePageState extends State<HomePage> {
 
   String _greeting() {
     final h = DateTime.now().hour;
-    if (h < 5) return '夜深了';
-    if (h < 11) return '早上好';
-    if (h < 13) return '中午好';
-    if (h < 18) return '下午好';
-    return '晚上好';
+    if (h < 5) return l10n.homeGreetingNight;
+    if (h < 11) return l10n.homeGreetingMorning;
+    if (h < 13) return l10n.homeGreetingNoon;
+    if (h < 18) return l10n.homeGreetingAfternoon;
+    return l10n.homeGreetingEvening;
   }
 
   @override
@@ -101,7 +102,7 @@ class _HomePageState extends State<HomePage> {
           ),
         ),
         if (context.watch<ScheduleStore>().upcoming().isNotEmpty) ...[
-          _header(context, '接下来', pad, action: TextButton(onPressed: () => ShellScope.of(context).goTo(Tabs.schedule), child: const Text('日程'))),
+          _header(context, l10n.homeUpNext, pad, action: TextButton(onPressed: () => ShellScope.of(context).goTo(Tabs.schedule), child: Text(l10n.commonSchedule))),
           SliverToBoxAdapter(
             child: ContentWidth(
               child: Padding(
@@ -114,12 +115,12 @@ class _HomePageState extends State<HomePage> {
             ),
           ),
         ],
-        _header(context, '学习足迹', pad,
+        _header(context, l10n.commonActivity, pad,
             action: TextButton(
-                onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ActivityPage())), child: const Text('统计'))),
+                onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ActivityPage())), child: Text(l10n.homeStatistics))),
         SliverToBoxAdapter(child: ContentWidth(child: Padding(padding: EdgeInsets.symmetric(horizontal: pad), child: const ActivityCard()))),
         if (_recent.isNotEmpty) ...[
-          _header(context, '继续观看', pad),
+          _header(context, l10n.homeContinueWatching, pad),
           SliverToBoxAdapter(
             child: ContentWidth(
               child: Padding(
@@ -147,7 +148,7 @@ class _HomePageState extends State<HomePage> {
           ),
         ],
         if (active.isNotEmpty) ...[
-          _header(context, '正在下载', pad, action: TextButton(onPressed: () => ShellScope.of(context).goTo(Tabs.downloads), child: const Text('全部'))),
+          _header(context, l10n.homeDownloading, pad, action: TextButton(onPressed: () => ShellScope.of(context).goTo(Tabs.downloads), child: Text(l10n.commonAll))),
           SliverToBoxAdapter(
             child: ContentWidth(
               child: Padding(
@@ -166,8 +167,8 @@ class _HomePageState extends State<HomePage> {
             ),
           ),
         ],
-        _header(context, latestTerm.isEmpty ? '课程' : '本学期课程', pad,
-            action: TextButton(onPressed: () => ShellScope.of(context).goTo(Tabs.courses), child: const Text('全部课程'))),
+        _header(context, latestTerm.isEmpty ? l10n.commonCourses : l10n.homeThisTermCourses, pad,
+            action: TextButton(onPressed: () => ShellScope.of(context).goTo(Tabs.courses), child: Text(l10n.homeAllCourses))),
         if (app.coursesLoading && app.courses.isEmpty)
           const SliverToBoxAdapter(child: Padding(padding: EdgeInsets.all(Space.xxl), child: CenteredLoader()))
         else if (app.coursesError != null && app.courses.isEmpty)
@@ -192,7 +193,7 @@ class _HomePageState extends State<HomePage> {
             ),
           ),
         if (_lib != null) ...[
-          _header(context, '课程库', pad),
+          _header(context, l10n.commonLibrary, pad),
           SliverToBoxAdapter(child: ContentWidth(child: Padding(padding: EdgeInsets.symmetric(horizontal: pad), child: _LibraryStats(lib: _lib!)))),
         ],
         const SliverToBoxAdapter(child: SizedBox(height: Space.huge)),
@@ -246,12 +247,12 @@ class _Welcome extends StatelessWidget {
         SizedBox(width: gap),
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('${now.month}月${now.day}日 · 周${'一二三四五六日'[now.weekday - 1]}',
+            Text(l10n.homeDate(now.month, now.day, weekdayNames[now.weekday - 1]),
                 style: tt.labelLarge?.copyWith(color: cs.primary, letterSpacing: 0.4)),
             const SizedBox(height: Space.xxs),
             Text.rich(
               TextSpan(children: [
-                TextSpan(text: '$greeting，', style: TextStyle(color: cs.onSurfaceVariant)),
+                TextSpan(text: l10n.homeGreeting(greeting), style: TextStyle(color: cs.onSurfaceVariant)),
                 TextSpan(text: name),
               ]),
               style: compact ? tt.headlineMedium : tt.displaySmall,
@@ -286,7 +287,7 @@ class _AvatarButtonState extends State<_AvatarButton> {
   bool _hover = false;
   @override
   Widget build(BuildContext context) => Tooltip(
-        message: '编辑个人资料',
+        message: l10n.profileEdit,
         waitDuration: const Duration(milliseconds: 500),
         child: MouseRegion(
           cursor: SystemMouseCursors.click,
@@ -334,7 +335,10 @@ class _QuoteLineState extends State<_QuoteLine> with SingleTickerProviderStateMi
         if (mounted && _q == null && c != null) setState(() => _q = c);
       });
     }
-    _load();
+    // _load reads MediaQuery, which is only available once mounted.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _load();
+    });
   }
 
   @override
@@ -367,7 +371,7 @@ class _QuoteLineState extends State<_QuoteLine> with SingleTickerProviderStateMi
         width: widget.lead,
         child: Center(
           child: Tooltip(
-            message: '换一句',
+            message: l10n.homeNextQuote,
             waitDuration: const Duration(milliseconds: 500),
             child: MouseRegion(
               cursor: SystemMouseCursors.click,
@@ -524,10 +528,10 @@ class _LibraryStats extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
     final items = [
-      ('${st['local_lectures'] ?? 0}', '节已存本地'),
-      (fmtBytes((st['bytes'] ?? 0) as num), '占用空间'),
-      ('${st['segments'] ?? 0}', '句转写'),
-      ('${st['notes'] ?? 0}', '篇笔记'),
+      ('${st['local_lectures'] ?? 0}', l10n.homeStatLecturesSaved),
+      (fmtBytes((st['bytes'] ?? 0) as num), l10n.homeStatStorage),
+      ('${st['segments'] ?? 0}', l10n.homeStatSegments),
+      ('${st['notes'] ?? 0}', l10n.homeStatNotes),
     ];
     return Card(
       color: cs.surfaceContainer,

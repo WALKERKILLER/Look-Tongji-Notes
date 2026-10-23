@@ -9,6 +9,7 @@ import '../../core/format.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/organic_shapes.dart';
 import 'local_asr_page.dart';
+import '../../l10n/l10n.dart';
 
 /// Free cloud transcription channels: enable/disable, strategy, concurrency
 /// and live status from lookd's ASR pool.
@@ -59,8 +60,8 @@ class _AsrSettingsState extends State<AsrSettings> {
   }
 
   String _slotsHint() {
-    final parts = [for (final c in _chans) '${c['name']} ${c['slots'] ?? 1} 段'];
-    return parts.isEmpty ? '每个渠道有各自的并发上限' : '渠道上限：${parts.join('、')}；调高不一定更快，容易触发限流';
+    final parts = [for (final c in _chans) l10n.asrChannelSlots(c['name'], c['slots'] ?? 1)];
+    return parts.isEmpty ? l10n.asrPerChannelLimits : l10n.asrChannelLimits(parts.join(l10n.listSeparator));
   }
 
   @override
@@ -73,7 +74,7 @@ class _AsrSettingsState extends State<AsrSettings> {
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Padding(
         padding: const EdgeInsets.symmetric(vertical: Space.sm),
-        child: Text('长音频会切成 20 分钟的段，分给下面的渠道识别；某个渠道被限流时自动冷却，由其他渠道接手。已识别的段会保留，重试时只补缺失的部分。',
+        child: Text(l10n.asrIntro,
             style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant, height: 1.6)),
       ),
       Card.filled(
@@ -84,9 +85,9 @@ class _AsrSettingsState extends State<AsrSettings> {
           shape: RoundedRectangleBorder(borderRadius: Corners.all(Corners.lg)),
           leading: Icon(local != null ? Icons.offline_bolt_rounded : Icons.computer_rounded,
               color: local != null ? cs.onSecondaryContainer : cs.onPrimaryContainer),
-          title: Text(local != null ? '本地识别已启用' : '免费渠道限流太厉害？改用本地模型',
+          title: Text(local != null ? l10n.asrLocalEnabled : l10n.asrTryLocal,
               style: TextStyle(color: local != null ? cs.onSecondaryContainer : cs.onPrimaryContainer)),
-          subtitle: Text(local != null ? '${local['name']} · 不受额度限制' : '下载一个识别模型到本机，看对比图选适合你电脑的那个',
+          subtitle: Text(local != null ? l10n.asrLocalUnlimited(local['name']) : l10n.asrLocalHint,
               style: TextStyle(color: local != null ? cs.onSecondaryContainer : cs.onPrimaryContainer)),
           trailing: Icon(Icons.chevron_right_rounded, color: local != null ? cs.onSecondaryContainer : cs.onPrimaryContainer),
           onTap: () async {
@@ -98,13 +99,13 @@ class _AsrSettingsState extends State<AsrSettings> {
       for (final c in _chans)
         Padding(padding: const EdgeInsets.only(top: Space.sm), child: _ChannelCard(c: c, onToggle: (v) => _toggle('${c['id']}', v))),
       const SizedBox(height: Space.lg),
-      Text('分配方式', style: tt.titleSmall),
+      Text(l10n.asrDistribution, style: tt.titleSmall),
       const SizedBox(height: Space.sm),
       SegmentedButton<String>(
         showSelectedIcon: false,
         segments: [
-          const ButtonSegment(value: 'balance', icon: Icon(Icons.balance_rounded), label: Text('均衡')),
-          for (final c in _chans) ButtonSegment(value: '${c['id']}', label: Text('优先${c['name']}')),
+          ButtonSegment(value: 'balance', icon: Icon(Icons.balance_rounded), label: Text(l10n.asrBalanced)),
+          for (final c in _chans) ButtonSegment(value: '${c['id']}', label: Text(l10n.asrPrefer(c['name']))),
         ],
         selected: {strategy},
         onSelectionChanged: (s) => widget.put('asr.strategy', s.first),
@@ -113,11 +114,11 @@ class _AsrSettingsState extends State<AsrSettings> {
       Row(children: [
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('同时识别的段数', style: tt.titleSmall),
+            Text(l10n.asrConcurrency, style: tt.titleSmall),
             Text(_slotsHint(), style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
           ]),
         ),
-        Text('${conc.round()} 段', style: tt.labelLarge?.copyWith(color: cs.primary)),
+        Text(l10n.asrSegments(conc.round()), style: tt.labelLarge?.copyWith(color: cs.primary)),
       ]),
       Slider(
         value: conc.clamp(1, 4),
@@ -132,8 +133,8 @@ class _AsrSettingsState extends State<AsrSettings> {
       SwitchListTile(
         contentPadding: EdgeInsets.zero,
         secondary: const Icon(Icons.auto_delete_outlined),
-        title: const Text('转写完成后删除视频'),
-        subtitle: const Text('只保留文字稿、PPT 和课件，视频文件在转写成功后立即删除，节省磁盘空间。在线播放不受影响'),
+        title: Text(l10n.asrDeleteVideo),
+        subtitle: Text(l10n.asrDeleteVideoHint),
         value: widget.server['transcript.delete_video'] == true,
         onChanged: (v) => widget.put('transcript.delete_video', v),
       ),
@@ -156,11 +157,11 @@ class _ChannelCard extends StatelessWidget {
     final quota = (c['quota_secs'] as num?)?.toDouble() ?? 1;
     final coolUntil = (c['cool_until'] as num?)?.toInt() ?? 0;
     final (label, color) = switch (state) {
-      'ready' => ('就绪', cs.primary),
-      'busy' => ('识别中 ${c['busy']} 段', cs.tertiary),
-      'cooling' => ('冷却至 ${_hm(coolUntil)}', cs.error),
-      'quota' => ('额度已满', cs.error),
-      _ => ('已停用', cs.outline),
+      'ready' => (l10n.asrReady, cs.primary),
+      'busy' => (l10n.asrBusy(c['busy']), cs.tertiary),
+      'cooling' => (l10n.asrCooling(_hm(coolUntil)), cs.error),
+      'quota' => (l10n.asrQuotaFull, cs.error),
+      _ => (l10n.commonDisabled, cs.outline),
     };
     final lastErr = '${c['last_error'] ?? ''}';
     final local = c['local'] == true;
@@ -205,12 +206,12 @@ class _ChannelCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: Space.md),
-                Text('12 小时内 ${_dur(used)} / ${_dur(quota)}', style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant)),
+                Text(l10n.asrQuotaUsage(_dur(used), _dur(quota)), style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant)),
               ]),
             ),
           const SizedBox(height: Space.xs),
           Text(
-            ['成功 ${c['ok'] ?? 0} 段', '失败 ${c['fail'] ?? 0} 段', if ((c['last_used'] ?? 0) != 0) '上次 ${fmtRelative(DateTime.fromMillisecondsSinceEpoch((c['last_used'] as num).toInt() * 1000))}']
+            [l10n.asrOkSegments(c['ok'] ?? 0), l10n.asrFailedSegments(c['fail'] ?? 0), if ((c['last_used'] ?? 0) != 0) l10n.commonLastUsed(fmtRelative(DateTime.fromMillisecondsSinceEpoch((c['last_used'] as num).toInt() * 1000)))]
                 .join(' · '),
             style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant),
           ),
@@ -231,7 +232,7 @@ class _ChannelCard extends StatelessWidget {
 
   static String _dur(double s) {
     final m = (s / 60).round();
-    return m >= 60 ? '${(m / 60).toStringAsFixed(m % 60 == 0 ? 0 : 1)} 小时' : '$m 分钟';
+    return m >= 60 ? l10n.durationHoursOnly((m / 60).toStringAsFixed(m % 60 == 0 ? 0 : 1)) : l10n.durationMinutes(m);
   }
 }
 
@@ -250,8 +251,8 @@ class _EventLog extends StatelessWidget {
       child: ExpansionTile(
         tilePadding: EdgeInsets.zero,
         leading: const Icon(Icons.history_rounded),
-        title: const Text('最近识别记录'),
-        subtitle: Text('最近 ${events.length} 次 · 失败 $fails 次', style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+        title: Text(l10n.asrRecent),
+        subtitle: Text(l10n.asrRecentSummary(events.length, fails), style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
         children: [
           for (final e in events.take(12))
             Padding(
@@ -263,8 +264,7 @@ class _EventLog extends StatelessWidget {
                 Expanded(
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Text(
-                      '${_ChannelCard._hm((e['at'] as num).toInt())}  ${e['channel']} · 第 ${e['chunk']} 段 · '
-                      '${_ChannelCard._dur((e['secs'] as num).toDouble())}音频 · 用时 ${(e['took'] as num).round()} 秒',
+                      l10n.asrEventLine(_ChannelCard._hm((e['at'] as num).toInt()), e['channel'], e['chunk'], _ChannelCard._dur((e['secs'] as num).toDouble()), (e['took'] as num).round()),
                       style: tt.labelMedium,
                     ),
                     if ('${e['error'] ?? ''}'.isNotEmpty)

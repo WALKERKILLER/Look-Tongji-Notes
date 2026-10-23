@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../theme/tokens.dart';
+import '../../l10n/l10n.dart';
 
 String fmtTokens(num n) {
   if (n <= 0) return '';
@@ -29,13 +30,13 @@ class ModelBadges extends StatelessWidget {
     final cin = m['cost_in'] as num?;
     final cout = m['cost_out'] as num?;
     final items = <(IconData, String, bool)>[
-      if (m['reasoning'] == true) (Icons.psychology_outlined, '思考', true),
-      if (m['vision'] == true) (Icons.image_outlined, '识图', true),
-      if (ctx > 0) (Icons.data_array_rounded, '${fmtTokens(ctx)} 上下文', false),
-      if (!dense && out > 0) (Icons.output_rounded, '输出 ${fmtTokens(out)}', false),
+      if (m['reasoning'] == true) (Icons.psychology_outlined, l10n.modelTagReasoning, true),
+      if (m['vision'] == true) (Icons.image_outlined, l10n.modelTagVision, true),
+      if (ctx > 0) (Icons.data_array_rounded, l10n.modelTagContext(fmtTokens(ctx)), false),
+      if (!dense && out > 0) (Icons.output_rounded, l10n.modelTagOutput(fmtTokens(out)), false),
       if (cin != null && cout != null && (cin > 0 || cout > 0)) (Icons.payments_outlined, '\$${fmtPrice(cin)} / \$${fmtPrice(cout)}', false),
-      if (cin == 0 && cout == 0) (Icons.redeem_outlined, '免费', true),
-      if (m['deprecated'] == true) (Icons.history_toggle_off_rounded, '已弃用', false),
+      if (cin == 0 && cout == 0) (Icons.redeem_outlined, l10n.modelTagFree, true),
+      if (m['deprecated'] == true) (Icons.history_toggle_off_rounded, l10n.modelTagDeprecated, false),
     ];
     return Wrap(spacing: 4, runSpacing: 4, children: [
       for (final (icon, text, accent) in items)

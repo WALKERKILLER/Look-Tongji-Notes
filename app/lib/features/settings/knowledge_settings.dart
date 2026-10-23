@@ -13,6 +13,7 @@ import '../../widgets/states.dart';
 import 'notion_page.dart';
 import 'obsidian_settings.dart';
 import 'settings_common.dart';
+import '../../l10n/l10n.dart';
 
 /// The 知识库 pane: where the library lives, and where it goes.
 class KnowledgeSettings extends StatefulWidget {
@@ -73,11 +74,11 @@ class _KnowledgeSettingsState extends State<KnowledgeSettings> {
     final vault = '${v['obsidian.vault'] ?? ''}';
     final notionOn = _notion['connected'] == true;
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      SettingsGroup(title: '连接到笔记应用', padding: const EdgeInsets.symmetric(vertical: Space.sm), children: [
+      SettingsGroup(title: l10n.knowledgeConnectApps, padding: const EdgeInsets.symmetric(vertical: Space.sm), children: [
         _IntegrationTile(
           mark: const BrandMark('assets/brands/obsidian.svg'),
           title: 'Obsidian',
-          subtitle: vault.isEmpty ? '导出到本地仓库，时间戳可点回 Look Studio' : '${p.basename(vault)} / ${v['obsidian.folder'] ?? ''}${v['obsidian.auto'] == true ? ' · 自动导出' : ''}',
+          subtitle: vault.isEmpty ? l10n.knowledgeObsidianSubtitle : '${p.basename(vault)} / ${v['obsidian.folder'] ?? ''}${v['obsidian.auto'] == true ? l10n.knowledgeAutoExportSuffix : ''}',
           on: vault.isNotEmpty,
           onTap: () => _open(ObsidianPage(settings: widget.settings)),
         ),
@@ -90,42 +91,42 @@ class _KnowledgeSettingsState extends State<KnowledgeSettings> {
           onTap: () => _open(const NotionPage()),
         ),
       ]),
-      SettingsGroup(title: '课程库', children: [
+      SettingsGroup(title: l10n.commonLibrary, children: [
         ListTile(
           contentPadding: EdgeInsets.zero,
-          title: const Text('位置'),
+          title: Text(l10n.commonLocation),
           subtitle: Text(daemon.libraryRoot),
-          trailing: canOpenFolders ? IconButton(tooltip: '打开', onPressed: () => openPath(daemon.libraryRoot), icon: const Icon(Icons.open_in_new_rounded)) : null,
+          trailing: canOpenFolders ? IconButton(tooltip: l10n.commonOpen, onPressed: () => openPath(daemon.libraryRoot), icon: const Icon(Icons.open_in_new_rounded)) : null,
         ),
         const SizedBox(height: Space.sm),
-        Text('文件夹命名模板', style: tt.titleSmall),
+        Text(l10n.knowledgeFolderTemplates, style: tt.titleSmall),
         const SizedBox(height: Space.xs),
-        Text('课程可用 {title} {teacher} {term} {id}；课次可用 {date} {title} {sub_id} {lecturer}。只影响之后新建的文件夹。',
+        Text(l10n.knowledgeFolderTemplatesHint,
             style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
         const SizedBox(height: Space.md),
         Row(children: [
-          Expanded(child: TextField(controller: _courseTpl, decoration: const InputDecoration(labelText: '课程文件夹', isDense: true))),
+          Expanded(child: TextField(controller: _courseTpl, decoration: InputDecoration(labelText: l10n.knowledgeCourseFolder, isDense: true))),
           const SizedBox(width: Space.md),
-          Expanded(child: TextField(controller: _lectureTpl, decoration: const InputDecoration(labelText: '课次文件夹', isDense: true))),
+          Expanded(child: TextField(controller: _lectureTpl, decoration: InputDecoration(labelText: l10n.knowledgeLectureFolder, isDense: true))),
           const SizedBox(width: Space.sm),
           FilledButton.tonal(
             onPressed: () async {
               try {
                 await widget.settings.put('library.templates', {'course': _courseTpl.text.trim(), 'lecture': _lectureTpl.text.trim()});
-                if (context.mounted) showSnack(context, '模板已保存');
+                if (context.mounted) showSnack(context, l10n.knowledgeTemplatesSaved);
               } catch (e) {
-                if (context.mounted) showSnack(context, '保存失败：$e');
+                if (context.mounted) showSnack(context, l10n.commonSaveFailed(e));
               }
             },
-            child: const Text('保存'),
+            child: Text(l10n.commonSave),
           ),
         ]),
         const SizedBox(height: Space.md),
         ListTile(
           contentPadding: EdgeInsets.zero,
           leading: const Icon(Icons.ios_share_rounded),
-          title: const Text('导出为 Look-Tongji-Notes 技能格式'),
-          subtitle: const Text('以硬链接生成 raw/<课程>/<节次>/原始数据/ 目录，不额外占空间'),
+          title: Text(l10n.knowledgeSkillExport),
+          subtitle: Text(l10n.knowledgeSkillExportHint),
           trailing: const Icon(Icons.chevron_right_rounded),
           onTap: () => _export(context),
         ),
@@ -138,29 +139,29 @@ class _KnowledgeSettingsState extends State<KnowledgeSettings> {
     final root = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('导出到技能目录'),
+        title: Text(l10n.knowledgeSkillExportAction),
         content: SizedBox(
           width: 440,
           child: FolderField(
             controller: ctl,
             autofocus: true,
-            label: '目标文件夹',
-            helper: 'Look-Tongji-Notes 技能所在的文件夹',
+            label: l10n.knowledgeTargetFolder,
+            helper: l10n.knowledgeTargetFolderHelper,
             onSubmitted: (v) => Navigator.pop(context, v.trim()),
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('取消')),
-          FilledButton(onPressed: () => Navigator.pop(context, ctl.text.trim()), child: const Text('导出')),
+          TextButton(onPressed: () => Navigator.pop(context), child: Text(l10n.commonCancel)),
+          FilledButton(onPressed: () => Navigator.pop(context, ctl.text.trim()), child: Text(l10n.commonExport)),
         ],
       ),
     );
     if (root == null || root.isEmpty || !context.mounted) return;
     try {
       final r = await context.read<AppState>().api.post('/api/library/export', {'root': root}) as Map;
-      if (context.mounted) showSnack(context, '已导出 ${r['exported']} 节课');
+      if (context.mounted) showSnack(context, l10n.knowledgeExported(r['exported']));
     } catch (e) {
-      if (context.mounted) showSnack(context, '导出失败：$e');
+      if (context.mounted) showSnack(context, l10n.commonExportFailed(e));
     }
   }
 }
@@ -186,7 +187,7 @@ class _IntegrationTile extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: Space.sm, vertical: Space.xxs),
             decoration: BoxDecoration(color: cs.secondaryContainer, borderRadius: BorderRadius.circular(Corners.full)),
-            child: Text('已连接', style: tt.labelSmall?.copyWith(color: cs.onSecondaryContainer)),
+            child: Text(l10n.commonConnected, style: tt.labelSmall?.copyWith(color: cs.onSecondaryContainer)),
           ),
         const SizedBox(width: Space.xs),
         const Icon(Icons.chevron_right_rounded),

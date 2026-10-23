@@ -17,6 +17,7 @@ import '../../widgets/states.dart';
 import '../player/player_page.dart';
 import '../plugins/plugin_views.dart';
 import 'note_editor.dart';
+import '../../l10n/l10n.dart';
 
 /// A note opened for reading: contents on the left, the text in a readable
 /// column, and the sources a reference points to (recording, slide or
@@ -96,11 +97,11 @@ class _NotePageState extends State<NotePage> {
       context: context,
       builder: (context) => AlertDialog(
         icon: const Icon(Icons.delete_outline_rounded),
-        title: const Text('删除这篇笔记？'),
-        content: const Text('笔记文件会从课程库中删除。'),
+        title: Text(l10n.noteDeleteTitle),
+        content: Text(l10n.noteDeleteBody),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('取消')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('删除')),
+          TextButton(onPressed: () => Navigator.pop(context, false), child: Text(l10n.commonCancel)),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: Text(l10n.commonDelete)),
         ],
       ),
     );
@@ -124,7 +125,7 @@ class _NotePageState extends State<NotePage> {
     final n = _note;
     final cs = Theme.of(context).colorScheme;
     return ReportScreen(
-      value: {'screen': '笔记', if (n != null) 'note_id': n.id, if (n != null) 'note_title': n.title, if (n != null && n.lectureId.isNotEmpty) 'lecture_id': n.lectureId},
+      value: {'screen': l10n.commonNotes, if (n != null) 'note_id': n.id, if (n != null) 'note_title': n.title, if (n != null && n.lectureId.isNotEmpty) 'lecture_id': n.lectureId},
       child: ActivityRegion(kind: 'read', lectureId: n?.lectureId ?? '', child: LayoutBuilder(builder: (context, c) {
         final tocPane = c.maxWidth >= 1040;
         final sidePane = c.maxWidth >= 1200;
@@ -133,12 +134,12 @@ class _NotePageState extends State<NotePage> {
           backgroundColor: Colors.transparent,
           appBar: AppBar(
             backgroundColor: Colors.transparent,
-            title: Text(n == null ? '新笔记' : n.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+            title: Text(n == null ? l10n.noteNew : n.title, maxLines: 1, overflow: TextOverflow.ellipsis),
             actions: [
               if (reading) ...[
-                IconButton(tooltip: '查找', isSelected: _search, onPressed: () => setState(() => _search = !_search), icon: const Icon(Icons.search_rounded)),
-                if (!tocPane && _doc!.headings.isNotEmpty) IconButton(tooltip: '目录', onPressed: _showToc, icon: const Icon(Icons.toc_rounded)),
-                IconButton(tooltip: '编辑', onPressed: () => setState(() => _editing = true), icon: const Icon(Icons.edit_outlined)),
+                IconButton(tooltip: l10n.commonFind, isSelected: _search, onPressed: () => setState(() => _search = !_search), icon: const Icon(Icons.search_rounded)),
+                if (!tocPane && _doc!.headings.isNotEmpty) IconButton(tooltip: l10n.commonContents, onPressed: _showToc, icon: const Icon(Icons.toc_rounded)),
+                IconButton(tooltip: l10n.commonEdit, onPressed: () => setState(() => _editing = true), icon: const Icon(Icons.edit_outlined)),
               ],
               if (reading)
                 PluginMenuButton(
@@ -149,7 +150,7 @@ class _NotePageState extends State<NotePage> {
                 ),
               if (n != null && n.lectureId.isNotEmpty)
                 IconButton(
-                  tooltip: '打开对应课次',
+                  tooltip: l10n.noteOpenLecture,
                   onPressed: () => Navigator.of(context, rootNavigator: true).push(MaterialPageRoute(builder: (_) => PlayerPage(lectureId: n.lectureId))),
                   icon: const Icon(Icons.ondemand_video_rounded),
                 ),
@@ -160,13 +161,13 @@ class _NotePageState extends State<NotePage> {
                       leadingIcon: const Icon(Icons.copy_rounded),
                       onPressed: () {
                         Clipboard.setData(ClipboardData(text: n.body));
-                        showSnack(context, '已复制 Markdown');
+                        showSnack(context, l10n.noteCopiedMarkdown);
                       },
-                      child: const Text('复制 Markdown'),
+                      child: Text(l10n.noteCopyMarkdown),
                     ),
-                    MenuItemButton(leadingIcon: const Icon(Icons.delete_outline_rounded), onPressed: _delete, child: const Text('删除')),
+                    MenuItemButton(leadingIcon: const Icon(Icons.delete_outline_rounded), onPressed: _delete, child: Text(l10n.commonDelete)),
                   ],
-                  builder: (context, m, _) => IconButton(tooltip: '更多', onPressed: () => m.isOpen ? m.close() : m.open(), icon: const Icon(Icons.more_vert_rounded)),
+                  builder: (context, m, _) => IconButton(tooltip: l10n.commonMore, onPressed: () => m.isOpen ? m.close() : m.open(), icon: const Icon(Icons.more_vert_rounded)),
                 ),
               const SizedBox(width: Space.sm),
             ],
@@ -204,7 +205,7 @@ class _NotePageState extends State<NotePage> {
                               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                                 Padding(
                                   padding: const EdgeInsets.fromLTRB(Space.xl, Space.lg, Space.lg, Space.xs),
-                                  child: Text('目录', style: Theme.of(context).textTheme.titleSmall?.copyWith(color: cs.onSurfaceVariant)),
+                                  child: Text(l10n.commonContents, style: Theme.of(context).textTheme.titleSmall?.copyWith(color: cs.onSurfaceVariant)),
                                 ),
                                 Expanded(child: ReaderToc(doc: _doc!, controller: _reader)),
                               ]),
@@ -277,14 +278,14 @@ class _NoteHeader extends StatelessWidget {
         Wrap(spacing: Space.sm, runSpacing: Space.xs, crossAxisAlignment: WrapCrossAlignment.center, children: [
           if (courseTitle.isNotEmpty) Text(courseTitle, style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
           if (note.updatedAt > 0)
-            Text('· ${fmtRelative(DateTime.fromMillisecondsSinceEpoch(note.updatedAt * 1000))}更新', style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
+            Text(l10n.noteUpdated(fmtRelative(DateTime.fromMillisecondsSinceEpoch(note.updatedAt * 1000))), style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
             decoration: BoxDecoration(color: agent ? cs.tertiaryContainer : cs.secondaryContainer, borderRadius: BorderRadius.circular(Corners.sm)),
             child: Row(mainAxisSize: MainAxisSize.min, children: [
               Icon(agent ? Icons.auto_awesome_outlined : Icons.edit_note_rounded, size: 14, color: agent ? cs.onTertiaryContainer : cs.onSecondaryContainer),
               const SizedBox(width: 4),
-              Text(agent ? '助手整理' : '我的笔记', style: tt.labelSmall?.copyWith(color: agent ? cs.onTertiaryContainer : cs.onSecondaryContainer)),
+              Text(agent ? l10n.noteByAssistant : l10n.noteMine, style: tt.labelSmall?.copyWith(color: agent ? cs.onTertiaryContainer : cs.onSecondaryContainer)),
             ]),
           ),
         ]),
@@ -336,7 +337,7 @@ class _PaneHeader extends StatelessWidget {
         const SizedBox(width: Space.sm),
         Expanded(child: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.titleMedium)),
         ?trailing,
-        if (onClose != null) IconButton(tooltip: '关闭', onPressed: onClose, icon: const Icon(Icons.close_rounded)),
+        if (onClose != null) IconButton(tooltip: l10n.commonClose, onPressed: onClose, icon: const Icon(Icons.close_rounded)),
       ]),
     );
   }
@@ -391,7 +392,7 @@ class _MomentSourceState extends State<_MomentSource> {
         return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           _PaneHeader(
             icon: widget.slideIdx != null ? Icons.slideshow_outlined : Icons.graphic_eq_rounded,
-            title: widget.slideIdx != null ? 'PPT 第 ${widget.slideIdx} 张 · ${fmtClock(ms)}' : '课堂原声 · ${fmtClock(ms)}',
+            title: widget.slideIdx != null ? l10n.noteSlideRef(widget.slideIdx!, fmtClock(ms)) : l10n.noteAudioRef(fmtClock(ms)),
             onClose: widget.onClose,
           ),
           Expanded(
@@ -418,17 +419,17 @@ class _MomentSourceState extends State<_MomentSource> {
                       ),
                       Padding(
                         padding: const EdgeInsets.only(top: Space.xs, bottom: Space.lg),
-                        child: Text('当时的 PPT · 第 ${d.$1!.idx} 张，${fmtClock(d.$1!.tSec * 1000)} 起', style: tt.labelMedium?.copyWith(color: cs.onSurfaceVariant)),
+                        child: Text(l10n.noteSlideAt(d.$1!.idx, fmtClock(d.$1!.tSec * 1000)), style: tt.labelMedium?.copyWith(color: cs.onSurfaceVariant)),
                       ),
                     ],
                     FilledButton.tonalIcon(
                       onPressed: () => seekOrOpen(context, widget.lectureId, ms ~/ 1000),
                       icon: const Icon(Icons.play_arrow_rounded),
-                      label: Text('从 ${fmtClock(ms)} 播放'),
+                      label: Text(l10n.notePlayFrom(fmtClock(ms))),
                     ),
                     const SizedBox(height: Space.lg),
                     if (d.$2.isEmpty)
-                      Text('这段没有文字稿', style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant))
+                      Text(l10n.noteNoTranscriptHere, style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant))
                     else
                       for (final s in d.$2) _SegmentLine(seg: s, current: s.startMs <= ms && ms < s.endMs, lectureId: widget.lectureId),
                   ]),
@@ -473,10 +474,10 @@ class _SegmentLine extends StatelessWidget {
 Future<(CoursewareFile, String)> loadParsedCourseware(Api api, String lectureId, String file) async {
   final list = jsonList(await api.get('/api/lectures/$lectureId/courseware')).map((e) => CoursewareFile((e as Map).cast<String, dynamic>()));
   final f = list.where((x) => x.path == file || x.name == file).firstOrNull;
-  if (f == null) throw Exception('课件已不存在');
-  if (!f.parsed) throw Exception('这个课件还没有解析');
+  if (f == null) throw Exception(l10n.coursewareGone);
+  if (!f.parsed) throw Exception(l10n.coursewareNotParsed);
   final res = await http.get(Uri.parse(api.fileUrl(f.mdPath)));
-  if (res.statusCode != 200) throw Exception('读取失败：HTTP ${res.statusCode}');
+  if (res.statusCode != 200) throw Exception(l10n.coursewareReadFailed(res.statusCode));
   return (f, res.body);
 }
 
@@ -508,12 +509,12 @@ class _CoursewareSourceState extends State<CoursewareSource> {
         return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           _PaneHeader(
             icon: Icons.description_outlined,
-            title: d?.$1.name ?? '课件',
+            title: d?.$1.name ?? l10n.assetCourseware,
             onClose: widget.onClose,
             trailing: d == null
                 ? null
                 : IconButton(
-                    tooltip: '全屏阅读',
+                    tooltip: l10n.readerFullscreen,
                     onPressed: () => openCoursewareReader(context, d.$1, lectureId: widget.lectureId, query: widget.query),
                     icon: const Icon(Icons.open_in_full_rounded),
                   ),
@@ -582,14 +583,14 @@ class _CoursewareReaderPageState extends State<_CoursewareReaderPage> {
                   child: Row(children: [
                     ClipRRect(borderRadius: BorderRadius.circular(4), child: Image.asset('assets/brands/mineru.png', width: 18, height: 18)),
                     const SizedBox(width: 6),
-                    Text('MinerU 解析${widget.file.pages > 0 ? ' · ${widget.file.pages} 页' : ''}', style: tt.labelMedium?.copyWith(color: cs.onSurfaceVariant)),
+                    Text(l10n.coursewareParsedBy(widget.file.pages > 0 ? l10n.coursewarePages(widget.file.pages) : ''), style: tt.labelMedium?.copyWith(color: cs.onSurfaceVariant)),
                   ]),
                 ),
                 if (doc != null) ...[
-                  IconButton(tooltip: '查找', isSelected: _search, onPressed: () => setState(() => _search = !_search), icon: const Icon(Icons.search_rounded)),
+                  IconButton(tooltip: l10n.commonFind, isSelected: _search, onPressed: () => setState(() => _search = !_search), icon: const Icon(Icons.search_rounded)),
                   if (!tocPane && doc.headings.isNotEmpty)
                     IconButton(
-                      tooltip: '目录',
+                      tooltip: l10n.commonContents,
                       onPressed: () => showModalBottomSheet(
                         context: context,
                         showDragHandle: true,
@@ -704,7 +705,7 @@ class _NoteInlineReaderState extends State<NoteInlineReader> {
       Padding(
         padding: const EdgeInsets.fromLTRB(Space.xs, Space.xs, Space.xs, 0),
         child: Row(children: [
-          IconButton(tooltip: '返回', onPressed: widget.onBack, icon: const Icon(Icons.arrow_back_rounded)),
+          IconButton(tooltip: l10n.commonBack, onPressed: widget.onBack, icon: const Icon(Icons.arrow_back_rounded)),
           Expanded(child: Text(n.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: tt.titleMedium)),
           if (_doc.headings.isNotEmpty)
             MenuAnchor(
@@ -718,11 +719,11 @@ class _NoteInlineReaderState extends State<NoteInlineReader> {
                     ),
                   ),
               ],
-              builder: (context, m, _) => IconButton(tooltip: '目录', onPressed: () => m.isOpen ? m.close() : m.open(), icon: const Icon(Icons.toc_rounded)),
+              builder: (context, m, _) => IconButton(tooltip: l10n.commonContents, onPressed: () => m.isOpen ? m.close() : m.open(), icon: const Icon(Icons.toc_rounded)),
             ),
-          IconButton(tooltip: '编辑', onPressed: widget.onEdit, icon: const Icon(Icons.edit_outlined)),
+          IconButton(tooltip: l10n.commonEdit, onPressed: widget.onEdit, icon: const Icon(Icons.edit_outlined)),
           IconButton(
-            tooltip: '在阅读器中打开',
+            tooltip: l10n.readerOpen,
             onPressed: () => Navigator.of(context, rootNavigator: true).push(MaterialPageRoute(builder: (_) => NotePage(noteId: n.id))),
             icon: const Icon(Icons.open_in_full_rounded),
           ),

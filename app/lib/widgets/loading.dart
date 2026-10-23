@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import '../l10n/l10n.dart';
 
 /// M3 Expressive loading indicator: a rounded "cookie" shape that morphs
 /// between lobe counts while rotating. Use for short waits (< 5 s).
@@ -36,7 +37,7 @@ class _ExpressiveLoaderState extends State<ExpressiveLoader> with SingleTickerPr
         ),
       ),
     );
-    final child = Semantics(label: '加载中', child: indicator);
+    final child = Semantics(label: l10n.commonLoading, child: indicator);
     if (!widget.contained) return SizedBox.square(dimension: widget.size, child: Center(child: child));
     return Container(
       width: widget.size,

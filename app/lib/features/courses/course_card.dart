@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/models.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/course_visuals.dart';
+import '../../l10n/l10n.dart';
 
 class CourseCard extends StatefulWidget {
   const CourseCard({super.key, required this.course, required this.onTap, this.onMenu});
@@ -23,7 +24,7 @@ class _CourseCardState extends State<CourseCard> {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
     final s = courseScheme(context, c);
-    final teachers = c.teachers.isNotEmpty ? c.teachers.join('、') : c.teacher;
+    final teachers = c.teachers.isNotEmpty ? c.teachers.join(l10n.listSeparator) : c.teacher;
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
       onExit: (_) => setState(() => _hover = false),
@@ -102,7 +103,7 @@ class _CourseCardState extends State<CourseCard> {
                       ),
                     ),
                     const SizedBox(width: Space.sm),
-                    Text('${c.lectureTotal} 节', style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant)),
+                    Text(l10n.courseLectureCount(c.lectureTotal), style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant)),
                   ]),
                 ]),
               ),

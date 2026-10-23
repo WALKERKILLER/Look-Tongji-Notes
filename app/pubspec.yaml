@@ -12,6 +12,8 @@ dependencies:
   file_selector: ^1.1.0
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
   flutter_svg: ^2.3.0
   gpt_markdown: ^1.3.4
   http: ^1.6.0
@@ -35,6 +37,8 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  # Strings live in lib/l10n/app_zh.arb; see lib/l10n/l10n.dart.
+  generate: true
   assets:
     - assets/providers/
     - assets/brands/

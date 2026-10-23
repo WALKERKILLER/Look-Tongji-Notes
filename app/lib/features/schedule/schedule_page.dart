@@ -9,6 +9,7 @@ import '../../widgets/report_screen.dart';
 import '../../widgets/states.dart';
 import 'schedule_store.dart';
 import 'schedule_widgets.dart';
+import '../../l10n/l10n.dart';
 
 /// Month calendar beside an agenda of homework, exams and activities.
 class SchedulePage extends StatefulWidget {
@@ -57,12 +58,17 @@ class _SchedulePageState extends State<SchedulePage> {
     });
   }
 
+  /// Width the page needs for the calendar beside the agenda; the docked
+  /// assistant can take a large share of the window.
+  static const double _twoColumnWidth = 760;
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => LayoutBuilder(builder: (context, box) => _build(context, box.maxWidth >= _twoColumnWidth));
+
+  Widget _build(BuildContext context, bool wide) {
     final store = context.watch<ScheduleStore>();
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
-    final wide = MediaQuery.sizeOf(context).width >= 900;
     final open = store.items.where((i) => !i.done).length;
     final overdue = store.items.where((i) => i.overdue).length;
 
@@ -71,17 +77,17 @@ class _SchedulePageState extends State<SchedulePage> {
       child: Row(children: [
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('日程', style: tt.headlineMedium),
+            Text(l10n.commonSchedule, style: tt.headlineMedium),
             const SizedBox(height: 2),
             Text(
-              [open == 0 ? '没有待办' : '$open 项待办', if (overdue > 0) '$overdue 项已逾期'].join(' · '),
+              [open == 0 ? l10n.scheduleNoTodos : l10n.scheduleOpenTodos(open), if (overdue > 0) l10n.scheduleOverdue(overdue)].join(' · '),
               style: tt.bodyMedium?.copyWith(color: overdue > 0 ? cs.error : cs.onSurfaceVariant),
             ),
           ]),
         ),
         SegmentedButton<bool>(
           showSelectedIcon: false,
-          segments: const [ButtonSegment(value: false, label: Text('待办')), ButtonSegment(value: true, label: Text('全部'))],
+          segments: [ButtonSegment(value: false, label: Text(l10n.scheduleTodos)), ButtonSegment(value: true, label: Text(l10n.commonAll))],
           selected: {_all},
           onSelectionChanged: (s) => setState(() => _all = s.first),
         ),
@@ -103,25 +109,25 @@ class _SchedulePageState extends State<SchedulePage> {
         : store.items.isEmpty
             ? EmptyState(
                 icon: Icons.event_available_outlined,
-                title: '还没有日程',
-                body: '老师在课上说到带日期的作业、考试或活动时，助手可以把它标记进来，并附上原话和录像时间点。也可以自己添加。',
+                title: l10n.scheduleEmpty,
+                body: l10n.scheduleEmptyBody,
                 action: FilledButton.tonalIcon(
                   onPressed: () => showScheduleEditor(context, day: _selected),
                   icon: const Icon(Icons.add_rounded),
-                  label: const Text('添加日程'),
+                  label: Text(l10n.scheduleAdd),
                 ),
               )
             : _Agenda(items: store.items, all: _all, selected: _selected, keys: _keys, onSelect: _select);
 
     return ReportScreen(
-      value: {'screen': '日程', 'open_items': '$open', 'overdue': '$overdue', 'selected_day': isoDate(_selected)},
+      value: {'screen': l10n.commonSchedule, 'open_items': '$open', 'overdue': '$overdue', 'selected_day': isoDate(_selected)},
       child: Scaffold(
         backgroundColor: Colors.transparent,
         floatingActionButton: FloatingActionButton.extended(
           heroTag: 'schedule-add',
           onPressed: () => showScheduleEditor(context, day: _selected.isBefore(dayOf(DateTime.now())) ? null : _selected),
           icon: const Icon(Icons.add_rounded),
-          label: const Text('新建'),
+          label: Text(l10n.commonNew),
         ),
         body: wide
             ? Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -224,15 +230,15 @@ class _MonthCalendarState extends State<_MonthCalendar> {
       child: Column(mainAxisSize: MainAxisSize.min, children: [
         Row(children: [
           const SizedBox(width: Space.sm),
-          Text('${m.year}年${m.month}月', style: tt.titleMedium),
+          Text(l10n.dateYearMonth(m.year, m.month), style: tt.titleMedium),
           if (showToday)
             Padding(
               padding: const EdgeInsets.only(left: Space.xs),
-              child: TextButton(onPressed: () => widget.onSelect(today), child: const Text('今天')),
+              child: TextButton(onPressed: () => widget.onSelect(today), child: Text(l10n.commonToday)),
             ),
           const Spacer(),
-          IconButton(tooltip: widget.collapsed ? '上一周' : '上个月', onPressed: () => _shift(-1), icon: const Icon(Icons.chevron_left_rounded)),
-          IconButton(tooltip: widget.collapsed ? '下一周' : '下个月', onPressed: () => _shift(1), icon: const Icon(Icons.chevron_right_rounded)),
+          IconButton(tooltip: widget.collapsed ? l10n.schedulePrevWeek : l10n.schedulePrevMonth, onPressed: () => _shift(-1), icon: const Icon(Icons.chevron_left_rounded)),
+          IconButton(tooltip: widget.collapsed ? l10n.scheduleNextWeek : l10n.scheduleNextMonth, onPressed: () => _shift(1), icon: const Icon(Icons.chevron_right_rounded)),
         ]),
         Row(children: [
           for (final w in weekdayNames)
@@ -265,7 +271,7 @@ class _MonthCalendarState extends State<_MonthCalendar> {
             height: 28,
             child: IconButton(
               padding: EdgeInsets.zero,
-              tooltip: widget.collapsed ? '展开月历' : '收起月历',
+              tooltip: widget.collapsed ? l10n.scheduleExpandMonth : l10n.scheduleCollapseMonth,
               onPressed: widget.onToggle,
               icon: AnimatedRotation(
                 turns: widget.collapsed ? 0 : 0.5,
@@ -302,7 +308,7 @@ class _DayCell extends StatelessWidget {
     return Semantics(
       button: true,
       selected: selected,
-      label: '${day.month}月${day.day}日${items.isEmpty ? '' : '，${items.length} 项日程'}',
+      label: l10n.scheduleDayLabel(day.month, day.day, items.isEmpty ? '' : l10n.scheduleDayItems(items.length)),
       child: InkWell(
         customBorder: const CircleBorder(),
         onTap: onTap,
@@ -374,7 +380,7 @@ class _Agenda extends StatelessWidget {
         child: Row(children: [
           Icon(Icons.error_outline_rounded, size: 18, color: cs.error),
           const SizedBox(width: Space.sm),
-          Text('已逾期', style: tt.titleSmall?.copyWith(color: cs.error)),
+          Text(l10n.scheduleOverdueHeader, style: tt.titleSmall?.copyWith(color: cs.error)),
         ]),
       ));
       for (final i in overdue) {
@@ -390,7 +396,7 @@ class _Agenda extends StatelessWidget {
         lastMonth = month;
         children.add(Padding(
           padding: const EdgeInsets.fromLTRB(Space.sm, Space.lg, 0, Space.sm),
-          child: Text(d.year == DateTime.now().year ? '${d.month}月' : '${d.year}年${d.month}月', style: tt.titleSmall?.copyWith(color: cs.primary)),
+          child: Text(d.year == DateTime.now().year ? l10n.dateMonth(d.month) : l10n.dateYearMonth(d.year, d.month), style: tt.titleSmall?.copyWith(color: cs.primary)),
         ));
       }
       children.add(KeyedSubtree(
@@ -423,7 +429,7 @@ class _DayRow extends StatelessWidget {
             width: 56,
             child: Column(children: [
               const SizedBox(height: Space.xs),
-              Text('周${weekdayNames[day.weekday - 1]}', style: tt.labelMedium?.copyWith(color: today ? cs.primary : cs.onSurfaceVariant)),
+              Text(l10n.weekdayName(weekdayNames[day.weekday - 1]), style: tt.labelMedium?.copyWith(color: today ? cs.primary : cs.onSurfaceVariant)),
               const SizedBox(height: 2),
               AnimatedContainer(
                 duration: Motion.medium1,
@@ -452,11 +458,11 @@ class _DayRow extends StatelessWidget {
                     borderRadius: BorderRadius.circular(Corners.lg),
                   ),
                   child: Row(children: [
-                    Expanded(child: Text('这天没有安排', style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant))),
+                    Expanded(child: Text(l10n.scheduleDayEmpty, style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant))),
                     TextButton.icon(
                       onPressed: () => showScheduleEditor(context, day: day),
                       icon: const Icon(Icons.add_rounded, size: 18),
-                      label: const Text('添加'),
+                      label: Text(l10n.commonAdd),
                     ),
                   ]),
                 )

@@ -3,6 +3,7 @@ import 'dart:ui' show PointerDeviceKind;
 import 'package:flutter/material.dart';
 
 import '../theme/tokens.dart';
+import '../l10n/l10n.dart';
 
 /// Makes a horizontal scrollable usable with a mouse. A vertical wheel
 /// keeps scrolling the page, so the row can be dragged with the mouse, and
@@ -143,7 +144,7 @@ class _EdgeButton extends StatelessWidget {
             elevation: 2,
             shadowColor: cs.shadow.withValues(alpha: 0.4),
             child: IconButton(
-              tooltip: back ? '向左滚动' : '向右滚动',
+              tooltip: back ? l10n.scrollLeft : l10n.scrollRight,
               visualDensity: VisualDensity.compact,
               iconSize: 20,
               color: cs.onSurface,

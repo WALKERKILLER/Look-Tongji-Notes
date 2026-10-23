@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:gpt_markdown/gpt_markdown.dart';
 
 import '../theme/tokens.dart';
+import '../l10n/l10n.dart';
 
 const _ts = r'(\d{1,2}:\d{2}(?::\d{2})?)';
 // A range `[a]–[b]`, or a single `[a]`, not already followed by a link target.
@@ -106,7 +107,7 @@ class _TimestampChipState extends State<TimestampChip> {
     final base = DefaultTextStyle.of(context).style;
     final fg = _hover ? cs.onPrimary : cs.onSecondaryContainer;
     return Tooltip(
-      message: widget.external ? '打开对应课次并跳到这里' : '跳到这里播放',
+      message: widget.external ? l10n.timestampOpenLecture : l10n.timestampSeek,
       waitDuration: const Duration(milliseconds: 600),
       child: MouseRegion(
         cursor: SystemMouseCursors.click,

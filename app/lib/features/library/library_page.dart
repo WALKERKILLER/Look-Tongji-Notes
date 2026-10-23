@@ -16,6 +16,7 @@ import '../../widgets/states.dart';
 import '../player/player_page.dart';
 import '../practice/quiz.dart';
 import 'note_reader.dart';
+import '../../l10n/l10n.dart';
 
 class LibraryPage extends StatefulWidget {
   const LibraryPage({super.key});
@@ -82,7 +83,7 @@ class _LibraryPageState extends State<LibraryPage> {
       if (!mounted || _q.text.trim() != q) return;
       setState(() => _hits = r.map((e) => Hit((e as Map).cast<String, dynamic>())).toList());
     } catch (e) {
-      if (mounted) showSnack(context, '搜索失败：$e');
+      if (mounted) showSnack(context, l10n.searchFailed(e));
     } finally {
       if (mounted) setState(() => _searching = false);
     }
@@ -103,14 +104,14 @@ class _LibraryPageState extends State<LibraryPage> {
     final courses = app.courses.where((c) => c.localLectures > 0 || _notes.any((n) => n.courseId == c.id)).toList();
 
     return ReportScreen(
-      value: const {'screen': '资料库'},
+      value: {'screen': l10n.screenLibrary},
       child: Scaffold(
         backgroundColor: Colors.transparent,
         floatingActionButton: FloatingActionButton.extended(
           heroTag: null,
           onPressed: () => _openNote(null),
           icon: const Icon(Icons.edit_note_rounded),
-          label: const Text('写笔记'),
+          label: Text(l10n.libraryWriteNote),
         ),
         body: CustomScrollView(slivers: [
           SliverToBoxAdapter(
@@ -118,13 +119,13 @@ class _LibraryPageState extends State<LibraryPage> {
               child: Padding(
                 padding: EdgeInsets.fromLTRB(pad, compact ? Space.xl : Space.xxl, pad, Space.md),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text('资料库', style: compact ? tt.headlineMedium : tt.displaySmall),
+                  Text(l10n.screenLibrary, style: compact ? tt.headlineMedium : tt.displaySmall),
                   const SizedBox(height: Space.xs),
-                  Text('全文搜索所有文字稿与笔记', style: tt.bodyLarge?.copyWith(color: cs.onSurfaceVariant)),
+                  Text(l10n.librarySearchTitle, style: tt.bodyLarge?.copyWith(color: cs.onSurfaceVariant)),
                   const SizedBox(height: Space.lg),
                   SearchBar(
                     controller: _q,
-                    hintText: '例如：傅里叶变换、期中、作业',
+                    hintText: l10n.librarySearchHint,
                     leading: _searching
                         ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2.5))
                         : const Icon(Icons.manage_search_rounded),
@@ -150,7 +151,7 @@ class _LibraryPageState extends State<LibraryPage> {
                     child: Row(children: [
                       // The kinds filter search results; the course filter also applies to the notes below.
                       if (_q.text.trim().isNotEmpty)
-                        for (final (k, l) in const [('', '全部'), ('segment', '文字稿'), ('note', '笔记')]) ...[
+                        for (final (k, l) in [('', l10n.commonAll), ('segment', l10n.commonTranscript), ('note', l10n.commonNotes)]) ...[
                           ChoiceChip(label: Text(l), selected: _kind == k, onSelected: (_) => setState(() => _kind = k)),
                           const SizedBox(width: Space.sm),
                         ],
@@ -162,7 +163,7 @@ class _LibraryPageState extends State<LibraryPage> {
                                 setState(() => _courseId = '');
                                 _search();
                               },
-                              child: const Text('所有课程'),
+                              child: Text(l10n.libraryAllCourses),
                             ),
                             for (final c in courses)
                               MenuItemButton(
@@ -175,7 +176,7 @@ class _LibraryPageState extends State<LibraryPage> {
                           ],
                           builder: (context, m, _) => FilterChip(
                             avatar: const Icon(Icons.school_outlined, size: 18),
-                            label: Text(_courseId.isEmpty ? '所有课程' : app.course(_courseId)?.title ?? '课程'),
+                            label: Text(_courseId.isEmpty ? l10n.libraryAllCourses : app.course(_courseId)?.title ?? l10n.commonCourses),
                             selected: _courseId.isNotEmpty,
                             onSelected: (_) => m.isOpen ? m.close() : m.open(),
                           ),
@@ -198,7 +199,7 @@ class _LibraryPageState extends State<LibraryPage> {
       return [
         SliverFillRemaining(
           hasScrollBody: false,
-          child: EmptyState(icon: Icons.search_off_rounded, title: '没有找到“${_q.text.trim()}”', body: '只有转写过的课和笔记可以被搜索。'),
+          child: EmptyState(icon: Icons.search_off_rounded, title: l10n.librarySearchEmpty(_q.text.trim()), body: l10n.librarySearchEmptyBody),
         ),
       ];
     }
@@ -207,7 +208,7 @@ class _LibraryPageState extends State<LibraryPage> {
         child: ContentWidth(
           child: Padding(
             padding: EdgeInsets.fromLTRB(pad, Space.sm, pad, Space.sm),
-            child: Text('${hits.length} 条结果', style: Theme.of(context).textTheme.titleSmall),
+            child: Text(l10n.librarySearchCount(hits.length), style: Theme.of(context).textTheme.titleSmall),
           ),
         ),
       ),
@@ -244,7 +245,7 @@ class _LibraryPageState extends State<LibraryPage> {
         child: ContentWidth(
           child: Padding(
             padding: EdgeInsets.fromLTRB(pad, Space.lg, pad, Space.sm),
-            child: Text('笔记 · ${notes.length}', style: tt.titleLarge),
+            child: Text(l10n.libraryNotesCount(notes.length), style: tt.titleLarge),
           ),
         ),
       ),
@@ -253,7 +254,7 @@ class _LibraryPageState extends State<LibraryPage> {
           child: ContentWidth(
             child: Padding(
               padding: EdgeInsets.symmetric(horizontal: pad),
-              child: Text(_courseId.isEmpty || _notes.isEmpty ? '在播放器里边看边记，或让助手根据文字稿整理笔记。' : '这门课还没有笔记。', style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
+              child: Text(_courseId.isEmpty || _notes.isEmpty ? l10n.libraryNotesEmptyHint : l10n.libraryNotesEmpty, style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
             ),
           ),
         )
@@ -285,7 +286,7 @@ class _LibraryPageState extends State<LibraryPage> {
                               ]),
                               const SizedBox(height: Space.sm),
                               Text(
-                                [app.course(n.courseId)?.title ?? '未归类', fmtRelative(DateTime.fromMillisecondsSinceEpoch(n.updatedAt * 1000))].join(' · '),
+                                [app.course(n.courseId)?.title ?? l10n.commonUncategorized, fmtRelative(DateTime.fromMillisecondsSinceEpoch(n.updatedAt * 1000))].join(' · '),
                                 style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
@@ -307,7 +308,7 @@ class _LibraryPageState extends State<LibraryPage> {
             child: LayoutBuilder(
               builder: (context, c) => QuizList(
                 columns: (c.maxWidth / 300).floor().clamp(1, 3),
-                header: Padding(padding: const EdgeInsets.only(bottom: Space.sm), child: Text('练习', style: tt.titleLarge)),
+                header: Padding(padding: const EdgeInsets.only(bottom: Space.sm), child: Text(l10n.commonPractice, style: tt.titleLarge)),
               ),
             ),
           ),
@@ -317,7 +318,7 @@ class _LibraryPageState extends State<LibraryPage> {
         child: ContentWidth(
           child: Padding(
             padding: EdgeInsets.fromLTRB(pad, Space.xxl, pad, Space.sm),
-            child: Text('课程库', style: tt.titleLarge),
+            child: Text(l10n.commonLibrary, style: tt.titleLarge),
           ),
         ),
       ),
@@ -332,14 +333,13 @@ class _LibraryPageState extends State<LibraryPage> {
                 padding: const EdgeInsets.all(Space.xl),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Wrap(spacing: Space.xxl, runSpacing: Space.md, children: [
-                    _Stat(value: '${st['local_lectures'] ?? 0}', label: '节课在本地'),
-                    _Stat(value: fmtBytes((st['bytes'] ?? 0) as num), label: '占用空间'),
-                    _Stat(value: '${st['segments'] ?? 0}', label: '句文字稿'),
-                    _Stat(value: '${st['notes'] ?? 0}', label: '篇笔记'),
+                    _Stat(value: '${st['local_lectures'] ?? 0}', label: l10n.libraryStatLocal),
+                    _Stat(value: fmtBytes((st['bytes'] ?? 0) as num), label: l10n.homeStatStorage),
+                    _Stat(value: '${st['segments'] ?? 0}', label: l10n.libraryStatSegments),
+                    _Stat(value: '${st['notes'] ?? 0}', label: l10n.homeStatNotes),
                   ]),
                   const SizedBox(height: Space.lg),
-                  Text('每节课一个文件夹：video.mp4、slides/、courseware/、transcript.md/.srt、lecture.json。'
-                      '根目录的 README.md 说明了结构，方便 AI 工具直接阅读；library.db 是可重建的索引。',
+                  Text(l10n.libraryLayoutHint,
                       style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant, height: 1.6)),
                   const SizedBox(height: Space.lg),
                   Wrap(spacing: Space.sm, runSpacing: Space.sm, children: [
@@ -347,20 +347,20 @@ class _LibraryPageState extends State<LibraryPage> {
                       FilledButton.tonalIcon(
                         onPressed: _lib == null ? null : () => openPath('${_lib!['root']}'),
                         icon: const Icon(Icons.folder_open_outlined),
-                        label: const Text('打开文件夹'),
+                        label: Text(l10n.commonOpenFolder),
                       ),
                     OutlinedButton.icon(
                       onPressed: () async {
                         try {
                           final r = await app.api.post('/api/library/reindex') as Map;
-                          if (context.mounted) showSnack(context, '已重建索引，${r['indexed']} 节课');
+                          if (context.mounted) showSnack(context, l10n.libraryReindexed(r['indexed']));
                           _load();
                         } catch (e) {
-                          if (context.mounted) showSnack(context, '重建失败：$e');
+                          if (context.mounted) showSnack(context, l10n.libraryReindexFailed(e));
                         }
                       },
                       icon: const Icon(Icons.manage_history_rounded),
-                      label: const Text('从文件重建索引'),
+                      label: Text(l10n.libraryReindex),
                     ),
                   ]),
                   const SizedBox(height: Space.sm),

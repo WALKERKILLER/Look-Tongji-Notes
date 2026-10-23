@@ -9,6 +9,7 @@ import '../../widgets/horizontal_scroller.dart';
 import '../../widgets/states.dart';
 import 'course_card.dart';
 import 'course_page.dart';
+import '../../l10n/l10n.dart';
 
 class CoursesPage extends StatefulWidget {
   const CoursesPage({super.key});
@@ -59,9 +60,9 @@ class _CoursesPageState extends State<CoursesPage> {
               padding: EdgeInsets.fromLTRB(pad, compact ? Space.xl : Space.xxl, pad, Space.md),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Row(children: [
-                  Expanded(child: Text('课程', style: compact ? tt.headlineMedium : tt.displaySmall)),
+                  Expanded(child: Text(l10n.commonCourses, style: compact ? tt.headlineMedium : tt.displaySmall)),
                   IconButton(
-                    tooltip: '从平台同步',
+                    tooltip: l10n.coursesSync,
                     onPressed: app.coursesLoading ? null : () => app.loadCourses(sync: true),
                     icon: app.coursesLoading
                         ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2.5))
@@ -71,7 +72,7 @@ class _CoursesPageState extends State<CoursesPage> {
                 const SizedBox(height: Space.lg),
                 SearchBar(
                   controller: _q,
-                  hintText: '搜索课程或老师',
+                  hintText: l10n.coursesSearchHint,
                   leading: const Icon(Icons.search_rounded),
                   trailing: [
                     if (_q.text.isNotEmpty)
@@ -94,11 +95,11 @@ class _CoursesPageState extends State<CoursesPage> {
                       ),
                       const SizedBox(width: Space.sm),
                     ],
-                    ChoiceChip(label: const Text('全部学期'), selected: term.isEmpty, onSelected: (_) => setState(() => _term = '')),
+                    ChoiceChip(label: Text(l10n.coursesAllTerms), selected: term.isEmpty, onSelected: (_) => setState(() => _term = '')),
                     if (hiddenCount > 0) ...[
                       const SizedBox(width: Space.sm),
                       FilterChip(
-                        label: Text('已隐藏 $hiddenCount'),
+                        label: Text(l10n.coursesHiddenCount(hiddenCount)),
                         selected: _showHidden,
                         onSelected: (v) => setState(() => _showHidden = v),
                       ),
@@ -110,13 +111,13 @@ class _CoursesPageState extends State<CoursesPage> {
           ),
         ),
         if (app.coursesLoading && app.courses.isEmpty)
-          const SliverFillRemaining(hasScrollBody: false, child: CenteredLoader(label: '正在同步课程'))
+          SliverFillRemaining(hasScrollBody: false, child: CenteredLoader(label: l10n.coursesSyncing))
         else if (app.coursesError != null && app.courses.isEmpty)
           SliverFillRemaining(hasScrollBody: false, child: ErrorState(error: app.coursesError!, onRetry: () => app.loadCourses(sync: true)))
         else if (list.isEmpty)
           SliverFillRemaining(
             hasScrollBody: false,
-            child: EmptyState(icon: Icons.search_off_rounded, title: q.isEmpty ? '这个学期没有课程' : '没有匹配“${_q.text}”的课程'),
+            child: EmptyState(icon: Icons.search_off_rounded, title: q.isEmpty ? l10n.coursesEmptyTerm : l10n.coursesNoMatch(_q.text)),
           )
         else
           SliverToBoxAdapter(
@@ -158,10 +159,10 @@ Future<void> showCourseMenu(BuildContext context, Course c, Offset pos) async {
     context: context,
     position: RelativeRect.fromRect(pos & const Size(1, 1), Offset.zero & overlay.size),
     items: [
-      PopupMenuItem(value: 'pin', child: ListTile(leading: Icon(c.pinned ? Icons.push_pin_outlined : Icons.push_pin_rounded), title: Text(c.pinned ? '取消置顶' : '置顶'))),
-      const PopupMenuItem(value: 'rename', child: ListTile(leading: Icon(Icons.edit_outlined), title: Text('重命名'))),
-      const PopupMenuItem(value: 'color', child: ListTile(leading: Icon(Icons.palette_outlined), title: Text('课程颜色'))),
-      PopupMenuItem(value: 'hide', child: ListTile(leading: Icon(c.hidden ? Icons.visibility_outlined : Icons.visibility_off_outlined), title: Text(c.hidden ? '取消隐藏' : '隐藏'))),
+      PopupMenuItem(value: 'pin', child: ListTile(leading: Icon(c.pinned ? Icons.push_pin_outlined : Icons.push_pin_rounded), title: Text(c.pinned ? l10n.coursesUnpin : l10n.coursesPin))),
+      PopupMenuItem(value: 'rename', child: ListTile(leading: Icon(Icons.edit_outlined), title: Text(l10n.commonRename))),
+      PopupMenuItem(value: 'color', child: ListTile(leading: Icon(Icons.palette_outlined), title: Text(l10n.coursesColor))),
+      PopupMenuItem(value: 'hide', child: ListTile(leading: Icon(c.hidden ? Icons.visibility_outlined : Icons.visibility_off_outlined), title: Text(c.hidden ? l10n.coursesUnhide : l10n.commonHide))),
     ],
   );
   if (!context.mounted || v == null) return;
@@ -185,20 +186,20 @@ Future<String?> _renameDialog(BuildContext context, Course c) {
     context: context,
     builder: (context) => AlertDialog(
       icon: const Icon(Icons.edit_outlined),
-      title: const Text('重命名课程'),
+      title: Text(l10n.coursesRenameTitle),
       content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('原名：${c.rawTitle}', style: Theme.of(context).textTheme.bodySmall),
+        Text(l10n.coursesOriginalName(c.rawTitle), style: Theme.of(context).textTheme.bodySmall),
         const SizedBox(height: Space.md),
         TextField(
           controller: ctl,
           autofocus: true,
-          decoration: const InputDecoration(labelText: '显示名称', helperText: '留空则使用原名，不影响本地文件夹'),
+          decoration: InputDecoration(labelText: l10n.coursesDisplayName, helperText: l10n.coursesDisplayNameHelper),
           onSubmitted: (v) => Navigator.pop(context, v.trim()),
         ),
       ]),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('取消')),
-        FilledButton(onPressed: () => Navigator.pop(context, ctl.text.trim()), child: const Text('保存')),
+        TextButton(onPressed: () => Navigator.pop(context), child: Text(l10n.commonCancel)),
+        FilledButton(onPressed: () => Navigator.pop(context, ctl.text.trim()), child: Text(l10n.commonSave)),
       ],
     ),
   );
@@ -209,13 +210,13 @@ Future<String?> _colorDialog(BuildContext context, Course c) {
   return showDialog<String>(
     context: context,
     builder: (context) => AlertDialog(
-      title: const Text('课程颜色'),
+      title: Text(l10n.coursesColor),
       content: Wrap(spacing: Space.md, runSpacing: Space.md, children: [
         _Swatch(color: null, selected: c.color.isEmpty, onTap: () => Navigator.pop(context, '')),
         for (final (_, col) in kSeedPalette)
           _Swatch(color: col, selected: c.color.toUpperCase() == hex(col), onTap: () => Navigator.pop(context, hex(col))),
       ]),
-      actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('取消'))],
+      actions: [TextButton(onPressed: () => Navigator.pop(context), child: Text(l10n.commonCancel))],
     ),
   );
 }

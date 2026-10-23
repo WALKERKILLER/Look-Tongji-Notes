@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../../core/api.dart';
 import '../../core/app_state.dart';
 import '../../theme/tokens.dart';
+import '../../l10n/l10n.dart';
 
 /// What the assistant needs to run (GET /api/agent/runtime), see
 /// docs/specs/0008-assistant-runtime-setup.md.
@@ -116,32 +117,32 @@ class _RuntimeSetupCardState extends State<RuntimeSetupCard> {
                 child: Icon(Icons.download_for_offline_outlined, color: cs.onTertiaryContainer),
               ),
               const SizedBox(width: Space.lg),
-              Expanded(child: Text(st?.ready == true ? '运行环境已就绪' : '安装助手运行环境', style: tt.titleLarge)),
+              Expanded(child: Text(st?.ready == true ? l10n.runtimeReady : l10n.runtimeInstallTitle, style: tt.titleLarge)),
             ]),
             const SizedBox(height: Space.md),
             Text(
-              '助手运行在 Node.js 上，并使用 Pi SDK。缺少的部分会安装到 Look Studio 的数据目录，不改动系统；安装包会按官方发布的 SHA-256 校验。',
+              l10n.runtimeIntro,
               style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
             ),
             const SizedBox(height: Space.lg),
             if (st == null && _error == null)
               const LinearProgressIndicator()
             else if (st == null)
-              Text('无法读取运行环境：$_error', style: tt.bodyMedium?.copyWith(color: cs.error))
+              Text(l10n.runtimeReadFailed(_error ?? ''), style: tt.bodyMedium?.copyWith(color: cs.error))
             else ...[
               _StepRow(
                 label: 'Node.js',
-                detail: st.nodeOk ? '${st.nodeVersion} · ${st.nodeSource == 'managed' ? '应用内安装' : '系统'}' : '未找到可用的 Node.js 22+',
+                detail: st.nodeOk ? '${st.nodeVersion} · ${st.nodeSource == 'managed' ? l10n.runtimeSourceManaged : l10n.runtimeSourceSystem}' : l10n.runtimeNodeMissing,
                 state: st.nodeOk ? _Step.done : (st.running && st.step.contains('Node') ? _Step.active : _Step.todo),
               ),
               _StepRow(
-                label: '助手依赖（Pi SDK）',
-                detail: st.depsOk ? '已安装' : '未安装',
-                state: st.depsOk ? _Step.done : (st.running && st.step == '安装依赖' ? _Step.active : _Step.todo),
+                label: l10n.runtimeDeps,
+                detail: st.depsOk ? l10n.commonInstalled : l10n.commonNotInstalled,
+                state: st.depsOk ? _Step.done : (st.running && st.step == l10n.runtimeInstallDeps ? _Step.active : _Step.todo),
               ),
               _StepRow(
-                label: '启动助手',
-                detail: st.state == 'done' ? '正在启动…' : '安装完成后自动启动',
+                label: l10n.runtimeStartAssistant,
+                detail: st.state == 'done' ? l10n.runtimeStarting : l10n.runtimeStartsAfterInstall,
                 state: st.state == 'done' ? _Step.done : _Step.todo,
               ),
               const SizedBox(height: Space.md),
@@ -165,12 +166,12 @@ class _RuntimeSetupCardState extends State<RuntimeSetupCard> {
               ),
               if (!st.running && !st.ready) ...[
                 const SizedBox(height: Space.lg),
-                Text('下载源', style: tt.labelLarge?.copyWith(color: cs.onSurfaceVariant)),
+                Text(l10n.commonMirror, style: tt.labelLarge?.copyWith(color: cs.onSurfaceVariant)),
                 const SizedBox(height: Space.sm),
                 SegmentedButton<String>(
-                  segments: const [
-                    ButtonSegment(value: 'npmmirror', label: Text('国内镜像'), icon: Icon(Icons.bolt_rounded)),
-                    ButtonSegment(value: 'official', label: Text('官方源'), icon: Icon(Icons.public_rounded)),
+                  segments: [
+                    ButtonSegment(value: 'npmmirror', label: Text(l10n.runtimeMirrorChina), icon: Icon(Icons.bolt_rounded)),
+                    ButtonSegment(value: 'official', label: Text(l10n.runtimeMirrorOfficial), icon: Icon(Icons.public_rounded)),
                   ],
                   selected: {_mirror},
                   onSelectionChanged: (v) => setState(() => _mirror = v.first),
@@ -181,7 +182,7 @@ class _RuntimeSetupCardState extends State<RuntimeSetupCard> {
                   data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
                   child: ExpansionTile(
                     tilePadding: EdgeInsets.zero,
-                    title: Text('安装日志', style: tt.labelLarge),
+                    title: Text(l10n.runtimeInstallLog, style: tt.labelLarge),
                     children: [
                       Container(
                         width: double.infinity,
@@ -200,11 +201,11 @@ class _RuntimeSetupCardState extends State<RuntimeSetupCard> {
               Align(
                 alignment: Alignment.centerRight,
                 child: st.ready
-                    ? OutlinedButton.icon(onPressed: _load, icon: const Icon(Icons.refresh_rounded), label: const Text('重新检查'))
+                    ? OutlinedButton.icon(onPressed: _load, icon: const Icon(Icons.refresh_rounded), label: Text(l10n.runtimeRecheck))
                     : FilledButton.icon(
                         onPressed: st.running ? null : _install,
                         icon: Icon(st.state == 'failed' ? Icons.refresh_rounded : Icons.download_rounded),
-                        label: Text(st.running ? '正在安装' : st.state == 'failed' ? '重试' : '开始安装'),
+                        label: Text(st.running ? l10n.runtimeInstalling : st.state == 'failed' ? l10n.commonRetry : l10n.runtimeInstall),
                       ),
               ),
             ],
@@ -254,7 +255,7 @@ Future<void> showRuntimeSetup(BuildContext context) => showDialog(
         elevation: 0,
         child: Stack(children: [
           const RuntimeSetupCard(),
-          Positioned(top: Space.sm, right: Space.sm, child: IconButton(tooltip: '关闭', onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close_rounded))),
+          Positioned(top: Space.sm, right: Space.sm, child: IconButton(tooltip: l10n.commonClose, onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close_rounded))),
         ]),
       ),
     );

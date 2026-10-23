@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../core/format.dart';
 import '../theme/tokens.dart';
+import '../l10n/l10n.dart';
 
 /// Headline number with a label and an optional comparison line.
 class StatTile extends StatelessWidget {
@@ -227,7 +228,7 @@ class _Tooltip extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.only(top: Space.xs),
                 child: Row(children: [
-                  Expanded(child: Text('合计', style: figs?.copyWith(fontWeight: FontWeight.w600))),
+                  Expanded(child: Text(l10n.chartTotal, style: figs?.copyWith(fontWeight: FontWeight.w600))),
                   Text(total!, style: figs?.copyWith(fontWeight: FontWeight.w600)),
                 ]),
               ),
@@ -324,7 +325,7 @@ class _BarsPainter extends CustomPainter {
       final d = days[i];
       final show = long ? d.day == 1 : (i % every == 0);
       if (!show) continue;
-      _text(canvas, long ? '${d.month}月' : '${d.month}/${d.day}', Offset(axisW + slot * i + slot / 2, plotH + bottom / 2 + 2), center: true);
+      _text(canvas, long ? l10n.dateMonth(d.month) : '${d.month}/${d.day}', Offset(axisW + slot * i + slot / 2, plotH + bottom / 2 + 2), center: true);
     }
   }
 

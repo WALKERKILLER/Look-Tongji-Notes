@@ -5,6 +5,7 @@ import '../../core/format.dart';
 import '../../core/lookd_service.dart';
 import '../../core/workspace.dart';
 import '../../theme/tokens.dart';
+import '../../l10n/l10n.dart';
 
 // First run on Android: install the Linux workspace lookd and the
 // assistant run in. Contract: docs/specs/draft-android-app.md
@@ -18,7 +19,7 @@ class WorkspaceSetupPage extends StatefulWidget {
 class _WorkspaceSetupPageState extends State<WorkspaceSetupPage> {
   String _mirror = workspaceMirrors.first.id;
 
-  static const _steps = ['下载 Ubuntu 基础系统', '解压 Ubuntu 基础系统', '配置工作区'];
+  static final _steps = [l10n.workspaceStepDownload, l10n.workspaceStepUnpack, l10n.workspaceStepConfigure];
 
   Future<void> _start(LookdService daemon, Workspace ws) async {
     try {
@@ -58,15 +59,14 @@ class _WorkspaceSetupPageState extends State<WorkspaceSetupPage> {
                       ),
                     ),
                     const SizedBox(height: Space.xl),
-                    Text('准备 Linux 工作区', style: tt.headlineMedium),
+                    Text(l10n.workspaceTitle, style: tt.headlineMedium),
                     const SizedBox(height: Space.md),
                     Text(
-                      'Look Studio 在手机上运行一个精简的 Ubuntu 环境，下载、转写、同步和助手都在里面工作，和电脑版一样。'
-                      '首次需要下载约 30 MB，安装后占用约 140 MB，只保存在本应用内。',
+                      l10n.workspaceBody,
                       style: tt.bodyLarge?.copyWith(color: cs.onSurfaceVariant, height: 1.5),
                     ),
                     const SizedBox(height: Space.xl),
-                    Text('下载源', style: tt.titleSmall),
+                    Text(l10n.commonMirror, style: tt.titleSmall),
                     const SizedBox(height: Space.sm),
                     SegmentedButton<String>(
                       showSelectedIcon: false,
@@ -106,10 +106,10 @@ class _WorkspaceSetupPageState extends State<WorkspaceSetupPage> {
                       icon: ws.busy
                           ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2.5))
                           : Icon(ws.error == null ? Icons.download_rounded : Icons.refresh_rounded),
-                      label: Text(ws.busy ? '正在准备' : (ws.error == null ? '开始准备' : '重试')),
+                      label: Text(ws.busy ? l10n.workspacePreparing : (ws.error == null ? l10n.workspaceStart : l10n.commonRetry)),
                     ),
                     const SizedBox(height: Space.md),
-                    Text('需要联网。卸载应用会删除工作区和其中的课程库；可以先在「设置 → 数据与同步」导出备份。',
+                    Text(l10n.workspaceUninstallNote,
                         textAlign: TextAlign.center, style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
                   ]),
                 ),
@@ -177,7 +177,7 @@ class WorkspaceFFmpegButton extends StatelessWidget {
       context: context,
       barrierDismissible: false,
       builder: (c) => AlertDialog(
-        title: const Text('安装 ffmpeg'),
+        title: Text(l10n.workspaceInstallFfmpeg),
         content: SizedBox(
           width: 560,
           height: 320,
@@ -185,7 +185,7 @@ class WorkspaceFFmpegButton extends StatelessWidget {
             valueListenable: lines,
             builder: (_, ls, _) => SingleChildScrollView(
               reverse: true,
-              child: SelectableText(ls.isEmpty ? '正在连接镜像…' : ls.join('\n'), style: const TextStyle(fontFamily: 'monospace', fontSize: 11)),
+              child: SelectableText(ls.isEmpty ? l10n.workspaceConnecting : ls.join('\n'), style: const TextStyle(fontFamily: 'monospace', fontSize: 11)),
             ),
           ),
         ),
@@ -194,7 +194,7 @@ class WorkspaceFFmpegButton extends StatelessWidget {
             valueListenable: done,
             builder: (_, d, _) => d == null
                 ? const Padding(padding: EdgeInsets.all(Space.sm), child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2.5)))
-                : FilledButton(onPressed: () => Navigator.pop(c), child: const Text('关闭')),
+                : FilledButton(onPressed: () => Navigator.pop(c), child: Text(l10n.commonClose)),
           ),
         ],
       ),
@@ -202,7 +202,7 @@ class WorkspaceFFmpegButton extends StatelessWidget {
     try {
       await workspace.installFFmpeg(onLine: (l) => lines.value = [...lines.value.length > 400 ? lines.value.sublist(200) : lines.value, l]);
       done.value = 'ok';
-      lines.value = [...lines.value, '', '已安装 ffmpeg。'];
+      lines.value = [...lines.value, '', l10n.workspaceFfmpegInstalled];
       onDone();
     } catch (e) {
       done.value = 'error';
@@ -216,7 +216,7 @@ class WorkspaceFFmpegButton extends StatelessWidget {
         builder: (context, _) => FilledButton.tonalIcon(
           onPressed: workspace.busy ? null : () => _install(context),
           icon: const Icon(Icons.download_rounded, size: 18),
-          label: const Text('安装 ffmpeg'),
+          label: Text(l10n.workspaceInstallFfmpeg),
         ),
       );
 }

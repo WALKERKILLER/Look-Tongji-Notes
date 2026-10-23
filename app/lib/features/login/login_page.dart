@@ -8,6 +8,7 @@ import '../../core/api.dart';
 import '../../core/app_state.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/loading.dart';
+import '../../l10n/l10n.dart';
 
 class LoginPage extends StatelessWidget {
   const LoginPage({super.key});
@@ -76,12 +77,12 @@ class _BrandPanel extends StatelessWidget {
               Text('Look Studio', style: tt.titleLarge?.copyWith(color: cs.primary, fontWeight: FontWeight.w600)),
             ]),
             const SizedBox(height: Space.xxl),
-            Text('课堂录像，\n变成你的知识库。', style: tt.displaySmall?.copyWith(height: 1.25, color: cs.onSurface)),
+            Text(l10n.loginHeadline, style: tt.displaySmall?.copyWith(height: 1.25, color: cs.onSurface)),
             const SizedBox(height: Space.xl),
-            for (final (icon, text) in const [
-              (Icons.bolt_rounded, '高速下载录像、PPT 与课件，断点续传'),
-              (Icons.subject_rounded, '自动转写，按时间轴全文检索'),
-              (Icons.auto_awesome_outlined, '常驻助手帮你梳理每一节课'),
+            for (final (icon, text) in [
+              (Icons.bolt_rounded, l10n.loginFeatureDownload),
+              (Icons.subject_rounded, l10n.loginFeatureTranscribe),
+              (Icons.auto_awesome_outlined, l10n.loginFeatureAssistant),
             ])
               Padding(
                 padding: const EdgeInsets.only(bottom: Space.md),
@@ -153,7 +154,7 @@ class _LoginFormState extends State<LoginForm> with SingleTickerProviderStateMix
   Future<void> _submit() async {
     if (_busy) return;
     if (_user.text.trim().isEmpty || _pass.text.isEmpty) {
-      setState(() => _error = '请输入学号和密码');
+      setState(() => _error = l10n.loginMissingCredentials);
       _shake.forward(from: 0);
       return;
     }
@@ -199,16 +200,16 @@ class _LoginFormState extends State<LoginForm> with SingleTickerProviderStateMix
         padding: widget.dialog ? const EdgeInsets.all(Space.xl) : EdgeInsets.zero,
         child: AutofillGroup(
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Text(widget.dialog ? '重新登录' : '登录', style: tt.headlineMedium),
+            Text(widget.dialog ? l10n.loginSignInAgain : l10n.loginSignIn, style: tt.headlineMedium),
             const SizedBox(height: Space.sm),
-            Text('使用同济大学统一身份认证', style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
+            Text(l10n.loginWithTongji, style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
             const SizedBox(height: Space.xxl),
             TextField(
               controller: _user,
               autofillHints: const [AutofillHints.username],
               textInputAction: TextInputAction.next,
               onSubmitted: (_) => _passFocus.requestFocus(),
-              decoration: const InputDecoration(labelText: '学号 / 工号', prefixIcon: Icon(Icons.badge_outlined)),
+              decoration: InputDecoration(labelText: l10n.loginStudentId, prefixIcon: Icon(Icons.badge_outlined)),
             ),
             const SizedBox(height: Space.lg),
             TextField(
@@ -219,10 +220,10 @@ class _LoginFormState extends State<LoginForm> with SingleTickerProviderStateMix
               textInputAction: _needCaptcha ? TextInputAction.next : TextInputAction.done,
               onSubmitted: (_) => _submit(),
               decoration: InputDecoration(
-                labelText: '密码',
+                labelText: l10n.commonPassword,
                 prefixIcon: const Icon(Icons.lock_outline_rounded),
                 suffixIcon: IconButton(
-                  tooltip: _obscure ? '显示密码' : '隐藏密码',
+                  tooltip: _obscure ? l10n.commonShowPassword : l10n.commonHidePassword,
                   onPressed: () => setState(() => _obscure = !_obscure),
                   icon: AnimatedSwitcher(
                     duration: Motion.short4,
@@ -243,7 +244,7 @@ class _LoginFormState extends State<LoginForm> with SingleTickerProviderStateMix
                           child: TextField(
                             controller: _captcha,
                             onSubmitted: (_) => _submit(),
-                            decoration: const InputDecoration(labelText: '验证码', prefixIcon: Icon(Icons.pin_outlined)),
+                            decoration: InputDecoration(labelText: l10n.loginCaptcha, prefixIcon: Icon(Icons.pin_outlined)),
                           ),
                         ),
                         const SizedBox(width: Space.md),
@@ -269,8 +270,8 @@ class _LoginFormState extends State<LoginForm> with SingleTickerProviderStateMix
             MergeSemantics(
               child: ListTile(
                 contentPadding: EdgeInsets.zero,
-                title: const Text('保持登录'),
-                subtitle: const Text('令牌到期前自动续期，密码加密保存在本机'),
+                title: Text(l10n.loginStaySignedIn),
+                subtitle: Text(l10n.loginStaySignedInHint),
                 trailing: Switch(value: _remember, onChanged: (v) => setState(() => _remember = v)),
                 onTap: () => setState(() => _remember = !_remember),
               ),
@@ -301,13 +302,13 @@ class _LoginFormState extends State<LoginForm> with SingleTickerProviderStateMix
                   duration: Motion.short4,
                   child: _busy
                       ? ExpressiveLoader(key: const ValueKey('l'), size: 28, color: cs.onSurface.withValues(alpha: 0.6))
-                      : const Text('登录', key: ValueKey('t')),
+                      : Text(l10n.loginSignIn, key: ValueKey('t')),
                 ),
               ),
             ),
             const SizedBox(height: Space.lg),
             Text(
-              '账号只用于登录 look.tongji.edu.cn，凭据仅保存在本机。',
+              l10n.loginPrivacy,
               style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
               textAlign: TextAlign.center,
             ),

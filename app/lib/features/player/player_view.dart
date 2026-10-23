@@ -11,6 +11,7 @@ import '../../theme/tokens.dart';
 import '../../widgets/loading.dart';
 import 'lecture_player.dart';
 import 'seek_bar.dart';
+import '../../l10n/l10n.dart';
 
 const kSpeeds = [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0, 2.5, 3.0];
 
@@ -105,20 +106,20 @@ class PlayerViewState extends State<PlayerView> {
 
   void seekBy(int s) {
     ctl.seekBy(s);
-    toast('${s > 0 ? '+' : ''}$s 秒', s > 0 ? Icons.fast_forward_rounded : Icons.fast_rewind_rounded);
+    toast(l10n.playerSeekToast(s > 0 ? '+' : '', s), s > 0 ? Icons.fast_forward_rounded : Icons.fast_rewind_rounded);
   }
 
   void volumeBy(double d) {
     final v = (ctl.volume + d).clamp(0.0, 100.0);
     ctl.setVolume(v);
-    toast('音量 ${v.round()}%', v == 0 ? Icons.volume_off_rounded : Icons.volume_up_rounded);
+    toast(l10n.playerVolumeToast(v.round()), v == 0 ? Icons.volume_off_rounded : Icons.volume_up_rounded);
   }
 
   void cycleSpeed(int dir) {
     final i = kSpeeds.indexWhere((s) => s >= ctl.rate - 0.01);
     final n = kSpeeds[((i < 0 ? 2 : i) + dir).clamp(0, kSpeeds.length - 1)];
     ctl.setRate(n);
-    toast('倍速 ${speedLabel(n)}', Icons.speed_rounded);
+    toast(l10n.playerSpeedToast(speedLabel(n)), Icons.speed_rounded);
   }
 
   @override
@@ -230,7 +231,7 @@ class PlayerViewState extends State<PlayerView> {
                   child: AnimatedSwitcher(
                     duration: Motion.short4,
                     transitionBuilder: (c, a) => FadeTransition(opacity: a, child: ScaleTransition(scale: Tween(begin: 0.8, end: 1.0).animate(a), child: c)),
-                    child: ctl.boosting ? _Pill(icon: Icons.fast_forward_rounded, text: '${speedLabel(prefs.boostSpeed)} 快进中', key: const ValueKey('b')) : const SizedBox.shrink(),
+                    child: ctl.boosting ? _Pill(icon: Icons.fast_forward_rounded, text: l10n.playerBoosting(speedLabel(prefs.boostSpeed)), key: const ValueKey('b')) : const SizedBox.shrink(),
                   ),
                 ),
               ),
@@ -357,7 +358,7 @@ class PlayerViewState extends State<PlayerView> {
       child: SafeArea(
         bottom: false,
         child: Row(children: [
-          IconButton(onPressed: widget.onBack, icon: const Icon(Icons.arrow_back_rounded), color: Colors.white, tooltip: '返回'),
+          IconButton(onPressed: widget.onBack, icon: const Icon(Icons.arrow_back_rounded), color: Colors.white, tooltip: l10n.commonBack),
           const SizedBox(width: Space.xs),
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
@@ -369,7 +370,7 @@ class PlayerViewState extends State<PlayerView> {
           if (ctl.sources.length > 1) _sourcePicker(context),
           if (widget.onTogglePanel != null)
             IconButton(
-              tooltip: widget.panelOpen == true ? '收起侧栏' : '展开侧栏',
+              tooltip: widget.panelOpen == true ? l10n.playerCollapsePanel : l10n.playerExpandPanel,
               onPressed: widget.onTogglePanel,
               color: Colors.white,
               icon: Icon(widget.panelOpen == true ? Icons.view_sidebar_rounded : Icons.view_sidebar_outlined),
@@ -392,13 +393,13 @@ class PlayerViewState extends State<PlayerView> {
             leadingIcon: Icon(i == ctl.sourceIdx ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded),
             trailingIcon: ctl.sources[i].local ? const Icon(Icons.download_done_rounded, size: 18) : null,
             onPressed: () => ctl.switchSource(i),
-            child: Text('${ctl.sources[i].label}${ctl.sources[i].local ? '（本地）' : ''}'),
+            child: Text('${ctl.sources[i].label}${ctl.sources[i].local ? l10n.playerLocalSuffix : ''}'),
           ),
         const Divider(),
         SubmenuButton(
           leadingIcon: const Icon(Icons.picture_in_picture_alt_rounded),
           menuChildren: [
-            MenuItemButton(onPressed: () => ctl.setPip(null), leadingIcon: Icon(ctl.pipIdx == null ? Icons.check_rounded : null), child: const Text('关闭')),
+            MenuItemButton(onPressed: () => ctl.setPip(null), leadingIcon: Icon(ctl.pipIdx == null ? Icons.check_rounded : null), child: Text(l10n.commonClose)),
             for (var i = 0; i < ctl.sources.length; i++)
               if (i != ctl.sourceIdx && !ctl.sources[i].local)
                 MenuItemButton(
@@ -407,7 +408,7 @@ class PlayerViewState extends State<PlayerView> {
                   child: Text(ctl.sources[i].label),
                 ),
           ],
-          child: const Text('画中画'),
+          child: Text(l10n.playerPip),
         ),
       ],
       builder: (context, menu, _) => TextButton.icon(
@@ -438,8 +439,8 @@ class PlayerViewState extends State<PlayerView> {
             _PlayButton(playing: ctl.playing, onPressed: () => ctl.player.playOrPause()),
             const SizedBox(width: Space.xs),
             if (!compact) ...[
-              IconButton(tooltip: '后退 ${prefs.seekStepSec} 秒 (←)', onPressed: () => seekBy(-prefs.seekStepSec), color: white, icon: const Icon(Icons.replay_10_rounded)),
-              IconButton(tooltip: '前进 ${prefs.seekStepSec} 秒 (→)', onPressed: () => seekBy(prefs.seekStepSec), color: white, icon: const Icon(Icons.forward_10_rounded)),
+              IconButton(tooltip: l10n.playerSeekBack(prefs.seekStepSec), onPressed: () => seekBy(-prefs.seekStepSec), color: white, icon: const Icon(Icons.replay_10_rounded)),
+              IconButton(tooltip: l10n.playerSeekForward(prefs.seekStepSec), onPressed: () => seekBy(prefs.seekStepSec), color: white, icon: const Icon(Icons.forward_10_rounded)),
               _VolumeControl(ctl: ctl),
             ],
             const SizedBox(width: Space.sm),
@@ -469,7 +470,7 @@ class PlayerViewState extends State<PlayerView> {
                   ),
               ],
               builder: (context, menu, _) => Tooltip(
-                message: '倍速 ([ / ])',
+                message: l10n.playerSpeedTooltip,
                 child: TextButton(
                   onPressed: () => menu.isOpen ? menu.close() : menu.open(),
                   style: TextButton.styleFrom(
@@ -486,22 +487,22 @@ class PlayerViewState extends State<PlayerView> {
             ),
             if (ctl.segments.isNotEmpty)
               IconButton(
-                tooltip: '字幕 (C)',
+                tooltip: l10n.playerSubtitlesTooltip,
                 onPressed: () => prefs.update((p) => p.showSubtitles = !p.showSubtitles),
                 color: white,
                 icon: Icon(prefs.showSubtitles ? Icons.closed_caption_rounded : Icons.closed_caption_off_outlined),
               ),
             IconButton(
-              tooltip: '添加书签 (B)',
+              tooltip: l10n.playerBookmarkTooltip,
               onPressed: () async {
                 final b = await ctl.addBookmark();
-                if (b != null) toast('已添加书签 ${fmtClock(b.tMs)}', Icons.bookmark_added_rounded);
+                if (b != null) toast(l10n.playerBookmarkAdded(fmtClock(b.tMs)), Icons.bookmark_added_rounded);
               },
               color: white,
               icon: const Icon(Icons.bookmark_add_outlined),
             ),
             IconButton(
-              tooltip: widget.fullscreen ? '退出全屏 (F)' : '全屏 (F)',
+              tooltip: widget.fullscreen ? l10n.playerExitFullscreen : l10n.playerFullscreen,
               onPressed: widget.onFullscreen,
               color: white,
               icon: Icon(widget.fullscreen ? Icons.fullscreen_exit_rounded : Icons.fullscreen_rounded),
@@ -531,7 +532,7 @@ class _VolumeControlState extends State<_VolumeControl> {
       onExit: (_) => setState(() => _hover = false),
       child: Row(mainAxisSize: MainAxisSize.min, children: [
         IconButton(
-          tooltip: '静音 (M)',
+          tooltip: l10n.playerMute,
           color: Colors.white,
           onPressed: () {
             if (v > 0) {
@@ -612,15 +613,15 @@ class _ResumePrompt extends StatelessWidget {
           child: Row(mainAxisSize: MainAxisSize.min, children: [
             const Icon(Icons.history_rounded, size: 18, color: Colors.white70),
             const SizedBox(width: Space.sm),
-            Text('已从 ${fmtClock(fromMs)} 继续', style: tt.bodyMedium?.copyWith(color: Colors.white)),
+            Text(l10n.playerResumedFrom(fmtClock(fromMs)), style: tt.bodyMedium?.copyWith(color: Colors.white)),
             const SizedBox(width: Space.sm),
             TextButton(
               onPressed: onRestart,
               style: TextButton.styleFrom(foregroundColor: cs.inversePrimary, visualDensity: VisualDensity.compact),
-              child: const Text('从头播放'),
+              child: Text(l10n.playerStartOver),
             ),
             IconButton(
-              tooltip: '关闭',
+              tooltip: l10n.commonClose,
               onPressed: onClose,
               visualDensity: VisualDensity.compact,
               iconSize: 18,
@@ -652,7 +653,7 @@ class _PlayButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final r = BorderRadius.circular(playing ? 14 : 24);
     return Tooltip(
-      message: playing ? '暂停 (空格)' : '播放 (空格)',
+      message: playing ? l10n.playerPauseTooltip : l10n.playerPlayTooltip,
       child: AnimatedContainer(
         duration: Motion.medium2,
         curve: Motion.emphasized,
@@ -705,11 +706,11 @@ class _ErrorBox extends StatelessWidget {
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           const Icon(Icons.error_outline_rounded, color: Colors.white, size: 36),
           const SizedBox(height: Space.md),
-          Text('播放出错', style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Colors.white)),
+          Text(l10n.playerError, style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Colors.white)),
           const SizedBox(height: Space.xs),
           Text(text, style: const TextStyle(color: Colors.white70), textAlign: TextAlign.center, maxLines: 4, overflow: TextOverflow.ellipsis),
           const SizedBox(height: Space.lg),
-          FilledButton.tonalIcon(onPressed: onRetry, icon: const Icon(Icons.refresh_rounded), label: const Text('重新加载')),
+          FilledButton.tonalIcon(onPressed: onRetry, icon: const Icon(Icons.refresh_rounded), label: Text(l10n.playerReload)),
         ]),
       );
 }

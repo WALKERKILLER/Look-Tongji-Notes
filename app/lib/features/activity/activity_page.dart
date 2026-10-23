@@ -15,14 +15,15 @@ import '../courses/course_page.dart';
 import '../library/note_reader.dart';
 import '../player/player_page.dart';
 import '../practice/practice_page.dart';
+import '../../l10n/l10n.dart';
 
 /// Timed kinds in display order.
 const kActivityKinds = ['watch', 'read', 'practice'];
 
 String activityKindLabel(String k) => switch (k) {
-      'watch' => '看课',
-      'read' => '阅读',
-      'practice' => '练习',
+      'watch' => l10n.activityWatching,
+      'read' => l10n.activityReading,
+      'practice' => l10n.commonPractice,
       _ => k,
     };
 
@@ -65,18 +66,18 @@ class ActivityDay {
   (String, List<String>) tooltip(DateTime d) => (
         fmtDayLabel(d),
         [
-          if (!active) '没有学习记录' else if (minutes > 0) '学习 ${fmtMinutes(minutes)}',
+          if (!active) l10n.activityNone else if (minutes > 0) l10n.activityStudyTime(fmtMinutes(minutes)),
           if (minutes > 0) [for (final k in kActivityKinds) if (kindMinutes(k) > 0) '${activityKindLabel(k)} ${kindMinutes(k)}'].join(' · '),
           if (asks > 0 || notesCreated + notesEdited > 0 || quizzes > 0)
             [
-              if (quizzes > 0) '练习 $quizzes 组',
-              if (asks > 0) '提问 $asks 次',
-              if (notesCreated + notesEdited > 0) '笔记 ${notesCreated + notesEdited} 篇',
+              if (quizzes > 0) l10n.activityQuizzes(quizzes),
+              if (asks > 0) l10n.activityAsks(asks),
+              if (notesCreated + notesEdited > 0) l10n.activityNotes(notesCreated + notesEdited),
             ].join(' · '),
         ],
       );
 
-  String describe(DateTime d) => '${fmtMonthDay(d)}，${minutes > 0 ? '学习 ${fmtMinutes(minutes)}' : active ? '有学习记录' : '没有学习'}';
+  String describe(DateTime d) => l10n.activityDayLabel(fmtMonthDay(d), minutes > 0 ? l10n.activityStudyTime(fmtMinutes(minutes)) : active ? l10n.activityHasRecord : l10n.activityNoStudy);
 }
 
 /// `GET /api/activity` for a range.
@@ -174,9 +175,9 @@ class _ActivityCardState extends State<ActivityCard> with _LiveActivity {
         final from = weekStart(_today).subtract(Duration(days: (weeks - 1) * 7));
         return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Wrap(spacing: Space.xxl, runSpacing: Space.md, children: [
-            _Figure(value: d == null ? '—' : fmtMinutes(d.minutesSince(weekStart(_today), _today)), label: '本周'),
-            _Figure(value: d == null ? '—' : '${d.current} 天', label: '连续学习'),
-            _Figure(value: d == null ? '—' : '${d.longest} 天', label: '最长连续'),
+            _Figure(value: d == null ? '—' : fmtMinutes(d.minutesSince(weekStart(_today), _today)), label: l10n.activityThisWeek),
+            _Figure(value: d == null ? '—' : l10n.commonDays(d.current), label: l10n.activityStreak),
+            _Figure(value: d == null ? '—' : l10n.activityLongestDays(d.longest), label: l10n.activityLongestStreak),
           ]),
           const SizedBox(height: Space.lg),
           ContributionHeatmap(
@@ -192,7 +193,7 @@ class _ActivityCardState extends State<ActivityCard> with _LiveActivity {
           Row(children: [
             Expanded(
               child: d != null && d.isEmpty
-                  ? Text('开始看课或做题后，这里会记录你的学习足迹', style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant))
+                  ? Text(l10n.activityEmpty, style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant))
                   : const SizedBox.shrink(),
             ),
             const HeatLegend(),
@@ -280,7 +281,7 @@ class _ActivityPageState extends State<ActivityPage> with _LiveActivity {
     if (d == null && _loading) {
       body = const CenteredLoader();
     } else if (d == null) {
-      body = ErrorState(error: _error ?? '没有数据', onRetry: reload);
+      body = ErrorState(error: _error ?? l10n.commonNoData, onRetry: reload);
     } else {
       body = RefreshIndicator(
         onRefresh: reload,
@@ -290,14 +291,14 @@ class _ActivityPageState extends State<ActivityPage> with _LiveActivity {
               padding: context.isCompact ? Space.pageCompact : Space.page,
               child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                 StatGrid(children: [
-                  StatTile(icon: Icons.schedule_rounded, label: '学习时长', value: fmtMinutes(d.minutes)),
-                  StatTile(icon: Icons.event_available_outlined, label: '学习天数', value: '${d.activeDays} 天'),
-                  StatTile(icon: Icons.local_fire_department_outlined, label: '当前连续', value: '${d.current} 天'),
-                  StatTile(icon: Icons.emoji_events_outlined, label: '最长连续', value: '${d.longest} 天'),
+                  StatTile(icon: Icons.schedule_rounded, label: l10n.activityDuration, value: fmtMinutes(d.minutes)),
+                  StatTile(icon: Icons.event_available_outlined, label: l10n.activityDaysCount, value: l10n.activityActiveDays(d.activeDays)),
+                  StatTile(icon: Icons.local_fire_department_outlined, label: l10n.activityCurrentStreak, value: l10n.commonDays(d.current)),
+                  StatTile(icon: Icons.emoji_events_outlined, label: l10n.activityLongestStreak, value: l10n.activityLongestDays(d.longest)),
                 ]),
                 const SizedBox(height: Space.lg),
                 _Section(
-                  title: '$_year 年',
+                  title: l10n.activityYear(_year),
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     LayoutBuilder(builder: (context, c) {
                       final from = DateTime(_year), to = DateTime(_year, 12, 31);
@@ -324,16 +325,16 @@ class _ActivityPageState extends State<ActivityPage> with _LiveActivity {
                   ]),
                 ),
                 const SizedBox(height: Space.lg),
-                _Section(title: '按类型', child: _kinds(d)),
+                _Section(title: l10n.activityByKind, child: _kinds(d)),
                 const SizedBox(height: Space.lg),
                 _Section(
-                  title: '按课程',
+                  title: l10n.activityByCourse,
                   child: d.courses.isEmpty
-                      ? Padding(padding: const EdgeInsets.symmetric(vertical: Space.md), child: Text('还没有按课程记录的学习时间', style: tt.bodyMedium))
+                      ? Padding(padding: const EdgeInsets.symmetric(vertical: Space.md), child: Text(l10n.activityByCourseEmpty, style: tt.bodyMedium))
                       : Column(children: [
                           for (final c in d.courses)
                             RankedRow(
-                              label: '${c['title'] ?? ''}'.isEmpty ? '未归类' : '${c['title']}',
+                              label: '${c['title'] ?? ''}'.isEmpty ? l10n.commonUncategorized : '${c['title']}',
                               fraction: _int(c['minutes']) / math.max(1, _int(d.courses.first['minutes'])),
                               trailing: fmtMinutes(_int(c['minutes'])),
                               onTap: '${c['course_id'] ?? ''}'.isEmpty
@@ -349,10 +350,10 @@ class _ActivityPageState extends State<ActivityPage> with _LiveActivity {
       );
     }
     return Scaffold(
-      appBar: AppBar(title: const Text('学习统计'), actions: [
-        IconButton(tooltip: '上一年', onPressed: () => _setYear(_year - 1), icon: const Icon(Icons.chevron_left_rounded)),
+      appBar: AppBar(title: Text(l10n.activityStatsTitle), actions: [
+        IconButton(tooltip: l10n.activityPrevYear, onPressed: () => _setYear(_year - 1), icon: const Icon(Icons.chevron_left_rounded)),
         Text('$_year', style: tt.titleMedium?.copyWith(fontFeatures: const [FontFeature.tabularFigures()])),
-        IconButton(tooltip: '下一年', onPressed: _year >= _today.year ? null : () => _setYear(_year + 1), icon: const Icon(Icons.chevron_right_rounded)),
+        IconButton(tooltip: l10n.activityNextYear, onPressed: _year >= _today.year ? null : () => _setYear(_year + 1), icon: const Icon(Icons.chevron_right_rounded)),
         const SizedBox(width: Space.sm),
       ]),
       body: body,
@@ -374,7 +375,7 @@ class _ActivityPageState extends State<ActivityPage> with _LiveActivity {
       for (final k in kActivityKinds) RankedRow(label: activityKindLabel(k), fraction: totals[k]! / top, trailing: fmtMinutes(totals[k]! / 60)),
       Padding(
         padding: const EdgeInsets.only(top: Space.sm),
-        child: Text('完成练习 $quizzes 组 · 向助手提问 $asks 次 · 新建笔记 $notes 篇', style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+        child: Text(l10n.activityDaySummary(quizzes, asks, notes), style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
       ),
     ]);
   }
@@ -431,11 +432,11 @@ class _DaySheet extends StatelessWidget {
           final transcribed = [for (final t in (j['transcribed'] as List? ?? const [])) (t as Map).cast<String, dynamic>()];
           final attempts = [for (final a in (j['attempts'] as List? ?? const [])) (a as Map).cast<String, dynamic>()];
           final counts = [
-            if (d.quizzes > 0) '完成练习 ${d.quizzes} 组',
-            if (d.asks > 0) '提问 ${d.asks} 次',
-            if (d.notesCreated > 0) '新建笔记 ${d.notesCreated} 篇',
-            if (d.notesEdited > 0) '编辑笔记 ${d.notesEdited} 篇',
-            if (d.transcripts > 0) '完成转写 ${d.transcripts} 节',
+            if (d.quizzes > 0) l10n.activityQuizzesDone(d.quizzes),
+            if (d.asks > 0) l10n.activityAsks(d.asks),
+            if (d.notesCreated > 0) l10n.activityNotesCreated(d.notesCreated),
+            if (d.notesEdited > 0) l10n.activityNotesEdited(d.notesEdited),
+            if (d.transcripts > 0) l10n.activityTranscripts(d.transcripts),
           ];
           void open(Widget page) {
             Navigator.pop(context);
@@ -448,7 +449,7 @@ class _DaySheet extends StatelessWidget {
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(fmtDayLabel(day), style: tt.titleLarge),
                 const SizedBox(height: Space.xs),
-                Text(d.minutes > 0 ? '学习 ${fmtMinutes(d.minutes)}' : d.active ? '没有计时的学习' : '这天没有学习记录',
+                Text(d.minutes > 0 ? l10n.activityStudyTime(fmtMinutes(d.minutes)) : d.active ? l10n.activityUntimed : l10n.activityDayEmpty,
                     style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
                 if (d.minutes > 0) ...[
                   const SizedBox(height: Space.lg),
@@ -463,7 +464,7 @@ class _DaySheet extends StatelessWidget {
               ]),
             ),
             if (lectures.isNotEmpty) ...[
-              _subheader(context, '课程'),
+              _subheader(context, l10n.commonCourses),
               for (final l in lectures)
                 ListTile(
                   leading: const Icon(Icons.play_circle_outline_rounded),
@@ -473,7 +474,7 @@ class _DaySheet extends StatelessWidget {
                 ),
             ],
             if (attempts.isNotEmpty) ...[
-              _subheader(context, '练习'),
+              _subheader(context, l10n.commonPractice),
               for (final a in attempts)
                 ListTile(
                   leading: const Icon(Icons.quiz_outlined),
@@ -483,17 +484,17 @@ class _DaySheet extends StatelessWidget {
                 ),
             ],
             if (notes.isNotEmpty) ...[
-              _subheader(context, '笔记'),
+              _subheader(context, l10n.commonNotes),
               for (final n in notes)
                 ListTile(
                   leading: const Icon(Icons.description_outlined),
                   title: Text('${n['title']}', maxLines: 1, overflow: TextOverflow.ellipsis),
-                  subtitle: Text(n['created'] == true ? '新建' : '编辑'),
+                  subtitle: Text(n['created'] == true ? l10n.commonNew : l10n.commonEdit),
                   onTap: () => open(NotePage(noteId: '${n['id']}')),
                 ),
             ],
             if (transcribed.isNotEmpty) ...[
-              _subheader(context, '完成转写'),
+              _subheader(context, l10n.activityTranscriptsHeader),
               for (final t in transcribed)
                 ListTile(
                   leading: const Icon(Icons.subject_rounded),

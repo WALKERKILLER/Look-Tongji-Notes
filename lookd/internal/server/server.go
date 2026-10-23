@@ -147,8 +147,8 @@ func (s *Server) Handler() http.Handler {
 		if err := decode(r, &in); err != nil {
 			return nil, err
 		}
-		if in.Action != "pause" && in.Action != "resume" && in.Action != "retry" {
-			return nil, badRequest("action 只能是 pause、resume 或 retry")
+		if in.Action != "pause" && in.Action != "resume" && in.Action != "retry" && in.Action != "cancel" {
+			return nil, badRequest("action 只能是 pause、resume、retry 或 cancel")
 		}
 		n, err := s.Jobs.Bulk(r.Context(), in.Action, in.IDs)
 		return map[string]any{"changed": n}, err

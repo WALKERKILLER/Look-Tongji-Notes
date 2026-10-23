@@ -5,6 +5,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import '../../l10n/l10n.dart';
 
 /// Emblems bundled with the app (public domain, see assets/schools/NOTICE).
 /// Others are fetched once from the school's `emblem_url` and cached in the
@@ -52,7 +53,7 @@ class SchoolEmblem extends StatelessWidget {
     final asset = _bundled[id];
     final Widget child;
     if (asset != null) {
-      child = mark(SvgPicture.asset(asset, semanticsLabel: '$name校徽'));
+      child = mark(SvgPicture.asset(asset, semanticsLabel: l10n.schoolEmblem(name)));
     } else if (id == 'other') {
       child = fallback;
     } else {
@@ -60,7 +61,7 @@ class SchoolEmblem extends StatelessWidget {
         future: _emblem(id, url),
         builder: (_, s) => AnimatedSwitcher(
           duration: const Duration(milliseconds: 200),
-          child: s.data == null ? KeyedSubtree(key: const ValueKey(0), child: fallback) : mark(SvgPicture.string(s.data!, key: const ValueKey(1), semanticsLabel: '$name校徽')),
+          child: s.data == null ? KeyedSubtree(key: const ValueKey(0), child: fallback) : mark(SvgPicture.string(s.data!, key: const ValueKey(1), semanticsLabel: l10n.schoolEmblem(name))),
         ),
       );
     }

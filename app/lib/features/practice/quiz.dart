@@ -10,6 +10,7 @@ import '../../widgets/states.dart';
 import '../assistant/assistant_controller.dart';
 import '../assistant/assistant_panel.dart';
 import 'practice_page.dart';
+import '../../l10n/l10n.dart';
 
 // Practice quizzes (docs/specs/0002-tutor-quiz-cards.md).
 
@@ -63,13 +64,13 @@ class Quiz {
   final List<QuizQuestion> questions;
   final QuizScore? best, last;
 
-  String get meta => [if (lectureTitle.isNotEmpty) lectureTitle, '$count 题', difficultyLabel(difficulty)].join(' · ');
+  String get meta => [if (lectureTitle.isNotEmpty) lectureTitle, l10n.quizCount(count), difficultyLabel(difficulty)].join(' · ');
 }
 
 String difficultyLabel(String d) => switch (d) {
-      'easy' => '简单',
-      'hard' => '困难',
-      _ => '中等',
+      'easy' => l10n.quizEasy,
+      'hard' => l10n.quizHard,
+      _ => l10n.quizMedium,
     };
 
 /// Sends [prompt] to the assistant and shows it in a sheet over the current
@@ -77,7 +78,7 @@ String difficultyLabel(String d) => switch (d) {
 Future<void> askInSheet(BuildContext context, String prompt) async {
   final a = context.read<AssistantController>();
   if (!a.ready || a.busy) {
-    showSnack(context, a.busy ? '助手正在回复，请稍后再试' : '助手还没有就绪');
+    showSnack(context, a.busy ? l10n.quizAssistantBusy : l10n.quizAssistantNotReady);
     return;
   }
   unawaited(a.send(prompt));
@@ -142,7 +143,7 @@ class _QuizCardState extends State<QuizCard> {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
     final q = _quiz;
-    final score = _gone ? '已删除' : (q.best == null ? '还没有练习' : '最好 ${q.best!.label} · 练过 ${q.attempts} 次');
+    final score = _gone ? l10n.commonDeleted : (q.best == null ? l10n.quizNone : l10n.quizBestAttempts(q.best!.label, q.attempts));
     final start = _gone ? null : () => openPractice(context, q.id);
     final icon = Container(
       width: 40,
@@ -174,7 +175,7 @@ class _QuizCardState extends State<QuizCard> {
                     child: FilledButton(
                       style: FilledButton.styleFrom(backgroundColor: cs.tertiary, foregroundColor: cs.onTertiary),
                       onPressed: start,
-                      child: Text(q.attempts == 0 ? '开始练习' : '再练一次'),
+                      child: Text(q.attempts == 0 ? l10n.quizStart : l10n.quizAgain),
                     ),
                   ),
                 ]),
@@ -271,8 +272,7 @@ class _QuizSheetState extends State<_QuizSheet> {
 
   String get prompt {
     final f = _focus.text.trim();
-    return '请为这节课（lecture_id ${widget.lectureId}）出 $_count 道${difficultyLabel(_difficulty)}难度的选择题，保存为练习'
-        '${f.isEmpty ? '，覆盖整节课的重点' : '，侧重：$f'}。';
+    return l10n.promptCreateQuiz(widget.lectureId, _count, difficultyLabel(_difficulty), f.isEmpty ? l10n.quizFocusAll : l10n.quizFocusOn(f));
   }
 
   @override
@@ -283,19 +283,19 @@ class _QuizSheetState extends State<_QuizSheet> {
     return Padding(
       padding: EdgeInsets.fromLTRB(Space.xl, 0, Space.xl, Space.xl + MediaQuery.viewInsetsOf(context).bottom),
       child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Text('出题练习', style: tt.titleLarge),
+        Text(l10n.quizCreateTitle, style: tt.titleLarge),
         const SizedBox(height: Space.xs),
-        Text('助手会先读完字幕并核对 PPT 与课件，每道题都附出处和解析。', style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
+        Text(l10n.quizCreateHint, style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
         const SizedBox(height: Space.xl),
-        label('题量'),
+        label(l10n.quizSize),
         SegmentedButton<int>(
           showSelectedIcon: false,
-          segments: [for (final n in const [5, 10, 15]) ButtonSegment(value: n, label: Text('$n 题'))],
+          segments: [for (final n in const [5, 10, 15]) ButtonSegment(value: n, label: Text(l10n.quizQuestions(n)))],
           selected: {_count},
           onSelectionChanged: (v) => setState(() => _count = v.first),
         ),
         const SizedBox(height: Space.lg),
-        label('难度'),
+        label(l10n.quizDifficulty),
         SegmentedButton<String>(
           showSelectedIcon: false,
           segments: [for (final d in const ['easy', 'medium', 'hard']) ButtonSegment(value: d, label: Text(difficultyLabel(d)))],
@@ -305,7 +305,7 @@ class _QuizSheetState extends State<_QuizSheet> {
         const SizedBox(height: Space.lg),
         TextField(
           controller: _focus,
-          decoration: const InputDecoration(labelText: '侧重（可选）', hintText: '例如：卷积的性质、例题的解法', border: OutlineInputBorder()),
+          decoration: InputDecoration(labelText: l10n.quizFocus, hintText: l10n.quizFocusHint, border: OutlineInputBorder()),
         ),
         const SizedBox(height: Space.xl),
         FilledButton.icon(
@@ -314,7 +314,7 @@ class _QuizSheetState extends State<_QuizSheet> {
             widget.onAsk(prompt);
           },
           icon: const Icon(Icons.auto_awesome_outlined),
-          label: const Text('让助手出题'),
+          label: Text(l10n.quizCreate),
         ),
       ]),
     );

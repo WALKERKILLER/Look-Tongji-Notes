@@ -10,6 +10,7 @@ import '../../theme/tokens.dart';
 import '../../widgets/horizontal_scroller.dart';
 import '../../widgets/states.dart';
 import '../../widgets/user_avatar.dart';
+import '../../l10n/l10n.dart';
 
 /// Edit nickname and avatar. Changes apply immediately.
 Future<void> showProfileDialog(BuildContext context) =>
@@ -33,14 +34,14 @@ class _ProfileDialogState extends State<_ProfileDialog> {
   }
 
   Future<void> _pickFile() async {
-    final f = await openFile(acceptedTypeGroups: const [
-      XTypeGroup(label: '图片', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp'], mimeTypes: ['image/*']),
+    final f = await openFile(acceptedTypeGroups: [
+      XTypeGroup(label: l10n.commonImage, extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp'], mimeTypes: ['image/*']),
     ]);
     if (f == null || !mounted) return;
     try {
       await context.read<UserProfile>().setFile(f.path);
     } catch (e) {
-      if (mounted) showSnack(context, '没能使用这张图片：$e');
+      if (mounted) showSnack(context, l10n.profileImageFailed(e));
     }
   }
 
@@ -60,16 +61,16 @@ class _ProfileDialogState extends State<_ProfileDialog> {
           final r = await showEmojiPicker(context, initial: p.kind == AvatarKind.emoji ? p.value : '');
           if (r != null) p.setEmoji(r);
         },
-        child: const Text('选择表情'),
+        child: Text(l10n.profilePickEmoji),
       ),
-      MenuItemButton(leadingIcon: const Icon(Icons.image_outlined), onPressed: _pickFile, child: const Text('从图片文件…')),
+      MenuItemButton(leadingIcon: const Icon(Icons.image_outlined), onPressed: _pickFile, child: Text(l10n.profileFromFile)),
       MenuItemButton(
         leadingIcon: const Icon(Icons.link_rounded),
         onPressed: () async {
           final r = await _showLinkDialog(context, qq: false);
           if (r != null) p.setUrl(r);
         },
-        child: const Text('输入图片链接…'),
+        child: Text(l10n.profileFromUrl),
       ),
       MenuItemButton(
         leadingIcon: const Icon(Icons.chat_bubble_outline_rounded),
@@ -77,11 +78,11 @@ class _ProfileDialogState extends State<_ProfileDialog> {
           final r = await _showLinkDialog(context, qq: true);
           if (r != null) p.setQQ(r);
         },
-        child: const Text('使用 QQ 头像…'),
+        child: Text(l10n.profileFromQq),
       ),
-      MenuItemButton(leadingIcon: const Icon(Icons.auto_awesome_outlined), onPressed: () => p.setArt(UserProfile.randomSeed()), child: const Text('随机生成图形')),
+      MenuItemButton(leadingIcon: const Icon(Icons.auto_awesome_outlined), onPressed: () => p.setArt(UserProfile.randomSeed()), child: Text(l10n.profileRandomShape)),
       const Divider(height: 1),
-      MenuItemButton(leadingIcon: const Icon(Icons.restart_alt_rounded), onPressed: p.reset, child: const Text('重置为首字')),
+      MenuItemButton(leadingIcon: const Icon(Icons.restart_alt_rounded), onPressed: p.reset, child: Text(l10n.profileResetInitial)),
     ];
 
     return Dialog(
@@ -91,9 +92,9 @@ class _ProfileDialogState extends State<_ProfileDialog> {
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(Space.xl, Space.xl, Space.xl, Space.lg),
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Text('个人资料', style: tt.headlineSmall),
+            Text(l10n.profileTitle, style: tt.headlineSmall),
             const SizedBox(height: Space.xs),
-            Text('昵称和头像只保存在这台设备上', style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+            Text(l10n.profileLocalOnly, style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
             const SizedBox(height: Space.xl),
             Center(
               child: MenuAnchor(
@@ -109,9 +110,9 @@ class _ProfileDialogState extends State<_ProfileDialog> {
               maxLength: 24,
               textInputAction: TextInputAction.done,
               decoration: InputDecoration(
-                labelText: '昵称',
+                labelText: l10n.profileNickname,
                 hintText: fallback,
-                helperText: '留空则显示「$fallback」',
+                helperText: l10n.profileNicknameHelper(fallback),
                 prefixIcon: const Icon(Icons.badge_outlined),
               ),
               onChanged: p.setNickname,
@@ -119,12 +120,12 @@ class _ProfileDialogState extends State<_ProfileDialog> {
             ),
             const SizedBox(height: Space.lg),
             Row(children: [
-              Text('灵感', style: tt.titleSmall),
+              Text(l10n.profileInspiration, style: tt.titleSmall),
               const SizedBox(width: Space.sm),
-              Text('点一下换上', style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+              Text(l10n.profileTapToUse, style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
               const Spacer(),
               IconButton(
-                tooltip: '换一批',
+                tooltip: l10n.profileShuffle,
                 onPressed: () => setState(() => _ideas = List.generate(6, (_) => UserProfile.randomSeed())),
                 icon: const Icon(Icons.shuffle_rounded),
               ),
@@ -146,7 +147,7 @@ class _ProfileDialogState extends State<_ProfileDialog> {
               ),
             ),
             const SizedBox(height: Space.lg),
-            Text('轮廓', style: tt.titleSmall),
+            Text(l10n.profileShape, style: tt.titleSmall),
             const SizedBox(height: Space.sm),
             SegmentedButton<AvatarFrame>(
               showSelectedIcon: false,
@@ -162,7 +163,7 @@ class _ProfileDialogState extends State<_ProfileDialog> {
                   ? Padding(
                       padding: const EdgeInsets.only(top: Space.lg),
                       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Text('底色', style: tt.titleSmall),
+                        Text(l10n.profileBackground, style: tt.titleSmall),
                         const SizedBox(height: Space.sm),
                         Wrap(spacing: Space.sm, runSpacing: Space.sm, children: [
                           for (var i = 0; i < kAvatarTones.length; i++) _ToneDot(index: i, selected: p.tone == i, onTap: () => p.update((x) => x.tone = i)),
@@ -174,13 +175,13 @@ class _ProfileDialogState extends State<_ProfileDialog> {
             const SizedBox(height: Space.md),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
-              title: const Text('首页显示一言'),
-              subtitle: const Text('欢迎语下方展示一句文学、诗词或哲思'),
+              title: Text(l10n.profileShowQuote),
+              subtitle: Text(l10n.profileShowQuoteHint),
               value: p.showQuote,
               onChanged: (v) => p.update((x) => x.showQuote = v),
             ),
             const SizedBox(height: Space.sm),
-            Align(alignment: Alignment.centerRight, child: FilledButton(onPressed: () => Navigator.pop(context), child: const Text('完成'))),
+            Align(alignment: Alignment.centerRight, child: FilledButton(onPressed: () => Navigator.pop(context), child: Text(l10n.commonFinished))),
           ]),
         ),
       ),
@@ -201,7 +202,7 @@ class _EditableAvatarState extends State<_EditableAvatar> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return Tooltip(
-      message: '更换头像',
+      message: l10n.profileChangeAvatar,
       child: MouseRegion(
         cursor: SystemMouseCursors.click,
         onEnter: (_) => setState(() => _hover = true),
@@ -268,7 +269,7 @@ class _ToneDot extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final (bg, fg) = avatarToneColors(context, index);
     return Tooltip(
-      message: index == 0 ? '跟随主题' : '底色 $index',
+      message: index == 0 ? l10n.commonFollowTheme : l10n.profileBackgroundIndex(index),
       child: InkResponse(
         onTap: onTap,
         radius: 22,
@@ -300,7 +301,7 @@ Future<String?> _showLinkDialog(BuildContext context, {required bool qq}) {
       final ok = valid(ctl.text);
       return AlertDialog(
         icon: Icon(qq ? Icons.chat_bubble_outline_rounded : Icons.link_rounded),
-        title: Text(qq ? '使用 QQ 头像' : '图片链接'),
+        title: Text(qq ? l10n.profileUseQq : l10n.profileImageUrl),
         content: SizedBox(
           width: 360,
           child: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -322,9 +323,9 @@ Future<String?> _showLinkDialog(BuildContext context, {required bool qq}) {
               autofocus: true,
               keyboardType: qq ? TextInputType.number : TextInputType.url,
               decoration: InputDecoration(
-                labelText: qq ? 'QQ 号' : '图片地址',
-                hintText: qq ? '5–12 位数字' : 'https://example.com/avatar.png',
-                errorText: ctl.text.isNotEmpty && !ok ? (qq ? '请输入 5–12 位 QQ 号' : '需要 http(s) 链接') : null,
+                labelText: qq ? l10n.profileQqNumber : l10n.profileImageAddress,
+                hintText: qq ? l10n.profileQqHint : 'https://example.com/avatar.png',
+                errorText: ctl.text.isNotEmpty && !ok ? (qq ? l10n.profileQqInvalid : l10n.profileUrlInvalid) : null,
               ),
               onChanged: (s) {
                 set(() {});
@@ -340,13 +341,13 @@ Future<String?> _showLinkDialog(BuildContext context, {required bool qq}) {
             ),
             if (qq) ...[
               const SizedBox(height: Space.sm),
-              Text('头像从 QQ 公开头像服务加载，需要联网', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+              Text(l10n.profileQqNote, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant)),
             ],
           ]),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('取消')),
-          FilledButton(onPressed: ok ? () => Navigator.pop(context, ctl.text.trim()) : null, child: const Text('使用')),
+          TextButton(onPressed: () => Navigator.pop(context), child: Text(l10n.commonCancel)),
+          FilledButton(onPressed: ok ? () => Navigator.pop(context, ctl.text.trim()) : null, child: Text(l10n.commonUse)),
         ],
       );
     }),
@@ -357,13 +358,13 @@ Future<String?> _showLinkDialog(BuildContext context, {required bool qq}) {
   });
 }
 
-const _emojiGroups = <(String, String)>[
-  ('学习', '📚 📖 ✏️ 📝 🎓 🧠 💡 🔬 🔭 🧪 🧮 📐 📏 🖊️ 🗂️ 📎 🎒 🏫 💻 ⌨️ 📊 🧭 🌏 🗺️'),
-  ('表情', '😀 😄 😁 😆 😊 🙂 😉 😍 🥰 😎 🤓 🧐 🤔 😴 🥱 😌 😇 🤗 🤩 🥳 😺 😸 🫠 🫡'),
-  ('动物', '🐱 🐶 🐼 🐨 🦊 🐻 🐰 🐹 🐯 🦁 🐮 🐷 🐸 🐵 🐧 🐦 🦉 🦄 🐝 🦋 🐢 🐬 🐳 🦕'),
-  ('自然', '🌸 🌼 🌻 🌷 🌹 🍀 🌿 🌵 🌲 🍁 🍂 🌙 ⭐ 🌈 ☀️ ⛅ ❄️ 🌊 🔥 ⚡ 🪐 🌍 🍄 🌾'),
-  ('食物', '🍎 🍊 🍋 🍉 🍓 🍑 🍒 🥝 🍞 🥐 🍩 🍪 🍰 🧁 🍫 🍬 🍙 🍜 🍣 🥟 ☕ 🧋 🍵 🥤'),
-  ('爱好', '⚽ 🏀 🏸 🏓 🎾 🏐 🎮 🎧 🎸 🎹 🎨 📷 🎬 🚀 ✈️ 🚲 ⛵ 🏝️ 🎈 🎁 🔑 🧩 🪴 ⏰'),
+final _emojiGroups = <(String, String)>[
+  (l10n.emojiStudy, '📚 📖 ✏️ 📝 🎓 🧠 💡 🔬 🔭 🧪 🧮 📐 📏 🖊️ 🗂️ 📎 🎒 🏫 💻 ⌨️ 📊 🧭 🌏 🗺️'),
+  (l10n.emojiFaces, '😀 😄 😁 😆 😊 🙂 😉 😍 🥰 😎 🤓 🧐 🤔 😴 🥱 😌 😇 🤗 🤩 🥳 😺 😸 🫠 🫡'),
+  (l10n.emojiAnimals, '🐱 🐶 🐼 🐨 🦊 🐻 🐰 🐹 🐯 🦁 🐮 🐷 🐸 🐵 🐧 🐦 🦉 🦄 🐝 🦋 🐢 🐬 🐳 🦕'),
+  (l10n.emojiNature, '🌸 🌼 🌻 🌷 🌹 🍀 🌿 🌵 🌲 🍁 🍂 🌙 ⭐ 🌈 ☀️ ⛅ ❄️ 🌊 🔥 ⚡ 🪐 🌍 🍄 🌾'),
+  (l10n.emojiFood, '🍎 🍊 🍋 🍉 🍓 🍑 🍒 🥝 🍞 🥐 🍩 🍪 🍰 🧁 🍫 🍬 🍙 🍜 🍣 🥟 ☕ 🧋 🍵 🥤'),
+  (l10n.emojiHobbies, '⚽ 🏀 🏸 🏓 🎾 🏐 🎮 🎧 🎸 🎹 🎨 📷 🎬 🚀 ✈️ 🚲 ⛵ 🏝️ 🎈 🎁 🔑 🧩 🪴 ⏰'),
 ];
 
 /// Grid of curated emoji plus free input for any emoji.
@@ -377,14 +378,14 @@ Future<String?> showEmojiPicker(BuildContext context, {String initial = ''}) {
       final typed = ctl.text.trim().isEmpty ? '' : ctl.text.trim().characters.first;
       final list = _emojiGroups[group].$2.split(' ');
       return AlertDialog(
-        title: const Text('选择表情'),
+        title: Text(l10n.profilePickEmoji),
         content: SizedBox(
           width: 380,
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             TextField(
               controller: ctl,
               decoration: InputDecoration(
-                hintText: '输入或粘贴任意表情',
+                hintText: l10n.profileEmojiHint,
                 prefixIcon: Padding(
                   padding: const EdgeInsets.all(Space.sm),
                   child: Text(typed.isEmpty ? '🙂' : typed, style: TextStyle(fontSize: 22, color: typed.isEmpty ? cs.outline : null)),
@@ -426,8 +427,8 @@ Future<String?> showEmojiPicker(BuildContext context, {String initial = ''}) {
           ]),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('取消')),
-          FilledButton(onPressed: typed.isEmpty ? null : () => Navigator.pop(context, typed), child: const Text('使用')),
+          TextButton(onPressed: () => Navigator.pop(context), child: Text(l10n.commonCancel)),
+          FilledButton(onPressed: typed.isEmpty ? null : () => Navigator.pop(context, typed), child: Text(l10n.commonUse)),
         ],
       );
     }),

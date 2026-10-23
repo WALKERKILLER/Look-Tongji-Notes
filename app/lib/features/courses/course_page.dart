@@ -18,6 +18,7 @@ import '../canvas/canvas_course.dart';
 import '../plugins/plugin_views.dart';
 import 'courses_page.dart';
 import 'download_sheet.dart';
+import '../../l10n/l10n.dart';
 
 class CoursePage extends StatefulWidget {
   const CoursePage({super.key, required this.courseId});
@@ -115,14 +116,14 @@ class _CoursePageState extends State<CoursePage> {
     String? month;
     for (final l in list) {
       final d = l.begin;
-      final m = d == null ? '未排期' : '${d.year}年${d.month}月';
+      final m = d == null ? l10n.courseUnscheduled : l10n.dateYearMonth(d.year, d.month);
       if (m != month) rows.add(m);
       month = m;
       rows.add(l);
     }
 
     return ReportScreen(
-      value: {'screen': '课程详情', 'course_id': widget.courseId, if (course != null) 'course': course.title},
+      value: {'screen': l10n.screenCourse, 'course_id': widget.courseId, if (course != null) 'course': course.title},
       child: Theme(
         data: base.copyWith(colorScheme: base.colorScheme.copyWith(primary: s.primary, primaryContainer: s.primaryContainer, onPrimaryContainer: s.onPrimaryContainer, secondaryContainer: s.secondaryContainer, onSecondaryContainer: s.onSecondaryContainer)),
         child: Scaffold(
@@ -133,14 +134,14 @@ class _CoursePageState extends State<CoursePage> {
               backgroundColor: base.colorScheme.surfaceContainerLowest,
               title: AnimatedSwitcher(
                 duration: Motion.short4,
-                child: _selecting ? Text('已选 ${_sel.length} 节', key: const ValueKey(1)) : const SizedBox.shrink(key: ValueKey(0)),
+                child: _selecting ? Text(l10n.courseSelectedCount(_sel.length), key: const ValueKey(1)) : const SizedBox.shrink(key: ValueKey(0)),
               ),
               leading: _selecting ? IconButton(onPressed: () => setState(_sel.clear), icon: const Icon(Icons.close_rounded)) : null,
               actions: _selecting
                   ? [
                       TextButton(
                         onPressed: () => setState(() => _sel.length == playable.length ? _sel.clear() : _sel.addAll(playable.map((l) => l.id))),
-                        child: Text(_sel.length == playable.length ? '取消全选' : '全选'),
+                        child: Text(_sel.length == playable.length ? l10n.commonDeselectAll : l10n.commonSelectAll),
                       ),
                     ]
                   : [
@@ -150,11 +151,11 @@ class _CoursePageState extends State<CoursePage> {
                           child: FilledButton.tonalIcon(
                             onPressed: () => openCourseAssistant(context, widget.courseId, course.title),
                             icon: const Icon(Icons.forum_outlined, size: 18),
-                            label: const Text('课程助手'),
+                            label: Text(l10n.courseAssistant),
                           ),
                         ),
                       IconButton(
-                        tooltip: '刷新课表',
+                        tooltip: l10n.courseRefreshSchedule,
                         onPressed: _syncing ? null : () => _load(sync: true),
                         icon: _syncing ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2.5)) : const Icon(Icons.sync_rounded),
                       ),
@@ -162,7 +163,7 @@ class _CoursePageState extends State<CoursePage> {
                       if (course != null)
                         Builder(
                           builder: (ctx) => IconButton(
-                            tooltip: '更多',
+                            tooltip: l10n.commonMore,
                             onPressed: () {
                               final box = ctx.findRenderObject() as RenderBox;
                               showCourseMenu(context, course, box.localToGlobal(box.size.bottomCenter(Offset.zero)));
@@ -196,7 +197,7 @@ class _CoursePageState extends State<CoursePage> {
               ),
             ),
             if (_loading)
-              const SliverFillRemaining(hasScrollBody: false, child: CenteredLoader(label: '正在读取课表'))
+              SliverFillRemaining(hasScrollBody: false, child: CenteredLoader(label: l10n.courseLoadingSchedule))
             else if (_error != null && list.isEmpty)
               SliverFillRemaining(hasScrollBody: false, child: ErrorState(error: _error!, onRetry: () => _load(sync: true)))
             else ...[
@@ -205,7 +206,7 @@ class _CoursePageState extends State<CoursePage> {
                   child: Padding(
                     padding: EdgeInsets.fromLTRB(pad, Space.sm, pad - Space.sm, Space.sm),
                     child: Row(children: [
-                      Text('${list.length} 节课', style: tt.titleMedium),
+                      Text(l10n.courseLectureTotal(list.length), style: tt.titleMedium),
                       const Spacer(),
                       TextButton.icon(
                         onPressed: () => prefs.update((p) => p.lecturesNewestFirst = !newestFirst),
@@ -215,7 +216,7 @@ class _CoursePageState extends State<CoursePage> {
                           curve: Motion.emphasized,
                           child: const Icon(Icons.arrow_downward_rounded, size: 18),
                         ),
-                        label: Text(newestFirst ? '最新在前' : '第一节在前'),
+                        label: Text(newestFirst ? l10n.courseNewestFirst : l10n.courseOldestFirst),
                       ),
                       TextButton.icon(
                         onPressed: playable.isEmpty
@@ -226,7 +227,7 @@ class _CoursePageState extends State<CoursePage> {
                                 setState(() => _sel.addAll((missing.isEmpty ? playable : missing).map((l) => l.id)));
                               },
                         icon: const Icon(Icons.checklist_rounded, size: 18),
-                        label: const Text('批量下载'),
+                        label: Text(l10n.courseBatchDownload),
                       ),
                     ]),
                   ),
@@ -288,7 +289,7 @@ class _CoursePageState extends State<CoursePage> {
                       if (mounted) setState(_sel.clear);
                     },
               icon: const Icon(Icons.download_rounded),
-              label: Text('下载 ${_sel.length} 节'),
+              label: Text(l10n.courseDownloadSelected(_sel.length)),
             ),
           ),
         ),
@@ -344,7 +345,7 @@ class _HeaderState extends State<_Header> with SingleTickerProviderStateMixin {
     final course = widget.course;
     final scheme = widget.scheme;
     final tt = Theme.of(context).textTheme;
-    final teachers = course.teachers.isNotEmpty ? course.teachers.join('、') : course.teacher;
+    final teachers = course.teachers.isNotEmpty ? course.teachers.join(l10n.listSeparator) : course.teacher;
     final compact = context.isCompact;
     final art = MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
@@ -373,9 +374,9 @@ class _HeaderState extends State<_Header> with SingleTickerProviderStateMixin {
           style: tt.bodyMedium?.copyWith(color: scheme.onSurfaceVariant)),
       const SizedBox(height: Space.lg),
       Wrap(spacing: Space.sm, runSpacing: Space.sm, children: [
-        _Pill(icon: Icons.play_lesson_outlined, text: '${widget.lectures} 节', scheme: scheme),
-        _Pill(icon: Icons.download_done_rounded, text: '本地 ${widget.local} 节', scheme: scheme),
-        _Pill(icon: Icons.trending_up_rounded, text: '学习进度 ${(course.progress * 100).round()}%', scheme: scheme),
+        _Pill(icon: Icons.play_lesson_outlined, text: l10n.courseStatLectures(widget.lectures), scheme: scheme),
+        _Pill(icon: Icons.download_done_rounded, text: l10n.courseStatLocal(widget.local), scheme: scheme),
+        _Pill(icon: Icons.trending_up_rounded, text: l10n.courseProgress((course.progress * 100).round()), scheme: scheme),
       ]),
       if (widget.resume != null) ...[
         const SizedBox(height: Space.lg),
@@ -384,7 +385,7 @@ class _HeaderState extends State<_Header> with SingleTickerProviderStateMixin {
           style: FilledButton.styleFrom(backgroundColor: scheme.primary, foregroundColor: scheme.onPrimary),
           icon: Icon(widget.resumeStarted ? Icons.play_circle_rounded : Icons.play_arrow_rounded),
           label: Text(
-            '${widget.resumeStarted ? '继续学习' : '开始学习'} · ${widget.resume!.date.isNotEmpty ? widget.resume!.date : widget.resume!.shortTitle}'
+            '${widget.resumeStarted ? l10n.courseContinue : l10n.courseStart} · ${widget.resume!.date.isNotEmpty ? widget.resume!.date : widget.resume!.shortTitle}'
             '${widget.resumeStarted ? ' ${fmtClock(widget.resume!.positionMs)}' : ''}',
           ),
         ),
@@ -423,7 +424,7 @@ class _Pill extends StatelessWidget {
         child: Row(mainAxisSize: MainAxisSize.min, children: [
           Icon(icon, size: 14, color: scheme.onSecondaryContainer),
           const SizedBox(width: 4),
-          Text(text, style: Theme.of(context).textTheme.labelMedium?.copyWith(color: scheme.onSecondaryContainer)),
+          Flexible(child: Text(text, maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.labelMedium?.copyWith(color: scheme.onSecondaryContainer))),
         ]),
       );
 }
@@ -508,11 +509,11 @@ class _LectureTileState extends State<_LectureTile> {
                         const SizedBox(height: 2),
                         Text(
                           [
-                            '第 ${widget.ordinal} 节',
+                            l10n.lectureOrdinal(widget.ordinal),
                             fmtLectureDate(d),
                             if (l.durationS > 0) fmtDuration(l.durationS),
                             if (l.room.isNotEmpty) l.room,
-                            if (disabled) (l.upcoming ? '未开始' : '暂无回放'),
+                            if (disabled) (l.upcoming ? l10n.lectureNotStarted : l10n.lectureNoReplay),
                           ].join(' · '),
                           style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                           maxLines: 1,
@@ -539,8 +540,8 @@ class _LectureTileState extends State<_LectureTile> {
                       ]),
                     ),
                     if (!widget.selecting && !disabled) ...[
-                      IconButton(tooltip: '下载', onPressed: widget.onDownload, icon: const Icon(Icons.download_outlined)),
-                      IconButton.filledTonal(tooltip: '播放', onPressed: widget.onTap, icon: const Icon(Icons.play_arrow_rounded)),
+                      IconButton(tooltip: l10n.commonDownload, onPressed: widget.onDownload, icon: const Icon(Icons.download_outlined)),
+                      IconButton.filledTonal(tooltip: l10n.commonPlay, onPressed: widget.onTap, icon: const Icon(Icons.play_arrow_rounded)),
                     ],
                   ]),
                 ),
@@ -567,7 +568,7 @@ class _DateBlock extends StatelessWidget {
       child: date == null
           ? Icon(Icons.event_outlined, color: cs.onPrimaryContainer)
           : Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-              Text('${date!.month}月', style: tt.labelSmall?.copyWith(color: cs.onPrimaryContainer)),
+              Text(l10n.dateMonth(date!.month), style: tt.labelSmall?.copyWith(color: cs.onPrimaryContainer)),
               Text('${date!.day}', style: tt.titleLarge?.copyWith(color: cs.onPrimaryContainer, height: 1.1, fontWeight: FontWeight.w600)),
             ]),
     );

@@ -11,6 +11,7 @@ import '../../widgets/look_markdown.dart' show openPlainLink;
 import '../../widgets/states.dart';
 import 'canvas_course.dart';
 import 'school_emblem.dart';
+import '../../l10n/l10n.dart';
 
 /// Connects the school's Canvas: school, sign-in method, status and which
 /// Look course each Canvas course belongs to.
@@ -31,7 +32,7 @@ class CanvasPage extends StatefulWidget {
 Map<String, dynamic> _map(Object? v) => v is Map ? v.cast<String, dynamic>() : <String, dynamic>{};
 List<Map<String, dynamic>> _maps(Object? v) => jsonList(v).whereType<Map>().map((e) => e.cast<String, dynamic>()).toList();
 
-const _other = {'id': 'other', 'name': '其他学校', 'canvas': '', 'sso': '', 'look': false};
+final _other = {'id': 'other', 'name': l10n.schoolOther, 'canvas': '', 'sso': '', 'look': false};
 
 class _CanvasPageState extends State<CanvasPage> {
   Map<String, dynamic>? _r;
@@ -119,7 +120,7 @@ class _CanvasPageState extends State<CanvasPage> {
       _pass.clear();
       if (mounted) setState(() => _editing = false);
       await _load();
-      if (mounted) showSnack(context, '已连接 Canvas，正在同步课程和作业');
+      if (mounted) showSnack(context, l10n.canvasConnected);
     } catch (e) {
       if (mounted) showSnack(context, '$e');
     } finally {
@@ -142,11 +143,11 @@ class _CanvasPageState extends State<CanvasPage> {
       context: context,
       builder: (c) => AlertDialog(
         icon: const Icon(Icons.link_off_rounded),
-        title: const Text('断开 Canvas？'),
-        content: Text('日程里的 Canvas 作业和课程关联会一起移除，已下载的课件保留。${auto ? 'Look Studio 创建的访问令牌也会被撤销。' : ''}'),
+        title: Text(l10n.canvasDisconnectTitle),
+        content: Text(l10n.canvasDisconnectBody(auto ? l10n.canvasRevokesToken : '')),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('取消')),
-          FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('断开')),
+          TextButton(onPressed: () => Navigator.pop(c, false), child: Text(l10n.commonCancel)),
+          FilledButton(onPressed: () => Navigator.pop(c, true), child: Text(l10n.commonDisconnect)),
         ],
       ),
     );
@@ -172,7 +173,7 @@ class _CanvasPageState extends State<CanvasPage> {
   Widget build(BuildContext context) {
     final r = _r;
     return Scaffold(
-      appBar: AppBar(title: const Text('学校与 Canvas')),
+      appBar: AppBar(title: Text(l10n.settingsSchoolCanvas)),
       body: r == null
           ? (_error != null ? ErrorState(error: _error!, onRetry: _load) : const CenteredLoader())
           : ListView(
@@ -198,11 +199,11 @@ class _CanvasPageState extends State<CanvasPage> {
     final sc = _sc;
     final note = '${sc['note'] ?? ''}';
     return [
-      Text('连接你学校的 Canvas', style: tt.headlineSmall),
+      Text(l10n.canvasConnectTitle, style: tt.headlineSmall),
       const SizedBox(height: Space.xs),
-      Text('作业会进入日程，截止前一天提醒你；课件可以直接下载到对应课程的文件夹。Look Studio 只读取，不会提交或修改任何内容。', style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
+      Text(l10n.canvasConnectBody, style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
       const SizedBox(height: Space.xl),
-      Text('学校', style: tt.titleSmall),
+      Text(l10n.commonSchool, style: tt.titleSmall),
       const SizedBox(height: Space.sm),
       Wrap(spacing: Space.md, runSpacing: Space.md, children: [
         for (final s in _schools)
@@ -225,16 +226,16 @@ class _CanvasPageState extends State<CanvasPage> {
           controller: _base,
           keyboardType: TextInputType.url,
           onChanged: (_) => setState(() {}),
-          decoration: const InputDecoration(labelText: 'Canvas 地址', hintText: 'https://canvas.example.edu.cn', border: OutlineInputBorder()),
+          decoration: InputDecoration(labelText: l10n.canvasUrl, hintText: 'https://canvas.example.edu.cn', border: OutlineInputBorder()),
         ),
       ],
       const SizedBox(height: Space.xl),
-      Text('登录方式', style: tt.titleSmall),
+      Text(l10n.canvasSignInMethod, style: tt.titleSmall),
       const SizedBox(height: Space.sm),
       SegmentedButton<String>(
         segments: [
-          ButtonSegment(value: 'sso', enabled: _hasSso, icon: const Icon(Icons.verified_user_outlined), label: const Text('统一身份认证')),
-          const ButtonSegment(value: 'token', icon: Icon(Icons.key_outlined), label: Text('访问令牌')),
+          ButtonSegment(value: 'sso', enabled: _hasSso, icon: const Icon(Icons.verified_user_outlined), label: Text(l10n.authTongji)),
+          ButtonSegment(value: 'token', icon: Icon(Icons.key_outlined), label: Text(l10n.canvasAccessToken)),
         ],
         selected: {_hasSso ? _mode : 'token'},
         onSelectionChanged: (v) => setState(() => _mode = v.first),
@@ -246,11 +247,11 @@ class _CanvasPageState extends State<CanvasPage> {
         FilledButton.icon(
           onPressed: _busy || !_ready ? null : _connect,
           icon: _busy ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2.5)) : const Icon(Icons.link_rounded),
-          label: Text(_busy ? '正在连接' : '连接'),
+          label: Text(_busy ? l10n.commonConnecting : l10n.commonConnect),
         ),
         if (st['connected'] == true) ...[
           const SizedBox(width: Space.sm),
-          TextButton(onPressed: _busy ? null : () => setState(() => _editing = false), child: const Text('取消')),
+          TextButton(onPressed: _busy ? null : () => setState(() => _editing = false), child: Text(l10n.commonCancel)),
         ],
       ]),
     ];
@@ -265,26 +266,26 @@ class _CanvasPageState extends State<CanvasPage> {
       TextField(
         controller: _user,
         onChanged: (_) => setState(() {}),
-        decoration: const InputDecoration(labelText: '复旦 UIS 学号', border: OutlineInputBorder()),
+        decoration: InputDecoration(labelText: l10n.canvasFudanId, border: OutlineInputBorder()),
       ),
       const SizedBox(height: Space.md),
       TextField(
         controller: _pass,
         obscureText: true,
         onChanged: (_) => setState(() {}),
-        decoration: const InputDecoration(labelText: 'UIS 密码', border: OutlineInputBorder(), helperText: '用本机密钥加密保存，只用来登录复旦 UIS'),
+        decoration: InputDecoration(labelText: l10n.canvasFudanPassword, border: OutlineInputBorder(), helperText: l10n.canvasFudanPasswordHelper),
       ),
     ];
-    final lookWarning = sso == 'look' && !_lookSignedIn ? [const _Banner(icon: Icons.login_rounded, text: '需要先在 Look Studio 登录同济统一身份认证。', error: true), const SizedBox(height: Space.md)] : <Widget>[];
+    final lookWarning = sso == 'look' && !_lookSignedIn ? [_Banner(icon: Icons.login_rounded, text: l10n.canvasNeedsTongji, error: true), const SizedBox(height: Space.md)] : <Widget>[];
     if (mode == 'sso') {
       return [
         ...lookWarning,
         _Explain(
           icon: Icons.autorenew_rounded,
-          title: sso == 'look' ? '沿用 Look Studio 的同济登录' : '用复旦 UIS 登录 Canvas',
+          title: sso == 'look' ? l10n.canvasTongjiTitle : l10n.canvasFudanTitle,
           body: sso == 'look'
-              ? '不在 Canvas 账户里创建任何东西。Canvas 的登录过期时，会用和 Look 相同的方式自动续上：先静默单点登录，必要时用你记住的密码。'
-              : '不在 Canvas 账户里创建任何东西。Canvas 的登录过期时，会用保存的 UIS 账号自动重新登录。',
+              ? l10n.canvasTongjiBody
+              : l10n.canvasFudanBody,
         ),
         if (sso == 'uis') ...[const SizedBox(height: Space.lg), ...uisFields],
       ];
@@ -294,8 +295,8 @@ class _CanvasPageState extends State<CanvasPage> {
       if (_hasSso) ...[
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
-          title: const Text('由 Look Studio 创建并自动续期'),
-          subtitle: const Text('通过统一身份认证在你的 Canvas 账户里新建一个 90 天的访问令牌，到期前 14 天自动换新，断开时撤销'),
+          title: Text(l10n.canvasAutoTokenTitle),
+          subtitle: Text(l10n.canvasAutoTokenBody),
           value: _create,
           onChanged: (v) => setState(() => _create = v),
         ),
@@ -305,12 +306,12 @@ class _CanvasPageState extends State<CanvasPage> {
         ...lookWarning,
         if (sso == 'uis') ...uisFields,
       ] else ...[
-        Text('手动获取令牌', style: tt.titleSmall),
+        Text(l10n.canvasManualToken, style: tt.titleSmall),
         const SizedBox(height: Space.sm),
         for (final (i, s) in [
-          '打开 Canvas，进入「账户 → 设置」',
-          '在「已批准的集成」下点「新建访问许可证」，用途填 Look Studio；过期日期可以留空',
-          '复制生成的令牌（只显示一次），粘贴到下面',
+          l10n.canvasTokenStep1,
+          l10n.canvasTokenStep2,
+          l10n.canvasTokenStep3,
         ].indexed)
           Padding(
             padding: const EdgeInsets.only(bottom: Space.sm),
@@ -325,7 +326,7 @@ class _CanvasPageState extends State<CanvasPage> {
           child: TextButton.icon(
             onPressed: base.startsWith('https://') ? () => openPlainLink(context, '$base/profile/settings') : null,
             icon: const Icon(Icons.open_in_new_rounded, size: 18),
-            label: const Text('打开 Canvas 设置页'),
+            label: Text(l10n.canvasOpenSettings),
           ),
         ),
         const SizedBox(height: Space.sm),
@@ -333,10 +334,10 @@ class _CanvasPageState extends State<CanvasPage> {
           controller: _token,
           obscureText: true,
           onChanged: (_) => setState(() {}),
-          decoration: const InputDecoration(
-            labelText: '访问令牌',
+          decoration: InputDecoration(
+            labelText: l10n.canvasAccessToken,
             border: OutlineInputBorder(),
-            helperText: '加密保存在本机，界面上只显示末 4 位。令牌到期或被撤销时会提醒你重新粘贴',
+            helperText: l10n.canvasTokenHelper,
             helperMaxLines: 2,
           ),
         ),
@@ -355,11 +356,11 @@ class _CanvasPageState extends State<CanvasPage> {
     final err = '${st['error'] ?? ''}';
     final exp = DateTime.tryParse('${st['expires_at'] ?? ''}')?.toLocal();
     final auth = st['mode'] == 'sso'
-        ? '统一身份认证会话 · 过期自动续上'
+        ? l10n.canvasSessionAuth
         : [
-            '访问令牌 ····${st['token_last4'] ?? ''}',
-            if (st['token_auto'] == true) '自动续期',
-            if (exp != null) '${st['token_auto'] == true ? '当前令牌' : ''}到期 ${fmtIsoDay(exp)}',
+            l10n.canvasTokenTail(st['token_last4'] ?? ''),
+            if (st['token_auto'] == true) l10n.canvasAutoRenew,
+            if (exp != null) l10n.canvasTokenExpires(st['token_auto'] == true ? l10n.canvasCurrentToken : '', fmtIsoDay(exp)),
           ].join(' · ');
     final courses = _maps(st['courses']);
     final open = courses.fold<int>(0, (n, c) => n + ((c['open'] as num?)?.toInt() ?? 0));
@@ -376,7 +377,7 @@ class _CanvasPageState extends State<CanvasPage> {
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text('${sc['id'] == 'other' ? Uri.tryParse('${st['base']}')?.host ?? 'Canvas' : sc['name']} · Canvas', style: tt.titleLarge),
                   const SizedBox(height: Space.xxs),
-                  Text('${st['user'] ?? ''}'.isEmpty ? '已连接' : '已连接为 ${st['user']}', style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
+                  Text('${st['user'] ?? ''}'.isEmpty ? l10n.commonConnected : l10n.canvasConnectedAs(st['user']), style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
                 ]),
               ),
             ]),
@@ -385,10 +386,10 @@ class _CanvasPageState extends State<CanvasPage> {
             _Line(
               icon: Icons.schedule_rounded,
               text: syncing
-                  ? '正在同步…'
-                  : [synced > 0 ? '上次同步 ${fmtRelative(DateTime.fromMillisecondsSinceEpoch(synced))}' : '还没有同步', '每 15 分钟自动同步'].join(' · '),
+                  ? l10n.commonSyncing
+                  : [synced > 0 ? l10n.commonLastSynced(fmtRelative(DateTime.fromMillisecondsSinceEpoch(synced))) : l10n.canvasNotSynced, l10n.canvasSyncInterval].join(' · '),
             ),
-            _Line(icon: Icons.assignment_outlined, text: '${courses.length} 门课程 · $open 项作业待交'),
+            _Line(icon: Icons.assignment_outlined, text: l10n.canvasSummary(courses.length, open)),
             AnimatedSize(
               duration: Motion.medium2,
               curve: Motion.emphasized,
@@ -400,22 +401,22 @@ class _CanvasPageState extends State<CanvasPage> {
             ],
             const SizedBox(height: Space.lg),
             Wrap(spacing: Space.sm, runSpacing: Space.sm, children: [
-              FilledButton.tonalIcon(onPressed: syncing ? null : _sync, icon: const Icon(Icons.sync_rounded), label: const Text('立即同步')),
-              OutlinedButton.icon(onPressed: () => setState(() => _editing = true), icon: const Icon(Icons.manage_accounts_outlined), label: const Text('更改登录方式')),
-              TextButton.icon(onPressed: () => _disconnect(st), icon: const Icon(Icons.link_off_rounded), label: const Text('断开')),
+              FilledButton.tonalIcon(onPressed: syncing ? null : _sync, icon: const Icon(Icons.sync_rounded), label: Text(l10n.commonSyncNow)),
+              OutlinedButton.icon(onPressed: () => setState(() => _editing = true), icon: const Icon(Icons.manage_accounts_outlined), label: Text(l10n.canvasChangeMethod)),
+              TextButton.icon(onPressed: () => _disconnect(st), icon: const Icon(Icons.link_off_rounded), label: Text(l10n.commonDisconnect)),
             ]),
           ]),
         ),
       ),
       const SizedBox(height: Space.xl),
-      Text('课程关联', style: tt.titleMedium),
+      Text(l10n.canvasCourseLinks, style: tt.titleMedium),
       const SizedBox(height: Space.xs),
-      Text('作业按关联的 Look 课程归类，课件会下载到那门课的文件夹。同名课程会自动关联。', style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
+      Text(l10n.canvasCourseLinksBody, style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
       const SizedBox(height: Space.md),
       if (courses.isEmpty)
         Padding(
           padding: const EdgeInsets.symmetric(vertical: Space.xl),
-          child: Text(syncing ? '正在读取课程…' : '这个学期在 Canvas 上没有课程', textAlign: TextAlign.center, style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
+          child: Text(syncing ? l10n.canvasLoadingCourses : l10n.canvasNoCourses, textAlign: TextAlign.center, style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
         )
       else
         Material(
@@ -446,7 +447,7 @@ class _SchoolCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final tt = Theme.of(context).textTheme;
     final cs = Theme.of(context).colorScheme;
-    final chips = [if (school['look'] == true) 'Look 录播', 'Canvas'];
+    final chips = [if (school['look'] == true) l10n.canvasLookReplay, 'Canvas'];
     return Semantics(
       selected: selected,
       button: true,
@@ -480,7 +481,7 @@ class _SchoolCard extends StatelessWidget {
                 Text('${school['name']}', style: tt.titleMedium?.copyWith(color: selected ? cs.onSecondaryContainer : null)),
                 const SizedBox(height: Space.xs),
                 Text(
-                  school['id'] == 'other' ? '任意 Canvas 站点，用访问令牌' : chips.join(' · '),
+                  school['id'] == 'other' ? l10n.canvasAnySite : chips.join(' · '),
                   style: tt.bodySmall?.copyWith(color: selected ? cs.onSecondaryContainer : cs.onSurfaceVariant),
                 ),
               ]),
@@ -505,7 +506,7 @@ class _CourseRow extends StatelessWidget {
     final look = '${course['look_course'] ?? ''}';
     final manual = course['manual'] == true;
     final title = looks.where((l) => l.id == look).map((l) => l.title).firstOrNull ?? '';
-    final label = look.isEmpty ? (manual ? '不关联' : '自动：未找到同名课程') : (manual ? title : '自动：$title');
+    final label = look.isEmpty ? (manual ? l10n.canvasNoLink : l10n.canvasAutoNoMatch) : (manual ? title : l10n.canvasAutoMatch(title));
     final open = (course['open'] as num?)?.toInt() ?? 0;
     final term = '${_map(course['term'])['name'] ?? ''}';
     return ListTile(
@@ -515,18 +516,18 @@ class _CourseRow extends StatelessWidget {
         child: Text('${course['name']}'.characters.firstOrNull ?? '?', style: TextStyle(color: cs.onTertiaryContainer)),
       ),
       title: Text('${course['name']}', maxLines: 1, overflow: TextOverflow.ellipsis),
-      subtitle: Text([if (term.isNotEmpty) term, open > 0 ? '$open 项作业待交' : '没有待交作业'].join(' · ')),
+      subtitle: Text([if (term.isNotEmpty) term, open > 0 ? l10n.canvasOpenAssignments(open) : l10n.canvasNoOpenAssignments].join(' · ')),
       onTap: () => showCanvasCourseSheet(context, id, '${course['name']}'),
       trailing: MenuAnchor(
         builder: (context, ctl, _) => ActionChip(
           avatar: Icon(look.isEmpty ? Icons.link_off_rounded : Icons.link_rounded, size: 18),
           label: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 180), child: Text(label, overflow: TextOverflow.ellipsis)),
-          tooltip: '关联到 Look 课程',
+          tooltip: l10n.canvasLinkCourse,
           onPressed: () => ctl.isOpen ? ctl.close() : ctl.open(),
         ),
         menuChildren: [
-          MenuItemButton(leadingIcon: const Icon(Icons.auto_awesome_outlined), onPressed: () => onLink(id, auto: true), child: const Text('自动匹配同名课程')),
-          MenuItemButton(leadingIcon: const Icon(Icons.link_off_rounded), onPressed: () => onLink(id), child: const Text('不关联')),
+          MenuItemButton(leadingIcon: const Icon(Icons.auto_awesome_outlined), onPressed: () => onLink(id, auto: true), child: Text(l10n.canvasAutoLink)),
+          MenuItemButton(leadingIcon: const Icon(Icons.link_off_rounded), onPressed: () => onLink(id), child: Text(l10n.canvasNoLink)),
           if (looks.isNotEmpty) const Divider(),
           for (final l in looks)
             MenuItemButton(
@@ -649,13 +650,13 @@ class _CanvasSettingsEntryState extends State<CanvasSettingsEntry> {
     return ListTile(
       contentPadding: EdgeInsets.zero,
       leading: SchoolEmblem(id: '${sc['id']}', name: '${sc['name']}', url: '${sc['emblem_url'] ?? ''}'),
-      title: Text(connected ? '${sc['id'] == 'other' ? '' : sc['name']} Canvas 已连接' : '连接 Canvas'),
+      title: Text(connected ? l10n.canvasSchoolConnected(sc['id'] == 'other' ? '' : sc['name']) : l10n.canvasConnect),
       subtitle: Text(
         !connected
-            ? '同济、复旦或其他学校的 Canvas：作业进日程，课件下载到课程文件夹'
+            ? l10n.canvasEntryHint
             : err.isNotEmpty
                 ? err
-                : '${_maps(st['courses']).length} 门课程 · $open 项作业待交',
+                : l10n.canvasSummary(_maps(st['courses']).length, open),
         style: err.isNotEmpty ? TextStyle(color: Theme.of(context).colorScheme.error) : null,
       ),
       trailing: const Icon(Icons.chevron_right_rounded),

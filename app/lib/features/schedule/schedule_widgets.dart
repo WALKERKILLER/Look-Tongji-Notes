@@ -12,6 +12,7 @@ import '../player/player_page.dart';
 import '../plugins/plugin_views.dart';
 import '../../widgets/look_markdown.dart' show openPlainLink;
 import 'schedule_store.dart';
+import '../../l10n/l10n.dart';
 
 /// Visual identity of a schedule kind, built from color-scheme roles.
 class KindStyle {
@@ -25,11 +26,11 @@ class KindStyle {
   static KindStyle of(BuildContext context, String kind) {
     final cs = Theme.of(context).colorScheme;
     return switch (kind) {
-      'homework' => KindStyle('作业', Icons.edit_note_rounded, cs.primaryContainer, cs.onPrimaryContainer, cs.primary),
-      'exam' => KindStyle('考试', Icons.quiz_outlined, cs.tertiaryContainer, cs.onTertiaryContainer, cs.tertiary),
-      'activity' => KindStyle('活动', Icons.groups_2_outlined, cs.secondaryContainer, cs.onSecondaryContainer, cs.secondary),
-      'deadline' => KindStyle('截止', Icons.flag_outlined, cs.errorContainer, cs.onErrorContainer, cs.error),
-      _ => KindStyle('待办', Icons.task_alt_rounded, cs.surfaceContainerHighest, cs.onSurfaceVariant, cs.outline),
+      'homework' => KindStyle(l10n.commonAssignments, Icons.edit_note_rounded, cs.primaryContainer, cs.onPrimaryContainer, cs.primary),
+      'exam' => KindStyle(l10n.scheduleKindExam, Icons.quiz_outlined, cs.tertiaryContainer, cs.onTertiaryContainer, cs.tertiary),
+      'activity' => KindStyle(l10n.scheduleKindEvent, Icons.groups_2_outlined, cs.secondaryContainer, cs.onSecondaryContainer, cs.secondary),
+      'deadline' => KindStyle(l10n.scheduleKindDeadline, Icons.flag_outlined, cs.errorContainer, cs.onErrorContainer, cs.error),
+      _ => KindStyle(l10n.scheduleTodos, Icons.task_alt_rounded, cs.surfaceContainerHighest, cs.onSurfaceVariant, cs.outline),
     };
   }
 }
@@ -38,17 +39,17 @@ String fmtDue(ScheduleItem it) {
   final d = it.day;
   final today = dayOf(DateTime.now());
   final diff = d.difference(today).inDays;
-  final rel = switch (diff) { 0 => '今天', 1 => '明天', 2 => '后天', -1 => '昨天', _ => '${d.month}月${d.day}日' };
-  final wd = '周${weekdayNames[d.weekday - 1]}';
+  final rel = switch (diff) { 0 => l10n.commonToday, 1 => l10n.commonTomorrow, 2 => l10n.commonDayAfterTomorrow, -1 => l10n.commonYesterday, _ => l10n.dateMonthDay(d.month, d.day) };
+  final wd = l10n.weekdayName(weekdayNames[d.weekday - 1]);
   return [rel, if (diff.abs() > 1) wd, if (it.dueTime.isNotEmpty) it.dueTime].join(' ');
 }
 
 String fmtCountdown(ScheduleItem it) {
   final diff = it.day.difference(dayOf(DateTime.now())).inDays;
-  if (it.done) return '已完成';
-  if (diff < 0) return '逾期 ${-diff} 天';
-  if (diff == 0) return '今天';
-  return '还有 $diff 天';
+  if (it.done) return l10n.commonDone;
+  if (diff < 0) return l10n.scheduleOverdueDays(-diff);
+  if (diff == 0) return l10n.commonToday;
+  return l10n.scheduleDaysLeft(diff);
 }
 
 /// A calendar leaf: month on a tinted band, the day large below.
@@ -75,15 +76,16 @@ class DateLeaf extends StatelessWidget {
               width: double.infinity,
               color: muted ? cs.surfaceContainerHigh : style.container,
               alignment: Alignment.center,
-              child: Text('${date.month}月', style: tt.labelSmall?.copyWith(color: muted ? cs.onSurfaceVariant : style.onContainer, height: 1)),
+              child: Text(l10n.dateMonth(date.month), style: tt.labelSmall?.copyWith(color: muted ? cs.onSurfaceVariant : style.onContainer, height: 1)),
             ),
             Expanded(
               child: Center(
-                child: Column(mainAxisSize: MainAxisSize.min, children: [
+                // Large text sizes shrink the date instead of spilling out of the tile.
+                child: FittedBox(fit: BoxFit.scaleDown, child: Column(mainAxisSize: MainAxisSize.min, children: [
                   Text('${date.day}',
                       style: tt.titleLarge?.copyWith(height: 1, fontWeight: FontWeight.w600, color: muted ? cs.onSurfaceVariant : cs.onSurface)),
-                  Text('周${weekdayNames[date.weekday - 1]}', style: tt.labelSmall?.copyWith(fontSize: 10, height: 1.3, color: cs.onSurfaceVariant)),
-                ]),
+                  Text(l10n.weekdayName(weekdayNames[date.weekday - 1]), style: tt.labelSmall?.copyWith(fontSize: 10, height: 1.3, color: cs.onSurfaceVariant)),
+                ])),
               ),
             ),
           ]),
@@ -205,7 +207,7 @@ class ScheduleTile extends StatelessWidget {
                 done: item.done,
                 color: st.accent,
                 onChanged: (v) => store.patch(item, {'done': v}).catchError((e) {
-                  if (context.mounted) showSnack(context, '更新失败：$e');
+                  if (context.mounted) showSnack(context, l10n.commonUpdateFailed(e));
                 }),
               ),
               Expanded(
@@ -236,7 +238,7 @@ class ScheduleTile extends StatelessWidget {
                 context_: {'schedule_id': item.id, if (item.courseId.isNotEmpty) 'course_id': item.courseId, if (item.lectureId.isNotEmpty) 'lecture_id': item.lectureId},
               ),
               PopupMenuButton<String>(
-                tooltip: '更多',
+                tooltip: l10n.commonMore,
                 icon: Icon(Icons.more_vert_rounded, color: cs.onSurfaceVariant),
                 onSelected: (v) async {
                   if (v == 'edit') showScheduleEditor(context, item: item);
@@ -244,19 +246,19 @@ class ScheduleTile extends StatelessWidget {
                   if (v == 'delete') {
                     await store.remove(item);
                     if (context.mounted) {
-                      showSnack(context, '${item.isCanvas ? '已从日程隐藏' : '已删除'}「${item.title}」', action: '撤销', onAction: () => store.restore(item));
+                      showSnack(context, l10n.scheduleRemovedNotice(item.isCanvas ? l10n.scheduleHiddenFromSchedule : l10n.commonDeleted, item.title), action: l10n.commonUndo, onAction: () => store.restore(item));
                     }
                   }
                 },
                 itemBuilder: (_) => item.isCanvas
                     ? [
                         if (item.url.isNotEmpty)
-                          const PopupMenuItem(value: 'open', child: ListTile(leading: Icon(Icons.open_in_new_rounded), title: Text('在 Canvas 打开'), contentPadding: EdgeInsets.zero)),
-                        const PopupMenuItem(value: 'delete', child: ListTile(leading: Icon(Icons.visibility_off_outlined), title: Text('从日程隐藏'), contentPadding: EdgeInsets.zero)),
+                          PopupMenuItem(value: 'open', child: ListTile(leading: Icon(Icons.open_in_new_rounded), title: Text(l10n.scheduleOpenInCanvas), contentPadding: EdgeInsets.zero)),
+                        PopupMenuItem(value: 'delete', child: ListTile(leading: Icon(Icons.visibility_off_outlined), title: Text(l10n.scheduleHide), contentPadding: EdgeInsets.zero)),
                       ]
-                    : const [
-                        PopupMenuItem(value: 'edit', child: ListTile(leading: Icon(Icons.edit_outlined), title: Text('编辑'), contentPadding: EdgeInsets.zero)),
-                        PopupMenuItem(value: 'delete', child: ListTile(leading: Icon(Icons.delete_outline_rounded), title: Text('删除'), contentPadding: EdgeInsets.zero)),
+                    : [
+                        PopupMenuItem(value: 'edit', child: ListTile(leading: Icon(Icons.edit_outlined), title: Text(l10n.commonEdit), contentPadding: EdgeInsets.zero)),
+                        PopupMenuItem(value: 'delete', child: ListTile(leading: Icon(Icons.delete_outline_rounded), title: Text(l10n.commonDelete), contentPadding: EdgeInsets.zero)),
                       ],
               ),
             ]),
@@ -290,7 +292,7 @@ class _Mention extends StatelessWidget {
             visualDensity: VisualDensity.compact,
             avatar: const Icon(Icons.play_arrow_rounded, size: 16),
             label: Text(fmtClock(item.tMs), style: const TextStyle(fontFeatures: [FontFeature.tabularFigures()])),
-            tooltip: '跳到老师提到的地方',
+            tooltip: l10n.scheduleJumpToSource,
             onPressed: () => openMention(context, item),
           ),
         ),
@@ -362,7 +364,7 @@ class _EditorState extends State<_Editor> {
     } catch (e) {
       if (mounted) {
         setState(() => _busy = false);
-        showSnack(context, '保存失败：$e');
+        showSnack(context, l10n.commonSaveFailed(e));
       }
     }
   }
@@ -376,13 +378,13 @@ class _EditorState extends State<_Editor> {
     return SingleChildScrollView(
       padding: EdgeInsets.fromLTRB(Space.xl, context.isCompact ? 0 : Space.xl, Space.xl, Space.xl + MediaQuery.viewInsetsOf(context).bottom),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: [
-        Text(it == null ? '新建日程' : '编辑日程', style: tt.headlineSmall),
+        Text(it == null ? l10n.scheduleNew : l10n.scheduleEdit, style: tt.headlineSmall),
         const SizedBox(height: Space.lg),
         TextField(
           controller: _title,
           autofocus: it == null,
           maxLength: 80,
-          decoration: const InputDecoration(labelText: '标题', hintText: '例如：实验二报告', border: OutlineInputBorder()),
+          decoration: InputDecoration(labelText: l10n.commonTitle, hintText: l10n.scheduleTitleHint, border: OutlineInputBorder()),
           onSubmitted: (_) => _save(),
         ),
         const SizedBox(height: Space.sm),
@@ -403,21 +405,21 @@ class _EditorState extends State<_Editor> {
         Wrap(spacing: Space.sm, runSpacing: Space.sm, children: [
           InputChip(
             avatar: const Icon(Icons.event_rounded, size: 18),
-            label: Text('${_date.year}年${_date.month}月${_date.day}日 周${weekdayNames[_date.weekday - 1]}'),
+            label: Text(l10n.dateYearMonthDayWeek(_date.year, _date.month, _date.day, weekdayNames[_date.weekday - 1])),
             onPressed: () async {
               final d = await showDatePicker(
                 context: context,
                 initialDate: _date,
                 firstDate: DateTime(2020),
                 lastDate: DateTime(2100),
-                helpText: '截止日期',
+                helpText: l10n.scheduleDueDate,
               );
               if (d != null) setState(() => _date = d);
             },
           ),
           InputChip(
             avatar: const Icon(Icons.schedule_rounded, size: 18),
-            label: Text(_time.isEmpty ? '全天' : _time),
+            label: Text(_time.isEmpty ? l10n.scheduleAllDay : _time),
             onDeleted: _time.isEmpty ? null : () => setState(() => _time = ''),
             onPressed: () async {
               final parts = _time.split(':');
@@ -433,11 +435,11 @@ class _EditorState extends State<_Editor> {
         DropdownMenu<String>(
           initialSelection: _course,
           expandedInsets: EdgeInsets.zero,
-          label: const Text('课程'),
+          label: Text(l10n.commonCourses),
           leadingIcon: const Icon(Icons.school_outlined),
           onSelected: (v) => setState(() => _course = v ?? ''),
           dropdownMenuEntries: [
-            const DropdownMenuEntry(value: '', label: '不关联课程'),
+            DropdownMenuEntry(value: '', label: l10n.scheduleNoCourse),
             for (final c in courses) DropdownMenuEntry(value: c.id, label: c.title),
           ],
         ),
@@ -446,7 +448,7 @@ class _EditorState extends State<_Editor> {
           controller: _detail,
           minLines: 2,
           maxLines: 5,
-          decoration: const InputDecoration(labelText: '备注', hintText: '要求、提交方式…', border: OutlineInputBorder()),
+          decoration: InputDecoration(labelText: l10n.scheduleNote, hintText: l10n.scheduleNoteHint, border: OutlineInputBorder()),
         ),
         if (it != null && it.quote.isNotEmpty) ...[
           const SizedBox(height: Space.lg),
@@ -459,9 +461,9 @@ class _EditorState extends State<_Editor> {
         const SizedBox(height: Space.xl),
         Row(children: [
           const Spacer(),
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('取消')),
+          TextButton(onPressed: () => Navigator.pop(context), child: Text(l10n.commonCancel)),
           const SizedBox(width: Space.sm),
-          FilledButton(onPressed: _busy ? null : _save, child: Text(it == null ? '添加' : '保存')),
+          FilledButton(onPressed: _busy ? null : _save, child: Text(it == null ? l10n.commonAdd : l10n.commonSave)),
         ]),
       ]),
     );
@@ -511,7 +513,7 @@ class ScheduleChatCard extends StatelessWidget {
                 Wrap(spacing: Space.sm, runSpacing: Space.xs, crossAxisAlignment: WrapCrossAlignment.center, children: [
                   KindLabel(style: st),
                   Text(
-                    removed ? '已撤销' : duplicate ? '日程里已有' : [fmtDue(it), fmtCountdown(it)].join(' · '),
+                    removed ? l10n.commonUndone : duplicate ? l10n.scheduleAlreadyAdded : [fmtDue(it), fmtCountdown(it)].join(' · '),
                     style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                   ),
                 ]),
@@ -528,11 +530,11 @@ class ScheduleChatCard extends StatelessWidget {
               TextButton.icon(
                 onPressed: () => store.restore(it),
                 icon: const Icon(Icons.undo_rounded, size: 18),
-                label: const Text('恢复'),
+                label: Text(l10n.commonRestore),
               )
             else ...[
-              TextButton(onPressed: () => store.remove(it), child: const Text('撤销')),
-              TextButton(onPressed: () => store.patch(it, {'done': !it.done}), child: Text(it.done ? '标为未完成' : '完成')),
+              TextButton(onPressed: () => store.remove(it), child: Text(l10n.commonUndo)),
+              TextButton(onPressed: () => store.patch(it, {'done': !it.done}), child: Text(it.done ? l10n.scheduleMarkUndone : l10n.commonFinished)),
               TextButton(
                 onPressed: () {
                   context.read<ScheduleFocus>().value = it.day;
@@ -540,7 +542,7 @@ class ScheduleChatCard extends StatelessWidget {
                   Navigator.of(context, rootNavigator: true).popUntil((r) => r.isFirst);
                   ShellNav.goTo(Tabs.schedule);
                 },
-                child: const Text('查看日程'),
+                child: Text(l10n.toolListSchedule),
               ),
             ],
           ]),

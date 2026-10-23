@@ -17,6 +17,7 @@ import '../assistant/assistant_panel.dart';
 import 'lecture_player.dart';
 import 'player_view.dart';
 import 'side_panel.dart';
+import '../../l10n/l10n.dart';
 
 /// The page route of each open player, so a seek can bring it back on top.
 final _playerRoutes = Expando<ModalRoute<dynamic>>('playerRoute');
@@ -37,7 +38,7 @@ void seekOrOpen(BuildContext context, String lectureId, int seconds) {
     return;
   }
   if (lectureId.isEmpty) {
-    showSnack(context, '这个时间点没有对应的课次');
+    showSnack(context, l10n.playerNoLectureAtTime);
     return;
   }
   Navigator.of(context, rootNavigator: true).push(MaterialPageRoute(builder: (_) => PlayerPage(lectureId: lectureId, startMs: seconds * 1000)));
@@ -193,7 +194,7 @@ class _PlayerPageState extends State<PlayerPage> {
       prefs.update((p) => p.showSubtitles = !p.showSubtitles);
     } else if (k == LogicalKeyboardKey.keyB && e is KeyDownEvent) {
       ctl.addBookmark().then((b) {
-        if (b != null) v?.toast('已添加书签 ${fmtClock(b.tMs)}', Icons.bookmark_added_rounded);
+        if (b != null) v?.toast(l10n.playerBookmarkAdded(fmtClock(b.tMs)), Icons.bookmark_added_rounded);
       });
     } else if (k == LogicalKeyboardKey.keyP && e is KeyDownEvent) {
       setState(() => _panel = !_panel);
@@ -219,7 +220,7 @@ class _PlayerPageState extends State<PlayerPage> {
         final l = ctl.lecture;
         Widget body;
         if (ctl.loading) {
-          body = const ColoredBox(color: Colors.black, child: CenteredLoader(label: '正在准备播放'));
+          body = ColoredBox(color: Colors.black, child: CenteredLoader(label: l10n.playerPreparing));
         } else if (ctl.loadError != null) {
           body = Scaffold(
             appBar: AppBar(),
@@ -278,7 +279,7 @@ class _PlayerPageState extends State<PlayerPage> {
         }
         return ReportScreen(
           value: {
-            'screen': '播放器',
+            'screen': l10n.screenPlayer,
             'lecture_id': widget.lectureId,
             if (l != null) 'lecture': '${l.date} ${l.shortTitle}',
             if (ctl.course != null) 'course': ctl.course!.title,

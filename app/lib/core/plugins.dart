@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import 'api.dart';
 import 'app_state.dart';
+import '../l10n/l10n.dart';
 
 /// One place a plugin appears outside the chat: an action on a surface, a
 /// note view, an exporter or a page (docs/specs/0004-plugin-platform.md).
@@ -54,7 +55,7 @@ class PluginStore extends ChangeNotifier {
           setStatus('${d['plugin']}', d['status']);
         case 'notify':
           final p = byId('${d['plugin']}');
-          _notices.add(p == null ? '${d['text']}' : '${p['title']}：${d['text']}');
+          _notices.add(p == null ? '${d['text']}' : l10n.pluginContextLine(p['title'], d['text']));
       }
     });
     load();
@@ -222,14 +223,14 @@ const pluginIcons = <String, IconData>{
 
 IconData pluginIcon(Object? name) => pluginIcons['$name'] ?? Icons.extension_outlined;
 
-const pluginCategories = {
-  'notes': '笔记',
-  'visualize': '可视化',
-  'review': '复习',
-  'programming': '编程',
-  'connector': '连接器',
-  'tutor': '学习方式',
-  'assignment': '作业',
+final pluginCategories = {
+  'notes': l10n.commonNotes,
+  'visualize': l10n.pluginCategoryVisualize,
+  'review': l10n.pluginCategoryReview,
+  'programming': l10n.pluginCategoryProgramming,
+  'connector': l10n.pluginCategoryConnector,
+  'tutor': l10n.pluginCategoryTutor,
+  'assignment': l10n.commonAssignments,
 };
 
 const permissionIcons = <String, IconData>{

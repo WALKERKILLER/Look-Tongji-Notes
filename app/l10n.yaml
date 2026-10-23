@@ -1,0 +1,7 @@
+# gen-l10n: lib/l10n/app_<locale>.arb -> lib/l10n/app_localizations*.dart
+arb-dir: lib/l10n
+template-arb-file: app_zh.arb
+output-localization-file: app_localizations.dart
+output-class: AppLocalizations
+nullable-getter: false
+use-escaping: true
