@@ -1002,7 +1002,9 @@ class _AssistantTurn extends StatelessWidget {
         child: Row(children: [
           const ExpressiveLoader(size: 22),
           const SizedBox(width: Space.sm),
-          Text(msg.status ?? l10n.chatThinking, style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+          Flexible(
+            child: Text(msg.status ?? l10n.chatThinking, maxLines: 1, overflow: TextOverflow.ellipsis, style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+          ),
         ]),
       ));
     }

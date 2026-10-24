@@ -509,34 +509,41 @@ class _CourseRow extends StatelessWidget {
     final label = look.isEmpty ? (manual ? l10n.canvasNoLink : l10n.canvasAutoNoMatch) : (manual ? title : l10n.canvasAutoMatch(title));
     final open = (course['open'] as num?)?.toInt() ?? 0;
     final term = '${_map(course['term'])['name'] ?? ''}';
+    final meta = Text([if (term.isNotEmpty) term, open > 0 ? l10n.canvasOpenAssignments(open) : l10n.canvasNoOpenAssignments].join(' · '),
+        maxLines: 1, overflow: TextOverflow.ellipsis);
+    // On a phone the link sits under the name, which keeps the row's width.
+    final compact = context.isCompact;
+    final link = MenuAnchor(
+      builder: (context, ctl, _) => ActionChip(
+        avatar: Icon(look.isEmpty ? Icons.link_off_rounded : Icons.link_rounded, size: 18),
+        label: ConstrainedBox(constraints: BoxConstraints(maxWidth: compact ? 220 : 180), child: Text(label, overflow: TextOverflow.ellipsis)),
+        tooltip: l10n.canvasLinkCourse,
+        onPressed: () => ctl.isOpen ? ctl.close() : ctl.open(),
+      ),
+      menuChildren: [
+        MenuItemButton(leadingIcon: const Icon(Icons.auto_awesome_outlined), onPressed: () => onLink(id, auto: true), child: Text(l10n.canvasAutoLink)),
+        MenuItemButton(leadingIcon: const Icon(Icons.link_off_rounded), onPressed: () => onLink(id), child: Text(l10n.canvasNoLink)),
+        if (looks.isNotEmpty) const Divider(),
+        for (final l in looks)
+          MenuItemButton(
+            leadingIcon: Icon(l.id == look && manual ? Icons.check_rounded : Icons.class_outlined),
+            onPressed: () => onLink(id, course: l.id),
+            child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 280), child: Text(l.title, overflow: TextOverflow.ellipsis)),
+          ),
+      ],
+    );
     return ListTile(
-      contentPadding: const EdgeInsets.fromLTRB(Space.lg, Space.xs, Space.sm, Space.xs),
+      contentPadding: EdgeInsets.fromLTRB(Space.lg, Space.xs, compact ? Space.lg : Space.sm, Space.xs),
       leading: CircleAvatar(
         backgroundColor: cs.tertiaryContainer,
         child: Text('${course['name']}'.characters.firstOrNull ?? '?', style: TextStyle(color: cs.onTertiaryContainer)),
       ),
-      title: Text('${course['name']}', maxLines: 1, overflow: TextOverflow.ellipsis),
-      subtitle: Text([if (term.isNotEmpty) term, open > 0 ? l10n.canvasOpenAssignments(open) : l10n.canvasNoOpenAssignments].join(' · ')),
+      title: Text('${course['name']}', maxLines: compact ? 2 : 1, overflow: TextOverflow.ellipsis),
+      subtitle: compact
+          ? Column(crossAxisAlignment: CrossAxisAlignment.start, children: [meta, const SizedBox(height: Space.xs), link])
+          : meta,
       onTap: () => showCanvasCourseSheet(context, id, '${course['name']}'),
-      trailing: MenuAnchor(
-        builder: (context, ctl, _) => ActionChip(
-          avatar: Icon(look.isEmpty ? Icons.link_off_rounded : Icons.link_rounded, size: 18),
-          label: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 180), child: Text(label, overflow: TextOverflow.ellipsis)),
-          tooltip: l10n.canvasLinkCourse,
-          onPressed: () => ctl.isOpen ? ctl.close() : ctl.open(),
-        ),
-        menuChildren: [
-          MenuItemButton(leadingIcon: const Icon(Icons.auto_awesome_outlined), onPressed: () => onLink(id, auto: true), child: Text(l10n.canvasAutoLink)),
-          MenuItemButton(leadingIcon: const Icon(Icons.link_off_rounded), onPressed: () => onLink(id), child: Text(l10n.canvasNoLink)),
-          if (looks.isNotEmpty) const Divider(),
-          for (final l in looks)
-            MenuItemButton(
-              leadingIcon: Icon(l.id == look && manual ? Icons.check_rounded : Icons.class_outlined),
-              onPressed: () => onLink(id, course: l.id),
-              child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 280), child: Text(l.title, overflow: TextOverflow.ellipsis)),
-            ),
-        ],
-      ),
+      trailing: compact ? null : link,
     );
   }
 }

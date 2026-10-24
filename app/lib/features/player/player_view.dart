@@ -613,7 +613,9 @@ class _ResumePrompt extends StatelessWidget {
           child: Row(mainAxisSize: MainAxisSize.min, children: [
             const Icon(Icons.history_rounded, size: 18, color: Colors.white70),
             const SizedBox(width: Space.sm),
-            Text(l10n.playerResumedFrom(fmtClock(fromMs)), style: tt.bodyMedium?.copyWith(color: Colors.white)),
+            Flexible(
+              child: Text(l10n.playerResumedFrom(fmtClock(fromMs)), maxLines: 1, overflow: TextOverflow.ellipsis, style: tt.bodyMedium?.copyWith(color: Colors.white)),
+            ),
             const SizedBox(width: Space.sm),
             TextButton(
               onPressed: onRestart,

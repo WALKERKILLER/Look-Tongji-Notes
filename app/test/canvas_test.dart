@@ -158,9 +158,16 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('访问令牌'));
     await tester.pumpAndSettle();
-    await tester.pumpWidget(wrap(CanvasPage(key: const ValueKey(2), api: Fake(connected()).call, events: const Stream.empty(), lookCourses: looks)));
+    // Canvas names carry the term and the class code; the link goes under the name.
+    const long = '(2026-2027-1)-42029401-01 计算机视觉与模式识别（双语）张三、李四';
+    final st = connected();
+    (st['status'] as Map)['courses'] = [
+      {'id': '1', 'name': long, 'look_course': 'cv', 'manual': false, 'open': 2, 'total': 3},
+    ];
+    await tester.pumpWidget(wrap(CanvasPage(key: const ValueKey(2), api: Fake(st).call, events: const Stream.empty(), lookCourses: looks)));
     await tester.pumpAndSettle();
     expect(find.text('课程关联'), findsOneWidget);
+    expect(tester.getTopLeft(find.byType(ActionChip)).dy, greaterThan(tester.getBottomLeft(find.text(long)).dy));
     await tester.pumpWidget(wrap(Scaffold(body: CanvasCourseView(canvasId: '1', name: '计算机视觉 42029401', api: Fake(connected()).call, libraryRoot: '/lib'))));
     await tester.pumpAndSettle();
     await tester.tap(find.text('课件'));
