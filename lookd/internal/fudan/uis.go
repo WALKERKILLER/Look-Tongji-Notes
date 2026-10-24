@@ -30,6 +30,7 @@ const UISBase = "https://id.fudan.edu.cn"
 
 var (
 	ErrBadCredentials = errors.New("复旦 UIS 学号或密码错误")
+	ErrNeedsPassword  = errors.New("复旦 UIS 需要重新输入密码") // credentials asked for, none given
 	ticketRe          = regexp.MustCompile(`locationValue\s*=\s*"([^"]*ticket=[^"]*)"`)
 	lckRe             = regexp.MustCompile(`lck=([^&#"]+)`)
 	entityRe          = regexp.MustCompile(`entityId=([^&#"]+)`)
@@ -39,11 +40,20 @@ var (
 type UIS struct {
 	Base string       // default UISBase; tests point it at a fake
 	HC   *http.Client // must carry a cookie jar
+	// VPN reaches UIS through WebVPN, for services behind the gateway; the
+	// gateway session must exist already.
+	VPN bool
+	// Entity is the service's entity id when the sign-in address lacks one.
+	Entity string
 }
 
 func (u *UIS) base() string {
 	if u.Base != "" {
 		return u.Base
+	}
+	if u.VPN {
+		b, _ := VPNURL(UISBase)
+		return b
 	}
 	return UISBase
 }
@@ -52,7 +62,9 @@ func (u *UIS) do(req *http.Request) (*http.Response, error) {
 	req.Header.Set("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36")
 	req.Header.Set("Referer", u.base()+"/ac/")
 	if req.Method == http.MethodPost {
-		req.Header.Set("Origin", u.base())
+		if b, err := url.Parse(u.base()); err == nil {
+			req.Header.Set("Origin", b.Scheme+"://"+b.Host)
+		}
 	}
 	return u.HC.Do(req)
 }
@@ -78,7 +90,9 @@ func (u *UIS) postJSON(ctx context.Context, path string, in, out any) error {
 
 // Login runs the UIS chain for start, a URL that redirects to UIS (for
 // example a service's CAS login page), and follows the ticket back to the
-// service. On return the jar holds the service's session cookies.
+// service. On return the jar holds the service's session cookies. While the
+// UIS session itself lasts, the service is signed in without the password;
+// otherwise an empty password is ErrNeedsPassword.
 func (u *UIS) Login(ctx context.Context, start, username, password string) error {
 	// 1. The service redirects to UIS; the address carries lck and entityId.
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, start, nil)
@@ -96,8 +110,14 @@ func (u *UIS) Login(ctx context.Context, start, username, password string) error
 		return nil // still signed in: the service took us back directly
 	}
 	lck, entity := match(lckRe, final), match(entityRe, final)
+	if entity == "" {
+		entity = u.Entity
+	}
 	if lck == "" || entity == "" {
 		return errors.New("复旦 UIS 登录页缺少 lck 或 entityId")
+	}
+	if password == "" {
+		return ErrNeedsPassword
 	}
 
 	// 2. Which auth chain handles username + password.
@@ -175,8 +195,15 @@ func (u *UIS) Login(ctx context.Context, start, username, password string) error
 		return errors.New("复旦 UIS 没有返回服务票据")
 	}
 
-	// 6. Follow the ticket; the service sets its session.
-	treq, err := http.NewRequestWithContext(ctx, http.MethodGet, html.UnescapeString(string(m[1])), nil)
+	// 6. Follow the ticket; the service sets its session. Behind WebVPN the
+	// page may name the service's own address, which only the gateway reaches.
+	ticket := html.UnescapeString(string(m[1]))
+	if u.VPN && !strings.HasPrefix(ticket, WebVPNBase+"/") {
+		if ticket, err = VPNURL(ticket); err != nil {
+			return err
+		}
+	}
+	treq, err := http.NewRequestWithContext(ctx, http.MethodGet, ticket, nil)
 	if err != nil {
 		return err
 	}

@@ -25,7 +25,7 @@ type School struct {
 	Name      string `json:"name"`
 	Canvas    string `json:"canvas"`     // Canvas site
 	SSO       string `json:"sso"`        // how "sso" mode signs in: look | uis
-	Look      bool   `json:"look"`       // lecture replays in Look Studio
+	Look      bool   `json:"look"`       // lecture replays in Look Studio (sign-in at POST /api/auth/login)
 	EmblemURL string `json:"emblem_url"` // vector emblem, fetched by the app
 	Note      string `json:"note,omitempty"`
 }
@@ -33,9 +33,8 @@ type School struct {
 var schools = []School{
 	{ID: "tongji", Name: "同济大学", Canvas: "https://canvas.tongji.edu.cn", SSO: "look", Look: true,
 		EmblemURL: "https://upload.wikimedia.org/wikipedia/zh/f/f8/Tongji_University_Emblem.svg"},
-	{ID: "fudan", Name: "复旦大学", Canvas: "https://elearning.fudan.edu.cn", SSO: "uis",
-		EmblemURL: "https://upload.wikimedia.org/wikipedia/commons/4/44/Fudan_University_Logo.svg",
-		Note:      "复旦 iCourse 录播只能在校园网或 WebVPN 内访问，暂未接入；Canvas 课件、作业和公告可用。"},
+	{ID: "fudan", Name: "复旦大学", Canvas: "https://elearning.fudan.edu.cn", SSO: "uis", Look: true,
+		EmblemURL: "https://upload.wikimedia.org/wikipedia/commons/4/44/Fudan_University_Logo.svg"},
 }
 
 const canvasEvery = 15 * time.Minute
@@ -54,7 +53,7 @@ func (a tongjiCanvas) SignIn(ctx context.Context) error {
 	if !errors.Is(err, canvas.ErrIdP) {
 		return err
 	}
-	if a.sess.State().Status == "signed_out" {
+	if a.sess.State().Status == "signed_out" || a.sess.School() != tongji.Tongji {
 		return errors.New("请先在 Look Studio 登录同济统一身份认证")
 	}
 	// The IAM session lapsed: renew it the way Look's token is renewed

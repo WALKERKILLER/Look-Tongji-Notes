@@ -4,19 +4,34 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
 	"log/slog"
 	"net"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
 	"os"
+	"strings"
 	"sync"
 	"time"
+
+	"lookstudio/lookd/internal/fudan"
+)
+
+// Schools whose lecture platform Look Studio signs in to. Both run the same
+// product: Tongji's Look is public and uses a JWT; Fudan's iCourse is
+// reachable only through WebVPN, whose gateway session (a cookie) carries
+// iCourse's own.
+const (
+	Tongji = "tongji"
+	Fudan  = "fudan"
 )
 
 // AuthState is reported to the UI.
 type AuthState struct {
 	Status    string    `json:"status"` // signed_out | active | renewing | needs_password | captcha
+	School    string    `json:"school"` // tongji | fudan
 	Username  string    `json:"username"`
 	Realname  string    `json:"realname"`
 	ExpiresAt time.Time `json:"expires_at"`
@@ -30,6 +45,9 @@ type AuthState struct {
 //  1. proactive renewal ahead of expiry,
 //  2. silent IAM SSO renewal (cookies only) first,
 //  3. password re-login as fallback when credentials are remembered.
+//
+// For Fudan it owns the WebVPN session instead, renewed when a request finds
+// it gone: silently while the UIS session lasts, then with the password.
 type Session struct {
 	mu       sync.Mutex
 	jar      *recordingJar
@@ -46,6 +64,7 @@ type Session struct {
 }
 
 type persisted struct {
+	School   string        `json:"school,omitempty"`
 	Username string        `json:"username"`
 	Realname string        `json:"realname"`
 	Token    string        `json:"token"`
@@ -95,7 +114,7 @@ func (s *Session) load() {
 		return
 	}
 	s.jar.restore(p.Cookies)
-	s.state.Username, s.state.Realname, s.state.Remember = p.Username, p.Realname, p.Remember
+	s.state.School, s.state.Username, s.state.Realname, s.state.Remember = p.School, p.Username, p.Realname, p.Remember
 	if p.Password != "" {
 		if pw, err := unseal(p.Password); err == nil {
 			s.password = pw
@@ -110,10 +129,13 @@ func (s *Session) load() {
 			s.state.Status = "renewing"
 		}
 	}
+	if p.School == Fudan && p.Username != "" && len(p.Cookies) > 0 {
+		s.state.Status, s.state.Method = "active", "cache"
+	}
 }
 
 func (s *Session) saveLocked() {
-	p := persisted{Username: s.state.Username, Realname: s.state.Realname, Token: s.token, Method: s.state.Method,
+	p := persisted{School: s.state.School, Username: s.state.Username, Realname: s.state.Realname, Token: s.token, Method: s.state.Method,
 		Remember: s.state.Remember, Cookies: s.jar.snapshot()}
 	if s.state.Remember && s.password != "" {
 		if sealed, err := seal(s.password); err == nil {
@@ -157,10 +179,59 @@ func (s *Session) adopt(tok, method string) {
 	}
 }
 
+// School is the school of the current (or last) sign-in.
+func (s *Session) School() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.state.School == Fudan {
+		return Fudan
+	}
+	return Tongji
+}
+
+// Base is the origin of the school's lecture platform.
+func (s *Session) Base() string {
+	if s.School() == Fudan {
+		return fudan.ICourseBase
+	}
+	return BaseURL
+}
+
+// URL is where the daemon fetches a platform address (video, slide image,
+// courseware): Fudan's campus hosts go through WebVPN.
+func (s *Session) URL(raw string) string {
+	if s.School() != Fudan {
+		return raw
+	}
+	u, err := fudan.VPNURL(raw)
+	if err != nil {
+		return raw
+	}
+	return u
+}
+
+// Header goes with requests for URL's addresses. For Fudan it carries the
+// gateway's session cookie, so it never leaves the daemon.
+func (s *Session) Header() http.Header {
+	h := http.Header{"User-Agent": {UserAgent}, "Referer": {s.URL(s.Base() + "/")}}
+	if s.School() == Fudan {
+		gw, _ := url.Parse(fudan.WebVPNBase + "/")
+		var cs []string
+		for _, c := range s.jar.Cookies(gw) {
+			cs = append(cs, c.Name+"="+c.Value)
+		}
+		h.Set("Cookie", strings.Join(cs, "; "))
+	}
+	return h
+}
+
 // Login signs in with a password. remember keeps the password (sealed) on
 // disk so renewal works after the IAM SSO session itself expires.
-func (s *Session) Login(ctx context.Context, username, password, captcha string, remember bool) error {
+func (s *Session) Login(ctx context.Context, school, username, password, captcha string, remember bool) error {
 	s.jar.reset()
+	if school == Fudan {
+		return s.loginFudan(ctx, username, password, remember)
+	}
 	tok, err := Login(ctx, s.hc, username, password, captcha)
 	if err != nil {
 		var le *LoginError
@@ -168,12 +239,14 @@ func (s *Session) Login(ctx context.Context, username, password, captcha string,
 		if errors.As(err, &le) && errors.Is(le.Kind, ErrCaptchaRequired) {
 			status = "captcha"
 		}
-		s.setState(func(st *AuthState) { st.Status, st.Error, st.Username = status, err.Error(), username })
+		s.setState(func(st *AuthState) {
+			st.Status, st.Error, st.School, st.Username = status, err.Error(), Tongji, username
+		})
 		return err
 	}
 	s.mu.Lock()
 	s.password = password
-	s.state.Username, s.state.Remember = username, remember
+	s.state.School, s.state.Username, s.state.Remember = Tongji, username, remember
 	if !remember {
 		s.password = ""
 	}
@@ -183,13 +256,62 @@ func (s *Session) Login(ctx context.Context, username, password, captcha string,
 	return nil
 }
 
-func (s *Session) Captcha(ctx context.Context) ([]byte, string, error) { return Captcha(ctx, s.hc) }
+func (s *Session) loginFudan(ctx context.Context, username, password string, remember bool) error {
+	if err := s.signInFudan(ctx, username, password); err != nil {
+		s.setState(func(st *AuthState) {
+			st.Status, st.Error, st.School, st.Username = "signed_out", err.Error(), Fudan, username
+		})
+		return err
+	}
+	s.mu.Lock()
+	s.token, s.claims, s.password = "", Claims{}, password
+	if !remember {
+		s.password = ""
+	}
+	s.mu.Unlock()
+	s.setState(func(st *AuthState) {
+		st.Status, st.Method, st.Error, st.School, st.Username, st.Remember = "active", "password", "", Fudan, username, remember
+		st.ExpiresAt, st.RenewedAt = time.Time{}, time.Now()
+	})
+	go s.fetchRealname()
+	return nil
+}
+
+// signInFudan runs the WebVPN and iCourse sign-in and checks that iCourse
+// answers as the signed-in user.
+func (s *Session) signInFudan(ctx context.Context, username, password string) error {
+	if err := fudan.SignInICourse(ctx, s.hc, username, password); err != nil {
+		return err
+	}
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, fudan.ICourseBase+"/userapi/v1/infosimple", nil)
+	resp, err := s.viaVPN(ctx, req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	var r struct {
+		Code any `json:"code"`
+	}
+	b, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	if VPNSignedOut(resp) || json.Unmarshal(b, &r) != nil || !okCode(r.Code) {
+		return errors.New("iCourse 没有接受这次登录，请稍后重试")
+	}
+	return nil
+}
+
+func (s *Session) Captcha(ctx context.Context) ([]byte, string, error) {
+	if s.School() == Fudan {
+		return nil, "", errors.New("复旦 UIS 登录不需要这里的验证码")
+	}
+	return Captcha(ctx, s.hc)
+}
 
 func (s *Session) Logout() {
 	s.jar.reset()
+	school := s.School()
 	s.setState(func(st *AuthState) {
 		s.token, s.password = "", ""
-		*st = AuthState{Status: "signed_out"}
+		*st = AuthState{Status: "signed_out", School: school}
 	})
 }
 
@@ -227,7 +349,7 @@ func (s *Session) Renew(ctx context.Context) error {
 	}
 	ch := make(chan struct{})
 	s.renewing = ch
-	user, pw := s.state.Username, s.password
+	user, pw, school := s.state.Username, s.password, s.state.School
 	s.mu.Unlock()
 	defer func() {
 		s.mu.Lock()
@@ -237,6 +359,9 @@ func (s *Session) Renew(ctx context.Context) error {
 	}()
 
 	s.setState(func(st *AuthState) { st.Status = "renewing" })
+	if school == Fudan {
+		return s.renewFudan(ctx, user, pw)
+	}
 	tok, err := SilentRenew(ctx, s.hc)
 	if err == nil {
 		s.adopt(tok, "sso")
@@ -255,6 +380,26 @@ func (s *Session) Renew(ctx context.Context) error {
 	}
 	s.setState(func(st *AuthState) { st.Status, st.Error = "needs_password", err.Error() })
 	return err
+}
+
+// renewFudan signs in again: the empty password first, which works while the
+// UIS session lasts, then the remembered one.
+func (s *Session) renewFudan(ctx context.Context, user, pw string) error {
+	err := s.signInFudan(ctx, user, "")
+	method := "sso"
+	if errors.Is(err, fudan.ErrNeedsPassword) && pw != "" {
+		err, method = s.signInFudan(ctx, user, pw), "password"
+	}
+	if err != nil {
+		if errors.Is(err, fudan.ErrNeedsPassword) {
+			err = errors.New("复旦 WebVPN 登录已过期，请重新登录")
+		}
+		s.setState(func(st *AuthState) { st.Status, st.Error = "needs_password", err.Error() })
+		return err
+	}
+	s.setState(func(st *AuthState) { st.Status, st.Method, st.Error, st.RenewedAt = "active", method, "", time.Now() })
+	slog.Info("fudan session renewed", "method", method)
+	return nil
 }
 
 // Run keeps the token fresh until ctx ends.
@@ -300,8 +445,24 @@ func (s *Session) Run(ctx context.Context) {
 	}
 }
 
-// Do performs an authenticated look API request, renewing once on 401/403.
+// Do performs an authenticated look API request, renewing once on 401/403
+// (for Fudan, also when WebVPN sends it to the gateway's sign-in).
 func (s *Session) Do(ctx context.Context, req *http.Request) (*http.Response, error) {
+	if s.School() == Fudan {
+		for attempt := 0; ; attempt++ {
+			resp, err := s.viaVPN(ctx, req)
+			if err != nil || !VPNSignedOut(resp) {
+				return resp, err
+			}
+			resp.Body.Close()
+			if attempt == 1 {
+				return nil, errors.New("复旦 WebVPN 会话无效，请重新登录")
+			}
+			if err := s.Renew(ctx); err != nil {
+				return nil, err
+			}
+		}
+	}
 	for attempt := 0; attempt < 2; attempt++ {
 		tok, err := s.Token(ctx)
 		if err != nil {
@@ -325,6 +486,34 @@ func (s *Session) Do(ctx context.Context, req *http.Request) (*http.Response, er
 		return resp, nil
 	}
 	return nil, errors.New("unreachable")
+}
+
+// viaVPN sends an iCourse request through WebVPN with the gateway cookie.
+func (s *Session) viaVPN(ctx context.Context, req *http.Request) (*http.Response, error) {
+	u, err := fudan.VPNURL(req.URL.String())
+	if err != nil {
+		return nil, err
+	}
+	r := req.Clone(ctx)
+	if r.URL, err = url.Parse(u); err != nil {
+		return nil, err
+	}
+	r.Host = ""
+	r.Header.Set("User-Agent", UserAgent)
+	r.Header.Set("accept-language", "zh_cn")
+	resp, err := s.hc.Do(r)
+	if err != nil {
+		return nil, fmt.Errorf("无法连接复旦 WebVPN: %w", err)
+	}
+	return resp, nil
+}
+
+// VPNSignedOut reports a WebVPN answer that is not the service's: the gateway
+// redirects to its sign-in page (or UIS) once its session is gone.
+func VPNSignedOut(resp *http.Response) bool {
+	return resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden ||
+		!strings.HasPrefix(resp.Request.URL.Path, "/http") ||
+		strings.Contains(resp.Header.Get("Content-Type"), "text/html")
 }
 
 func (s *Session) fetchRealname() {

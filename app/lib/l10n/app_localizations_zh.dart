@@ -477,7 +477,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String get loginSignIn => '登录';
 
   @override
-  String get loginWithTongji => '使用同济大学统一身份认证';
+  String get loginChooseSchool => '选择学校，用统一身份认证账号登录';
+
+  @override
+  String get loginHintTongji => '连接同济 Look 录课平台（look.tongji.edu.cn）';
+
+  @override
+  String get loginHintFudan => '经复旦 WebVPN 连接 iCourse，登录约需半分钟';
+
+  @override
+  String loginSchoolsFailed(Object e) {
+    return '无法读取学校列表：$e';
+  }
 
   @override
   String get loginStudentId => '学号 / 工号';
@@ -498,10 +509,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get loginStaySignedIn => '保持登录';
 
   @override
-  String get loginStaySignedInHint => '令牌到期前自动续期，密码加密保存在本机';
+  String get loginStaySignedInHint => '登录过期时自动续期，密码加密保存在本机';
 
   @override
-  String get loginPrivacy => '账号只用于登录 look.tongji.edu.cn，凭据仅保存在本机。';
+  String get loginPrivacy => '学号和密码只发送给学校的统一身份认证，保持登录时加密保存在本机。';
 
   @override
   String get homeGreetingNight => '夜深了';
@@ -4555,6 +4566,70 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get schoolTongji => '同济大学';
+
+  @override
+  String get schoolFudan => '复旦大学';
+
+  @override
+  String get settingsAbout => '关于';
+
+  @override
+  String get settingsAboutHint => '版本、更新和反馈';
+
+  @override
+  String aboutVersion(Object value) {
+    return '版本 $value';
+  }
+
+  @override
+  String get aboutUpdates => '更新';
+
+  @override
+  String get aboutCheckHint => '从 GitHub Releases 检查是否有新版本';
+
+  @override
+  String get aboutChecking => '正在检查…';
+
+  @override
+  String get aboutCheckUpdates => '检查更新';
+
+  @override
+  String get aboutUpToDate => '已是最新版本';
+
+  @override
+  String aboutNewVersion(Object version, Object when) {
+    return '有新版本 $version（$when发布）';
+  }
+
+  @override
+  String aboutDownload(Object version) {
+    return '下载 $version';
+  }
+
+  @override
+  String get aboutReleaseNotes => '查看更新说明';
+
+  @override
+  String aboutCheckFailed(Object e) {
+    return '无法检查更新：$e。请检查网络后重试。';
+  }
+
+  @override
+  String get aboutLinks => '链接';
+
+  @override
+  String get aboutRepo => '代码仓库';
+
+  @override
+  String get aboutFeedback => '反馈问题';
+
+  @override
+  String get aboutFeedbackHint => '在 GitHub 提交问题，自动附上版本和系统';
+
+  @override
+  String aboutFeedbackBody(Object version, Object os) {
+    return '请描述遇到的问题和复现步骤：\n\n\n---\n版本：$version\n系统：$os';
+  }
 
   @override
   String authExpires(Object value) {

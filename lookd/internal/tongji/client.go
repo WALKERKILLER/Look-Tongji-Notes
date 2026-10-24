@@ -54,7 +54,7 @@ func (f flex) Int() int64     { n, _ := strconv.ParseInt(string(f), 10, 64); ret
 func (f flex) String() string { return string(f) }
 
 func (c *Client) getJSON(ctx context.Context, path string, q url.Values, out any) error {
-	u := BaseURL + path
+	u := c.S.Base() + path
 	if len(q) > 0 {
 		u += "?" + q.Encode()
 	}
@@ -417,7 +417,7 @@ func (c *Client) LectureMedia(ctx context.Context, courseID, subID string) (*Med
 		if err != nil {
 			return nil, err
 		}
-		m.Streams[i].URL = signed
+		m.Streams[i].URL = c.S.URL(signed)
 		if m.Streams[i].Duration == 0 {
 			m.Streams[i].Duration = m.Duration
 		}
@@ -426,7 +426,10 @@ func (c *Client) LectureMedia(ctx context.Context, courseID, subID string) (*Med
 		m.Duration = m.Streams[0].Duration
 	}
 	m.Courseware, _ = c.courseware(ctx, courseID, subID)
-	m.Headers = http.Header{"User-Agent": {UserAgent}, "Referer": {BaseURL + "/"}}
+	for i := range m.Courseware {
+		m.Courseware[i].URL = c.S.URL(m.Courseware[i].URL)
+	}
+	m.Headers = c.S.Header()
 	return m, nil
 }
 
@@ -452,6 +455,16 @@ func (c *Client) courseware(ctx context.Context, courseID, subID string) ([]Cour
 		}
 	}
 	return out, nil
+}
+
+// StreamURL signs a media address afresh and returns where the daemon
+// fetches it (see Session.URL).
+func (c *Client) StreamURL(ctx context.Context, raw string) (string, error) {
+	signed, err := c.Sign(ctx, raw, 0)
+	if err != nil {
+		return "", err
+	}
+	return c.S.URL(signed), nil
 }
 
 // Sign adds look CDN authentication (clientUUID + t) to a media URL.

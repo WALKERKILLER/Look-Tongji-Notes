@@ -10,13 +10,19 @@ class AuthState {
   AuthState(this.j);
   final Map<String, dynamic> j;
   String get status => _s(j['status']);
+
+  /// The school signed in to (or last tried): `tongji` or `fudan`.
+  String get school => j['school'] == 'fudan' ? 'fudan' : 'tongji';
   String get username => _s(j['username']);
   String get realname => _s(j['realname']);
   String get method => _s(j['method']);
   bool get remember => _b(j['remember']);
   String get error => _s(j['error']);
-  DateTime? get expiresAt => DateTime.tryParse(_s(j['expires_at']))?.toLocal();
-  DateTime? get renewedAt => DateTime.tryParse(_s(j['renewed_at']))?.toLocal();
+  DateTime? get expiresAt => _time(j['expires_at']);
+  DateTime? get renewedAt => _time(j['renewed_at']);
+
+  /// lookd sends Go's zero time when there is none (Fudan's session has no expiry).
+  static DateTime? _time(dynamic v) => switch (DateTime.tryParse(_s(v))) { final t? when t.year > 2000 => t.toLocal(), _ => null };
   bool get signedIn => status == 'active' || status == 'renewing';
   static final empty = AuthState({'status': 'signed_out'});
 }
@@ -172,6 +178,9 @@ class LectureMedia {
   Map<String, String> get headers =>
       ((j['headers'] as Map?) ?? {}).map((k, v) => MapEntry(k.toString(), v.toString()));
   String get localPath => _s(j['local_path']);
+
+  /// Streams are lookd paths (relayed for Fudan, whose media only lookd reaches).
+  bool get relayed => _b(j['relayed']);
   List<Map<String, dynamic>> get courseware => ((j['courseware'] as List?) ?? []).cast<Map<String, dynamic>>();
 }
 

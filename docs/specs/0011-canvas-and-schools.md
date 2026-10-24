@@ -6,12 +6,12 @@ Status: Approved
 ## Intent
 Students at Tongji and Fudan use Canvas for assignments, courseware and announcements next to their recorded lectures, but had to check it separately and type homework into the schedule by hand. Outcome: Look Studio connects to the school's Canvas, puts assignments into the schedule with reminders, links each Canvas course to its Look course, downloads courseware into that course's folder, and keeps the connection alive without the user renewing anything. A school chooser with each school's emblem makes Fudan (whose Canvas is the same product) a first-class choice. Design choice for sign-in: [decision 0009](../decisions/0009-canvas-through-the-school-sso-session.md).
 
-Non-goals: submitting assignments or changing anything on Canvas; grades beyond the score shown with an assignment; Fudan iCourse lecture replays (campus network or WebVPN only, not verifiable from outside; the UIS sign-in and WebVPN address helpers are in place for it); Canvas instances other than through an access token.
+Non-goals: submitting assignments or changing anything on Canvas; grades beyond the score shown with an assignment (Fudan iCourse replays are [spec 0015](0015-fudan-icourse.md)); Canvas instances other than through an access token.
 
 ## Contract
 
 ### Schools
-- `GET /api/canvas` returns `schools`: `{id, name, canvas, sso, look, emblem_url, note}` for `tongji` (`https://canvas.tongji.edu.cn`, `sso: "look"`, Look replays) and `fudan` (`https://elearning.fudan.edu.cn`, `sso: "uis"`, note that iCourse is not connected). The app adds `other`: any `https://` Canvas site with a token.
+- `GET /api/canvas` returns `schools`: `{id, name, canvas, sso, look, emblem_url, note}` for `tongji` (`https://canvas.tongji.edu.cn`, `sso: "look"`, Look replays) and `fudan` (`https://elearning.fudan.edu.cn`, `sso: "uis"`, iCourse replays per [spec 0015](0015-fudan-icourse.md)). The app adds `other`: any `https://` Canvas site with a token.
 - Emblems: Fudan's (public domain, trademark) is bundled as `app/assets/schools/fudan.svg` with a NOTICE; Tongji's (not freely licensed) is downloaded by the app from `emblem_url` on first use and cached in the app support folder `emblems/`. Both are drawn on a white disc so their brand colours read the same in light and dark themes; while missing, the school's first character is shown.
 
 ### Connection modes

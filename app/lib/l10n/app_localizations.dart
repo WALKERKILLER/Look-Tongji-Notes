@@ -886,11 +886,29 @@ abstract class AppLocalizations {
   /// **'登录'**
   String get loginSignIn;
 
-  /// No description provided for @loginWithTongji.
+  /// No description provided for @loginChooseSchool.
   ///
   /// In zh, this message translates to:
-  /// **'使用同济大学统一身份认证'**
-  String get loginWithTongji;
+  /// **'选择学校，用统一身份认证账号登录'**
+  String get loginChooseSchool;
+
+  /// No description provided for @loginHintTongji.
+  ///
+  /// In zh, this message translates to:
+  /// **'连接同济 Look 录课平台（look.tongji.edu.cn）'**
+  String get loginHintTongji;
+
+  /// No description provided for @loginHintFudan.
+  ///
+  /// In zh, this message translates to:
+  /// **'经复旦 WebVPN 连接 iCourse，登录约需半分钟'**
+  String get loginHintFudan;
+
+  /// No description provided for @loginSchoolsFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'无法读取学校列表：{e}'**
+  String loginSchoolsFailed(Object e);
 
   /// No description provided for @loginStudentId.
   ///
@@ -931,13 +949,13 @@ abstract class AppLocalizations {
   /// No description provided for @loginStaySignedInHint.
   ///
   /// In zh, this message translates to:
-  /// **'令牌到期前自动续期，密码加密保存在本机'**
+  /// **'登录过期时自动续期，密码加密保存在本机'**
   String get loginStaySignedInHint;
 
   /// No description provided for @loginPrivacy.
   ///
   /// In zh, this message translates to:
-  /// **'账号只用于登录 look.tongji.edu.cn，凭据仅保存在本机。'**
+  /// **'学号和密码只发送给学校的统一身份认证，保持登录时加密保存在本机。'**
   String get loginPrivacy;
 
   /// No description provided for @homeGreetingNight.
@@ -8043,6 +8061,114 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'同济大学'**
   String get schoolTongji;
+
+  /// No description provided for @schoolFudan.
+  ///
+  /// In zh, this message translates to:
+  /// **'复旦大学'**
+  String get schoolFudan;
+
+  /// No description provided for @settingsAbout.
+  ///
+  /// In zh, this message translates to:
+  /// **'关于'**
+  String get settingsAbout;
+
+  /// No description provided for @settingsAboutHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'版本、更新和反馈'**
+  String get settingsAboutHint;
+
+  /// No description provided for @aboutVersion.
+  ///
+  /// In zh, this message translates to:
+  /// **'版本 {value}'**
+  String aboutVersion(Object value);
+
+  /// No description provided for @aboutUpdates.
+  ///
+  /// In zh, this message translates to:
+  /// **'更新'**
+  String get aboutUpdates;
+
+  /// No description provided for @aboutCheckHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'从 GitHub Releases 检查是否有新版本'**
+  String get aboutCheckHint;
+
+  /// No description provided for @aboutChecking.
+  ///
+  /// In zh, this message translates to:
+  /// **'正在检查…'**
+  String get aboutChecking;
+
+  /// No description provided for @aboutCheckUpdates.
+  ///
+  /// In zh, this message translates to:
+  /// **'检查更新'**
+  String get aboutCheckUpdates;
+
+  /// No description provided for @aboutUpToDate.
+  ///
+  /// In zh, this message translates to:
+  /// **'已是最新版本'**
+  String get aboutUpToDate;
+
+  /// No description provided for @aboutNewVersion.
+  ///
+  /// In zh, this message translates to:
+  /// **'有新版本 {version}（{when}发布）'**
+  String aboutNewVersion(Object version, Object when);
+
+  /// No description provided for @aboutDownload.
+  ///
+  /// In zh, this message translates to:
+  /// **'下载 {version}'**
+  String aboutDownload(Object version);
+
+  /// No description provided for @aboutReleaseNotes.
+  ///
+  /// In zh, this message translates to:
+  /// **'查看更新说明'**
+  String get aboutReleaseNotes;
+
+  /// No description provided for @aboutCheckFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'无法检查更新：{e}。请检查网络后重试。'**
+  String aboutCheckFailed(Object e);
+
+  /// No description provided for @aboutLinks.
+  ///
+  /// In zh, this message translates to:
+  /// **'链接'**
+  String get aboutLinks;
+
+  /// No description provided for @aboutRepo.
+  ///
+  /// In zh, this message translates to:
+  /// **'代码仓库'**
+  String get aboutRepo;
+
+  /// No description provided for @aboutFeedback.
+  ///
+  /// In zh, this message translates to:
+  /// **'反馈问题'**
+  String get aboutFeedback;
+
+  /// No description provided for @aboutFeedbackHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'在 GitHub 提交问题，自动附上版本和系统'**
+  String get aboutFeedbackHint;
+
+  /// No description provided for @aboutFeedbackBody.
+  ///
+  /// In zh, this message translates to:
+  /// **'请描述遇到的问题和复现步骤：\n\n\n---\n版本：{version}\n系统：{os}'**
+  String aboutFeedbackBody(Object version, Object os);
 
   /// No description provided for @authExpires.
   ///
