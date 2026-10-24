@@ -26,6 +26,7 @@ import (
 	"lookstudio/lookd/internal/datasync"
 	"lookstudio/lookd/internal/dl"
 	"lookstudio/lookd/internal/events"
+	"lookstudio/lookd/internal/fudan"
 	"lookstudio/lookd/internal/jobs"
 	"lookstudio/lookd/internal/library"
 	"lookstudio/lookd/internal/localasr"
@@ -68,6 +69,7 @@ type Server struct {
 
 	syncMu        sync.Mutex
 	lastCourse    time.Time
+	relayed       relayCache
 	watchOnceInit sync.Once
 	w             *watchState
 
@@ -94,6 +96,7 @@ func (s *Server) Handler() http.Handler {
 	}
 	h("GET /api/health", s.health)
 	h("GET /api/auth", func(http.ResponseWriter, *http.Request) (any, error) { return s.Sess.State(), nil })
+	h("GET /api/schools", func(http.ResponseWriter, *http.Request) (any, error) { return schools, nil })
 	h("POST /api/auth/login", s.login)
 	h("POST /api/auth/logout", func(http.ResponseWriter, *http.Request) (any, error) {
 		s.Sess.Logout()
@@ -287,6 +290,7 @@ func (s *Server) Handler() http.Handler {
 	h("GET /api/lectures/{id}/courseware/text", s.coursewareText)
 	h("GET /api/lectures/{id}/courseware/search", s.searchCourseware)
 	mux.HandleFunc("GET /api/lectures/{id}/slides/{idx}/image", s.slideImage)
+	mux.HandleFunc("GET /api/lectures/{id}/streams/{n}", s.relayStream)
 	h("GET /api/storage", s.storage)
 	h("POST /api/storage/clean", s.storageClean)
 	mux.HandleFunc("GET /api/data/export", s.dataExport)
@@ -373,7 +377,7 @@ func writeErr(w http.ResponseWriter, err error) {
 		}
 	case errors.Is(err, sql.ErrNoRows):
 		code = http.StatusNotFound
-	case errors.Is(err, tongji.ErrSSOExpired):
+	case errors.Is(err, tongji.ErrSSOExpired), errors.Is(err, fudan.ErrBadCredentials), errors.Is(err, fudan.ErrNeedsPassword):
 		code = http.StatusUnauthorized
 	}
 	writeJSON(w, code, map[string]string{"error": err.Error()})
@@ -401,6 +405,7 @@ func (s *Server) health(http.ResponseWriter, *http.Request) (any, error) {
 
 func (s *Server) login(_ http.ResponseWriter, r *http.Request) (any, error) {
 	var in struct {
+		School   string `json:"school"`
 		Username string `json:"username"`
 		Password string `json:"password"`
 		Captcha  string `json:"captcha"`
@@ -409,13 +414,22 @@ func (s *Server) login(_ http.ResponseWriter, r *http.Request) (any, error) {
 	if err := decode(r, &in); err != nil {
 		return nil, err
 	}
+	switch in.School {
+	case "":
+		in.School = tongji.Tongji
+	case tongji.Tongji, tongji.Fudan:
+	default:
+		return nil, badRequest("不支持的学校：" + in.School)
+	}
 	if strings.TrimSpace(in.Username) == "" || in.Password == "" {
 		return nil, badRequest("请输入学号和密码")
 	}
 	s.Cl.ResetUser()
-	ctx, cancel := context.WithTimeout(r.Context(), 60*time.Second)
+	s.relayed.reset()
+	// Fudan signs in twice (WebVPN, then iCourse through it), and the gateway is slow.
+	ctx, cancel := context.WithTimeout(r.Context(), 120*time.Second)
 	defer cancel()
-	if err := s.Sess.Login(ctx, strings.TrimSpace(in.Username), in.Password, strings.TrimSpace(in.Captcha), in.Remember); err != nil {
+	if err := s.Sess.Login(ctx, in.School, strings.TrimSpace(in.Username), in.Password, strings.TrimSpace(in.Captcha), in.Remember); err != nil {
 		return nil, err
 	}
 	go s.syncCourses(context.Background())
@@ -573,11 +587,24 @@ func (s *Server) media(_ http.ResponseWriter, r *http.Request) (any, error) {
 		}
 	}
 	headers := map[string]string{}
-	for k := range m.Headers {
-		headers[k] = m.Headers.Get(k)
+	relayed := s.Sess.School() == tongji.Fudan
+	if relayed {
+		// The streams need the WebVPN cookie, which stays in the daemon:
+		// the player gets lookd's relay instead (see relayStream).
+		s.relayed.put(id, m)
+		streams := make([]tongji.Stream, len(m.Streams))
+		for i, st := range m.Streams {
+			st.URL = fmt.Sprintf("/api/lectures/%s/streams/%d", id, i)
+			streams[i] = st
+		}
+		m = &tongji.Media{Streams: streams, Duration: m.Duration, Courseware: m.Courseware, AllowDrag: m.AllowDrag}
+	} else {
+		for k := range m.Headers {
+			headers[k] = m.Headers.Get(k)
+		}
 	}
 	return map[string]any{"streams": m.Streams, "duration": m.Duration, "courseware": m.Courseware,
-		"allow_drag": m.AllowDrag, "headers": headers, "local_path": local}, nil
+		"allow_drag": m.AllowDrag, "headers": headers, "local_path": local, "relayed": relayed}, nil
 }
 
 func firstThumb(m *tongji.Media) string {
@@ -661,9 +688,8 @@ func (s *Server) slideImage(w http.ResponseWriter, r *http.Request) {
 		if !strings.HasPrefix(x.RemoteURL, "https://") && !strings.HasPrefix(x.RemoteURL, "http://") {
 			break
 		}
-		req, _ := http.NewRequestWithContext(ctx, http.MethodGet, x.RemoteURL, nil)
-		req.Header.Set("User-Agent", tongji.UserAgent)
-		req.Header.Set("Referer", tongji.BaseURL+"/")
+		req, _ := http.NewRequestWithContext(ctx, http.MethodGet, s.Sess.URL(x.RemoteURL), nil)
+		req.Header = s.Sess.Header()
 		res, err := slideClient.Do(req)
 		if err != nil {
 			writeErr(w, apiError{http.StatusBadGateway, "获取 PPT 图片失败"})

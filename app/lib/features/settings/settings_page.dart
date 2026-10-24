@@ -21,6 +21,7 @@ import '../assistant/bot_page.dart';
 import '../assistant/runtime_setup.dart';
 import '../usage/usage_page.dart';
 import '../canvas/canvas_page.dart';
+import 'about_page.dart';
 import 'asr_settings.dart';
 import 'data_settings.dart';
 import 'diagnostics.dart';
@@ -69,6 +70,8 @@ final _categories = [
   ]),
   _Category('notifications', l10n.commonNotifications, Icons.notifications_outlined, l10n.settingsNotificationsHint, [l10n.settingsWatchKeyword, l10n.watchCheckNow, l10n.settingsRemindersKeyword]),
   _Category('diagnostics', l10n.settingsDiagnostics, Icons.monitor_heart_outlined, l10n.settingsDiagnosticsHint, [l10n.settingsDaemonKeyword, 'ffmpeg', 'Pi Agent', l10n.diagDaemonLog, l10n.diagAgentLog, l10n.settingsRestartKeyword]),
+  _Category('about', l10n.settingsAbout, Icons.info_outline_rounded, l10n.settingsAboutHint,
+      [l10n.aboutCheckUpdates, l10n.aboutRepo, l10n.aboutFeedback, 'GitHub', 'OTA']),
 ];
 
 /// The bot's section names (agent/src/operate.mjs) → categories.
@@ -81,6 +84,7 @@ const _sectionAliases = {
   'data': 'data', 'sync': 'data', 'backup': 'data', 'storage': 'data',
   'notifications': 'notifications',
   'diagnostics': 'diagnostics',
+  'about': 'about',
 };
 
 /// Width from which the list and the open category sit side by side.
@@ -307,6 +311,7 @@ class _SettingsPageState extends State<SettingsPage> {
       'notifications' => [
           SettingsGroup(title: l10n.settingsWatchGroup, icon: Icons.notifications_outlined, children: [WatchSettings(server: server, put: _put)]),
         ],
+      'about' => const [AboutSection()],
       _ => const [Diagnostics()],
     };
   }
@@ -499,7 +504,7 @@ class _AccountSection extends StatelessWidget {
                   icon: Icon(Icons.edit_outlined, size: 18, color: cs.onSecondaryContainer),
                 ),
               ]),
-              Text([if (context.watch<UserProfile>().nickname.isNotEmpty) name, a.username, l10n.schoolTongji].join(' · '),
+              Text([if (context.watch<UserProfile>().nickname.isNotEmpty) name, a.username, a.school == 'fudan' ? l10n.schoolFudan : l10n.schoolTongji].join(' · '),
                   style: tt.bodyMedium?.copyWith(color: cs.onSecondaryContainer.withValues(alpha: 0.8))),
             ]),
           ),

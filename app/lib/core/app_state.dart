@@ -150,8 +150,11 @@ class AppState extends ChangeNotifier {
     return null;
   }
 
-  Future<void> login(String user, String pass, {String captcha = '', bool remember = true}) async {
-    final r = await api.post('/api/auth/login', {'username': user, 'password': pass, 'captcha': captcha, 'remember': remember});
+  /// Signs in to a school's lecture platform; [body] is lookd's
+  /// `{school, username, password, captcha, remember}`.
+  Future<void> login(Map<String, Object> body) async {
+    // Fudan signs in twice (WebVPN, then iCourse through it) and can take a while.
+    final r = await api.post('/api/auth/login', body, const Duration(seconds: 130));
     auth = AuthState((r as Map).cast<String, dynamic>());
     notifyListeners();
   }

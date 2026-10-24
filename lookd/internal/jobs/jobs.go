@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -419,7 +418,7 @@ func (m *Manager) runVideo(ctx context.Context, j store.Job, p progressFn) error
 	}
 	rel := dir + "/video.mp4"
 	err = m.Eng.Fetch(ctx, dl.Request{URL: s.URL, Header: media.Headers, Dest: m.Lib.Abs(rel),
-		Refresh: func(ctx context.Context) (string, error) { return m.Cl.Sign(ctx, s.RawURL, 0) },
+		Refresh: func(ctx context.Context) (string, error) { return m.Cl.StreamURL(ctx, s.RawURL) },
 	}, func(pr dl.Progress) {
 		p(func(j *store.Job) {
 			j.DoneBytes, j.TotalBytes, j.Speed, j.Conns, j.Stage = pr.Done, pr.Total, pr.Speed, pr.Conns, "下载中"
@@ -472,7 +471,7 @@ func (m *Manager) runSlides(ctx context.Context, j store.Job, p progressFn) erro
 	var firstErr atomic.Value
 	sem := make(chan struct{}, m.cfg.Load().SlideParallel)
 	var wg sync.WaitGroup
-	h := http.Header{"User-Agent": {tongji.UserAgent}, "Referer": {tongji.BaseURL + "/"}}
+	h := m.Cl.S.Header()
 	for i, s := range snaps {
 		rel := fmt.Sprintf("%s/slides/%04d_t%s%s", dir, i+1, clockName(s.TSec), extOf(s.ImageURL))
 		slides[i] = store.Slide{Idx: i + 1, TSec: s.TSec, IsKey: s.IsKey, RemoteURL: s.ImageURL}
@@ -481,7 +480,7 @@ func (m *Manager) runSlides(ctx context.Context, j store.Job, p progressFn) erro
 		go func(i int, url, rel string) {
 			defer wg.Done()
 			defer func() { <-sem }()
-			n, err := m.Eng.FetchSmall(ctx, url, h, m.Lib.Abs(rel))
+			n, err := m.Eng.FetchSmall(ctx, m.Cl.S.URL(url), h, m.Lib.Abs(rel))
 			if err != nil {
 				firstErr.CompareAndSwap(nil, err)
 				return
@@ -644,7 +643,7 @@ func (m *Manager) runTranscript(ctx context.Context, j store.Job, p progressFn) 
 		}
 		tmpVideo = filepath.Join(cache, j.LectureID+".mp4")
 		err = m.Eng.Fetch(ctx, dl.Request{URL: s.URL, Header: media.Headers, Dest: tmpVideo,
-			Refresh: func(ctx context.Context) (string, error) { return m.Cl.Sign(ctx, s.RawURL, 0) },
+			Refresh: func(ctx context.Context) (string, error) { return m.Cl.StreamURL(ctx, s.RawURL) },
 		}, func(pr dl.Progress) {
 			p(func(j *store.Job) {
 				j.DoneBytes, j.TotalBytes, j.Speed, j.Conns, j.Stage = pr.Done, pr.Total, pr.Speed, pr.Conns, "获取音视频"

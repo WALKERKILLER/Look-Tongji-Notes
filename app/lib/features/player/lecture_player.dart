@@ -136,7 +136,8 @@ class LecturePlayer extends ChangeNotifier implements PlayerHandle {
 
       media = LectureMedia((await api.get('/api/lectures/$lectureId/media') as Map).cast<String, dynamic>());
       sources = [
-        for (final s in media!.streams) Source(label: s.label, uri: s.url, headers: media!.headers),
+        for (final s in media!.streams)
+          Source(label: s.label, uri: media!.relayed ? api.uri(s.url, {'token': api.token}).toString() : s.url, headers: media!.headers),
       ];
       if (media!.localPath.isNotEmpty) {
         sources.insert(0, Source(label: localLabel.isEmpty ? l10n.commonLocal : localLabel, uri: Uri.file(media!.localPath).toString(), local: true));
@@ -345,7 +346,11 @@ class LecturePlayer extends ChangeNotifier implements PlayerHandle {
     return ans;
   }
 
-  String slideUrl(Slide s) => s.path.isNotEmpty ? api.fileUrl(s.path) : s.remoteUrl;
+  String slideUrl(Slide s) => switch (s) {
+        _ when s.path.isNotEmpty => api.fileUrl(s.path),
+        _ when media?.relayed ?? false => api.uri('/api/lectures/$lectureId/slides/${s.idx}/image', {'token': api.token}).toString(),
+        _ => s.remoteUrl,
+      };
 
   // ---- persistence ----
 

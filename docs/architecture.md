@@ -24,15 +24,15 @@ The app starts lookd ([lookd_service.dart](../app/lib/core/lookd_service.dart) s
 | --- | --- |
 | `lookd/cmd/lookd` | Daemon entry point |
 | `lookd/cmd/logintest`, `lookd/cmd/probe` | Manual tools against the live service (`LOOK_USER`/`LOOK_PASS`); not run in CI |
-| `lookd/internal/server` | HTTP API for the app and the agent — the main seam; the lecture watcher (`watch.go`, [spec 0010](specs/0010-live-refresh.md)); school profiles, Canvas sign-in adapters and the schedule merge (`canvas.go`, [spec 0011](specs/0011-canvas-and-schools.md)) |
-| `lookd/internal/tongji` | IAM login, JWT renewal, sealed session, Look API client |
+| `lookd/internal/server` | HTTP API for the app and the agent — the main seam; the lecture watcher (`watch.go`, [spec 0010](specs/0010-live-refresh.md)); school profiles, Canvas sign-in adapters and the schedule merge (`canvas.go`, [spec 0011](specs/0011-canvas-and-schools.md)); the media relay for streams only lookd reaches (`relay.go`) |
+| `lookd/internal/tongji` | IAM login, JWT renewal, sealed session, Look API client; the same client reaches Fudan's iCourse through the session's WebVPN mode ([spec 0015](specs/0015-fudan-icourse.md)) |
 | `lookd/internal/jobs` | Download, transcription and parse jobs with per-kind concurrency and persistence |
 | `lookd/internal/dl` | Segmented, resumable downloader |
 | `lookd/internal/asr` | Cloud ASR channels (bcut, JianYing), chunk pool with the optional `local` channel, cooldowns and retries |
 | `lookd/internal/localasr` | Local recognition: model catalog with digests and benchmarks, verified resumable installs, sherpa-onnx runner and punctuation realignment ([spec 0009](specs/0009-local-asr-models.md), [decision 0007](decisions/0007-sherpa-onnx-command-line-for-local-asr.md)) |
 | `lookd/internal/notify` | In-app notification feed (`notifications.json`), deduplicated by id and published as `notification` events |
 | `lookd/internal/canvas` | Canvas REST client and service: session or token sign-in with renewal and token rotation, sync cache, notifications, course links, files ([decision 0009](decisions/0009-canvas-through-the-school-sso-session.md)) |
-| `lookd/internal/fudan` | Fudan UIS sign-in and WebVPN addresses |
+| `lookd/internal/fudan` | Fudan UIS sign-in (directly or through WebVPN), WebVPN addresses, the iCourse sign-in |
 | `lookd/internal/mineru` | MinerU courseware parsing client and sealed token |
 | `lookd/internal/library` | On-disk library layout, courseware search, schedule, timeline, README for AI tools |
 | `lookd/internal/portable` | Converts library Markdown (`look://` links, timestamps, math) to plain Markdown for exports |

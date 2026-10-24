@@ -319,15 +319,23 @@
   "loginMissingCredentials": "请输入学号和密码",
   "loginSignInAgain": "重新登录",
   "loginSignIn": "登录",
-  "loginWithTongji": "使用同济大学统一身份认证",
+  "loginChooseSchool": "选择学校，用统一身份认证账号登录",
+  "loginHintTongji": "连接同济 Look 录课平台（look.tongji.edu.cn）",
+  "loginHintFudan": "经复旦 WebVPN 连接 iCourse，登录约需半分钟",
+  "loginSchoolsFailed": "无法读取学校列表：{e}",
+  "@loginSchoolsFailed": {
+    "placeholders": {
+      "e": {}
+    }
+  },
   "loginStudentId": "学号 / 工号",
   "commonPassword": "密码",
   "commonShowPassword": "显示密码",
   "commonHidePassword": "隐藏密码",
   "loginCaptcha": "验证码",
   "loginStaySignedIn": "保持登录",
-  "loginStaySignedInHint": "令牌到期前自动续期，密码加密保存在本机",
-  "loginPrivacy": "账号只用于登录 look.tongji.edu.cn，凭据仅保存在本机。",
+  "loginStaySignedInHint": "登录过期时自动续期，密码加密保存在本机",
+  "loginPrivacy": "学号和密码只发送给学校的统一身份认证，保持登录时加密保存在本机。",
   "homeGreetingNight": "夜深了",
   "homeGreetingMorning": "早上好",
   "homeGreetingNoon": "中午好",
@@ -2698,6 +2706,51 @@
   "authMethodRestored": "从本地会话恢复",
   "profileEditTooltip": "编辑昵称和头像",
   "schoolTongji": "同济大学",
+  "schoolFudan": "复旦大学",
+  "settingsAbout": "关于",
+  "settingsAboutHint": "版本、更新和反馈",
+  "aboutVersion": "版本 {value}",
+  "@aboutVersion": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "aboutUpdates": "更新",
+  "aboutCheckHint": "从 GitHub Releases 检查是否有新版本",
+  "aboutChecking": "正在检查…",
+  "aboutCheckUpdates": "检查更新",
+  "aboutUpToDate": "已是最新版本",
+  "aboutNewVersion": "有新版本 {version}（{when}发布）",
+  "@aboutNewVersion": {
+    "placeholders": {
+      "version": {},
+      "when": {}
+    }
+  },
+  "aboutDownload": "下载 {version}",
+  "@aboutDownload": {
+    "placeholders": {
+      "version": {}
+    }
+  },
+  "aboutReleaseNotes": "查看更新说明",
+  "aboutCheckFailed": "无法检查更新：{e}。请检查网络后重试。",
+  "@aboutCheckFailed": {
+    "placeholders": {
+      "e": {}
+    }
+  },
+  "aboutLinks": "链接",
+  "aboutRepo": "代码仓库",
+  "aboutFeedback": "反馈问题",
+  "aboutFeedbackHint": "在 GitHub 提交问题，自动附上版本和系统",
+  "aboutFeedbackBody": "请描述遇到的问题和复现步骤：\n\n\n---\n版本：{version}\n系统：{os}",
+  "@aboutFeedbackBody": {
+    "placeholders": {
+      "version": {},
+      "os": {}
+    }
+  },
   "authExpires": "凭证 {value}后到期，会在到期前自动续期",
   "@authExpires": {
     "placeholders": {
