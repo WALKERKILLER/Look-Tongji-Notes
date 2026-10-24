@@ -223,7 +223,7 @@ class _AppShellState extends State<AppShell> {
     if (sc == SizeClass.compact) {
       return Scaffold(
         body: SafeArea(bottom: false, child: content),
-        floatingActionButton: _AssistantFab(compact: true),
+        floatingActionButton: const PageFabClearance(child: _AssistantFab(compact: true)),
         bottomNavigationBar: NavigationBar(
           selectedIndex: _barTabs.contains(_index) ? _barTabs.indexOf(_index) : _barTabs.indexOf(Tabs.settings),
           onDestinationSelected: (b) => _select(_barTabs[b]),
@@ -370,6 +370,71 @@ class _BrandPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_BrandPainter o) => o.fill != fill || o.ring != ring;
+}
+
+/// Wraps a page's own floating action button. On phones the assistant's
+/// button sits in the same corner; while a wrapped button shows on the
+/// current tab and route, the assistant's moves up above it.
+class PageFab extends StatefulWidget {
+  const PageFab({super.key, this.visible = true, required this.child});
+
+  /// False while the page keeps the button but hides it (e.g. scaled to zero).
+  final bool visible;
+  final Widget child;
+
+  /// Height of the wrapped buttons (standard and extended FABs).
+  static const double height = 56;
+
+  /// Whether some page's button shows now.
+  static final shown = ValueNotifier(false);
+  static final _showing = <_PageFabState>{};
+
+  @override
+  State<PageFab> createState() => _PageFabState();
+}
+
+class _PageFabState extends State<PageFab> {
+  bool _on = false;
+
+  void _report(bool on) {
+    if (on == _on) return;
+    _on = on;
+    on ? PageFab._showing.add(this) : PageFab._showing.remove(this);
+    // Reported after the frame: the shell's button may not rebuild during this build.
+    WidgetsBinding.instance.addPostFrameCallback((_) => PageFab.shown.value = PageFab._showing.isNotEmpty);
+  }
+
+  @override
+  void dispose() {
+    _report(false);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Hidden tabs run with tickers off; covered routes are not current.
+    _report(widget.visible && TickerMode.valuesOf(context).enabled && (ModalRoute.isCurrentOf(context) ?? true));
+    return widget.child;
+  }
+}
+
+/// Holds the shell's own floating button clear of a page's: the page's keeps
+/// the corner and this one rises above it on the same right edge.
+class PageFabClearance extends StatelessWidget {
+  const PageFabClearance({super.key, required this.child});
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => ValueListenableBuilder<bool>(
+        valueListenable: PageFab.shown,
+        builder: (context, up, child) => AnimatedPadding(
+          padding: EdgeInsets.only(bottom: up ? PageFab.height + Space.md : 0),
+          duration: MediaQuery.disableAnimationsOf(context) ? Duration.zero : Motion.medium2,
+          curve: Motion.emphasized,
+          child: child,
+        ),
+        child: child,
+      );
 }
 
 /// The bot on the rail and the compact layout's floating button: tap to

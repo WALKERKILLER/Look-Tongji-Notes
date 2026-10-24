@@ -44,6 +44,7 @@ The app starts lookd ([lookd_service.dart](../app/lib/core/lookd_service.dart) s
 | `lookd/internal/agentenv` | Installs Node.js and the agent's npm dependencies into the data directory and prunes what they never read at run time ([spec 0008](specs/0008-assistant-runtime-setup.md)) |
 | `lookd/internal/rootfs` | Unpacks the Android workspace's Ubuntu base (`lookd unpack`), refusing entries that escape it |
 | `agent/src/host.mjs` | Agent host: HTTP endpoints, system prompt, sessions |
+| `agent/src/sessions.mjs` | Finds and opens conversations whatever library path they recorded, so ones synced from another device open here |
 | `agent/src/http.mjs` | Request body reading with the 1 MiB limit and 30 s deadline, HTTP error replies |
 | `agent/src/tools.mjs` | Tool groups, `find_tools`, note playbook, write guards |
 | `agent/src/models.mjs`, `catalog.mjs` | Providers, model preferences, models.dev metadata |

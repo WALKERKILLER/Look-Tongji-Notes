@@ -26,7 +26,7 @@ Every conversation has a kind, kept in `<agent data>/sessions-meta.json` (0600, 
 
 ### Bot identity
 `<agent data>/bot/bot.json` (0600): `{name, shape, color, persona, session_id, memory: {auto, learn_from_courses}, marks: {<session id>: <turns consolidated>}}`.
-- `name` 1–12 characters (default 小 Look); `shape` one of `pebble | mochi | bean | circle | squircle | capsule | droplet | ghost` (default `pebble`; a saved shape outside the set loads as `pebble`); `color` one of the app's seed palette keys or `theme` (default); `persona` ≤ 500 characters, added to the bot prompt as the user's description of how it should behave.
+- `name` 1–12 characters (default 小 Look); `shape` one of `pebble | mochi | bean | circle | squircle | capsule | droplet | ghost` (default `mochi`, cat ears; a saved shape outside the set loads as `mochi`); `color` one of the app's seed palette keys or `theme` (default); `persona` ≤ 500 characters, added to the bot prompt as the user's description of how it should behave.
 - `GET /bot` → identity, memory switches, `session_id`, `consolidating`, `last_run`. `PUT /bot` patches identity and switches (validated, 400 with a Chinese message).
 
 ### Memory

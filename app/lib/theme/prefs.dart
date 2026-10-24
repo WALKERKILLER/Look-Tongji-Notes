@@ -29,7 +29,7 @@ class UiPrefs extends ChangeNotifier {
 
   ThemeMode themeMode = ThemeMode.system;
   bool dynamicColor = true;
-  Color seed = const Color(0xFF3F6CB4); // 同济蓝
+  Color seed = const Color(0xFF3F6CB4); // 湛蓝
   DynamicSchemeVariant variant = DynamicSchemeVariant.tonalSpot;
   ContrastLevel contrast = ContrastLevel.standard;
   double textScale = 1.0;
@@ -142,7 +142,7 @@ class UiPrefs extends ChangeNotifier {
 
 /// Curated seed colors shown in the appearance picker.
 final kSeedPalette = <(String, Color)>[
-  (l10n.colorTongjiBlue, Color(0xFF3F6CB4)),
+  (l10n.colorAzure, Color(0xFF3F6CB4)),
   (l10n.colorIndigo, Color(0xFF2E6E6A)),
   (l10n.colorPine, Color(0xFF4F7A3A)),
   (l10n.colorAmber, Color(0xFFB0782A)),

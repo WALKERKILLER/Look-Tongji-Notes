@@ -19,6 +19,7 @@ import '../plugins/plugin_views.dart';
 import 'courses_page.dart';
 import 'download_sheet.dart';
 import '../../l10n/l10n.dart';
+import '../../shell.dart';
 
 class CoursePage extends StatefulWidget {
   const CoursePage({super.key, required this.courseId});
@@ -275,21 +276,24 @@ class _CoursePageState extends State<CoursePage> {
               ),
             ],
           ]),
-          floatingActionButton: AnimatedScale(
-            scale: _selecting ? 1 : 0,
-            duration: Motion.medium2,
-            curve: _selecting ? Motion.emphasizedDecelerate : Motion.emphasizedAccelerate,
-            child: FloatingActionButton.extended(
-              heroTag: null,
-              onPressed: !_selecting
-                  ? null
-                  : () async {
-                      final ids = _sel.toList();
-                      await showDownloadSheet(context, ids);
-                      if (mounted) setState(_sel.clear);
-                    },
-              icon: const Icon(Icons.download_rounded),
-              label: Text(l10n.courseDownloadSelected(_sel.length)),
+          floatingActionButton: PageFab(
+            visible: _selecting,
+            child: AnimatedScale(
+              scale: _selecting ? 1 : 0,
+              duration: Motion.medium2,
+              curve: _selecting ? Motion.emphasizedDecelerate : Motion.emphasizedAccelerate,
+              child: FloatingActionButton.extended(
+                heroTag: null,
+                onPressed: !_selecting
+                    ? null
+                    : () async {
+                        final ids = _sel.toList();
+                        await showDownloadSheet(context, ids);
+                        if (mounted) setState(_sel.clear);
+                      },
+                icon: const Icon(Icons.download_rounded),
+                label: Text(l10n.courseDownloadSelected(_sel.length)),
+              ),
             ),
           ),
         ),
