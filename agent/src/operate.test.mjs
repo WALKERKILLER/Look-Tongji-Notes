@@ -19,17 +19,28 @@ async function setup(over = {}) {
 			{ id: "j3", state: "queued", title: "第 3 节", kind: "slides" },
 		],
 		"GET /api/courses": [{ id: "c1", title: "高等数学", alias: "", pinned: false, hidden: false, color: "" }],
-		"GET /api/lectures/l1": { lecture: { id: "l1", title: "第 1 节", date: "2026-09-01" } },
+		"GET /api/lectures/l1": { lecture: { id: "l1", title: "第 1 节", date: "2026-09-01", has_playback: true, assets: [] } },
+		"GET /api/courses/c1/lectures": {
+			course: { id: "c1", title: "高等数学" },
+			lectures: [
+				{ id: "l4", title: "第 4 节", date: "2026-09-22", has_playback: true, assets: [], segments: 0 },
+				{ id: "l2", title: "第 2 节", date: "2026-09-08", has_playback: true, assets: ["video"], segments: 0 },
+				{ id: "l1", title: "第 1 节", date: "2026-09-01", has_playback: true, assets: ["video"], segments: 120 },
+				{ id: "l3", title: "第 3 节", date: "2026-09-15", has_playback: true, assets: [], segments: 0 },
+				{ id: "l5", title: "第 5 节", date: "2026-09-29", has_playback: false, assets: [], segments: 0 },
+			],
+		},
 		...over.lookd,
 	};
 	const api = async (method, path, body) => {
 		calls.push({ method, path, body });
 		const k = `${method} ${path}`;
 		if (k in lookd) return lookd[k];
+		if (k === "POST /api/jobs") return body.lecture_ids.flatMap((id) => body.kinds.map((kind) => ({ id: `${id}-${kind}`, lecture_id: id, kind, state: "queued" })));
 		if (method === "GET") throw Object.assign(new Error("not found"), { status: 404 });
 		return { ok: true, changed: body?.ids?.length ?? 0 };
 	};
-	const prefs = { provider: "p", model: "m1", thinking: "medium" };
+	const prefs = { provider: "p", model: "m1", thinking: "medium", approval: over.approval ?? "auto" };
 	const deps = {
 		bot,
 		api,
@@ -56,8 +67,8 @@ test("the registry validates values and lists no secret", () => {
 	for (const k of Object.keys(SETTINGS)) assert.doesNotMatch(k, /token|key|password|secret|auth|root/i);
 });
 
-test("low-risk settings apply at once with undo; the rest become a card", async () => {
-	const { tools, bot, calls, done } = await setup();
+test("settings apply at once with undo, across the app, lookd and the assistant", async () => {
+	const { tools, bot, calls, prefs, done } = await setup();
 	try {
 		const r = await tools.change_settings.execute("1", {
 			changes: [
@@ -65,18 +76,32 @@ test("low-risk settings apply at once with undo; the rest become a card", async 
 				{ key: "download.video_parallel", value: 3 },
 				{ key: "model", value: "p/m2" },
 			],
-			reason: "用户想加快下载",
 		});
+		assert.equal(r.details.app.op, "prefs");
 		assert.deepEqual(r.details.app.set, { textScale: 1.2 });
+		assert.deepEqual(calls.at(-1), { method: "PUT", path: "/api/settings", body: { "download.video_parallel": 3 } });
+		assert.equal(prefs.model, "m2");
+		const p = bot.proposal(r.details.app.proposal_id);
+		assert.equal(p.state, "applied");
+		assert.deepEqual(p.undo, { type: "settings", app: { textScale: 1 }, lookd: { "download.video_parallel": 2 }, agent: { model: "p/m1" } });
+		await assert.rejects(tools.change_settings.execute("2", { changes: [{ key: "model", value: "p/m3" }] }), /不可用/);
+	} finally {
+		await done();
+	}
+});
+
+test("ask mode turns a change into a card and sends nothing first", async () => {
+	const { tools, bot, calls, done } = await setup({ approval: "ask" });
+	try {
+		const r = await tools.change_settings.execute("1", { changes: [{ key: "textScale", value: 1.2 }, { key: "asr.concurrency", value: 3 }] });
 		assert.equal(r.details.proposal.state, "pending");
-		assert.equal(calls.filter((c) => c.method !== "GET").length, 0, "nothing reaches lookd before the card is applied");
-		const immediate = bot.proposal(r.details.app.proposal_id);
-		assert.deepEqual(immediate.undo, { type: "app", set: { textScale: 1 } });
-		const pending = bot.proposal(r.details.proposal.id);
-		assert.deepEqual(pending.op.lookd, { "download.video_parallel": 3 });
-		assert.deepEqual(pending.op.agent, { model: "p/m2" });
-		assert.deepEqual(pending.undo.lookd, { "download.video_parallel": 2 });
-		await assert.rejects(tools.change_settings.execute("2", { changes: [{ key: "model", value: "p/m3" }], reason: "" }), /不可用/);
+		assert.equal(r.details.app, undefined);
+		assert.equal(calls.filter((c) => c.method !== "GET").length, 0);
+		assert.deepEqual(bot.proposal(r.details.proposal.id).op, { type: "settings", app: { textScale: 1.2 }, lookd: { "asr.concurrency": 3 }, agent: {} });
+		const d = await tools.download.execute("2", { course_id: "c1", latest: 1, kinds: ["video"] });
+		assert.equal(d.details.proposal.state, "pending");
+		assert.equal(calls.filter((c) => c.method === "POST").length, 0);
+		assert.match(d.content[0].text, /不要声称/);
 	} finally {
 		await done();
 	}
@@ -96,32 +121,74 @@ test("applying a settings card writes lookd and the assistant prefs", async () =
 	}
 });
 
-test("download pause acts on matching jobs and records its undo", async () => {
-	const { tools, bot, calls, done } = await setup();
+test("download jobs pause and cancel with their undo", async () => {
+	const { tools, bot, deps, calls, done } = await setup();
 	try {
 		const r = await tools.manage_downloads.execute("1", { action: "pause" });
 		assert.deepEqual(calls.at(-1), { method: "POST", path: "/api/jobs/bulk", body: { action: "pause", ids: ["j1", "j3"] } });
-		const p = bot.proposal(r.details.app.proposal_id);
-		assert.deepEqual(p.undo, { type: "jobs", action: "resume", ids: ["j1", "j3"] });
+		assert.deepEqual(bot.proposal(r.details.app.proposal_id).undo, { type: "jobs", action: "resume", ids: ["j1", "j3"] });
 		const none = await tools.manage_downloads.execute("2", { action: "retry" });
 		assert.match(none.content[0].text, /没有符合条件/);
+		const c = await tools.manage_downloads.execute("3", { action: "cancel", job_ids: ["j2"] });
+		const undo = bot.proposal(c.details.app.proposal_id).undo;
+		assert.equal(undo.type, "requeue");
+		await runOp(undo, deps);
+		assert.deepEqual(calls.at(-1), { method: "POST", path: "/api/jobs", body: { lecture_ids: [undefined], kinds: ["video"] } });
 	} finally {
 		await done();
 	}
 });
 
-test("downloads and deletions only make cards", async () => {
+test("download picks a course's lectures by date or latest and skips what is local", async () => {
 	const { tools, bot, calls, done } = await setup();
 	try {
-		const r = await tools.download.execute("1", { lecture_ids: ["l1", "l1"], kinds: ["video", "transcript"] });
-		const p = bot.proposal(r.details.proposal.id);
-		assert.deepEqual(p.op, { type: "download", lecture_ids: ["l1"], kinds: ["video", "transcript"] });
-		assert.equal(calls.filter((c) => c.method !== "GET").length, 0);
-		await assert.rejects(tools.download.execute("2", { lecture_ids: ["nope"], kinds: ["video"] }), /没有节次/);
-		await assert.rejects(tools.download.execute("3", { lecture_ids: Array.from({ length: MAX_DOWNLOAD + 1 }, (_, i) => `x${i}`), kinds: ["video"] }), /最多/);
-		const d = await tools.delete_files.execute("4", { lecture_id: "l1", kinds: ["video"] });
+		const r = await tools.download.execute("1", { course_id: "c1", from: "2026-09-01", to: "2026-09-15", kinds: ["video", "transcript"] });
+		const posts = calls.filter((c) => c.method === "POST");
+		// l1 has both, l2 needs only the transcript, l3 needs both.
+		assert.deepEqual(
+			posts.map((c) => c.body),
+			[
+				{ lecture_ids: ["l2"], kinds: ["transcript"] },
+				{ lecture_ids: ["l3"], kinds: ["video", "transcript"] },
+			],
+		);
+		assert.match(r.content[0].text, /1 节已在本机/);
+		const p = bot.proposal(r.details.app.proposal_id);
+		assert.equal(p.state, "applied");
+		assert.deepEqual(p.undo, { type: "jobs", action: "cancel", ids: ["l2-transcript", "l3-video", "l3-transcript"] });
+		await tools.download.execute("2", { course_id: "c1", latest: 2, kinds: ["slides"] });
+		assert.deepEqual(calls.at(-1).body, { lecture_ids: ["l3", "l4"], kinds: ["slides"] }, "latest counts recorded lectures only");
+		const none = await tools.download.execute("3", { course_id: "c1", to: "2026-09-01", kinds: ["video", "transcript"] });
+		assert.match(none.content[0].text, /不用下载/);
+		await assert.rejects(tools.download.execute("4", { lecture_ids: ["nope"], kinds: ["video"] }), /没有节次/);
+		await assert.rejects(tools.download.execute("5", { kinds: ["video"] }), /course_id/);
+		await assert.rejects(tools.download.execute("6", { course_id: "c1", from: "9月1日", kinds: ["video"] }), /YYYY-MM-DD/);
+	} finally {
+		await done();
+	}
+});
+
+test("download undo leaves jobs that were already running", async () => {
+	const { tools, bot, done } = await setup({ lookd: { "GET /api/jobs": [{ id: "l3-video", state: "running", kind: "video" }] } });
+	try {
+		const r = await tools.download.execute("1", { lecture_ids: ["l1"], kinds: ["video"], redownload: true });
+		assert.deepEqual(bot.proposal(r.details.app.proposal_id).undo, { type: "jobs", action: "cancel", ids: ["l1-video"] });
+		assert.ok(MAX_DOWNLOAD >= 50);
+	} finally {
+		await done();
+	}
+});
+
+test("deleting files always waits for a card", async () => {
+	const { tools, bot, deps, calls, done } = await setup();
+	try {
+		const d = await tools.delete_files.execute("1", { lecture_ids: ["l1"], kinds: ["video"] });
 		assert.equal(d.details.proposal.state, "pending");
 		assert.equal(calls.filter((c) => c.method === "DELETE").length, 0);
+		await runOp(bot.proposal(d.details.proposal.id).op, deps);
+		assert.deepEqual(calls.at(-1), { method: "DELETE", path: "/api/lectures/l1/assets/video", body: undefined });
+		await runOp({ type: "delete_files", lecture_id: "l1", kinds: ["slides"] }, deps);
+		assert.equal(calls.at(-1).path, "/api/lectures/l1/assets/slides", "older cards still apply");
 	} finally {
 		await done();
 	}
@@ -141,18 +208,39 @@ test("course changes apply at once and undo to the previous values", async () =>
 	}
 });
 
-test("task and plugin proposals are validated", async () => {
-	const { tools, bot, deps, done } = await setup();
+test("tasks and plugins are created and switched at once with undo", async () => {
+	const { tools, bot, done } = await setup();
 	try {
-		await assert.rejects(tools.propose_task.execute("1", { name: "x", prompt: "y", schedule: { type: "daily", time: "25:00" } }), /HH:MM/);
-		const r = await tools.propose_task.execute("2", { name: "周复习", prompt: "复习本周课程", schedule: { type: "weekly", days: [7], time: "20:00" }, writes: ["notes"] });
-		const p = bot.proposal(r.details.proposal.id);
-		assert.equal((await runOp(p.op, deps)).task_id, "t1");
+		await assert.rejects(tools.create_task.execute("1", { name: "x", prompt: "y", schedule: { type: "daily", time: "25:00" } }), /HH:MM/);
+		const r = await tools.create_task.execute("2", { name: "周复习", prompt: "复习本周课程", schedule: { type: "weekly", days: [7], time: "20:00" }, writes: ["notes"] });
+		assert.deepEqual(bot.proposal(r.details.app.proposal_id).undo, { type: "delete_task", id: "t1" });
 		await assert.rejects(tools.toggle_plugin.execute("3", { id: "ghost", enabled: true }), /没有安装/);
 		const same = await tools.toggle_plugin.execute("4", { id: "demo", enabled: true });
 		assert.match(same.content[0].text, /已经是/);
 		const off = await tools.toggle_plugin.execute("5", { id: "demo", enabled: false });
-		assert.deepEqual(bot.proposal(off.details.proposal.id).undo, { type: "plugin", id: "demo", enabled: true });
+		assert.deepEqual(bot.proposal(off.details.app.proposal_id).undo, { type: "plugin", id: "demo", enabled: true });
+	} finally {
+		await done();
+	}
+});
+
+test("list_downloads reports states, progress and errors", async () => {
+	const { tools, done } = await setup({
+		lookd: {
+			"GET /api/jobs": [
+				{ id: "a", state: "running", title: "第 1 节", kind: "video", progress: 0.426, course_id: "c1" },
+				{ id: "b", state: "failed", title: "第 2 节", kind: "transcript", error: "网络中断", course_id: "c1" },
+				{ id: "c", state: "done", title: "第 3 节", kind: "slides", course_id: "c2" },
+			],
+		},
+	});
+	try {
+		const r = (await tools.list_downloads.execute("1", {})).content[0].text;
+		assert.match(r, /下载中 1 · 失败 1 · 已完成 1/);
+		assert.match(r, /第 1 节 · 视频 · 下载中 42%/);
+		assert.match(r, /网络中断/);
+		assert.doesNotMatch(r, /第 3 节/);
+		assert.doesNotMatch((await tools.list_downloads.execute("2", { state: "all", course_id: "c1" })).content[0].text, /第 3 节/);
 	} finally {
 		await done();
 	}

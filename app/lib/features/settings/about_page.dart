@@ -11,6 +11,7 @@ import '../../core/app_state.dart';
 import '../../core/format.dart';
 import '../../l10n/l10n.dart';
 import '../../theme/tokens.dart';
+import '../../widgets/look_logo.dart';
 import 'settings_common.dart';
 
 /// The repository Look Studio is built from; its releases carry the app.
@@ -165,22 +166,8 @@ class _AboutSectionState extends State<AboutSection> {
       _Check.failed => l10n.aboutCheckFailed(_error!),
     };
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      const SizedBox(height: Space.xl),
-      Row(children: [
-        Container(
-          width: 56,
-          height: 56,
-          decoration: BoxDecoration(color: cs.primaryContainer, shape: BoxShape.circle),
-          child: Icon(Icons.motion_photos_on_rounded, size: 32, color: cs.onPrimaryContainer),
-        ),
-        const SizedBox(width: Space.lg),
-        Expanded(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Look Studio', style: tt.titleLarge),
-            SelectableText(l10n.aboutVersion(version.isEmpty ? '—' : version), style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
-          ]),
-        ),
-      ]),
+      const SizedBox(height: Space.xxl),
+      _Hero(version: version),
       SettingsGroup(title: l10n.aboutUpdates, icon: Icons.system_update_alt_rounded, children: [
         Row(children: [
           Icon(
@@ -227,7 +214,121 @@ class _AboutSectionState extends State<AboutSection> {
           trailing: const Icon(Icons.open_in_new_rounded, size: 18),
           onTap: () => widget.open(_feedbackUrl),
         ),
+        ListTile(
+          contentPadding: const EdgeInsets.symmetric(horizontal: Space.xl),
+          leading: const Icon(Icons.description_outlined),
+          title: Text(l10n.aboutLicenses),
+          subtitle: Text(l10n.aboutLicensesHint),
+          trailing: const Icon(Icons.chevron_right_rounded),
+          onTap: () => showLicensePage(
+            context: context,
+            applicationName: 'Look Studio',
+            applicationVersion: version,
+            applicationIcon: const Padding(padding: EdgeInsets.all(Space.lg), child: LookLogo(size: 64, label: null)),
+          ),
+        ),
       ]),
+      const SizedBox(height: Space.xl),
+      // Quiet on purpose: a text button in the footer, the code only on request.
+      Center(
+        child: TextButton.icon(
+          style: TextButton.styleFrom(foregroundColor: cs.onSurfaceVariant),
+          onPressed: () => showReward(context),
+          icon: const Icon(Icons.volunteer_activism_outlined, size: 18),
+          label: Text(l10n.aboutReward),
+        ),
+      ),
+      const SizedBox(height: Space.xl),
     ]);
+  }
+}
+
+/// The logo, name, a line on what the app does, and the version (selectable,
+/// marked 预览版 on a pre-release).
+class _Hero extends StatelessWidget {
+  const _Hero({required this.version});
+  final String version;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+    return Column(children: [
+      const LookLogo(size: 88),
+      const SizedBox(height: Space.lg),
+      Text('Look Studio', style: tt.headlineSmall, textAlign: TextAlign.center),
+      const SizedBox(height: Space.xs),
+      Text(l10n.aboutTagline, style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant), textAlign: TextAlign.center),
+      const SizedBox(height: Space.md),
+      DecoratedBox(
+        decoration: BoxDecoration(color: cs.surfaceContainerHigh, borderRadius: BorderRadius.circular(Corners.full)),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: Space.md, vertical: Space.xs),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Flexible(child: SelectableText(l10n.aboutVersion(version.isEmpty ? '—' : version), style: tt.labelLarge?.copyWith(color: cs.onSurfaceVariant))),
+            if (version.contains('-')) ...[
+              const SizedBox(width: Space.sm),
+              Text(l10n.aboutPreview, style: tt.labelLarge?.copyWith(color: cs.tertiary)),
+            ],
+          ]),
+        ),
+      ),
+    ]);
+  }
+}
+
+/// The author's WeChat tip code: a bottom sheet on phones, a dialog elsewhere.
+Future<void> showReward(BuildContext context) {
+  if (context.isCompact) {
+    return showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      useSafeArea: true,
+      isScrollControlled: true,
+      builder: (_) => const SingleChildScrollView(child: Center(child: _Reward(sheet: true))),
+    );
+  }
+  return showDialog<void>(context: context, builder: (_) => const Dialog(child: _Reward(sheet: false)));
+}
+
+class _Reward extends StatelessWidget {
+  const _Reward({required this.sheet});
+  final bool sheet;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 360),
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(Space.xl, sheet ? 0 : Space.xl, Space.xl, Space.xl),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Text(l10n.aboutRewardTitle, style: tt.titleLarge, textAlign: TextAlign.center),
+          const SizedBox(height: Space.sm),
+          Text(l10n.aboutRewardBody, style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant), textAlign: TextAlign.center),
+          const SizedBox(height: Space.xl),
+          // The code keeps its own dark card; a hairline separates it from dark surfaces.
+          Container(
+            foregroundDecoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(Corners.lg),
+              border: Border.all(color: (dark ? Colors.white : Colors.black).withValues(alpha: 0.1)),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(Corners.lg),
+              child: Image.asset('assets/reward.png', width: 240, height: 240, fit: BoxFit.contain, filterQuality: FilterQuality.medium, semanticLabel: l10n.aboutRewardImage),
+            ),
+          ),
+          if (sheet) ...[
+            const SizedBox(height: Space.lg),
+            Text(l10n.aboutRewardPhoneHint, style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant), textAlign: TextAlign.center),
+          ] else ...[
+            const SizedBox(height: Space.lg),
+            Align(alignment: AlignmentDirectional.centerEnd, child: TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(l10n.commonClose))),
+          ],
+        ]),
+      ),
+    );
   }
 }

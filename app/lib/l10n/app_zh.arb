@@ -1323,12 +1323,13 @@
   "toolReadSettings": "读取设置",
   "toolChangeSettings": "调整设置",
   "toolManageDownloads": "管理下载",
-  "toolPrepareDownload": "准备下载",
+  "toolListDownloads": "查看下载",
+  "toolDownload": "下载",
   "toolPrepareDelete": "准备删除文件",
   "toolOrganizeCourses": "整理课程",
   "toolSyncCourses": "同步课程",
-  "toolPrepareTask": "准备定时任务",
-  "toolPreparePlugin": "准备开关插件",
+  "toolCreateTask": "创建定时任务",
+  "toolTogglePlugin": "开关插件",
   "toolListMemory": "翻看记忆",
   "toolRecall": "回想",
   "toolRemember": "记下来",
@@ -1378,7 +1379,7 @@
       "botName": {}
     }
   },
-  "botIntroBody": "我会记住你告诉我的事，也能替你在应用里动手：调设置、整理课程、管理下载、安排定时任务。下载和删除这类操作会先给你一张卡片确认。",
+  "botIntroBody": "我会记住你告诉我的事，也能替你在应用里动手：下载、调设置、整理课程、安排定时任务，做完都可以撤销。想先过目，就在输入框旁切到「询问」；删除文件总会先问你。",
   "courseAssistantTitle": "{value}助手",
   "@courseAssistantTitle": {
     "placeholders": {
@@ -3921,5 +3922,22 @@
     "placeholders": {
       "n": {}
     }
-  }
+  },
+  "approvalTooltip": "操作模式",
+  "approvalAsk": "询问",
+  "approvalAuto": "自动",
+  "approvalAskDetail": "改动先生成卡片，由你应用",
+  "approvalAutoDetail": "直接执行，可以撤销",
+  "approvalDeleteNote": "删除文件在两种模式下都会先问你",
+  "approvalSwitchHint": "Shift+Tab 切换",
+  "approvalFailed": "无法切换操作模式。确认助手已启动后再试",
+  "aboutTagline": "课堂录像的回放、转写与笔记",
+  "aboutPreview": "预览版",
+  "aboutLicenses": "开源许可",
+  "aboutLicensesHint": "Look Studio 用到的开源组件",
+  "aboutReward": "赞赏",
+  "aboutRewardTitle": "请作者喝杯咖啡",
+  "aboutRewardBody": "觉得 Look Studio 有用，可以用微信扫码赞赏。",
+  "aboutRewardPhoneHint": "在本机上可以先截屏，再在微信「扫一扫」里从相册识别。",
+  "aboutRewardImage": "微信赞赏码"
 }

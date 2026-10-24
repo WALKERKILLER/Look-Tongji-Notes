@@ -103,6 +103,27 @@ class AssistantController extends ChangeNotifier {
 
   String get thinking => '${(models?['prefs'] as Map?)?['thinking'] ?? 'medium'}';
 
+  /// How the assistant's changes run: 'auto' at once with 撤销, 'ask' as
+  /// cards the user applies (docs/specs/0016-agent-acts.md).
+  String get approval => (models?['prefs'] as Map?)?['approval'] == 'ask' ? 'ask' : 'auto';
+
+  /// Switches [approval], showing the new mode before the agent answers.
+  Future<void> setApproval(String mode) async {
+    final prefs = models?['prefs'];
+    final was = approval;
+    if (prefs is Map) {
+      prefs['approval'] = mode;
+      notifyListeners();
+    }
+    try {
+      await setPrefs({'approval': mode});
+    } catch (_) {
+      if (prefs is Map) prefs['approval'] = was;
+      notifyListeners();
+      rethrow;
+    }
+  }
+
   void _onApp() {
     if (ready && !_wasReady) {
       _wasReady = true;

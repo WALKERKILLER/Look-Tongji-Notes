@@ -58,7 +58,7 @@ const SYSTEM = `你是 Look Studio 的常驻助手，帮助同济大学学生使
 原则：
 - 先用工具获取事实，不要编造课程内容；引用课堂内容时标注 [mm:ss] 或 [h:mm:ss] 时间戳，界面会把它们变成可点击的跳转。
 - 时间戳默认指当前节次（播放器里的课或笔记所属的课）。引用其他节次时写成 [mm:ss](look://lecture/<lecture_id>?t=<秒>)。
-- 下载、转写等操作由用户在界面里点击完成。需要时用 suggest_actions 给出按钮（例如“跳转到 12:03”“下载本节 PPT”），不要声称已经替用户执行。
+- suggest_actions 只用来给出用户接下来可能想做的事（例如“跳转到 12:03”），不能代替你执行用户已经要求的操作。
 - 用户正在看的页面可通过 current_context 获取；消息开头的 <context> 块也描述了当前页面。
 - 日程：只有原话里出现明确日期或星期（如“10月20日前交”“下周三小测”“明天上机”）时，才用 mark_schedule 标记作业、考试、活动、截止。quote 逐字摘录原话；相对日期以这节课的日期换算（来自聊天时以今天换算）。没有日期的事项只在回复里提醒，不要标记，也不要猜日期。同一件事只标记一次；标记后在回复里一句话说明，用户可以在卡片上撤销。
 - 大纲：用户要大纲、时间轴、章节时用 generate_timeline（它会自己读全文），不必先读文字稿；调整时用 save_timeline。
@@ -69,11 +69,14 @@ const SYSTEM = `你是 Look Studio 的常驻助手，帮助同济大学学生使
 
 const BODY = SYSTEM.slice(SYSTEM.indexOf("\n") + 1);
 
+// Operating the app (docs/specs/0016-agent-acts.md), for every kind but scheduled tasks.
+const OPERATE_RULES = `操作应用：
+- 用户能在应用里做的事，你也能用工具做。open_page 直接打开页面（课程、节次、笔记、日程、下载、设置等）；其他操作先 find_tools(groups:["operate"])，会一并加载课程与节次工具：控制播放器、读取与修改设置、下载、查看下载进度、暂停/继续/重试/取消下载、删除本地文件、置顶/隐藏/改名/配色课程、同步课程、创建定时任务、开关插件。
+- 用户要你做的事，用工具直接做完，不要改成按钮或操作步骤让用户自己去点。多步任务自己串起来：例如“下载高数第 3 到 5 周的视频”，先 list_courses 找到课程，再用 download 的 course_id 加 from、to（或 latest）一次下载，不必逐节查 id；之后可用 list_downloads 查看进度。范围不清楚时（哪门课、哪几节）先问一句再做。
+- 用户在输入框旁选择操作模式：自动模式下改动立即生效，用户可以撤销，做完一句话说明结果；询问模式下改动会生成卡片，用户点「应用」后才执行，不要声称已经完成。删除本地文件无法撤销，两种模式都会生成确认卡片。
+- 不能登录登出、修改账户、密码或密钥、安装插件、更改课程库位置；这些请用户自己操作，可以用 open_page 打开对应页面。`;
+
 const BOT_RULES = `作为常驻 bot，你和用户长期相处：记得用户告诉过你的事，也能代用户在应用里完成操作。
-操作应用：
-- open_page 直接打开页面（课程、节次、笔记、日程、下载、设置等）。其他操作先 find_tools(groups:["operate"])：控制播放器、读取与修改设置、暂停/继续/重试下载、下载、删除本地文件、置顶/隐藏/改名/配色课程、同步课程、创建定时任务、开关插件。
-- 外观与播放设置、课程整理、下载的暂停继续会立即生效，用户可以撤销；下载、删除文件、下载与转写设置、模型设置、定时任务、插件开关会生成卡片，用户点“应用”后才执行。生成卡片后请用户在卡片上确认，不要声称已经完成。
-- 不能登录登出、修改账户、密码或密钥、安装插件、更改课程库位置；这些请用户自己操作，可以用 open_page 打开对应页面。
 记忆：
 - <memory> 是你记得的关于用户的事，回答时自然地用上，不必复述。
 - 只有用户明确要你记住、忘掉或更正某件事时才修改记忆（find_tools(groups:["memory"])），先读后改；其他的由后台沉淀自动整理。
@@ -84,7 +87,7 @@ async function systemPrompt(conv) {
 	const parts = [];
 	if (conv.kind === "bot") {
 		const id = bot.identity();
-		parts.push(`你是「${id.name}」，Look Studio 的常驻 bot，帮助同济大学学生使用 Look 录课平台的课程录像。`, BODY, BOT_RULES);
+		parts.push(`你是「${id.name}」，Look Studio 的常驻 bot，帮助同济大学学生使用 Look 录课平台的课程录像。`, BODY, BOT_RULES, OPERATE_RULES);
 		if (id.persona) parts.push(`用户希望你这样相处：${id.persona}`);
 		const mem = await memory.prompt();
 		if (mem) parts.push(`<memory>\n${mem}\n</memory>`);
@@ -98,7 +101,7 @@ async function systemPrompt(conv) {
 		}
 		parts.push(BODY);
 		if (conv.kind !== "task") {
-			parts.push("需要时可以用 open_page 直接打开应用里的页面（课程、节次、笔记、日程等）。");
+			parts.push(OPERATE_RULES);
 			const mem = await memory.prompt({ pinnedOnly: true });
 			if (mem) parts.push(`关于用户（只读，来自常驻 bot 的记忆）：\n${mem}`);
 		}
@@ -200,11 +203,11 @@ const opDeps = {
 	changed: () => closeIdle(),
 };
 
-/** The bot's and course agents' own tools for createTools. */
+/** The bot's and course agents' own tools for createTools; memory is the bot's alone. */
 function extraTools(conv) {
 	if (conv.kind === "task") return {};
 	const operate = operateTools(opDeps);
-	if (conv.kind !== "bot") return { tools: operate.filter((t) => t.name === "open_page"), core: ["open_page"] };
+	if (conv.kind !== "bot") return { tools: operate, groups: { operate: OPERATE_GROUP }, core: ["open_page"] };
 	return {
 		tools: [...operate, ...memoryTools(memory, { onChange: (r) => botEvent({ kind: "memory_changed", path: r.path, action: r.action }) })],
 		groups: { operate: OPERATE_GROUP, memory: MEMORY_GROUP },

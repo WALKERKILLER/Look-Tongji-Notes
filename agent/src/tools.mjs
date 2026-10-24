@@ -1,6 +1,6 @@
 // Tools the resident assistant can call. All data comes from lookd; the
-// assistant reads and organizes, while downloads stay user-initiated (the
-// assistant can only *suggest* actions that render as buttons in the app).
+// assistant reads and organizes here, and operates the app with the tools in
+// operate.mjs.
 //
 // Only a small core is declared to the model up front. The rest are grouped
 // and loaded on demand with find_tools, so tool schemas do not fill the

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:look_studio/features/settings/about_page.dart';
+import 'package:look_studio/widgets/look_logo.dart';
 
 Map<String, dynamic> release(String tag, {bool pre = false, bool draft = false}) => {
       'tag_name': tag,
@@ -55,6 +56,25 @@ void main() {
 
     await tester.tap(find.text('反馈问题'));
     expect(Uri.parse(opened.last).path, '/$repoSlug/issues/new');
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('the drawn logo heads the page and the tip code shows only on request', (tester) async {
+    tester.view.physicalSize = const Size(360, 780);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(body: ListView(children: [AboutSection(fetchReleases: () async => [], open: (_) async {})])),
+    ));
+    expect(find.byType(LookLogo), findsOneWidget);
+    expect(find.text('开源许可'), findsOneWidget);
+    expect(find.byType(Image), findsNothing, reason: 'the code is not on the page');
+    await tester.scrollUntilVisible(find.text('赞赏'), 100, scrollable: find.byType(Scrollable).first);
+    await tester.tap(find.text('赞赏'));
+    await tester.pumpAndSettle();
+    expect(find.text('请作者喝杯咖啡'), findsOneWidget);
+    expect(find.bySemanticsLabel('微信赞赏码'), findsOneWidget);
+    expect(find.textContaining('截屏'), findsOneWidget, reason: 'a phone gets the screenshot hint');
     expect(tester.takeException(), isNull);
   });
 

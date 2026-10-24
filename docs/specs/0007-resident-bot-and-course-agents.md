@@ -47,6 +47,8 @@ Files under `<agent data>/bot/memory/` (directory 0700, files 0600):
 - Events: the host posts `POST /api/agent/event {type: bot_event, data: {kind: consolidating|consolidated|failed, changes?}}`; lookd relays it on the event bus.
 
 ### Operating the app (bot)
+Amended by [spec 0016](0016-agent-acts.md): operations run at once with undo or as cards by the user's approval mode, course agents and chats operate too, and only file deletion always asks. The list below is the original contract.
+
 Tools (group `operate`, loaded with `find_tools`; `open_page` is a core bot tool):
 - `open_page {target, course_id?, lecture_id?, note_id?, t?, day?, section?}`: targets `home | courses | course | lecture | note | schedule | downloads | library | tasks | plugins | settings | activity | usage | bot`. The result carries `details.app = {op: open, …}`; the app navigates at once and shows `已打开 <page> · 返回`.
 - `player {action: play|pause|seek|speed, seconds?, rate?}`: `details.app = {op: player, …}` for the open player; the context block says whether one is open.
