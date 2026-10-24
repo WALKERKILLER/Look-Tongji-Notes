@@ -178,7 +178,7 @@ class _ChannelCard extends StatelessWidget {
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Row(children: [
-                  Text('${c['name']}', style: tt.titleSmall),
+                  Flexible(child: Text('${c['name']}', maxLines: 1, overflow: TextOverflow.ellipsis, style: tt.titleSmall)),
                   const SizedBox(width: Space.sm),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),

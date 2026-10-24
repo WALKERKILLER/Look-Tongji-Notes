@@ -4,10 +4,10 @@ The APK carries these unmodified Termux builds as native libraries
 (lib/<abi>/), downloaded and verified by android/workspace/prepare.py:
 
   libproot.so, libproot_loader.so
-    PRoot 5.1.107.98 (Termux package proot_5.1.107.98)
+    PRoot 5.1.107.101 (Termux package proot_5.1.107.101)
     GNU General Public License, version 2
     Copyright (C) the PRoot authors (STMicroelectronics and contributors)
-    Source: https://github.com/termux/proot/archive/v5.1.107.98.zip
+    Source: https://github.com/termux/proot/archive/v5.1.107.101.zip
     Build recipe: https://github.com/termux/termux-packages/tree/master/packages/proot
 
   libtalloc.so

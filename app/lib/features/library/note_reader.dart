@@ -574,17 +574,24 @@ class _CoursewareReaderPageState extends State<_CoursewareReaderPage> {
         final doc = d == null ? null : MdDoc(d.$2);
         return LayoutBuilder(builder: (context, c) {
           final tocPane = c.maxWidth >= 1040 && (doc?.headings.isNotEmpty ?? false);
+          final parsedBy = l10n.coursewareParsedBy(widget.file.pages > 0 ? l10n.coursewarePages(widget.file.pages) : '');
           return Scaffold(
             appBar: AppBar(
               title: Text(widget.file.name, maxLines: 1, overflow: TextOverflow.ellipsis),
               actions: [
-                Padding(
-                  padding: const EdgeInsets.only(right: Space.sm),
-                  child: Row(children: [
-                    ClipRRect(borderRadius: BorderRadius.circular(4), child: Image.asset('assets/brands/mineru.png', width: 18, height: 18)),
-                    const SizedBox(width: 6),
-                    Text(l10n.coursewareParsedBy(widget.file.pages > 0 ? l10n.coursewarePages(widget.file.pages) : ''), style: tt.labelMedium?.copyWith(color: cs.onSurfaceVariant)),
-                  ]),
+                // On a phone the title needs the room; the logo keeps the credit.
+                Tooltip(
+                  message: parsedBy,
+                  child: Padding(
+                    padding: const EdgeInsets.only(right: Space.sm),
+                    child: Row(children: [
+                      ClipRRect(borderRadius: BorderRadius.circular(4), child: Image.asset('assets/brands/mineru.png', width: 18, height: 18)),
+                      if (!context.isCompact) ...[
+                        const SizedBox(width: 6),
+                        Text(parsedBy, style: tt.labelMedium?.copyWith(color: cs.onSurfaceVariant)),
+                      ],
+                    ]),
+                  ),
                 ),
                 if (doc != null) ...[
                   IconButton(tooltip: l10n.commonFind, isSelected: _search, onPressed: () => setState(() => _search = !_search), icon: const Icon(Icons.search_rounded)),

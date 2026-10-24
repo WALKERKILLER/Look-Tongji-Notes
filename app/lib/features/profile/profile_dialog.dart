@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
@@ -87,6 +88,7 @@ class _ProfileDialogState extends State<_ProfileDialog> {
 
     return Dialog(
       backgroundColor: cs.surfaceContainerHigh,
+      insetPadding: context.isCompact ? const EdgeInsets.symmetric(horizontal: Space.lg, vertical: Space.xl) : null,
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 460),
         child: SingleChildScrollView(
@@ -122,8 +124,9 @@ class _ProfileDialogState extends State<_ProfileDialog> {
             Row(children: [
               Text(l10n.profileInspiration, style: tt.titleSmall),
               const SizedBox(width: Space.sm),
-              Text(l10n.profileTapToUse, style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
-              const Spacer(),
+              Expanded(
+                child: Text(l10n.profileTapToUse, maxLines: 1, overflow: TextOverflow.ellipsis, style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+              ),
               IconButton(
                 tooltip: l10n.profileShuffle,
                 onPressed: () => setState(() => _ideas = List.generate(6, (_) => UserProfile.randomSeed())),
@@ -131,26 +134,31 @@ class _ProfileDialogState extends State<_ProfileDialog> {
               ),
             ]),
             const SizedBox(height: Space.xs),
-            AnimatedSwitcher(
-              duration: Motion.medium2,
-              child: Row(
-                key: ValueKey(_ideas.first),
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  for (final seed in _ideas)
-                    _Pick(
-                      selected: p.kind == AvatarKind.art && p.value == seed,
-                      onTap: () => p.setArt(seed),
-                      child: AvatarView(kind: AvatarKind.art, value: seed, frame: p.frame, size: 52),
-                    ),
-                ],
-              ),
-            ),
+            LayoutBuilder(builder: (context, box) {
+              // The six picks share the row; each ring takes 10 px around its avatar.
+              final size = math.min(52.0, (box.maxWidth - Space.xs * (_ideas.length - 1)) / _ideas.length - 10);
+              return AnimatedSwitcher(
+                duration: Motion.medium2,
+                child: Row(
+                  key: ValueKey(_ideas.first),
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    for (final seed in _ideas)
+                      _Pick(
+                        selected: p.kind == AvatarKind.art && p.value == seed,
+                        onTap: () => p.setArt(seed),
+                        child: AvatarView(kind: AvatarKind.art, value: seed, frame: p.frame, size: size),
+                      ),
+                  ],
+                ),
+              );
+            }),
             const SizedBox(height: Space.lg),
             Text(l10n.profileShape, style: tt.titleSmall),
             const SizedBox(height: Space.sm),
             SegmentedButton<AvatarFrame>(
               showSelectedIcon: false,
+              expandedInsets: EdgeInsets.zero,
               segments: [for (final f in AvatarFrame.values) ButtonSegment(value: f, label: Text(f.label))],
               selected: {p.frame},
               onSelectionChanged: (s) => p.update((x) => x.frame = s.first),
