@@ -220,7 +220,7 @@ func (c *Client) Put(ctx context.Context, p string, open func() (io.ReadCloser, 
 		case resp.StatusCode == http.StatusPreconditionFailed:
 			resp.Body.Close()
 			return "", ErrChanged
-		case (resp.StatusCode == http.StatusConflict || resp.StatusCode == http.StatusNotFound || c.orphan(ctx, p, resp)) && attempt == 0:
+		case (resp.StatusCode == http.StatusConflict || resp.StatusCode == http.StatusNotFound || orphan(p, resp)) && attempt == 0:
 			resp.Body.Close()
 			if err := c.MkdirAll(ctx, parent(p)); err != nil {
 				return "", err
@@ -231,14 +231,12 @@ func (c *Client) Put(ctx context.Context, p string, open func() (io.ReadCloser, 
 	}
 }
 
-// orphan reports a 403 for a file whose folder is missing: some servers
-// answer so instead of 409.
-func (c *Client) orphan(ctx context.Context, p string, resp *http.Response) bool {
-	if resp.StatusCode != http.StatusForbidden || parent(p) == "" {
-		return false
-	}
-	there, err := c.exists(ctx, parent(p)+"/")
-	return err == nil && !there
+// orphan reports a 403 that may mean a missing folder: some servers answer
+// so instead of 409. It is not checked here: a parallel upload into the same
+// new folder can create it in between, so the folder is made (or found)
+// and the upload tried once more; a second 403 is a real refusal.
+func orphan(p string, resp *http.Response) bool {
+	return resp.StatusCode == http.StatusForbidden && parent(p) != ""
 }
 
 func parent(p string) string {

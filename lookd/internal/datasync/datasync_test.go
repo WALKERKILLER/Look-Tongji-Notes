@@ -4,11 +4,13 @@ import (
 	"archive/zip"
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -251,6 +253,40 @@ func TestWebDAVForbiddenWrites(t *testing.T) {
 	d := newDevice(t)
 	if _, err := d.Configure(ctx, Settings{URL: srv.URL, Folder: "LookStudio"}); err == nil || !strings.Contains(err.Error(), "上传 state/write-check") {
 		t.Fatalf("read-only account: %v", err)
+	}
+}
+
+// Uploads run in parallel: one that found a new folder missing (403) must
+// not fail because another upload created that folder meanwhile.
+func TestWebDAVParallelUploadsIntoNewFolders(t *testing.T) {
+	ctx := context.Background()
+	fs := webdav.NewMemFS()
+	h := &webdav.Handler{Prefix: "/dav", FileSystem: fs, LockSystem: webdav.NewMemLS()}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if u, p, ok := r.BasicAuth(); !ok || u != "me" || p != "secret" {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		if r.Method == http.MethodPut {
+			if _, err := fs.Stat(ctx, path.Dir(strings.TrimPrefix(r.URL.Path, "/dav"))); err != nil {
+				w.WriteHeader(http.StatusForbidden)
+				return
+			}
+		}
+		h.ServeHTTP(w, r)
+	}))
+	defer srv.Close()
+	d := newDevice(t)
+	for c := range 3 {
+		for l := range 6 {
+			for _, f := range []string{"lecture.json", "笔记.md", "transcript.json", "slides/001.png"} {
+				d.write(t, fmt.Sprintf("library/courses/课程%d/第%d讲/%s", c, l, f), "x", time.Hour)
+			}
+		}
+	}
+	connect(t, d, srv.URL, false)
+	if res := d.sync(t); res.Uploaded != 3*6*4 || res.Error != "" {
+		t.Fatalf("%+v", res)
 	}
 }
 
