@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import '../../core/api.dart';
 import '../../core/app_state.dart';
 import '../../theme/tokens.dart';
+import '../../widgets/look_logo.dart';
 import '../../widgets/loading.dart';
 import '../../l10n/l10n.dart';
 import '../canvas/school_emblem.dart';
@@ -104,7 +105,7 @@ class _BrandMark extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final style = size > 24 ? Theme.of(context).textTheme.titleLarge : Theme.of(context).textTheme.titleMedium;
     return Row(mainAxisSize: MainAxisSize.min, children: [
-      Icon(Icons.motion_photos_on_rounded, color: cs.primary, size: size),
+      LookLogo(size: size + Space.lg, label: null),
       SizedBox(width: size > 24 ? Space.md : Space.sm),
       Text('Look Studio', style: style?.copyWith(color: cs.primary, fontWeight: FontWeight.w600)),
     ]);

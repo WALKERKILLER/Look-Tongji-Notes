@@ -70,13 +70,15 @@ final _toolLabels = {
   'player': (l10n.toolControlPlayer, Icons.smart_display_outlined),
   'read_settings': (l10n.toolReadSettings, Icons.tune_rounded),
   'change_settings': (l10n.toolChangeSettings, Icons.tune_rounded),
+  'list_downloads': (l10n.toolListDownloads, Icons.downloading_rounded),
   'manage_downloads': (l10n.toolManageDownloads, Icons.downloading_rounded),
-  'download': (l10n.toolPrepareDownload, Icons.download_outlined),
+  'download': (l10n.toolDownload, Icons.download_outlined),
   'delete_files': (l10n.toolPrepareDelete, Icons.delete_sweep_outlined),
   'manage_course': (l10n.toolOrganizeCourses, Icons.school_outlined),
   'sync_courses': (l10n.toolSyncCourses, Icons.sync_rounded),
-  'propose_task': (l10n.toolPrepareTask, Icons.schedule_rounded),
-  'toggle_plugin': (l10n.toolPreparePlugin, Icons.extension_outlined),
+  'create_task': (l10n.toolCreateTask, Icons.schedule_rounded),
+  'propose_task': (l10n.toolCreateTask, Icons.schedule_rounded), // before spec 0016
+  'toggle_plugin': (l10n.toolTogglePlugin, Icons.extension_outlined),
   'memory_list': (l10n.toolListMemory, Icons.psychology_alt_outlined),
   'memory_read': (l10n.toolRecall, Icons.psychology_alt_outlined),
   'memory_write': (l10n.toolRemember, Icons.edit_note_rounded),
@@ -292,24 +294,18 @@ class _AssistantPanelState extends State<AssistantPanel> {
             ),
           ),
           const SizedBox(width: Space.xs),
-          Flexible(
-            child: SegmentedButton<String>(
-              showSelectedIcon: false,
-              style: const ButtonStyle(visualDensity: VisualDensity.compact, tapTargetSize: MaterialTapTargetSize.shrinkWrap),
-              segments: [
-                ButtonSegment(value: 'bot', label: Text(a.botName, maxLines: 1, overflow: TextOverflow.ellipsis)),
-                ButtonSegment(value: 'sessions', label: Text(l10n.chatSessions)),
-              ],
-              selected: {a.view},
-              onSelectionChanged: a.busy
+          Expanded(
+            child: AssistantViewSwitch(
+              botName: a.botName,
+              view: a.view,
+              onChanged: a.busy
                   ? null
                   : (v) {
                       setState(() => _history = false);
-                      v.first == 'bot' ? a.showBot() : a.showSessions();
+                      v == 'bot' ? a.showBot() : a.showSessions();
                     },
             ),
           ),
-          const Spacer(),
           if (!isBot) IconButton(tooltip: l10n.chatNewSession, onPressed: a.busy ? null : a.newChat, icon: const Icon(Icons.add_comment_outlined)),
           if (!widget.embedded)
           IconButton(
@@ -588,7 +584,9 @@ class _AssistantPanelState extends State<AssistantPanel> {
             const SizedBox(width: Space.md),
             Icon(player != null ? Icons.play_circle_outline_rounded : Icons.my_location_rounded, size: 14, color: cs.onSurfaceVariant),
             const SizedBox(width: 4),
-            Flexible(child: Text(ctxLabel, style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant), maxLines: 1, overflow: TextOverflow.ellipsis)),
+            Expanded(child: Text(ctxLabel, style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant), maxLines: 1, overflow: TextOverflow.ellipsis)),
+            const SizedBox(width: Space.sm),
+            ApprovalModeChip(mode: a.approval, onChanged: (m) => _setApproval(context, a, m)),
           ]),
           _ModeChips(context_: {'session_id': a.sessionId}),
           Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
@@ -602,7 +600,10 @@ class _AssistantPanelState extends State<AssistantPanel> {
             ),
             Expanded(
               child: CallbackShortcuts(
-                bindings: {const SingleActivator(LogicalKeyboardKey.enter): _send},
+                bindings: {
+                  const SingleActivator(LogicalKeyboardKey.enter): _send,
+                  const SingleActivator(LogicalKeyboardKey.tab, shift: true): () => _setApproval(context, a, a.approval == 'ask' ? 'auto' : 'ask'),
+                },
                 child: TextField(
                   controller: _input,
                   focusNode: _focus,
@@ -641,6 +642,160 @@ class _AssistantPanelState extends State<AssistantPanel> {
         ]),
       ),
     );
+  }
+}
+
+/// The approval mode at the end of the composer's context line, like the
+/// permission modes of coding agents: 询问 turns the assistant's changes into
+/// cards the user applies, 自动 runs them with 撤销. Shift+Tab in the
+/// composer switches it. Only the accent marks 自动; nothing is filled, so
+/// the send button stays the one filled action.
+class ApprovalModeChip extends StatelessWidget {
+  const ApprovalModeChip({super.key, required this.mode, required this.onChanged});
+
+  /// 'ask' or 'auto'.
+  final String mode;
+  final ValueChanged<String> onChanged;
+
+  static const _icons = {'ask': Icons.front_hand_outlined, 'auto': Icons.motion_photos_auto_outlined};
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+    final fg = mode == 'auto' ? cs.primary : cs.onSurfaceVariant;
+    final still = MediaQuery.disableAnimationsOf(context);
+    final compact = context.isCompact;
+    String name(String m) => m == 'ask' ? l10n.approvalAsk : l10n.approvalAuto;
+    return MenuAnchor(
+      alignmentOffset: const Offset(0, Space.xs),
+      menuChildren: [
+        for (final m in const ['ask', 'auto'])
+          MenuItemButton(
+            leadingIcon: Icon(_icons[m], size: 20, color: m == mode ? cs.primary : cs.onSurfaceVariant),
+            trailingIcon: Icon(Icons.check_rounded, size: 18, color: m == mode ? cs.primary : Colors.transparent),
+            onPressed: () => onChanged(m),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minWidth: 168, maxWidth: 220),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: Space.sm),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+                  Text(name(m), style: tt.labelLarge),
+                  const SizedBox(height: Space.xxs),
+                  Text(m == 'ask' ? l10n.approvalAskDetail : l10n.approvalAutoDetail, style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+                ]),
+              ),
+            ),
+          ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(Space.lg, Space.xs, Space.lg, Space.sm),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 264),
+            child: Text(
+              compact ? l10n.approvalDeleteNote : '${l10n.approvalDeleteNote} · ${l10n.approvalSwitchHint}',
+              style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant),
+            ),
+          ),
+        ),
+      ],
+      builder: (context, menu, _) => Tooltip(
+        message: compact ? l10n.approvalTooltip : '${l10n.approvalTooltip} · ${l10n.approvalSwitchHint}',
+        child: Semantics(
+          button: true,
+          label: '${l10n.approvalTooltip}：${name(mode)}',
+          excludeSemantics: true,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(Corners.full),
+            onTap: () => menu.isOpen ? menu.close() : menu.open(),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 32),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: Space.sm),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  // The icon swaps in from a quarter size, so a switch by
+                  // Shift+Tab is noticed without moving the composer.
+                  AnimatedSwitcher(
+                    duration: still ? Duration.zero : Motion.short4,
+                    switchInCurve: Motion.emphasizedDecelerate,
+                    switchOutCurve: Motion.emphasizedAccelerate,
+                    transitionBuilder: (c, an) => FadeTransition(
+                      opacity: an,
+                      child: ScaleTransition(scale: Tween(begin: 0.25, end: 1.0).animate(an), child: c),
+                    ),
+                    child: Icon(_icons[mode], key: ValueKey(mode), size: 16, color: fg),
+                  ),
+                  const SizedBox(width: Space.xs),
+                  AnimatedDefaultTextStyle(
+                    duration: still ? Duration.zero : Motion.short4,
+                    style: tt.labelMedium!.copyWith(color: fg),
+                    child: Text(name(mode)),
+                  ),
+                  const SizedBox(width: Space.xxs),
+                  Icon(Icons.unfold_more_rounded, size: 14, color: cs.onSurfaceVariant),
+                ]),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+void _setApproval(BuildContext context, AssistantController a, String mode) {
+  if (mode == a.approval) return;
+  a.setApproval(mode).catchError((Object _) {
+    if (context.mounted) showSnack(context, l10n.approvalFailed);
+  });
+}
+
+/// Switches the assistant between the bot and the session list. Both names
+/// show in full where they fit; on a narrower panel (a long bot name, large
+/// text) the segments become icons with tooltips rather than cutting the
+/// name off.
+class AssistantViewSwitch extends StatelessWidget {
+  const AssistantViewSwitch({super.key, required this.botName, required this.view, required this.onChanged});
+  final String botName;
+
+  /// 'bot' or 'sessions'.
+  final String view;
+  final ValueChanged<String>? onChanged;
+
+  /// Horizontal padding and borders of the two compact segments.
+  static const _chrome = 2 * 2 * Space.lg + 3;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = Theme.of(context).textTheme.labelLarge;
+    final scaler = MediaQuery.textScalerOf(context);
+    double width(String t) {
+      final p = TextPainter(text: TextSpan(text: t, style: style), textDirection: Directionality.of(context), textScaler: scaler, maxLines: 1)..layout();
+      final w = p.width;
+      p.dispose();
+      return w;
+    }
+
+    return LayoutBuilder(builder: (context, box) {
+      final labels = box.maxWidth >= width(botName) + width(l10n.chatSessions) + _chrome;
+      return Align(
+        alignment: AlignmentDirectional.centerStart,
+        child: SegmentedButton<String>(
+          showSelectedIcon: false,
+          style: const ButtonStyle(visualDensity: VisualDensity.compact, tapTargetSize: MaterialTapTargetSize.shrinkWrap),
+          segments: labels
+              ? [
+                  ButtonSegment(value: 'bot', label: Text(botName, maxLines: 1, softWrap: false)),
+                  ButtonSegment(value: 'sessions', label: Text(l10n.chatSessions, maxLines: 1, softWrap: false)),
+                ]
+              : [
+                  ButtonSegment(value: 'bot', icon: const Icon(Icons.smart_toy_outlined), tooltip: botName),
+                  ButtonSegment(value: 'sessions', icon: const Icon(Icons.forum_outlined), tooltip: l10n.chatSessions),
+                ],
+          selected: {view},
+          onSelectionChanged: onChanged == null ? null : (v) => onChanged!(v.first),
+        ),
+      );
+    });
   }
 }
 

@@ -3898,11 +3898,17 @@ abstract class AppLocalizations {
   /// **'管理下载'**
   String get toolManageDownloads;
 
-  /// No description provided for @toolPrepareDownload.
+  /// No description provided for @toolListDownloads.
   ///
   /// In zh, this message translates to:
-  /// **'准备下载'**
-  String get toolPrepareDownload;
+  /// **'查看下载'**
+  String get toolListDownloads;
+
+  /// No description provided for @toolDownload.
+  ///
+  /// In zh, this message translates to:
+  /// **'下载'**
+  String get toolDownload;
 
   /// No description provided for @toolPrepareDelete.
   ///
@@ -3922,17 +3928,17 @@ abstract class AppLocalizations {
   /// **'同步课程'**
   String get toolSyncCourses;
 
-  /// No description provided for @toolPrepareTask.
+  /// No description provided for @toolCreateTask.
   ///
   /// In zh, this message translates to:
-  /// **'准备定时任务'**
-  String get toolPrepareTask;
+  /// **'创建定时任务'**
+  String get toolCreateTask;
 
-  /// No description provided for @toolPreparePlugin.
+  /// No description provided for @toolTogglePlugin.
   ///
   /// In zh, this message translates to:
-  /// **'准备开关插件'**
-  String get toolPreparePlugin;
+  /// **'开关插件'**
+  String get toolTogglePlugin;
 
   /// No description provided for @toolListMemory.
   ///
@@ -4165,7 +4171,7 @@ abstract class AppLocalizations {
   /// No description provided for @botIntroBody.
   ///
   /// In zh, this message translates to:
-  /// **'我会记住你告诉我的事，也能替你在应用里动手：调设置、整理课程、管理下载、安排定时任务。下载和删除这类操作会先给你一张卡片确认。'**
+  /// **'我会记住你告诉我的事，也能替你在应用里动手：下载、调设置、整理课程、安排定时任务，做完都可以撤销。想先过目，就在输入框旁切到「询问」；删除文件总会先问你。'**
   String get botIntroBody;
 
   /// No description provided for @courseAssistantTitle.
@@ -11055,6 +11061,108 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'{n} 个任务已暂停'**
   String downloadsPausedSummary(Object n);
+
+  /// No description provided for @approvalTooltip.
+  ///
+  /// In zh, this message translates to:
+  /// **'操作模式'**
+  String get approvalTooltip;
+
+  /// No description provided for @approvalAsk.
+  ///
+  /// In zh, this message translates to:
+  /// **'询问'**
+  String get approvalAsk;
+
+  /// No description provided for @approvalAuto.
+  ///
+  /// In zh, this message translates to:
+  /// **'自动'**
+  String get approvalAuto;
+
+  /// No description provided for @approvalAskDetail.
+  ///
+  /// In zh, this message translates to:
+  /// **'改动先生成卡片，由你应用'**
+  String get approvalAskDetail;
+
+  /// No description provided for @approvalAutoDetail.
+  ///
+  /// In zh, this message translates to:
+  /// **'直接执行，可以撤销'**
+  String get approvalAutoDetail;
+
+  /// No description provided for @approvalDeleteNote.
+  ///
+  /// In zh, this message translates to:
+  /// **'删除文件在两种模式下都会先问你'**
+  String get approvalDeleteNote;
+
+  /// No description provided for @approvalSwitchHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'Shift+Tab 切换'**
+  String get approvalSwitchHint;
+
+  /// No description provided for @approvalFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'无法切换操作模式。确认助手已启动后再试'**
+  String get approvalFailed;
+
+  /// No description provided for @aboutTagline.
+  ///
+  /// In zh, this message translates to:
+  /// **'课堂录像的回放、转写与笔记'**
+  String get aboutTagline;
+
+  /// No description provided for @aboutPreview.
+  ///
+  /// In zh, this message translates to:
+  /// **'预览版'**
+  String get aboutPreview;
+
+  /// No description provided for @aboutLicenses.
+  ///
+  /// In zh, this message translates to:
+  /// **'开源许可'**
+  String get aboutLicenses;
+
+  /// No description provided for @aboutLicensesHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'Look Studio 用到的开源组件'**
+  String get aboutLicensesHint;
+
+  /// No description provided for @aboutReward.
+  ///
+  /// In zh, this message translates to:
+  /// **'赞赏'**
+  String get aboutReward;
+
+  /// No description provided for @aboutRewardTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'请作者喝杯咖啡'**
+  String get aboutRewardTitle;
+
+  /// No description provided for @aboutRewardBody.
+  ///
+  /// In zh, this message translates to:
+  /// **'觉得 Look Studio 有用，可以用微信扫码赞赏。'**
+  String get aboutRewardBody;
+
+  /// No description provided for @aboutRewardPhoneHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'在本机上可以先截屏，再在微信「扫一扫」里从相册识别。'**
+  String get aboutRewardPhoneHint;
+
+  /// No description provided for @aboutRewardImage.
+  ///
+  /// In zh, this message translates to:
+  /// **'微信赞赏码'**
+  String get aboutRewardImage;
 }
 
 class _AppLocalizationsDelegate

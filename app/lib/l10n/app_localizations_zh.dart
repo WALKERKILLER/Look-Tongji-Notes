@@ -2185,7 +2185,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get toolManageDownloads => '管理下载';
 
   @override
-  String get toolPrepareDownload => '准备下载';
+  String get toolListDownloads => '查看下载';
+
+  @override
+  String get toolDownload => '下载';
 
   @override
   String get toolPrepareDelete => '准备删除文件';
@@ -2197,10 +2200,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get toolSyncCourses => '同步课程';
 
   @override
-  String get toolPrepareTask => '准备定时任务';
+  String get toolCreateTask => '创建定时任务';
 
   @override
-  String get toolPreparePlugin => '准备开关插件';
+  String get toolTogglePlugin => '开关插件';
 
   @override
   String get toolListMemory => '翻看记忆';
@@ -2323,7 +2326,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get botIntroBody =>
-      '我会记住你告诉我的事，也能替你在应用里动手：调设置、整理课程、管理下载、安排定时任务。下载和删除这类操作会先给你一张卡片确认。';
+      '我会记住你告诉我的事，也能替你在应用里动手：下载、调设置、整理课程、安排定时任务，做完都可以撤销。想先过目，就在输入框旁切到「询问」；删除文件总会先问你。';
 
   @override
   String courseAssistantTitle(Object value) {
@@ -6359,4 +6362,55 @@ class AppLocalizationsZh extends AppLocalizations {
   String downloadsPausedSummary(Object n) {
     return '$n 个任务已暂停';
   }
+
+  @override
+  String get approvalTooltip => '操作模式';
+
+  @override
+  String get approvalAsk => '询问';
+
+  @override
+  String get approvalAuto => '自动';
+
+  @override
+  String get approvalAskDetail => '改动先生成卡片，由你应用';
+
+  @override
+  String get approvalAutoDetail => '直接执行，可以撤销';
+
+  @override
+  String get approvalDeleteNote => '删除文件在两种模式下都会先问你';
+
+  @override
+  String get approvalSwitchHint => 'Shift+Tab 切换';
+
+  @override
+  String get approvalFailed => '无法切换操作模式。确认助手已启动后再试';
+
+  @override
+  String get aboutTagline => '课堂录像的回放、转写与笔记';
+
+  @override
+  String get aboutPreview => '预览版';
+
+  @override
+  String get aboutLicenses => '开源许可';
+
+  @override
+  String get aboutLicensesHint => 'Look Studio 用到的开源组件';
+
+  @override
+  String get aboutReward => '赞赏';
+
+  @override
+  String get aboutRewardTitle => '请作者喝杯咖啡';
+
+  @override
+  String get aboutRewardBody => '觉得 Look Studio 有用，可以用微信扫码赞赏。';
+
+  @override
+  String get aboutRewardPhoneHint => '在本机上可以先截屏，再在微信「扫一扫」里从相册识别。';
+
+  @override
+  String get aboutRewardImage => '微信赞赏码';
 }

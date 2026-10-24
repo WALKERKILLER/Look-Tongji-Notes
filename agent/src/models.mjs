@@ -42,7 +42,8 @@ const mask = (k) => (k ? `${k.slice(0, 3)}…${k.slice(-4)}` : "");
 export class ModelPipeline {
 	runtime = null;
 	// vision: "provider/model" that transcribes images for text-only chat models.
-	prefs = { provider: "", model: "", thinking: "medium", persona: "", autoTitle: true, vision: "" };
+	// approval: "auto" runs operations at once with undo, "ask" makes them cards.
+	prefs = { provider: "", model: "", thinking: "medium", persona: "", autoTitle: true, vision: "", approval: "auto" };
 	listeners = new Set();
 	catalog = new Catalog(DATA_DIR);
 
@@ -140,7 +141,8 @@ export class ModelPipeline {
 	}
 
 	async setPrefs(patch) {
-		const allowed = ["provider", "model", "thinking", "persona", "autoTitle", "vision"];
+		const allowed = ["provider", "model", "thinking", "persona", "autoTitle", "vision", "approval"];
+		if ("approval" in patch && !["ask", "auto"].includes(patch.approval)) throw Object.assign(new Error("approval 只能是 ask 或 auto"), { status: 400 });
 		for (const k of allowed) if (k in patch) this.prefs[k] = patch[k];
 		await writeJSON(PREFS, this.prefs, 0o644);
 		for (const fn of this.listeners) fn();
