@@ -17,6 +17,7 @@ import '../player/player_page.dart';
 import '../practice/quiz.dart';
 import 'note_reader.dart';
 import '../../l10n/l10n.dart';
+import '../../shell.dart';
 
 class LibraryPage extends StatefulWidget {
   const LibraryPage({super.key});
@@ -107,11 +108,13 @@ class _LibraryPageState extends State<LibraryPage> {
       value: {'screen': l10n.screenLibrary},
       child: Scaffold(
         backgroundColor: Colors.transparent,
-        floatingActionButton: FloatingActionButton.extended(
-          heroTag: null,
-          onPressed: () => _openNote(null),
-          icon: const Icon(Icons.edit_note_rounded),
-          label: Text(l10n.libraryWriteNote),
+        floatingActionButton: PageFab(
+          child: FloatingActionButton.extended(
+            heroTag: null,
+            onPressed: () => _openNote(null),
+            icon: const Icon(Icons.edit_note_rounded),
+            label: Text(l10n.libraryWriteNote),
+          ),
         ),
         body: CustomScrollView(slivers: [
           SliverToBoxAdapter(

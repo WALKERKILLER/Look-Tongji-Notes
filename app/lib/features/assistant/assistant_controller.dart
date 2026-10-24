@@ -208,7 +208,7 @@ class AssistantController extends ChangeNotifier {
   /// GET /agent/bot: name, shape, color, persona, session_id, memory switches.
   Map<String, dynamic> bot = const {};
   String get botName => '${bot['name'] ?? l10n.botDefaultName}';
-  String get botShape => '${bot['shape'] ?? 'pebble'}';
+  String get botShape => '${bot['shape'] ?? kDefaultBotShape}';
   String get botColor => '${bot['color'] ?? 'theme'}';
   bool consolidating = false;
 

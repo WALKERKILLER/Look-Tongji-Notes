@@ -51,6 +51,9 @@ final kBotShapes = <String, (OrganicShape, String)>{
   'ghost': (OrganicShape.ghost, l10n.botAccessoryGhost),
 };
 
+/// The body a new bot wears (agent/src/bot.mjs DEFAULT_BOT): cat ears.
+const kDefaultBotShape = 'mochi';
+
 /// Colour keys of bot.json: `theme` follows the app, the rest are kSeedPalette in order.
 const kBotColorKeys = ['theme', 'blue', 'teal', 'green', 'amber', 'red', 'rose', 'violet', 'graphite'];
 
@@ -90,7 +93,7 @@ BotPalette botPalette(ColorScheme cs, String key) {
   return (s.primaryFixedDim, s.tertiary);
 }
 
-OrganicShape _shapeOf(String key) => (kBotShapes[key] ?? kBotShapes['pebble']!).$1;
+OrganicShape _shapeOf(String key) => (kBotShapes[key] ?? kBotShapes[kDefaultBotShape]!).$1;
 
 /// Where the face screen sits on a body, in body radii: centre height, width,
 /// height, and the top of the head on the centre line (toppers stand there).
@@ -107,7 +110,7 @@ const _faces = <String, _Face>{
   'ghost': (y: -0.1, w: 1.3, h: 0.82, top: -1),
 };
 
-_Face _faceOf(String key) => _faces[key] ?? _faces['pebble']!;
+_Face _faceOf(String key) => _faces[key] ?? _faces[kDefaultBotShape]!;
 
 _Face _lerpFace(_Face a, _Face b, double k) =>
     (y: a.y + (b.y - a.y) * k, w: a.w + (b.w - a.w) * k, h: a.h + (b.h - a.h) * k, top: a.top + (b.top - a.top) * k);
@@ -118,7 +121,7 @@ class BotAvatar extends StatefulWidget {
   const BotAvatar({
     super.key,
     this.size = 40,
-    this.shape = 'pebble',
+    this.shape = kDefaultBotShape,
     this.color = 'theme',
     this.mood = BotMood.idle,
     this.animate = true,
@@ -147,7 +150,7 @@ class _Pose {
   // The topper of [from] shrinks while the one of [shape] grows; 1 when settled.
   double morph = 1;
   late Float64List radii;
-  String shape = 'pebble', from = 'pebble';
+  String shape = kDefaultBotShape, from = kDefaultBotShape;
 }
 
 class _BotAvatarState extends State<BotAvatar> with SingleTickerProviderStateMixin {

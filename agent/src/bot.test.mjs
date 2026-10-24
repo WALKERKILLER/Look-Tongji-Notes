@@ -51,7 +51,7 @@ test("identity, kinds and marks persist privately", async () => {
 		const again = new Bot(dir);
 		await again.load();
 		assert.equal(again.identity().name, "阿布");
-		assert.equal(again.identity().shape, "pebble");
+		assert.equal(again.identity().shape, "mochi");
 		assert.deepEqual(again.identity().memory, { auto: true, learn_from_courses: true });
 		assert.deepEqual(again.kindOf("s-bot"), { kind: "bot" });
 		assert.deepEqual(again.kindOf("s-course"), { kind: "course", course_id: "42" });

@@ -10,6 +10,7 @@ import '../../widgets/states.dart';
 import 'schedule_store.dart';
 import 'schedule_widgets.dart';
 import '../../l10n/l10n.dart';
+import '../../shell.dart';
 
 /// Month calendar beside an agenda of homework, exams and activities.
 class SchedulePage extends StatefulWidget {
@@ -123,11 +124,13 @@ class _SchedulePageState extends State<SchedulePage> {
       value: {'screen': l10n.commonSchedule, 'open_items': '$open', 'overdue': '$overdue', 'selected_day': isoDate(_selected)},
       child: Scaffold(
         backgroundColor: Colors.transparent,
-        floatingActionButton: FloatingActionButton.extended(
-          heroTag: 'schedule-add',
-          onPressed: () => showScheduleEditor(context, day: _selected.isBefore(dayOf(DateTime.now())) ? null : _selected),
-          icon: const Icon(Icons.add_rounded),
-          label: Text(l10n.commonNew),
+        floatingActionButton: PageFab(
+          child: FloatingActionButton.extended(
+            heroTag: 'schedule-add',
+            onPressed: () => showScheduleEditor(context, day: _selected.isBefore(dayOf(DateTime.now())) ? null : _selected),
+            icon: const Icon(Icons.add_rounded),
+            label: Text(l10n.commonNew),
+          ),
         ),
         body: wide
             ? Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [

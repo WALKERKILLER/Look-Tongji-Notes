@@ -21,11 +21,13 @@ import { entryFrom, UsageLedger } from "./usage.mjs";
 import { Bot, CONSOLIDATE_CALLS, CONSOLIDATE_PROMPT, CONSOLIDATE_TIMEOUT_MS, Consolidator, turnsOf } from "./bot.mjs";
 import { MemoryStore, memoryTools } from "./memory.mjs";
 import { MEMORY_GROUP, OPERATE_GROUP, operateTools, runOp, SETTINGS } from "./operate.mjs";
+import { Sessions } from "./sessions.mjs";
 
 const TOKEN = process.env.LOOKD_TOKEN ?? "";
 const CWD = process.env.LIBRARY_ROOT ?? process.cwd();
 const SESSIONS = join(DATA_DIR, "sessions");
 await mkdir(SESSIONS, { recursive: true });
+const sessions = new Sessions(SESSIONS, CWD);
 
 const pipeline = new ModelPipeline();
 await pipeline.init();
@@ -240,11 +242,11 @@ async function openConversation(id, init = { kind: "chat" }) {
 	}
 	let sessionManager;
 	if (id) {
-		const path = SessionManager.findById(CWD, id, SESSIONS);
+		const path = await sessions.find(id);
 		if (!path) throw httpError(404, "会话不存在");
-		sessionManager = SessionManager.open(path, SESSIONS);
+		sessionManager = sessions.open(path);
 	} else {
-		sessionManager = SessionManager.create(CWD, SESSIONS);
+		sessionManager = sessions.create();
 	}
 	const model = await pipeline.currentModel();
 	if (!model) throw httpError(409, "还没有可用的模型。请在 设置 → 模型 中添加 API Key 或导入 Pi CLI 配置。");
@@ -463,12 +465,12 @@ function sessionTitle(s) {
 
 route("GET", "/usage/summary", async (req) => {
 	const q = new URL(req.url, "http://x").searchParams;
-	const titles = new Map((await SessionManager.list(CWD, SESSIONS)).map((s) => [s.id, sessionTitle(s)]));
+	const titles = new Map((await sessions.list()).map((s) => [s.id, sessionTitle(s)]));
 	return usage.summary(q.get("from") ?? "", q.get("to") ?? "", titles);
 });
 route("GET", "/usage/calls", async (req) => {
 	const q = new URL(req.url, "http://x").searchParams;
-	const titles = new Map((await SessionManager.list(CWD, SESSIONS)).map((s) => [s.id, sessionTitle(s)]));
+	const titles = new Map((await sessions.list()).map((s) => [s.id, sessionTitle(s)]));
 	const calls = await usage.calls({
 		before: q.get("before") || undefined,
 		limit: q.has("limit") ? Number(q.get("limit")) : 50,
@@ -482,7 +484,7 @@ route("GET", "/usage/calls", async (req) => {
 });
 
 route("GET", "/sessions", async () => {
-	const list = await SessionManager.list(CWD, SESSIONS);
+	const list = await sessions.list();
 	const names = await courseNames();
 	return list
 		.sort((a, b) => b.modified - a.modified)
@@ -544,7 +546,7 @@ route("DELETE", "/sessions/([^/]+)", async (_req, [id]) => {
 		c.session.dispose();
 		live.delete(id);
 	}
-	const path = SessionManager.findById(CWD, id, SESSIONS);
+	const path = await sessions.find(id);
 	if (path) await rm(path, { force: true });
 	await bot.forget(id);
 	return { ok: true };
@@ -562,7 +564,7 @@ route("POST", "/chat", async (req, _m, res) => {
 	if (session_id) conv = await openConversation(session_id);
 	else if (agent === "bot") {
 		const sid = bot.state.session_id;
-		conv = sid && (live.has(sid) || SessionManager.findById(CWD, sid, SESSIONS)) ? await openConversation(sid) : await openConversation(undefined, { kind: "bot" });
+		conv = sid && (live.has(sid) || (await sessions.find(sid))) ? await openConversation(sid) : await openConversation(undefined, { kind: "bot" });
 	} else if (course_id) conv = await openConversation(undefined, { kind: "course", course_id: String(course_id) });
 	else conv = await openConversation(undefined, { kind: "chat" });
 	const s = conv.session;
@@ -746,12 +748,12 @@ async function consolidationCandidates() {
 	const week = Date.now() - 7 * 86_400_000;
 	const names = await courseNames();
 	const out = [];
-	const list = (await SessionManager.list(CWD, SESSIONS)).filter((x) => x.modified >= week).sort((a, b) => b.modified - a.modified);
+	const list = (await sessions.list()).filter((x) => x.modified >= week).sort((a, b) => b.modified - a.modified);
 	for (const info of list.slice(0, 20)) {
 		const k = bot.kindOf(info.id);
 		if (k.kind === "task" || (k.kind !== "bot" && !learn)) continue;
 		if (live.get(info.id)?.busy) continue;
-		const sm = SessionManager.open(info.path, SESSIONS);
+		const sm = sessions.open(info.path);
 		const messages = sm.getBranch().filter((e) => e.type === "message").map((e) => e.message);
 		const turns = turnsOf(messages).slice(bot.mark(info.id));
 		if (turns.length) out.push({ id: info.id, kind: k.kind, title: sessionTitle(info), course: k.course_id ? names.get(k.course_id) : undefined, turns });

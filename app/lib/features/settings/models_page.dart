@@ -11,6 +11,7 @@ import 'model_meta.dart';
 import 'provider_presets.dart';
 import 'provider_setup_page.dart';
 import '../../l10n/l10n.dart';
+import '../../shell.dart';
 
 List<Map<String, dynamic>> providersOf(Map<String, dynamic>? models) =>
     jsonList(models?['providers']).whereType<Map>().map((e) => e.cast<String, dynamic>()).toList();
@@ -76,7 +77,7 @@ class _ModelsPageState extends State<ModelsPage> {
           ),
         ],
       ),
-      floatingActionButton: m == null ? null : FloatingActionButton.extended(onPressed: _add, icon: const Icon(Icons.add_rounded), label: Text(l10n.modelsAddProvider)),
+      floatingActionButton: m == null ? null : PageFab(child: FloatingActionButton.extended(onPressed: _add, icon: const Icon(Icons.add_rounded), label: Text(l10n.modelsAddProvider))),
       body: !a.ready
           ? EmptyState(icon: Icons.smart_toy_outlined, title: l10n.modelsAssistantNotStarted, body: l10n.modelsAssistantNotStartedBody)
           : m == null
