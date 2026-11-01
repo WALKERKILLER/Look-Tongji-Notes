@@ -48,12 +48,27 @@ func writeStudyPDFFixture(t *testing.T, p string) {
 	}
 }
 
-func TestStudyPopplerRealPDF(t *testing.T) {
+// Only absent external dependencies skip integration tests. Strict renderer
+// verification fails instead; conversion errors always remain test failures.
+func studyPDFDependencyMissing(t *testing.T, message string) {
+	t.Helper()
+	if os.Getenv("LOOK_REQUIRE_PDF_TESTS") == "1" {
+		t.Fatal(message)
+	}
+	t.Skip(message + "; set LOOK_REQUIRE_PDF_TESTS=1 to require renderer coverage")
+}
+
+func requireStudyPoppler(t *testing.T) {
+	t.Helper()
 	for _, tool := range []string{"pdfinfo", "pdftoppm", "pdftotext"} {
 		if _, err := exec.LookPath(tool); err != nil {
-			t.Skip("Poppler CLI integration requires " + tool)
+			studyPDFDependencyMissing(t, "Poppler integration requires "+tool+" (install poppler-utils)")
 		}
 	}
+}
+
+func TestStudyPopplerRealPDF(t *testing.T) {
+	requireStudyPoppler(t)
 	dir := t.TempDir()
 	source := filepath.Join(dir, "source.pdf")
 	writeStudyPDFFixture(t, source)
@@ -124,8 +139,10 @@ func TestStudyPagedPDFRealSelectionAndRestore(t *testing.T) {
 	if runtime.GOOS == "darwin" {
 		exe, _ := os.Executable()
 		if _, e := os.Stat(filepath.Join(filepath.Dir(exe), "look-study-pdf")); e != nil {
-			t.Skip("run compiled library.test beside the built PDFKit helper")
+			studyPDFDependencyMissing(t, "run compiled library.test beside the built PDFKit helper")
 		}
+	} else {
+		requireStudyPoppler(t)
 	}
 	l, _ := reviewFixture(t)
 	ctx := t.Context()

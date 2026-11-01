@@ -27,4 +27,14 @@ The Android build includes AndroidX motion prediction and Huawei's Pencil Engine
 
 ## Validation boundary
 
+Real PDF integration tests require an installed renderer. The ordinary Go suite explicitly skips them when required executables are absent; malformed PDFs, conversion failures and content assertions still fail when the renderer is present. The missing-component error and output/page limits have separate tests that do not require Poppler. A green ordinary suite without a renderer does not establish PDF conversion coverage.
+
+For a Linux renderer check, install `poppler-utils`, then run from `lookd/`:
+
+```sh
+LOOK_REQUIRE_PDF_TESTS=1 go test -count=1 -race ./internal/library -run '^(TestStudyPopplerRealPDF|TestStudyPagedPDFRealSelectionAndRestore)$'
+```
+
+For macOS, build the helper as above, compile `go test -c -race -o bin/library.test ./internal/library` from `lookd/`, then run `LOOK_REQUIRE_PDF_TESTS=1 bin/library.test -test.run '^TestStudyPagedPDFRealSelectionAndRestore$' -test.v`. The compiled test executable must be beside `look-study-pdf`. Strict mode fails when a dependency is missing, so a renderer acceptance run cannot silently skip. It affects test prerequisites only, not application dependency handling.
+
 The contributor's macOS and Huawei Android deployment exercised the study canvas, native PDF helper, folder synchronization and persisted folder permission. That deployment used separately packaged test applications. Those observations do not establish that the upstream release workflow or this rebased contribution has completed native builds on every platform. Windows and Linux device acceptance remain pending. The pull request reports checks actually run on its own revision.
