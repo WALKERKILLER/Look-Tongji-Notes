@@ -108,3 +108,28 @@ func TestUISLogin(t *testing.T) {
 		t.Fatalf("want credential error, got %v", err)
 	}
 }
+
+func TestUISExistingSessionFollowsTicketWithoutPasswordExchange(t *testing.T) {
+	accepted := make(chan bool, 1)
+	svc := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		accepted <- r.URL.Query().Get("ticket") == "existing-session" && r.URL.Query().Get("x") == "1"
+		w.Write([]byte("service"))
+	}))
+	defer svc.Close()
+	uis := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/ac/" || r.Method != "GET" {
+			t.Error("live SSO session unexpectedly entered password authentication")
+			http.Error(w, "unexpected authentication request", 400)
+			return
+		}
+		w.Write([]byte(`<script>var locationValue = "` + svc.URL + `/?ticket=existing-session&amp;x=1";</script>`))
+	}))
+	defer uis.Close()
+	u := &UIS{Base: uis.URL, HC: client()}
+	if err := u.Login(t.Context(), uis.URL+"/ac/", "", ""); err != nil {
+		t.Fatal(err)
+	}
+	if len(accepted) != 1 || !<-accepted {
+		t.Fatal("existing service ticket was not accepted")
+	}
+}

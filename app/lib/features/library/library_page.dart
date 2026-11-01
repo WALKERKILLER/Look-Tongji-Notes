@@ -5,19 +5,19 @@ import 'package:provider/provider.dart';
 
 import '../../core/api.dart';
 import '../../core/app_state.dart';
-import '../../core/format.dart';
 import '../../core/models.dart';
+import '../../core/format.dart';
 import '../../core/open_path.dart';
 import '../../theme/tokens.dart';
-import '../../widgets/course_visuals.dart';
-import '../../widgets/horizontal_scroller.dart';
+import '../../widgets/look_markdown.dart';
 import '../../widgets/report_screen.dart';
 import '../../widgets/states.dart';
+import '../../l10n/l10n.dart';
 import '../player/player_page.dart';
 import '../practice/quiz.dart';
 import 'note_reader.dart';
-import '../../l10n/l10n.dart';
 import '../../shell.dart';
+import 'catalog_browser.dart';
 
 class LibraryPage extends StatefulWidget {
   const LibraryPage({super.key});
@@ -28,20 +28,20 @@ class LibraryPage extends StatefulWidget {
 class _LibraryPageState extends State<LibraryPage> {
   final _q = TextEditingController();
   Timer? _debounce;
-  List<Hit>? _hits;
-  bool _searching = false;
-  String _kind = '';
-  String _courseId = '';
-  List<Note> _notes = [];
-  Map<String, dynamic>? _lib;
   StreamSubscription? _sub;
-
+  List<Map<String, dynamic>>? _items;
+  List<Hit>? _hits;
+  Map<String, dynamic>? _library;
+  String _courseId = '';
+  String? _error;
+  bool _searching = false;
+  int _searchVersion = 0;
   @override
   void initState() {
     super.initState();
     _load();
     _sub = context.read<AppState>().events.listen((e) {
-      if (e['type'] == 'notes_changed' || e['type'] == 'lecture_changed') _load();
+      if (['notes_changed', 'lecture_changed'].contains(e['type'])) _load();
     });
   }
 
@@ -54,56 +54,87 @@ class _LibraryPageState extends State<LibraryPage> {
   }
 
   Future<void> _load() async {
-    final api = context.read<AppState>().api;
     try {
-      final ns = jsonList(await api.get('/api/notes'));
-      final lib = await api.get('/api/library') as Map;
+      final api = context.read<AppState>().api;
+      final results = await Future.wait([
+        api.libraryCatalog(),
+        api.get('/api/library'),
+      ]);
+      final data = jsonList(results[0]);
       if (!mounted) return;
       setState(() {
-        _notes = ns.map((e) => Note((e as Map).cast<String, dynamic>())).toList();
-        _lib = lib.cast<String, dynamic>();
+        _items = data.map((i) => (i as Map).cast<String, dynamic>()).toList();
+        _library = (results[1] as Map).cast<String, dynamic>();
+        _error = null;
       });
-    } catch (_) {}
+    } catch (e) {
+      if (mounted) setState(() => _error = e.toString());
+    }
   }
 
-  void _onQuery(String _) {
+  Future<void> _search() async {
+    final version = ++_searchVersion;
+    final q = _q.text.trim();
+    if (q.isEmpty) {
+      setState(() {
+        _hits = null;
+        _searching = false;
+      });
+      return;
+    }
+    setState(() => _searching = true);
+    try {
+      final data = jsonList(
+        await context.read<AppState>().api.get('/api/search', {
+          'q': q,
+          'limit': '120',
+          if (_courseId.isNotEmpty) 'course_id': _courseId,
+        }),
+      );
+      if (!mounted || version != _searchVersion) return;
+      setState(
+        () => _hits = data
+            .map((e) => Hit((e as Map).cast<String, dynamic>()))
+            .toList(),
+      );
+    } catch (e) {
+      if (mounted && version == _searchVersion)
+        showSnack(context, l10n.searchFailed(e));
+    } finally {
+      if (mounted && version == _searchVersion)
+        setState(() => _searching = false);
+    }
+  }
+
+  void _query(String _) {
+    _searchVersion++;
     _debounce?.cancel();
     _debounce = Timer(const Duration(milliseconds: 220), _search);
     setState(() {});
   }
 
-  Future<void> _search() async {
-    final q = _q.text.trim();
-    if (q.isEmpty) {
-      setState(() => _hits = null);
-      return;
+  void _open(Map<String, dynamic> item) {
+    if ('${item['note_id'] ?? ''}'.isNotEmpty) {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => NotePage(noteId: '${item['note_id']}'),
+        ),
+      );
+    } else {
+      openLibraryFile(context, '${item['path']}');
     }
-    setState(() => _searching = true);
-    try {
-      final r = jsonList(await context.read<AppState>().api.get('/api/search', {'q': q, 'limit': '120', if (_courseId.isNotEmpty) 'course_id': _courseId}));
-      if (!mounted || _q.text.trim() != q) return;
-      setState(() => _hits = r.map((e) => Hit((e as Map).cast<String, dynamic>())).toList());
-    } catch (e) {
-      if (mounted) showSnack(context, l10n.searchFailed(e));
-    } finally {
-      if (mounted) setState(() => _searching = false);
-    }
-  }
-
-  void _openNote(Note? n) {
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => NotePage(noteId: n?.id)));
   }
 
   @override
   Widget build(BuildContext context) {
-    final app = context.watch<AppState>();
-    final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
-    final compact = context.isCompact;
-    final pad = compact ? Space.lg : Space.xl;
-    final hits = _hits?.where((h) => _kind.isEmpty || h.kind == _kind).toList();
-    final courses = app.courses.where((c) => c.localLectures > 0 || _notes.any((n) => n.courseId == c.id)).toList();
-
+    final pad = context.isCompact ? Space.lg : Space.xl;
+    Widget padded(Widget w) => ContentWidth(
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: pad, vertical: Space.md),
+        child: w,
+      ),
+    );
     return ReportScreen(
       value: {'screen': l10n.screenLibrary},
       child: Scaffold(
@@ -111,315 +142,185 @@ class _LibraryPageState extends State<LibraryPage> {
         floatingActionButton: PageFab(
           child: FloatingActionButton.extended(
             heroTag: null,
-            onPressed: () => _openNote(null),
+            onPressed: () =>
+                Navigator.of(context)
+                    .push(MaterialPageRoute(builder: (_) => const NotePage())),
             icon: const Icon(Icons.edit_note_rounded),
             label: Text(l10n.libraryWriteNote),
           ),
         ),
-        body: CustomScrollView(slivers: [
-          SliverToBoxAdapter(
-            child: ContentWidth(
-              child: Padding(
-                padding: EdgeInsets.fromLTRB(pad, compact ? Space.xl : Space.xxl, pad, Space.md),
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(l10n.screenLibrary, style: compact ? tt.headlineMedium : tt.displaySmall),
-                  const SizedBox(height: Space.xs),
-                  Text(l10n.librarySearchTitle, style: tt.bodyLarge?.copyWith(color: cs.onSurfaceVariant)),
-                  const SizedBox(height: Space.lg),
-                  SearchBar(
-                    controller: _q,
-                    hintText: l10n.librarySearchHint,
-                    leading: _searching
-                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2.5))
-                        : const Icon(Icons.manage_search_rounded),
-                    trailing: [
-                      if (_q.text.isNotEmpty)
-                        IconButton(
-                          onPressed: () {
-                            _q.clear();
-                            setState(() => _hits = null);
-                          },
-                          icon: const Icon(Icons.close_rounded),
-                        ),
+        body: CustomScrollView(
+          slivers: [
+            SliverToBoxAdapter(
+              child: padded(
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: Space.lg),
+                    Text(l10n.screenLibrary, style: tt.headlineLarge),
+                    const SizedBox(height: Space.lg),
+                    SearchBar(
+                      controller: _q,
+                      hintText: l10n.catalogSearchHint,
+                      leading: _searching
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.manage_search_rounded),
+                      onChanged: _query,
+                      onSubmitted: (_) => _search(),
+                      trailing: [
+                        if (_q.text.isNotEmpty)
+                          IconButton(
+                            icon: const Icon(Icons.close_rounded),
+                            onPressed: () {
+                              _q.clear();
+                              _query('');
+                              _search();
+                            },
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            if (_error != null)
+              SliverToBoxAdapter(
+                child: padded(
+                  Column(
+                    children: [
+                      Text(l10n.catalogLoadFailed(_error!)),
+                      TextButton(
+                        onPressed: _load,
+                        child: Text(l10n.commonRetry),
+                      ),
                     ],
-                    onChanged: _onQuery,
-                    onSubmitted: (_) => _search(),
-                    elevation: const WidgetStatePropertyAll(0),
-                    backgroundColor: WidgetStatePropertyAll(cs.surfaceContainerHigh),
                   ),
-                  const SizedBox(height: Space.md),
-                  HorizontalScroller(fade: true, builder: (c) => SingleChildScrollView(
-                    controller: c,
-                    scrollDirection: Axis.horizontal,
-                    child: Row(children: [
-                      // The kinds filter search results; the course filter also applies to the notes below.
-                      if (_q.text.trim().isNotEmpty)
-                        for (final (k, l) in [('', l10n.commonAll), ('segment', l10n.commonTranscript), ('note', l10n.commonNotes)]) ...[
-                          ChoiceChip(label: Text(l), selected: _kind == k, onSelected: (_) => setState(() => _kind = k)),
-                          const SizedBox(width: Space.sm),
-                        ],
-                      if (courses.isNotEmpty)
-                        MenuAnchor(
-                          menuChildren: [
-                            MenuItemButton(
-                              onPressed: () {
-                                setState(() => _courseId = '');
-                                _search();
-                              },
-                              child: Text(l10n.libraryAllCourses),
-                            ),
-                            for (final c in courses)
-                              MenuItemButton(
-                                onPressed: () {
-                                  setState(() => _courseId = c.id);
-                                  _search();
+                ),
+              ),
+            if (_items == null && _error == null)
+              const SliverToBoxAdapter(child: LinearProgressIndicator()),
+            if (_items != null)
+              SliverToBoxAdapter(
+                child: padded(
+                  CatalogBrowser(
+                    items: _items!,
+                    query: _q.text,
+                    courseId: _courseId,
+                    onCourse: (id) {
+                      setState(() => _courseId = id);
+                      _search();
+                    },
+                    onOpen: _open,
+                  ),
+                ),
+              ),
+            if (_q.text.trim().isNotEmpty && _hits != null) ...[
+              SliverToBoxAdapter(
+                child: padded(
+                  Text(
+                    l10n.catalogFulltextTitle(_hits!.length),
+                    style: tt.titleLarge,
+                  ),
+                ),
+              ),
+              SliverList.builder(
+                itemCount: _hits!.length,
+                itemBuilder: (context, i) => padded(
+                  _HitTile(
+                    hit: _hits![i],
+                    onTap: () {
+                      final h = _hits![i];
+                      Navigator.of(
+                        context,
+                        rootNavigator: h.kind != 'note',
+                      ).push(
+                        MaterialPageRoute(
+                          builder: (_) => h.kind == 'note'
+                              ? NotePage(noteId: h.noteId)
+                              : PlayerPage(
+                                  lectureId: h.lectureId,
+                                  startMs: h.startMs,
+                                ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+            ],
+            if (_q.text.trim().isEmpty)
+              SliverToBoxAdapter(
+                child: padded(
+                  QuizList(
+                    columns: context.isCompact ? 1 : 3,
+                    header: Text(l10n.commonPractice, style: tt.titleLarge),
+                  ),
+                ),
+              ),
+            if (_library != null)
+              SliverToBoxAdapter(
+                child: padded(
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(Space.lg),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(l10n.libraryStatLocal, style: tt.titleSmall),
+                          Text(
+                            '${_library!['stats']?['local_lectures'] ?? 0} · ${fmtBytes((_library!['stats']?['bytes'] as num?) ?? 0)}',
+                          ),
+                          Wrap(
+                            spacing: Space.sm,
+                            children: [
+                              if (canOpenFolders)
+                                TextButton.icon(
+                                  onPressed: () =>
+                                      openPath('${_library!['root']}'),
+                                  icon: const Icon(Icons.folder_open_outlined),
+                                  label: Text(l10n.commonOpenFolder),
+                                ),
+                              TextButton.icon(
+                                onPressed: () async {
+                                  try {
+                                    final r = await context
+                                        .read<AppState>()
+                                        .api
+                                        .post('/api/library/reindex');
+                                    if (context.mounted)
+                                      showSnack(
+                                        context,
+                                        l10n.libraryReindexed(r['indexed']),
+                                      );
+                                    if (mounted) await _load();
+                                  } catch (e) {
+                                    if (context.mounted)
+                                      showSnack(
+                                        context,
+                                        l10n.libraryReindexFailed(e),
+                                      );
+                                  }
                                 },
-                                child: Text(c.title),
+                                icon: const Icon(Icons.manage_history_rounded),
+                                label: Text(l10n.libraryReindex),
                               ),
-                          ],
-                          builder: (context, m, _) => FilterChip(
-                            avatar: const Icon(Icons.school_outlined, size: 18),
-                            label: Text(_courseId.isEmpty ? l10n.libraryAllCourses : app.course(_courseId)?.title ?? l10n.commonCourses),
-                            selected: _courseId.isNotEmpty,
-                            onSelected: (_) => m.isOpen ? m.close() : m.open(),
+                            ],
                           ),
-                        ),
-                    ]),
-                  )),
-                ]),
-              ),
-            ),
-          ),
-          if (hits != null) ..._results(context, hits, pad) else ..._overview(context, pad),
-          const SliverToBoxAdapter(child: SizedBox(height: 96)),
-        ]),
-      ),
-    );
-  }
-
-  List<Widget> _results(BuildContext context, List<Hit> hits, double pad) {
-    if (hits.isEmpty) {
-      return [
-        SliverFillRemaining(
-          hasScrollBody: false,
-          child: EmptyState(icon: Icons.search_off_rounded, title: l10n.librarySearchEmpty(_q.text.trim()), body: l10n.librarySearchEmptyBody),
-        ),
-      ];
-    }
-    return [
-      SliverToBoxAdapter(
-        child: ContentWidth(
-          child: Padding(
-            padding: EdgeInsets.fromLTRB(pad, Space.sm, pad, Space.sm),
-            child: Text(l10n.librarySearchCount(hits.length), style: Theme.of(context).textTheme.titleSmall),
-          ),
-        ),
-      ),
-      SliverList.builder(
-        itemCount: hits.length,
-        itemBuilder: (context, i) => ContentWidth(
-          child: Padding(
-            padding: EdgeInsets.symmetric(horizontal: pad, vertical: 2),
-            child: _HitTile(
-              hit: hits[i],
-              onTap: () {
-                final h = hits[i];
-                if (h.kind == 'note') {
-                  Navigator.of(context).push(MaterialPageRoute(builder: (_) => NotePage(noteId: h.noteId)));
-                } else {
-                  Navigator.of(context, rootNavigator: true).push(MaterialPageRoute(builder: (_) => PlayerPage(lectureId: h.lectureId, startMs: h.startMs)));
-                }
-              },
-            ),
-          ),
-        ),
-      ),
-    ];
-  }
-
-  List<Widget> _overview(BuildContext context, double pad) {
-    final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
-    final app = context.read<AppState>();
-    final st = (_lib?['stats'] as Map?) ?? {};
-    final notes = _courseId.isEmpty ? _notes : _notes.where((n) => n.courseId == _courseId).toList();
-    return [
-      SliverToBoxAdapter(
-        child: ContentWidth(
-          child: Padding(
-            padding: EdgeInsets.fromLTRB(pad, Space.lg, pad, Space.sm),
-            child: Text(l10n.libraryNotesCount(notes.length), style: tt.titleLarge),
-          ),
-        ),
-      ),
-      if (notes.isEmpty)
-        SliverToBoxAdapter(
-          child: ContentWidth(
-            child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: pad),
-              child: Text(_courseId.isEmpty || _notes.isEmpty ? l10n.libraryNotesEmptyHint : l10n.libraryNotesEmpty, style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
-            ),
-          ),
-        )
-      else
-        SliverToBoxAdapter(
-          child: ContentWidth(
-            child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: pad),
-              child: LayoutBuilder(builder: (context, c) {
-                final cols = (c.maxWidth / 300).floor().clamp(1, 3);
-                final w = (c.maxWidth - Space.md * (cols - 1)) / cols;
-                return Wrap(spacing: Space.md, runSpacing: Space.md, children: [
-                  for (final n in notes)
-                    SizedBox(
-                      width: w,
-                      child: Card(
-                        margin: EdgeInsets.zero,
-                        color: cs.surfaceContainer,
-                        child: InkWell(
-                          borderRadius: BorderRadius.circular(Corners.md),
-                          onTap: () => _openNote(n),
-                          child: Padding(
-                            padding: const EdgeInsets.all(Space.lg),
-                            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                              Row(children: [
-                                _NoteMark(note: n, course: app.course(n.courseId)),
-                                const SizedBox(width: Space.md),
-                                Expanded(child: Text(n.title, style: tt.titleSmall, maxLines: 2, overflow: TextOverflow.ellipsis)),
-                              ]),
-                              const SizedBox(height: Space.sm),
-                              Text(
-                                [app.course(n.courseId)?.title ?? l10n.commonUncategorized, fmtRelative(DateTime.fromMillisecondsSinceEpoch(n.updatedAt * 1000))].join(' · '),
-                                style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ]),
-                          ),
-                        ),
+                        ],
                       ),
                     ),
-                ]);
-              }),
-            ),
-          ),
-        ),
-      SliverToBoxAdapter(
-        child: ContentWidth(
-          child: Padding(
-            padding: EdgeInsets.fromLTRB(pad, Space.xxl, pad, 0),
-            child: LayoutBuilder(
-              builder: (context, c) => QuizList(
-                columns: (c.maxWidth / 300).floor().clamp(1, 3),
-                header: Padding(padding: const EdgeInsets.only(bottom: Space.sm), child: Text(l10n.commonPractice, style: tt.titleLarge)),
+                  ),
+                ),
               ),
-            ),
-          ),
+            const SliverToBoxAdapter(child: SizedBox(height: 96)),
+          ],
         ),
       ),
-      SliverToBoxAdapter(
-        child: ContentWidth(
-          child: Padding(
-            padding: EdgeInsets.fromLTRB(pad, Space.xxl, pad, Space.sm),
-            child: Text(l10n.commonLibrary, style: tt.titleLarge),
-          ),
-        ),
-      ),
-      SliverToBoxAdapter(
-        child: ContentWidth(
-          child: Padding(
-            padding: EdgeInsets.symmetric(horizontal: pad),
-            child: Card(
-              margin: EdgeInsets.zero,
-              color: cs.surfaceContainer,
-              child: Padding(
-                padding: const EdgeInsets.all(Space.xl),
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Wrap(spacing: Space.xxl, runSpacing: Space.md, children: [
-                    _Stat(value: '${st['local_lectures'] ?? 0}', label: l10n.libraryStatLocal),
-                    _Stat(value: fmtBytes((st['bytes'] ?? 0) as num), label: l10n.homeStatStorage),
-                    _Stat(value: '${st['segments'] ?? 0}', label: l10n.libraryStatSegments),
-                    _Stat(value: '${st['notes'] ?? 0}', label: l10n.homeStatNotes),
-                  ]),
-                  const SizedBox(height: Space.lg),
-                  Text(l10n.libraryLayoutHint,
-                      style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant, height: 1.6)),
-                  const SizedBox(height: Space.lg),
-                  Wrap(spacing: Space.sm, runSpacing: Space.sm, children: [
-                    if (canOpenFolders)
-                      FilledButton.tonalIcon(
-                        onPressed: _lib == null ? null : () => openPath('${_lib!['root']}'),
-                        icon: const Icon(Icons.folder_open_outlined),
-                        label: Text(l10n.commonOpenFolder),
-                      ),
-                    OutlinedButton.icon(
-                      onPressed: () async {
-                        try {
-                          final r = await app.api.post('/api/library/reindex') as Map;
-                          if (context.mounted) showSnack(context, l10n.libraryReindexed(r['indexed']));
-                          _load();
-                        } catch (e) {
-                          if (context.mounted) showSnack(context, l10n.libraryReindexFailed(e));
-                        }
-                      },
-                      icon: const Icon(Icons.manage_history_rounded),
-                      label: Text(l10n.libraryReindex),
-                    ),
-                  ]),
-                  const SizedBox(height: Space.sm),
-                  Text('${_lib?['root'] ?? ''}', style: tt.labelSmall?.copyWith(color: cs.outline)),
-                ]),
-              ),
-            ),
-          ),
-        ),
-      ),
-    ];
-  }
-}
-
-/// Course organic badge with a small source marker (agent sparkle / own note).
-class _NoteMark extends StatelessWidget {
-  const _NoteMark({required this.note, required this.course});
-  final Note note;
-  final Course? course;
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final agent = note.source == 'agent';
-    return SizedBox(
-      width: 40,
-      height: 40,
-      child: Stack(clipBehavior: Clip.none, children: [
-        if (course != null)
-          CourseGlyph(course: course!, size: 40)
-        else
-          Container(decoration: BoxDecoration(color: cs.surfaceContainerHighest, borderRadius: BorderRadius.circular(Corners.md))),
-        Positioned(
-          right: -4,
-          bottom: -4,
-          child: Container(
-            padding: const EdgeInsets.all(3),
-            decoration: BoxDecoration(color: cs.surfaceContainer, shape: BoxShape.circle),
-            child: Icon(agent ? Icons.auto_awesome_rounded : Icons.edit_rounded, size: 12, color: agent ? cs.tertiary : cs.primary),
-          ),
-        ),
-      ]),
     );
-  }
-}
-
-class _Stat extends StatelessWidget {
-  const _Stat({required this.value, required this.label});
-  final String value, label;
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(value, style: tt.headlineSmall?.copyWith(color: cs.primary)),
-      Text(label, style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
-    ]);
   }
 }
 
@@ -436,8 +337,18 @@ class _HitTile extends StatelessWidget {
     final re = RegExp('«(.*?)»');
     var at = 0;
     for (final m in re.allMatches(hit.snippet)) {
-      if (m.start > at) spans.add(TextSpan(text: hit.snippet.substring(at, m.start)));
-      spans.add(TextSpan(text: m[1], style: TextStyle(backgroundColor: cs.tertiaryContainer, color: cs.onTertiaryContainer, fontWeight: FontWeight.w600)));
+      if (m.start > at)
+        spans.add(TextSpan(text: hit.snippet.substring(at, m.start)));
+      spans.add(
+        TextSpan(
+          text: m[1],
+          style: TextStyle(
+            backgroundColor: cs.tertiaryContainer,
+            color: cs.onTertiaryContainer,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      );
       at = m.end;
     }
     spans.add(TextSpan(text: hit.snippet.substring(at)));
@@ -450,21 +361,44 @@ class _HitTile extends StatelessWidget {
         onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.all(Space.lg),
-          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Icon(note ? Icons.description_outlined : Icons.subject_rounded, color: cs.primary, size: 20),
-            const SizedBox(width: Space.md),
-            Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text.rich(TextSpan(children: spans), style: tt.bodyMedium?.copyWith(height: 1.55)),
-                const SizedBox(height: Space.xs),
-                Text(
-                  [hit.courseTitle, hit.lecture, if (!note) fmtClock(hit.startMs)].where((s) => s.isNotEmpty).join(' · '),
-                  style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                note ? Icons.description_outlined : Icons.subject_rounded,
+                color: cs.primary,
+                size: 20,
+              ),
+              const SizedBox(width: Space.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text.rich(
+                      TextSpan(children: spans),
+                      style: tt.bodyMedium?.copyWith(height: 1.55),
+                    ),
+                    const SizedBox(height: Space.xs),
+                    Text(
+                      [
+                        hit.courseTitle,
+                        hit.lecture,
+                        if (!note) fmtClock(hit.startMs),
+                      ].where((s) => s.isNotEmpty).join(' · '),
+                      style: tt.labelSmall?.copyWith(
+                        color: cs.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
                 ),
-              ]),
-            ),
-            if (!note) Icon(Icons.play_circle_outline_rounded, color: cs.onSurfaceVariant),
-          ]),
+              ),
+              if (!note)
+                Icon(
+                  Icons.play_circle_outline_rounded,
+                  color: cs.onSurfaceVariant,
+                ),
+            ],
+          ),
         ),
       ),
     );

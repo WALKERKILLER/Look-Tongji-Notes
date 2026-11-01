@@ -14,6 +14,16 @@ Desktop client for Tongji's lecture-recording platform (look.tongji.edu.cn), bui
 
 The app starts `lookd`, and `lookd` starts the agent. The app finds them through `LOOKD_BIN`, `LOOK_AGENT` and `LOOK_NODE`, then next to its executable (`Contents/Resources/agent` in the macOS app), then by walking up to `lookd/bin/lookd` and `agent/src/host.mjs` in a source checkout.
 
+## Local study workspace
+
+Lectures can open in a [study canvas](docs/study-canvas.md) with video, PDF pages, text, handwriting and scoped assistant conversations. [Drawing controls](docs/drawing-controls.md) cover dockable pen presets, pressure erasing, hold-to-shape and optional Android stylus prediction. The conventional player remains available from the canvas menu.
+
+[Local courses](docs/local-courses.md) work without school login. The library filters materials by course, purpose and file type; AI transcript review adds dismissible suggestions beside the original text. [Folder sync](docs/tutorials/course-folder-sync.md) exchanges selected courses through a user-managed folder, including media when enabled. It reports local publication separately from delivery to another device. Concurrent canvas saves use whole-document last-save-wins with recoverable losing copies; other content retains conflict handling.
+
+The [NAS adapter](docs/nas-services.md) is optional and requires explicit deployment configuration. See [build dependencies and validation boundaries](docs/study-workspace-build.md) before building PDF and Android features. The workspace is an integration preview; upstream release builds and Windows/Linux device acceptance need validation.
+
+![Study canvas with synthetic learning material](docs/images/study-workspace.png)
+
 ## Download
 
 Each `studio-v*` release on the [releases page](https://github.com/WALKERKILLER/Look-Tongji-Notes/releases) carries:

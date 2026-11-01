@@ -103,11 +103,19 @@ func (u *UIS) Login(ctx context.Context, start, username, password string) error
 	if err != nil {
 		return fmt.Errorf("打开复旦 UIS 失败: %w", err)
 	}
-	io.Copy(io.Discard, io.LimitReader(resp.Body, 1<<20))
+	firstPage, readErr := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	resp.Body.Close()
+	if readErr != nil {
+		return fmt.Errorf("读取复旦 UIS 响应失败: %w", readErr)
+	}
 	final := resp.Request.URL.String()
 	if !strings.HasPrefix(final, u.base()) {
 		return nil // still signed in: the service took us back directly
+	}
+	// A live UIS session returns the service ticket in an HTML script. There
+	// is no login form context in that response, and no password is needed.
+	if ticket := ticketRe.FindSubmatch(firstPage); ticket != nil {
+		return u.followTicket(ctx, html.UnescapeString(string(ticket[1])))
 	}
 	lck, entity := match(lckRe, final), match(entityRe, final)
 	if entity == "" {
@@ -195,9 +203,13 @@ func (u *UIS) Login(ctx context.Context, start, username, password string) error
 		return errors.New("复旦 UIS 没有返回服务票据")
 	}
 
-	// 6. Follow the ticket; the service sets its session. Behind WebVPN the
-	// page may name the service's own address, which only the gateway reaches.
-	ticket := html.UnescapeString(string(m[1]))
+	return u.followTicket(ctx, html.UnescapeString(string(m[1])))
+}
+
+// followTicket completes both password sign-in and silent SSO. Behind
+// WebVPN, UIS may name the service's original address in the ticket page.
+func (u *UIS) followTicket(ctx context.Context, ticket string) error {
+	var err error
 	if u.VPN && !strings.HasPrefix(ticket, WebVPNBase+"/") {
 		if ticket, err = VPNURL(ticket); err != nil {
 			return err

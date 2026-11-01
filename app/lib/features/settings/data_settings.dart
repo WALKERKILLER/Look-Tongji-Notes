@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
@@ -16,14 +17,21 @@ import '../../widgets/pickers.dart';
 import '../../widgets/states.dart';
 import 'settings_common.dart';
 import 'webdav_page.dart';
+import 'folder_sync_page.dart';
 import '../../l10n/l10n.dart';
 
 // The 数据与同步 pane: sync between devices, backups, and what takes space.
 // Contract: docs/specs/0014-data-sync-and-backup.md
 
-Map<String, dynamic> _map(Object? v) => v is Map ? v.cast<String, dynamic>() : <String, dynamic>{};
+Map<String, dynamic> _map(Object? v) =>
+    v is Map ? v.cast<String, dynamic>() : <String, dynamic>{};
 
-final _backupType = XTypeGroup(label: l10n.backupTypeLabel, extensions: ['zip'], mimeTypes: ['application/zip'], uniformTypeIdentifiers: ['public.zip-archive']);
+final _backupType = XTypeGroup(
+  label: l10n.backupTypeLabel,
+  extensions: ['zip'],
+  mimeTypes: ['application/zip'],
+  uniformTypeIdentifiers: ['public.zip-archive'],
+);
 
 class DataSettings extends StatefulWidget {
   const DataSettings({super.key, this.api, this.events});
@@ -55,7 +63,8 @@ class _DataSettingsState extends State<DataSettings> {
     _sub = (widget.events ?? context.read<AppState>().events).listen((e) {
       final t = '${e['type']}';
       if (t == 'sync_done' || t == 'sync_changed') _load();
-      if (t == 'sync_progress' && mounted && _sync['running'] != true) setState(() => _sync = {..._sync, 'running': true});
+      if (t == 'sync_progress' && mounted && _sync['running'] != true)
+        setState(() => _sync = {..._sync, 'running': true});
     });
   }
 
@@ -66,11 +75,13 @@ class _DataSettingsState extends State<DataSettings> {
   }
 
   Future<void> _load() async {
-    await Future.wait([
-      _call('GET', '/api/sync').then((r) => _sync = _map(r)),
-      _call('GET', '/api/data/estimate').then((r) => _estimate = _map(r)),
-      _call('GET', '/api/storage').then((r) => _storage = _map(r)),
-    ].map((f) => f.catchError((_) => const <String, dynamic>{})));
+    await Future.wait(
+      [
+        _call('GET', '/api/sync').then((r) => _sync = _map(r)),
+        _call('GET', '/api/data/estimate').then((r) => _estimate = _map(r)),
+        _call('GET', '/api/storage').then((r) => _storage = _map(r)),
+      ].map((f) => f.catchError((_) => const <String, dynamic>{})),
+    );
     if (mounted) setState(() {});
   }
 
@@ -78,30 +89,59 @@ class _DataSettingsState extends State<DataSettings> {
 
   Future<void> _export() async {
     final now = DateTime.now();
-    final name = l10n.backupFileName(now.year, '${now.month}'.padLeft(2, '0'), '${now.day}'.padLeft(2, '0'));
+    final name = l10n.backupFileName(
+      now.year,
+      '${now.month}'.padLeft(2, '0'),
+      '${now.day}'.padLeft(2, '0'),
+    );
     // Android saves through the system's document screen after the export.
-    final android = Platform.isAndroid;
+    final android = !kIsWeb && Platform.isAndroid;
     final path = android
         ? '${(await AndroidBridge.info())['cacheDir']}/$name'
-        : await pickSavePath(context, suggestedName: name, type: _backupType, confirm: l10n.commonExport);
+        : await pickSavePath(
+            context,
+            suggestedName: name,
+            type: _backupType,
+            confirm: l10n.commonExport,
+          );
     if (path == null || !mounted) return;
     final e = _estimate ?? {};
     setState(() {
       _task = l10n.commonExporting;
       _done = 0;
-      _total = ((e['bytes'] as num? ?? 0) + (_media ? e['media_bytes'] as num? ?? 0 : 0)).toInt();
+      _total =
+          ((e['bytes'] as num? ?? 0) +
+                  (_media ? e['media_bytes'] as num? ?? 0 : 0))
+              .toInt();
     });
     try {
-      await context.read<AppState>().api.download('/api/data/export', {if (_media) 'media': '1'}, File(path),
-          onProgress: (n) => mounted ? setState(() => _done = n) : null);
+      await context.read<AppState>().api.download(
+        '/api/data/export',
+        {if (_media) 'media': '1'},
+        File(path),
+        onProgress: (n) => mounted ? setState(() => _done = n) : null,
+      );
       if (!mounted) return;
       if (android) {
-        final saved = await AndroidBridge.saveAs(path, name: name, mime: 'application/zip');
+        final saved = await AndroidBridge.saveAs(
+          path,
+          name: name,
+          mime: 'application/zip',
+        );
         await File(path).delete().catchError((_) => File(path));
-        if (mounted) showSnack(context, saved ? l10n.backupSaved(fmtBytes(_done)) : l10n.backupNotSaved);
+        if (mounted)
+          showSnack(
+            context,
+            saved ? l10n.backupSaved(fmtBytes(_done)) : l10n.backupNotSaved,
+          );
         return;
       }
-      showSnack(context, l10n.backupSaved(fmtBytes(_done)), action: l10n.commonShowInFolder, onAction: () => revealPath(path));
+      showSnack(
+        context,
+        l10n.backupSaved(fmtBytes(_done)),
+        action: l10n.commonShowInFolder,
+        onAction: () => revealPath(path),
+      );
     } catch (err) {
       if (mounted) showSnack(context, l10n.backupExportFailed(err));
     } finally {
@@ -114,7 +154,8 @@ class _DataSettingsState extends State<DataSettings> {
     try {
       file = await openFile(acceptedTypeGroups: [_backupType]);
     } on PlatformException catch (e) {
-      if (mounted) showSnack(context, l10n.commonFilePickerFailed(e.message ?? e.code));
+      if (mounted)
+        showSnack(context, l10n.commonFilePickerFailed(e.message ?? e.code));
       return;
     }
     if (file == null || !mounted) return;
@@ -133,7 +174,9 @@ class _DataSettingsState extends State<DataSettings> {
         if (mounted) setState(() => _done = sent);
         return c;
       });
-      preview = _map(await api.upload('/api/data/import', const {}, data, length));
+      preview = _map(
+        await api.upload('/api/data/import', const {}, data, length),
+      );
     } catch (e) {
       if (mounted) {
         setState(() => _task = null);
@@ -143,7 +186,10 @@ class _DataSettingsState extends State<DataSettings> {
     }
     if (!mounted) return;
     setState(() => _task = null);
-    final mode = await showDialog<String>(context: context, builder: (_) => _RestoreDialog(preview: preview));
+    final mode = await showDialog<String>(
+      context: context,
+      builder: (_) => _RestoreDialog(preview: preview),
+    );
     final id = '${preview['id']}';
     if (mode == null) {
       unawaited(api.delete('/api/data/import/$id').catchError((_) => null));
@@ -155,14 +201,27 @@ class _DataSettingsState extends State<DataSettings> {
       _done = _total = 0;
     });
     try {
-      final r = _map(await api.post('/api/data/import/$id/apply', {'mode': mode}, const Duration(minutes: 30)));
+      final r = _map(
+        await api.post('/api/data/import/$id/apply', {
+          'mode': mode,
+        }, const Duration(minutes: 30)),
+      );
       if (!mounted) return;
       final conflict = '${r['conflict'] ?? ''}';
       showSnack(
         context,
-        r['written'] == 0 ? l10n.backupNothingToRestore : l10n.backupRestored(r['written'], fmtBytes(r['bytes'] as num? ?? 0)),
-        action: conflict.isEmpty || !canOpenFolders ? null : l10n.backupViewReplaced,
-        onAction: conflict.isEmpty || !canOpenFolders ? null : () => revealPath(conflict),
+        r['written'] == 0
+            ? l10n.backupNothingToRestore
+            : l10n.backupRestored(
+                r['written'],
+                fmtBytes(r['bytes'] as num? ?? 0),
+              ),
+        action: conflict.isEmpty || !canOpenFolders
+            ? null
+            : l10n.backupViewReplaced,
+        onAction: conflict.isEmpty || !canOpenFolders
+            ? null
+            : () => revealPath(conflict),
       );
       unawaited(_load());
     } catch (e) {
@@ -182,8 +241,14 @@ class _DataSettingsState extends State<DataSettings> {
           title: Text(l10n.storageCleanSyncTitle),
           content: Text(l10n.storageCleanSyncBody),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(c, false), child: Text(l10n.commonCancel)),
-            FilledButton(onPressed: () => Navigator.pop(c, true), child: Text(l10n.commonEmpty)),
+            TextButton(
+              onPressed: () => Navigator.pop(c, false),
+              child: Text(l10n.commonCancel),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(c, true),
+              child: Text(l10n.commonEmpty),
+            ),
           ],
         ),
       );
@@ -193,7 +258,11 @@ class _DataSettingsState extends State<DataSettings> {
     setState(() => _task = done);
     try {
       final r = _map(await _call('POST', '/api/storage/clean', {what: true}));
-      if (mounted) showSnack(context, l10n.storageFreed(fmtBytes(r['freed'] as num? ?? 0)));
+      if (mounted)
+        showSnack(
+          context,
+          l10n.storageFreed(fmtBytes(r['freed'] as num? ?? 0)),
+        );
     } catch (e) {
       if (mounted) showSnack(context, l10n.storageCleanFailed(e));
     } finally {
@@ -202,7 +271,10 @@ class _DataSettingsState extends State<DataSettings> {
     }
   }
 
-  void _openSync() => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const WebDavPage())).then((_) => _load());
+  void _openSync() =>
+      Navigator.of(context)
+          .push(MaterialPageRoute(builder: (_) => const WebDavPage()))
+          .then((_) => _load());
 
   @override
   Widget build(BuildContext context) {
@@ -212,62 +284,160 @@ class _DataSettingsState extends State<DataSettings> {
     final syncErr = '${_map(_sync['last'])['error'] ?? ''}';
     final e = _estimate;
     final busy = _task != null;
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      SettingsGroup(title: l10n.dataSyncTitle, icon: Icons.devices_rounded, padding: const EdgeInsets.symmetric(vertical: Space.sm), children: [
-        ListTile(
-          contentPadding: const EdgeInsets.symmetric(horizontal: Space.xl, vertical: Space.xs),
-          leading: Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(color: cs.primaryContainer, borderRadius: BorderRadius.circular(12)),
-            child: _sync['running'] == true
-                ? Padding(padding: const EdgeInsets.all(10), child: CircularProgressIndicator(strokeWidth: 2.5, color: cs.onPrimaryContainer))
-                : Icon(Icons.cloud_sync_rounded, color: cs.onPrimaryContainer),
-          ),
-          title: Text(l10n.webdavTitle),
-          subtitle: Text(webdavSummary(_sync), maxLines: 1, overflow: TextOverflow.ellipsis,
-              style: syncOn && syncErr.isNotEmpty ? TextStyle(color: cs.error) : null),
-          trailing: const Icon(Icons.chevron_right_rounded),
-          onTap: _openSync,
-        ),
-      ]),
-      SettingsGroup(title: l10n.backupTitle, icon: Icons.inventory_2_outlined, children: [
-        Text(l10n.backupIntro, style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
-        const SizedBox(height: Space.sm),
-        SwitchListTile(
-          contentPadding: EdgeInsets.zero,
-          title: Text(l10n.backupIncludeMedia),
-          subtitle: Text(e == null ? '…' : (e['media_files'] == 0 ? l10n.backupNoMedia : l10n.backupMediaSize(e['media_files'], fmtBytes(e['media_bytes'] as num? ?? 0)))),
-          value: _media,
-          onChanged: busy || e?['media_files'] == 0 ? null : (v) => setState(() => _media = v),
-        ),
-        AnimatedSize(
-          duration: Motion.medium2,
-          curve: Motion.emphasized,
-          alignment: Alignment.topCenter,
-          child: !busy
-              ? const SizedBox(width: double.infinity)
-              : Padding(
-                  padding: const EdgeInsets.symmetric(vertical: Space.md),
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                    LinearProgressIndicator(value: _total > 0 ? (_done / _total).clamp(0.0, 1.0) : null, borderRadius: BorderRadius.circular(Corners.full)),
-                    const SizedBox(height: Space.sm),
-                    Text(_done > 0 ? '$_task · ${fmtBytes(_done)}' : _task!, style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
-                  ]),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SettingsGroup(
+          title: l10n.dataSyncTitle,
+          icon: Icons.devices_rounded,
+          padding: const EdgeInsets.symmetric(vertical: Space.sm),
+          children: [
+            ListTile(
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: Space.xl,
+                vertical: Space.xs,
+              ),
+              leading: Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: cs.primaryContainer,
+                  borderRadius: BorderRadius.circular(12),
                 ),
+                child: _sync['running'] == true
+                    ? Padding(
+                        padding: const EdgeInsets.all(10),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.5,
+                          color: cs.onPrimaryContainer,
+                        ),
+                      )
+                    : Icon(
+                        Icons.cloud_sync_rounded,
+                        color: cs.onPrimaryContainer,
+                      ),
+              ),
+              title: Text(l10n.webdavTitle),
+              subtitle: Text(
+                webdavSummary(_sync),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: syncOn && syncErr.isNotEmpty
+                    ? TextStyle(color: cs.error)
+                    : null,
+              ),
+              trailing: const Icon(Icons.chevron_right_rounded),
+              onTap: _openSync,
+            ),
+          ],
         ),
-        const SizedBox(height: Space.sm),
-        Wrap(spacing: Space.sm, runSpacing: Space.sm, crossAxisAlignment: WrapCrossAlignment.center, children: [
-          FilledButton.tonalIcon(
-            onPressed: busy ? null : _export,
-            icon: const Icon(Icons.archive_outlined),
-            label: Text(e == null ? l10n.backupExport : l10n.backupExportSize(fmtBytes((e['bytes'] as num? ?? 0) + (_media ? e['media_bytes'] as num? ?? 0 : 0)))),
-          ),
-          OutlinedButton.icon(onPressed: busy ? null : _restore, icon: const Icon(Icons.unarchive_outlined), label: Text(l10n.backupRestoreFrom)),
-        ]),
-      ]),
-      _StorageGroup(report: _storage, busy: busy, onClean: _clean),
-    ]);
+        SettingsGroup(
+          title: '同步文件夹',
+          icon: Icons.folder_shared_outlined,
+          children: [
+            ListTile(
+              title: const Text('Syncthing / NAS 同步资料库'),
+              subtitle: Text(
+                _sync['kind'] == 'folder'
+                    ? '${_sync['local_folder']}'
+                    : '选择课程，在多台设备间同步学习成果',
+              ),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.of(context)
+                  .push(
+                    MaterialPageRoute(builder: (_) => const FolderSyncPage()),
+                  )
+                  .then((_) => _load()),
+            ),
+          ],
+        ),
+        SettingsGroup(
+          title: l10n.backupTitle,
+          icon: Icons.inventory_2_outlined,
+          children: [
+            Text(
+              l10n.backupIntro,
+              style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+            ),
+            const SizedBox(height: Space.sm),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(l10n.backupIncludeMedia),
+              subtitle: Text(
+                e == null
+                    ? '…'
+                    : (e['media_files'] == 0
+                          ? l10n.backupNoMedia
+                          : l10n.backupMediaSize(
+                              e['media_files'],
+                              fmtBytes(e['media_bytes'] as num? ?? 0),
+                            )),
+              ),
+              value: _media,
+              onChanged: busy || e?['media_files'] == 0
+                  ? null
+                  : (v) => setState(() => _media = v),
+            ),
+            AnimatedSize(
+              duration: Motion.medium2,
+              curve: Motion.emphasized,
+              alignment: Alignment.topCenter,
+              child: !busy
+                  ? const SizedBox(width: double.infinity)
+                  : Padding(
+                      padding: const EdgeInsets.symmetric(vertical: Space.md),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          LinearProgressIndicator(
+                            value: _total > 0
+                                ? (_done / _total).clamp(0.0, 1.0)
+                                : null,
+                            borderRadius: BorderRadius.circular(Corners.full),
+                          ),
+                          const SizedBox(height: Space.sm),
+                          Text(
+                            _done > 0 ? '$_task · ${fmtBytes(_done)}' : _task!,
+                            style: tt.bodySmall?.copyWith(
+                              color: cs.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+            ),
+            const SizedBox(height: Space.sm),
+            Wrap(
+              spacing: Space.sm,
+              runSpacing: Space.sm,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                FilledButton.tonalIcon(
+                  onPressed: busy ? null : _export,
+                  icon: const Icon(Icons.archive_outlined),
+                  label: Text(
+                    e == null
+                        ? l10n.backupExport
+                        : l10n.backupExportSize(
+                            fmtBytes(
+                              (e['bytes'] as num? ?? 0) +
+                                  (_media ? e['media_bytes'] as num? ?? 0 : 0),
+                            ),
+                          ),
+                  ),
+                ),
+                OutlinedButton.icon(
+                  onPressed: busy ? null : _restore,
+                  icon: const Icon(Icons.unarchive_outlined),
+                  label: Text(l10n.backupRestoreFrom),
+                ),
+              ],
+            ),
+          ],
+        ),
+        _StorageGroup(report: _storage, busy: busy, onClean: _clean),
+      ],
+    );
   }
 }
 
@@ -290,14 +460,17 @@ class _RestoreDialogState extends State<_RestoreDialog> {
     int n(String k) => (p[k] as num?)?.toInt() ?? 0;
     final created = DateTime.fromMillisecondsSinceEpoch(n('created'));
     final device = '${p['device'] ?? ''}';
-    Widget row(IconData icon, String label, int count, {Color? color}) => Padding(
+    Widget row(IconData icon, String label, int count, {Color? color}) =>
+        Padding(
           padding: const EdgeInsets.symmetric(vertical: Space.xs),
-          child: Row(children: [
-            Icon(icon, size: 18, color: color ?? cs.onSurfaceVariant),
-            const SizedBox(width: Space.md),
-            Expanded(child: Text(label, style: tt.bodyMedium)),
-            Text('$count', style: tt.titleSmall),
-          ]),
+          child: Row(
+            children: [
+              Icon(icon, size: 18, color: color ?? cs.onSurfaceVariant),
+              const SizedBox(width: Space.md),
+              Expanded(child: Text(label, style: tt.bodyMedium)),
+              Text('$count', style: tt.titleSmall),
+            ],
+          ),
         );
     return AlertDialog(
       icon: const Icon(Icons.unarchive_outlined),
@@ -305,60 +478,102 @@ class _RestoreDialogState extends State<_RestoreDialog> {
       content: SizedBox(
         width: 440,
         child: SingleChildScrollView(
-          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Text(
-              l10n.backupPreviewMeta(fmtLectureDate(created), created.hour.toString().padLeft(2, '0'), created.minute.toString().padLeft(2, '0'), device.isEmpty ? '' : l10n.backupFromDevice(device), n('files'), fmtBytes(n('bytes'))),
-              style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
-            ),
-            const SizedBox(height: Space.md),
-            row(Icons.add_circle_outline_rounded, l10n.restoreNew, n('new'), color: cs.primary),
-            row(Icons.update_rounded, l10n.restoreNewer, n('newer')),
-            row(Icons.history_rounded, l10n.restoreOlder, n('older'), color: n('older') > 0 ? cs.tertiary : null),
-            row(Icons.check_rounded, l10n.restoreSame, n('same')),
-            if (n('skipped') > 0) row(Icons.block_rounded, l10n.restoreSkipped, n('skipped')),
-            const SizedBox(height: Space.lg),
-            SegmentedButton<String>(
-              segments: [
-                ButtonSegment(value: 'merge', label: Text(l10n.restoreMerge), icon: Icon(Icons.merge_rounded)),
-                ButtonSegment(value: 'overwrite', label: Text(l10n.restoreOverwrite), icon: Icon(Icons.restore_rounded)),
-              ],
-              selected: {_mode},
-              onSelectionChanged: (s) => setState(() => _mode = s.first),
-            ),
-            const SizedBox(height: Space.sm),
-            Text(
-              _mode == 'merge'
-                  ? l10n.restoreMergeHint
-                  : l10n.restoreOverwriteHint,
-              style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-            ),
-          ]),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                l10n.backupPreviewMeta(
+                  fmtLectureDate(created),
+                  created.hour.toString().padLeft(2, '0'),
+                  created.minute.toString().padLeft(2, '0'),
+                  device.isEmpty ? '' : l10n.backupFromDevice(device),
+                  n('files'),
+                  fmtBytes(n('bytes')),
+                ),
+                style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+              ),
+              const SizedBox(height: Space.md),
+              row(
+                Icons.add_circle_outline_rounded,
+                l10n.restoreNew,
+                n('new'),
+                color: cs.primary,
+              ),
+              row(Icons.update_rounded, l10n.restoreNewer, n('newer')),
+              row(
+                Icons.history_rounded,
+                l10n.restoreOlder,
+                n('older'),
+                color: n('older') > 0 ? cs.tertiary : null,
+              ),
+              row(Icons.check_rounded, l10n.restoreSame, n('same')),
+              if (n('skipped') > 0)
+                row(Icons.block_rounded, l10n.restoreSkipped, n('skipped')),
+              const SizedBox(height: Space.lg),
+              SegmentedButton<String>(
+                segments: [
+                  ButtonSegment(
+                    value: 'merge',
+                    label: Text(l10n.restoreMerge),
+                    icon: Icon(Icons.merge_rounded),
+                  ),
+                  ButtonSegment(
+                    value: 'overwrite',
+                    label: Text(l10n.restoreOverwrite),
+                    icon: Icon(Icons.restore_rounded),
+                  ),
+                ],
+                selected: {_mode},
+                onSelectionChanged: (s) => setState(() => _mode = s.first),
+              ),
+              const SizedBox(height: Space.sm),
+              Text(
+                _mode == 'merge'
+                    ? l10n.restoreMergeHint
+                    : l10n.restoreOverwriteHint,
+                style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+              ),
+            ],
+          ),
         ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: Text(l10n.commonCancel)),
-        FilledButton(onPressed: n('files') == 0 ? null : () => Navigator.pop(context, _mode), child: Text(l10n.commonRestore)),
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(l10n.commonCancel),
+        ),
+        FilledButton(
+          onPressed: n('files') == 0
+              ? null
+              : () => Navigator.pop(context, _mode),
+          child: Text(l10n.commonRestore),
+        ),
       ],
     );
   }
 }
 
 class _StorageGroup extends StatelessWidget {
-  const _StorageGroup({required this.report, required this.busy, required this.onClean});
+  const _StorageGroup({
+    required this.report,
+    required this.busy,
+    required this.onClean,
+  });
   final Map<String, dynamic>? report;
   final bool busy;
   final Future<void> Function(String what, String doing) onClean;
 
   Color _color(ColorScheme cs, String key) => switch (key) {
-        'video' => cs.primary,
-        'slides' => cs.tertiary,
-        'courseware' => cs.secondary,
-        'text' => cs.primaryFixedDim,
-        'index' => cs.outline,
-        'cache' => cs.error,
-        'sync' => cs.tertiaryFixedDim,
-        _ => cs.outlineVariant,
-      };
+    'video' => cs.primary,
+    'slides' => cs.tertiary,
+    'courseware' => cs.secondary,
+    'text' => cs.primaryFixedDim,
+    'index' => cs.outline,
+    'cache' => cs.error,
+    'sync' => cs.tertiaryFixedDim,
+    _ => cs.outlineVariant,
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -366,9 +581,16 @@ class _StorageGroup extends StatelessWidget {
     final tt = Theme.of(context).textTheme;
     final r = report;
     if (r == null || r.isEmpty) {
-      return SettingsGroup(title: l10n.storageTitle, icon: Icons.pie_chart_outline_rounded, children: [
-        Padding(padding: EdgeInsets.all(Space.lg), child: Center(child: CircularProgressIndicator())),
-      ]);
+      return SettingsGroup(
+        title: l10n.storageTitle,
+        icon: Icons.pie_chart_outline_rounded,
+        children: [
+          Padding(
+            padding: EdgeInsets.all(Space.lg),
+            child: Center(child: CircularProgressIndicator()),
+          ),
+        ],
+      );
     }
     final total = (r['total'] as num? ?? 0).toInt();
     final cats = [
@@ -378,86 +600,143 @@ class _StorageGroup extends StatelessWidget {
     final clean = _map(r['cleanable']);
     int bytes(Object? v) => (v as num? ?? 0).toInt();
     final root = '${r['library'] ?? ''}';
-    return SettingsGroup(title: l10n.storageTitle, icon: Icons.pie_chart_outline_rounded, children: [
-      Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-        Text(fmtBytes(total), style: tt.headlineSmall),
-        const SizedBox(width: Space.sm),
-        Expanded(
-          child: Padding(
-            padding: const EdgeInsets.only(bottom: 3),
-            child: Text(l10n.commonLibrary, style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
-          ),
-        ),
-        if (root.isNotEmpty && canOpenFolders) IconButton(tooltip: l10n.commonOpenInFileManager, onPressed: () => openPath(root), icon: const Icon(Icons.folder_open_rounded)),
-      ]),
-      const SizedBox(height: Space.md),
-      if (total > 0) _Bar(parts: [for (final c in cats) (bytes(c['bytes']) / total, _color(cs, '${c['key']}'))]),
-      const SizedBox(height: Space.md),
-      Wrap(spacing: Space.lg, runSpacing: Space.sm, children: [
-        for (final c in cats)
-          Row(mainAxisSize: MainAxisSize.min, children: [
-            Container(width: 10, height: 10, decoration: BoxDecoration(color: _color(cs, '${c['key']}'), shape: BoxShape.circle)),
+    return SettingsGroup(
+      title: l10n.storageTitle,
+      icon: Icons.pie_chart_outline_rounded,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Text(fmtBytes(total), style: tt.headlineSmall),
             const SizedBox(width: Space.sm),
-            Text('${c['label']}', style: tt.bodySmall),
-            const SizedBox(width: Space.xs),
-            Text(fmtBytes(bytes(c['bytes'])), style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
-          ]),
-      ]),
-      const SizedBox(height: Space.md),
-      const Divider(),
-      _CleanTile(
-        icon: Icons.cleaning_services_outlined,
-        title: l10n.storageCache,
-        subtitle: bytes(clean['cache']) > 0 ? l10n.storageCacheCleanable(fmtBytes(bytes(clean['cache']))) : l10n.storageCacheEmpty,
-        action: l10n.commonClean,
-        onPressed: busy || bytes(clean['cache']) == 0 ? null : () => onClean('cache', l10n.storageCleaningCache),
-      ),
-      _CleanTile(
-        icon: Icons.restore_from_trash_outlined,
-        title: l10n.storageSync,
-        subtitle: bytes(clean['sync']) > 0 ? l10n.storageSyncSize(fmtBytes(bytes(clean['sync']))) : l10n.storageNoFiles,
-        action: l10n.commonEmpty,
-        onPressed: busy || bytes(clean['sync']) == 0 ? null : () => onClean('sync', l10n.storageEmptying),
-      ),
-      _CleanTile(
-        icon: Icons.compress_rounded,
-        title: l10n.storageCompact,
-        subtitle: l10n.storageCompactHint,
-        action: l10n.storageCompactAction,
-        onPressed: busy ? null : () => onClean('compact', l10n.storageCompacting),
-      ),
-      const Divider(),
-      for (final (label, key, icon) in [
-        (l10n.storageModels, 'models', Icons.graphic_eq_rounded),
-        (l10n.storageAssistant, 'assistant', Icons.forum_outlined),
-        (l10n.storageRuntime, 'runtime', Icons.terminal_rounded),
-      ])
-        if (bytes(r[key]) > 0)
-          ListTile(
-            dense: true,
-            contentPadding: EdgeInsets.zero,
-            leading: Icon(icon, size: 20),
-            title: Text(label),
-            trailing: Text(fmtBytes(bytes(r[key])), style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 3),
+                child: Text(
+                  l10n.commonLibrary,
+                  style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+                ),
+              ),
+            ),
+            if (root.isNotEmpty && canOpenFolders)
+              IconButton(
+                tooltip: l10n.commonOpenInFileManager,
+                onPressed: () => openPath(root),
+                icon: const Icon(Icons.folder_open_rounded),
+              ),
+          ],
+        ),
+        const SizedBox(height: Space.md),
+        if (total > 0)
+          _Bar(
+            parts: [
+              for (final c in cats)
+                (bytes(c['bytes']) / total, _color(cs, '${c['key']}')),
+            ],
           ),
-    ]);
+        const SizedBox(height: Space.md),
+        Wrap(
+          spacing: Space.lg,
+          runSpacing: Space.sm,
+          children: [
+            for (final c in cats)
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(
+                      color: _color(cs, '${c['key']}'),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: Space.sm),
+                  Text('${c['label']}', style: tt.bodySmall),
+                  const SizedBox(width: Space.xs),
+                  Text(
+                    fmtBytes(bytes(c['bytes'])),
+                    style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                  ),
+                ],
+              ),
+          ],
+        ),
+        const SizedBox(height: Space.md),
+        const Divider(),
+        _CleanTile(
+          icon: Icons.cleaning_services_outlined,
+          title: l10n.storageCache,
+          subtitle: bytes(clean['cache']) > 0
+              ? l10n.storageCacheCleanable(fmtBytes(bytes(clean['cache'])))
+              : l10n.storageCacheEmpty,
+          action: l10n.commonClean,
+          onPressed: busy || bytes(clean['cache']) == 0
+              ? null
+              : () => onClean('cache', l10n.storageCleaningCache),
+        ),
+        _CleanTile(
+          icon: Icons.restore_from_trash_outlined,
+          title: l10n.storageSync,
+          subtitle: bytes(clean['sync']) > 0
+              ? l10n.storageSyncSize(fmtBytes(bytes(clean['sync'])))
+              : l10n.storageNoFiles,
+          action: l10n.commonEmpty,
+          onPressed: busy || bytes(clean['sync']) == 0
+              ? null
+              : () => onClean('sync', l10n.storageEmptying),
+        ),
+        _CleanTile(
+          icon: Icons.compress_rounded,
+          title: l10n.storageCompact,
+          subtitle: l10n.storageCompactHint,
+          action: l10n.storageCompactAction,
+          onPressed: busy
+              ? null
+              : () => onClean('compact', l10n.storageCompacting),
+        ),
+        const Divider(),
+        for (final (label, key, icon) in [
+          (l10n.storageModels, 'models', Icons.graphic_eq_rounded),
+          (l10n.storageAssistant, 'assistant', Icons.forum_outlined),
+          (l10n.storageRuntime, 'runtime', Icons.terminal_rounded),
+        ])
+          if (bytes(r[key]) > 0)
+            ListTile(
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(icon, size: 20),
+              title: Text(label),
+              trailing: Text(
+                fmtBytes(bytes(r[key])),
+                style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+              ),
+            ),
+      ],
+    );
   }
 }
 
 class _CleanTile extends StatelessWidget {
-  const _CleanTile({required this.icon, required this.title, required this.subtitle, required this.action, required this.onPressed});
+  const _CleanTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.action,
+    required this.onPressed,
+  });
   final IconData icon;
   final String title, subtitle, action;
   final VoidCallback? onPressed;
 
   @override
   Widget build(BuildContext context) => ListTile(
-        contentPadding: EdgeInsets.zero,
-        leading: Icon(icon),
-        title: Text(title),
-        subtitle: Text(subtitle),
-        trailing: TextButton(onPressed: onPressed, child: Text(action)),
-      );
+    contentPadding: EdgeInsets.zero,
+    leading: Icon(icon),
+    title: Text(title),
+    subtitle: Text(subtitle),
+    trailing: TextButton(onPressed: onPressed, child: Text(action)),
+  );
 }
 
 /// A rounded bar split into proportional parts with small gaps.
@@ -472,13 +751,18 @@ class _Bar extends StatelessWidget {
       borderRadius: BorderRadius.circular(Corners.full),
       child: SizedBox(
         height: 12,
-        child: Row(children: [
-          for (final (i, (share, color)) in shown.indexed) ...[
-            if (i > 0) const SizedBox(width: 3),
-            // Tiny parts stay visible.
-            Expanded(flex: (share * 1000).round().clamp(8, 1000), child: ColoredBox(color: color)),
+        child: Row(
+          children: [
+            for (final (i, (share, color)) in shown.indexed) ...[
+              if (i > 0) const SizedBox(width: 3),
+              // Tiny parts stay visible.
+              Expanded(
+                flex: (share * 1000).round().clamp(8, 1000),
+                child: ColoredBox(color: color),
+              ),
+            ],
           ],
-        ]),
+        ),
       ),
     );
   }

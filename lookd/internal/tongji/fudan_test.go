@@ -94,7 +94,7 @@ func (f *fakeFudan) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		f.icourse(w, r, strings.TrimPrefix(r.URL.Path, vpnPrefix("icourse.fudan.edu.cn")), sess)
 	case r.URL.Path == vpnPrefix("vod.fudan.edu.cn")+"/v/1.mp4":
 		q := r.URL.Query()
-		if q.Get("clientUUID") == "" || !strings.HasPrefix(q.Get("t"), "7-") {
+		if q.Get("clientUUID") == "" || !strings.HasPrefix(q.Get("t"), "7-1800000000-") {
 			http.Error(w, "unsigned", 403)
 			return
 		}
@@ -190,7 +190,9 @@ func (f *fakeFudan) ticket(w http.ResponseWriter, r *http.Request, svc string) {
 	if !strings.HasPrefix(to, gw) {
 		to, _ = fudan.VPNURL(to)
 	}
-	http.Redirect(w, r, to, http.StatusFound)
+	// UIS returns a script ticket page during silent SSO, not an HTTP redirect.
+	w.Header().Set("Content-Type", "text/html")
+	w.Write([]byte(`<script>var locationValue = "` + strings.ReplaceAll(to, "&", "&amp;") + `";</script>`))
 }
 
 func (f *fakeFudan) icourse(w http.ResponseWriter, r *http.Request, path, sess string) {
@@ -223,7 +225,7 @@ func (f *fakeFudan) icourse(w http.ResponseWriter, r *http.Request, path, sess s
 		case "/personal/courseapi/vlabpassportapi/v1/account-profile/course":
 			w.Write([]byte(`{"params":{"result":{"total":1,"data":[{"Id":"42","Title":"数学分析","Teacher":"李老师"}]}}}`))
 		case "/courseapi/v3/portal-home-setting/get-sub-info":
-			w.Write([]byte(`{"code":0,"data":{"now":"1800000000","duration":"10","video_list":{"0":{"preview_url":"` + vodURL + `"}}}}`))
+			w.Write([]byte(`{"code":0,"data":{"duration":"10","segment_video_list":{"now":1800000000},"video_list":{"now":1800000000,"0":{"preview_url":"` + vodURL + `"}}}}`))
 		default:
 			http.NotFound(w, r)
 		}
@@ -350,5 +352,29 @@ func TestFudanRenewalWithoutRememberedPassword(t *testing.T) {
 	}
 	if st := s.State(); st.Status != "needs_password" || !strings.Contains(st.Error, "重新登录") {
 		t.Fatalf("state %+v", st)
+	}
+
+	// UI reloads after auth events must not restart failed renewal, otherwise
+	// renewing -> needs_password repeatedly hides and shows the login banner.
+	var eventMu sync.Mutex
+	events := 0
+	s.onChange = func(AuthState) { eventMu.Lock(); events++; eventMu.Unlock() }
+	for i := 0; i < 3; i++ {
+		if _, err := (&Client{S: s}).Courses(t.Context()); err == nil {
+			t.Fatal("expected a request to require sign-in")
+		}
+	}
+	eventMu.Lock()
+	count := events
+	eventMu.Unlock()
+	if count != 0 {
+		t.Fatalf("failed renewal retriggered %d auth events", count)
+	}
+	// An explicit sign-in still restores normal requests.
+	if err := s.Login(t.Context(), Fudan, "21300", "secret", "", false); err != nil {
+		t.Fatal(err)
+	}
+	if cs, err := (&Client{S: s}).Courses(t.Context()); err != nil || len(cs) != 1 {
+		t.Fatal("sign-in did not restore courses", err)
 	}
 }

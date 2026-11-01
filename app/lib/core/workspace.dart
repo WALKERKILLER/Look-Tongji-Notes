@@ -13,7 +13,13 @@ import '../l10n/l10n.dart';
 // Contract: docs/specs/draft-android-app.md
 
 class WorkspaceMirror {
-  const WorkspaceMirror(this.id, this.name, this.images, this.ports, this.archive);
+  const WorkspaceMirror(
+    this.id,
+    this.name,
+    this.images,
+    this.ports,
+    this.archive,
+  );
   final String id, name;
 
   /// Ubuntu base images, and the package archives for arm64 and x86_64.
@@ -21,12 +27,27 @@ class WorkspaceMirror {
 }
 
 final workspaceMirrors = [
-  WorkspaceMirror('tuna', l10n.mirrorTuna, 'https://mirrors.tuna.tsinghua.edu.cn/ubuntu-cdimage/ubuntu-base/releases/24.04/release/',
-      'http://mirrors.tuna.tsinghua.edu.cn/ubuntu-ports/', 'http://mirrors.tuna.tsinghua.edu.cn/ubuntu/'),
-  WorkspaceMirror('ustc', l10n.mirrorUstc, 'https://mirrors.ustc.edu.cn/ubuntu-cdimage/ubuntu-base/releases/24.04/release/',
-      'http://mirrors.ustc.edu.cn/ubuntu-ports/', 'http://mirrors.ustc.edu.cn/ubuntu/'),
-  WorkspaceMirror('official', l10n.mirrorUbuntu, 'https://cdimage.ubuntu.com/ubuntu-base/releases/24.04/release/',
-      'http://ports.ubuntu.com/ubuntu-ports/', 'http://archive.ubuntu.com/ubuntu/'),
+  WorkspaceMirror(
+    'tuna',
+    l10n.mirrorTuna,
+    'https://mirrors.tuna.tsinghua.edu.cn/ubuntu-cdimage/ubuntu-base/releases/24.04/release/',
+    'http://mirrors.tuna.tsinghua.edu.cn/ubuntu-ports/',
+    'http://mirrors.tuna.tsinghua.edu.cn/ubuntu/',
+  ),
+  WorkspaceMirror(
+    'ustc',
+    l10n.mirrorUstc,
+    'https://mirrors.ustc.edu.cn/ubuntu-cdimage/ubuntu-base/releases/24.04/release/',
+    'http://mirrors.ustc.edu.cn/ubuntu-ports/',
+    'http://mirrors.ustc.edu.cn/ubuntu/',
+  ),
+  WorkspaceMirror(
+    'official',
+    l10n.mirrorUbuntu,
+    'https://cdimage.ubuntu.com/ubuntu-base/releases/24.04/release/',
+    'http://ports.ubuntu.com/ubuntu-ports/',
+    'http://archive.ubuntu.com/ubuntu/',
+  ),
 ];
 
 const _release = '24.04.5';
@@ -46,7 +67,8 @@ class WorkspaceProgress {
 }
 
 class Workspace extends ChangeNotifier {
-  Workspace({Future<Map<String, dynamic>> Function()? info}) : _infoOf = info ?? AndroidBridge.info;
+  Workspace({Future<Map<String, dynamic>> Function()? info})
+    : _infoOf = info ?? AndroidBridge.info;
   final Future<Map<String, dynamic>> Function() _infoOf;
 
   late String nativeDir, filesDir, cacheDir;
@@ -123,7 +145,14 @@ class Workspace extends ChangeNotifier {
       _report(WorkspaceProgress(l10n.workspaceStepUnpack));
       if (staging.existsSync()) await staging.delete(recursive: true);
       final total = await archive.length();
-      await _unpack(archive.path, staging.path, _sums[_arch]!, (n) => _report(WorkspaceProgress(l10n.workspaceStepUnpack, done: n, total: total)));
+      await _unpack(
+        archive.path,
+        staging.path,
+        _sums[_arch]!,
+        (n) => _report(
+          WorkspaceProgress(l10n.workspaceStepUnpack, done: n, total: total),
+        ),
+      );
       _report(WorkspaceProgress(l10n.workspaceStepConfigure));
       final old = Directory(rootfs);
       if (old.existsSync()) await old.delete(recursive: true);
@@ -145,16 +174,27 @@ class Workspace extends ChangeNotifier {
     _report(WorkspaceProgress(l10n.workspaceStepDownload));
     final client = http.Client();
     try {
-      final res = await client.send(http.Request('GET', url)).timeout(const Duration(seconds: 30));
-      if (res.statusCode != 200) throw l10n.workspaceDownloadHttpError(res.statusCode);
+      final res = await client
+          .send(http.Request('GET', url))
+          .timeout(const Duration(seconds: 30));
+      if (res.statusCode != 200)
+        throw l10n.workspaceDownloadHttpError(res.statusCode);
       final total = res.contentLength ?? 0;
       final sink = dest.openWrite();
       var n = 0;
       try {
-        await for (final chunk in res.stream.timeout(const Duration(seconds: 60))) {
+        await for (final chunk in res.stream.timeout(
+          const Duration(seconds: 60),
+        )) {
           sink.add(chunk);
           n += chunk.length;
-          _report(WorkspaceProgress(l10n.workspaceStepDownload, done: n, total: total));
+          _report(
+            WorkspaceProgress(
+              l10n.workspaceStepDownload,
+              done: n,
+              total: total,
+            ),
+          );
         }
       } finally {
         await sink.close();
@@ -170,16 +210,32 @@ class Workspace extends ChangeNotifier {
 
   /// lookd unpacks: it runs straight from the native library folder and
   /// keeps file modes, which Dart cannot set.
-  Future<void> _unpack(String archive, String dir, String sha, void Function(int) onBytes) async {
-    final p = await Process.start('$nativeDir/liblookd.so', ['unpack', archive, dir, sha]);
+  Future<void> _unpack(
+    String archive,
+    String dir,
+    String sha,
+    void Function(int) onBytes,
+  ) async {
+    final p = await Process.start('$nativeDir/liblookd.so', [
+      'unpack',
+      archive,
+      dir,
+      sha,
+    ]);
     final err = StringBuffer();
     p.stderr.transform(utf8.decoder).listen(err.write);
-    await p.stdout.transform(utf8.decoder).transform(const LineSplitter()).forEach((l) {
-      if (l.startsWith('PROGRESS ')) onBytes(int.tryParse(l.substring(9)) ?? 0);
-    });
+    await p.stdout
+        .transform(utf8.decoder)
+        .transform(const LineSplitter())
+        .forEach((l) {
+          if (l.startsWith('PROGRESS '))
+            onBytes(int.tryParse(l.substring(9)) ?? 0);
+        });
     if (await p.exitCode != 0) {
       final msg = err.toString().trim();
-      throw msg.contains('checksum') ? l10n.workspaceChecksumFailed : l10n.workspaceUnpackFailed(msg);
+      throw msg.contains('checksum')
+          ? l10n.workspaceChecksumFailed
+          : l10n.workspaceUnpackFailed(msg);
     }
   }
 
@@ -187,22 +243,38 @@ class Workspace extends ChangeNotifier {
     Future<void> write(String rel, String body) async {
       final f = File('$rootfs/$rel');
       await f.parent.create(recursive: true);
-      if (await FileSystemEntity.type(f.path, followLinks: false) == FileSystemEntityType.link) await Link(f.path).delete();
+      if (await FileSystemEntity.type(f.path, followLinks: false) ==
+          FileSystemEntityType.link)
+        await Link(f.path).delete();
       await f.writeAsString(body);
     }
 
-    await write('etc/resolv.conf', 'nameserver 223.5.5.5\nnameserver 119.29.29.29\nnameserver 8.8.8.8\n');
-    await write('etc/hosts', '127.0.0.1 localhost\n::1 localhost ip6-localhost\n');
+    await write(
+      'etc/resolv.conf',
+      'nameserver 223.5.5.5\nnameserver 119.29.29.29\nnameserver 8.8.8.8\n',
+    );
+    await write(
+      'etc/hosts',
+      '127.0.0.1 localhost\n::1 localhost ip6-localhost\n',
+    );
     final archive = _arch == 'arm64' ? mirror.ports : mirror.archive;
-    await write('etc/apt/sources.list.d/ubuntu.sources',
-        'Types: deb\nURIs: $archive\nSuites: noble noble-updates noble-security\nComponents: main universe\n'
-        'Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg\n');
+    await write(
+      'etc/apt/sources.list.d/ubuntu.sources',
+      'Types: deb\nURIs: $archive\nSuites: noble noble-updates noble-security\nComponents: main universe\n'
+          'Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg\n',
+    );
     // apt drops to the _apt user, which proot's fake root cannot do.
-    await write('etc/apt/apt.conf.d/01-look', 'APT::Sandbox::User "root";\nAcquire::Retries "3";\n');
+    await write(
+      'etc/apt/apt.conf.d/01-look',
+      'APT::Sandbox::User "root";\nAcquire::Retries "3";\n',
+    );
     for (final d in ['root', 'tmp']) {
       await Directory('$rootfs/$d').create(recursive: true);
     }
-    await write('.look-workspace', jsonEncode({'release': _release, 'arch': _arch, 'mirror': mirror.id}));
+    await write(
+      '.look-workspace',
+      jsonEncode({'release': _release, 'arch': _arch, 'mirror': mirror.id}),
+    );
   }
 
   /// Unpacks the assistant's sources the APK carries when they changed.
@@ -222,11 +294,24 @@ class Workspace extends ChangeNotifier {
   /// proot's command line for running [command] in the guest. The app's
   /// files folder appears at the same path inside, so paths lookd reports
   /// work in the app too; native libraries appear at [guestNative].
-  (String, List<String>, Map<String, String>) guest(List<String> command, {Map<String, String> env = const {}, String cwd = '/root'}) {
+  (String, List<String>, Map<String, String>) guest(
+    List<String> command, {
+    Map<String, String> env = const {},
+    String cwd = '/root',
+  }) {
     final tmp = Directory('$cacheDir/proot')..createSync(recursive: true);
-    final binds = ['/dev', '/proc', '/sys', '/system', if (Directory('/apex').existsSync()) '/apex', filesDir, '$nativeDir:$guestNative'];
+    final binds = [
+      '/dev',
+      '/proc',
+      '/sys',
+      '/system',
+      if (Directory('/apex').existsSync()) '/apex',
+      filesDir,
+      '$nativeDir:$guestNative',
+    ];
     final certs = [
-      if (Directory('/apex/com.android.conscrypt/cacerts').existsSync()) '/apex/com.android.conscrypt/cacerts',
+      if (Directory('/apex/com.android.conscrypt/cacerts').existsSync())
+        '/apex/com.android.conscrypt/cacerts',
       '/system/etc/security/cacerts',
     ].join(':');
     return (
@@ -250,7 +335,11 @@ class Workspace extends ChangeNotifier {
         for (final e in env.entries) '${e.key}=${e.value}',
         ...command,
       ],
-      {'PROOT_LOADER': '$nativeDir/libproot_loader.so', 'PROOT_TMP_DIR': tmp.path, 'LD_LIBRARY_PATH': nativeDir},
+      {
+        'PROOT_LOADER': '$nativeDir/libproot_loader.so',
+        'PROOT_TMP_DIR': tmp.path,
+        'LD_LIBRARY_PATH': nativeDir,
+      },
     );
   }
 
@@ -263,26 +352,57 @@ class Workspace extends ChangeNotifier {
       onLine?.call(l);
     }
 
-    final out = p.stdout.transform(utf8.decoder).transform(const LineSplitter()).forEach(each);
-    final err = p.stderr.transform(utf8.decoder).transform(const LineSplitter()).forEach(each);
+    final out = p.stdout
+        .transform(utf8.decoder)
+        .transform(const LineSplitter())
+        .forEach(each);
+    final err = p.stderr
+        .transform(utf8.decoder)
+        .transform(const LineSplitter())
+        .forEach(each);
     await Future.wait([out, err]);
     return p.exitCode;
   }
 
   /// Installs ffmpeg, which transcription needs, from the chosen mirror.
-  Future<void> installFFmpeg({void Function(String line)? onLine}) async {
+  Future<void> installFFmpeg({void Function(String line)? onLine}) =>
+      _installPackages(
+        'ffmpeg ca-certificates',
+        l10n.workspaceInstallFfmpeg,
+        onLine,
+      );
+
+  /// PDF parsing stays on the device, using the selected Ubuntu mirror.
+  Future<void> installPDF({void Function(String line)? onLine}) =>
+      _installPackages(
+        'poppler-utils fonts-dejavu-core fonts-noto-cjk ca-certificates',
+        '安装 PDF 组件',
+        onLine,
+      );
+
+  Future<bool> pdfAvailable() async =>
+      await run(
+        'command -v pdfinfo >/dev/null && command -v pdftoppm >/dev/null && command -v pdftotext >/dev/null',
+      ) ==
+      0;
+
+  Future<void> _installPackages(
+    String packages,
+    String label,
+    void Function(String line)? onLine,
+  ) async {
     if (busy) return;
     busy = true;
     error = null;
-    _report(WorkspaceProgress(l10n.workspaceInstallFfmpeg));
+    _report(WorkspaceProgress(label));
     try {
       final code = await run(
-        'export DEBIAN_FRONTEND=noninteractive; apt-get update && apt-get install -y --no-install-recommends ffmpeg ca-certificates',
+        'export DEBIAN_FRONTEND=noninteractive; apt-get update && apt-get install -y --no-install-recommends $packages',
         onLine: onLine,
       );
       if (code != 0) throw l10n.workspaceAptExit(code);
     } catch (e) {
-      error = l10n.workspaceFfmpegFailed(e);
+      error = '$label失败：$e';
       rethrow;
     } finally {
       busy = false;

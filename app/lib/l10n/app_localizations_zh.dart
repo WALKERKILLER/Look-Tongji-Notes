@@ -6413,4 +6413,538 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get aboutRewardImage => '微信赞赏码';
+
+  @override
+  String get colorTongjiBlue => '同济蓝';
+
+  @override
+  String get toolPrepareDownload => '准备下载';
+
+  @override
+  String get toolPrepareTask => '准备定时任务';
+
+  @override
+  String get toolPreparePlugin => '准备开关插件';
+
+  @override
+  String get loginWithTongji => '使用同济大学统一身份认证';
+
+  @override
+  String get nasTitle => '课程自动化';
+
+  @override
+  String get nasRunHomework => '运行一轮作业任务';
+
+  @override
+  String get nasRunCalendar => '刷新 NAS 日历';
+
+  @override
+  String get nasHomeworkConfirm =>
+      '将使用 NAS 已配置的 Codex 服务，处理最多两项符合条件的作业。已有稿件保护和任务锁继续生效。生成完成后仍需检查，不会自动提交。';
+
+  @override
+  String get nasCalendarConfirm =>
+      '请求 NAS 刷新日历。当天已成功同步时，现有程序可能跳过重复更新；不会运行作业生成。';
+
+  @override
+  String get nasRun => '开始运行';
+
+  @override
+  String get nasTextTruncated => '仅展示前 12000 字；全文保留在同步目录中。';
+
+  @override
+  String get nasReady => '已生成，待检查';
+
+  @override
+  String get nasSubmitted => '平台已提交';
+
+  @override
+  String get nasFailed => '生成失败';
+
+  @override
+  String get nasExisting => '已有文件';
+
+  @override
+  String get nasRunning => '生成中';
+
+  @override
+  String get nasQueued => '排队中';
+
+  @override
+  String get nasNeedsInput => '需要补充材料或查看 NAS 运行记录';
+
+  @override
+  String get nasRefresh => '刷新状态';
+
+  @override
+  String get nasOnline => 'NAS 已连接 · 资料来自本机同步目录';
+
+  @override
+  String get nasOffline => 'NAS 未连接 · 展示已有资料和上次状态';
+
+  @override
+  String get nasObserved => 'NAS 状态采集时间';
+
+  @override
+  String get nasAllCourses => '全部课程';
+
+  @override
+  String get nasSearch => '搜索资料与作业';
+
+  @override
+  String get nasLinkCourse => '关联录播课程';
+
+  @override
+  String get nasUnlinked => '未关联录播课程';
+
+  @override
+  String get nasOpenRecording => '打开课程录像';
+
+  @override
+  String get nasHomework => '作业';
+
+  @override
+  String get nasDeadlines => '截止日程';
+
+  @override
+  String get nasMaterials => '资料与成果';
+
+  @override
+  String get nasServices => '后台服务';
+
+  @override
+  String get nasSeparateStates => '生成状态与平台提交状态分别显示；生成稿请检查后使用。';
+
+  @override
+  String get nasUnconfirmed => '提交待确认';
+
+  @override
+  String get nasDue => '截止';
+
+  @override
+  String get nasTimeout => '上次生成超过 45 分钟限制，需要处理后重试。';
+
+  @override
+  String get nasViewSource => '查看学校原页面';
+
+  @override
+  String get nasNoReport => '暂无已同步的报告入口，可在资料与成果中查找。';
+
+  @override
+  String get nasServicesHint => '后台任务由 NAS 独立运行，关闭本页面不影响原有定时任务。状态刷新不会启动生成。';
+
+  @override
+  String get nasServiceState => '服务状态';
+
+  @override
+  String get nasLastRun => '最近完成';
+
+  @override
+  String get nasNextRun => '下次计划';
+
+  @override
+  String get nasEntry => '课程自动化 · 资料、日程和作业';
+
+  @override
+  String get nasDeadlineCompleted => '日历标记已完成';
+
+  @override
+  String get nasHomeworkService => '作业生成';
+
+  @override
+  String get nasCalendarService => '日历同步定时任务';
+
+  @override
+  String get nasLectureService => '录课订阅';
+
+  @override
+  String get nasCalendarContainer => '日历同步运行环境';
+
+  @override
+  String get nasRelatedFiles => '查看本课程资料与代码';
+
+  @override
+  String get nasFullFile => '打开完整文件';
+
+  @override
+  String get nasCalendarSource => 'NAS 同步';
+
+  @override
+  String get nasScanResult => '最近扫描：任务数 / 失败数';
+
+  @override
+  String get nasCampusOffline =>
+      'iCourse 尚未登录：已同步资料、笔记和 NAS 任务仍可使用。点击登录以获取受保护的录课。';
+
+  @override
+  String get nasGenerationUnknown => '生成状态未单独记录';
+
+  @override
+  String get schoolLabel => '学校';
+
+  @override
+  String get schoolFudanLogin => '登录复旦 iCourse';
+
+  @override
+  String get schoolFudanHint => '在浏览器中完成复旦统一身份认证，密码仅在复旦认证页面输入。';
+
+  @override
+  String get schoolBrowserWaiting => '等待浏览器登录完成';
+
+  @override
+  String get schoolBrowserLogin => '打开浏览器登录';
+
+  @override
+  String get schoolSwitching => '正在切换学校…';
+
+  @override
+  String get schoolReconnectFailed => '学校已保存，但连接尚未恢复，请重新打开应用。';
+
+  @override
+  String get schoolChange => '切换学校';
+
+  @override
+  String get catalogCourseware => '课件';
+
+  @override
+  String get catalogHomework => '作业';
+
+  @override
+  String get catalogLab => 'Lab / 实验';
+
+  @override
+  String get catalogVideo => '录像';
+
+  @override
+  String get catalogSlides => '课堂截图';
+
+  @override
+  String get catalogReference => '参考资料';
+
+  @override
+  String get catalogOther => '其他';
+
+  @override
+  String get catalogCategory => '用途类别';
+
+  @override
+  String get catalogFileType => '文件类型';
+
+  @override
+  String get catalogAllCategories => '全部类别';
+
+  @override
+  String get catalogAllTypes => '全部文件类型';
+
+  @override
+  String get catalogClassificationHint => '依据文件名与目录自动分类；原文件保留原位。展开类别查看资料。';
+
+  @override
+  String get catalogEmpty => '没有符合筛选条件的资料。';
+
+  @override
+  String get catalogSearchHint => '搜索文件名；同时检索文字稿与笔记正文';
+
+  @override
+  String catalogTitle(int count) {
+    return '资料 · $count 项';
+  }
+
+  @override
+  String catalogFulltextTitle(int count) {
+    return '正文检索（按课程）· $count 条';
+  }
+
+  @override
+  String catalogLoadFailed(String error) {
+    return '无法读取资料列表：$error';
+  }
+
+  @override
+  String get reviewStart => 'AI 审校';
+
+  @override
+  String get reviewCancel => '取消审校';
+
+  @override
+  String get reviewShow => '显示 AI 旁注';
+
+  @override
+  String get reviewHint => '保留原文，自动检查整节课的疑似识别错误。';
+
+  @override
+  String get reviewConsent =>
+      '将这节课的完整文字稿、课程信息，以及可用的该节课堂 OCR / 课件文字发送给已配置的模型服务。按段检查可能产生模型费用。结果以「AI 推测」旁注显示，原文、字幕和时间戳保持不变；模型推测需要你核对。未完成的同版本审校会从已保存进度继续；重新审校已完成稿会替换已有旁注。';
+
+  @override
+  String get reviewStale => '文字稿已变化，这份旁注已过期。请重新审校。';
+
+  @override
+  String reviewProgress(Object done, Object total) {
+    return '正在审校：$done / $total 段';
+  }
+
+  @override
+  String reviewCompleted(int count) {
+    return '整节课已审校 · $count 条推测，供核对';
+  }
+
+  @override
+  String get reviewCancelled => '已取消，保留已检查部分的旁注。';
+
+  @override
+  String get reviewFailed => '审校未完成，请检查模型服务后重试；已保存部分结果。';
+
+  @override
+  String get reviewInterrupted => '审校进程已停止，可以重新审校。';
+
+  @override
+  String reviewLoadFailed(String error) {
+    return '无法读取或更新审校结果：$error';
+  }
+
+  @override
+  String reviewGuess(String guess) {
+    return '（AI 推测：$guess）';
+  }
+
+  @override
+  String reviewDetails(String original, String reason, String evidence) {
+    return '原文：$original\n\n推测理由：$reason\n\n依据：$evidence\n\n这是模型推测，请结合录音核对。';
+  }
+
+  @override
+  String get reviewDismiss => '忽略这条建议';
+
+  @override
+  String reviewFiltered(int count) {
+    return '已过滤 $count 条无法匹配原文或依据的候选建议。';
+  }
+
+  @override
+  String reviewModel(String model) {
+    return '审校模型：$model';
+  }
+
+  @override
+  String get studyOpening => '正在打开画布';
+
+  @override
+  String get studySaved => '已保存到本机';
+
+  @override
+  String get studyPendingSave => '等待保存';
+
+  @override
+  String get studySaving => '保存中…';
+
+  @override
+  String get studySaveFailed => '保存失败 · 点击重试';
+
+  @override
+  String get studyLayerUnavailable => '当前图层已隐藏或锁定';
+
+  @override
+  String get studyInkLimit => '本画布笔迹已接近上限，请另建课次画布';
+
+  @override
+  String get studyMaterials => '学习材料';
+
+  @override
+  String get studyPickLayer => '请先选择可编辑的图层';
+
+  @override
+  String get studyImporting => '正在导入并处理素材…';
+
+  @override
+  String get studyFileTooLarge => '文件超过 300 MiB，请拆分后导入';
+
+  @override
+  String get studyCardLimit => '画布卡片超过 2000 张';
+
+  @override
+  String get studyAddText => '添加文字笔记';
+
+  @override
+  String get studyEditText => '编辑文字';
+
+  @override
+  String get studyTextHint => '写下思考，或粘贴 Markdown…';
+
+  @override
+  String get studyLocked => '图层已锁定或隐藏';
+
+  @override
+  String get studyTextCard => '文字笔记';
+
+  @override
+  String get studyAskTitle => '向课程助手提问';
+
+  @override
+  String get studyAskHint => '助手会收到所选卡片的文字和视频时间点';
+
+  @override
+  String get studyAskSubmit => '提问';
+
+  @override
+  String get studyLayers => '图层';
+
+  @override
+  String get studyAddLayer => '添加图层';
+
+  @override
+  String get studyToggleVisible => '显示或隐藏';
+
+  @override
+  String get studyToggleLocked => '锁定或解锁';
+
+  @override
+  String get studyRecoverySaved => '已导出恢复文件；素材仍在本机课程目录';
+
+  @override
+  String get studyClassic => '使用传统播放器';
+
+  @override
+  String get studyBack => '返回课程';
+
+  @override
+  String get studyTitle => '学习画布';
+
+  @override
+  String get studyPlayer => '播放器';
+
+  @override
+  String get studySidebar => '课程资料与助手';
+
+  @override
+  String get studySelectTool => '选择 V';
+
+  @override
+  String get studyHandTool => '移动 H';
+
+  @override
+  String get studyPenTool => '钢笔 D';
+
+  @override
+  String get studyHighlighter => '荧光笔';
+
+  @override
+  String get studyEraser => '橡皮 E';
+
+  @override
+  String get studyRedo => '重做';
+
+  @override
+  String get studyImport => '导入';
+
+  @override
+  String get studyCourseware => '放入课程资料';
+
+  @override
+  String get studyNewText => '添加文字';
+
+  @override
+  String get studyAskAI => '问 AI';
+
+  @override
+  String get studyRemoveCards => '移除所选卡片（素材文件保留）';
+
+  @override
+  String get studyExportRecovery => '导出恢复文件';
+
+  @override
+  String get studyWriteHint => '触控笔 / 鼠标书写 · 手指移动画布';
+
+  @override
+  String get studyMoveHint => '拖动卡片标题移动 · 右下角缩放 · ⌘/Ctrl + 滚轮缩放';
+
+  @override
+  String get studyZoomOut => '缩小';
+
+  @override
+  String get studyZoomIn => '放大';
+
+  @override
+  String get studyFit => '显示全部材料';
+
+  @override
+  String get studyImageFailed => '无法读取图片，请重新导入';
+
+  @override
+  String get studyUnsaved => '画布尚未保存';
+
+  @override
+  String get studyUnsavedBody => '请检查本机服务后重试，或先导出恢复文件。当前内容仍保留在本窗口。';
+
+  @override
+  String get studyKeepEditing => '继续编辑';
+
+  @override
+  String studyImportError(String error) {
+    return '无法导入素材：$error';
+  }
+
+  @override
+  String studyExportError(String error) {
+    return '无法导出：$error';
+  }
+
+  @override
+  String studyOpenError(String error) {
+    return '无法打开学习画布：$error';
+  }
+
+  @override
+  String studyLayerName(int number) {
+    return '图层 $number';
+  }
+
+  @override
+  String studyPenWidth(String width) {
+    return '笔宽 $width';
+  }
+
+  @override
+  String get studyDefaultLayer => '学习笔记';
+
+  @override
+  String get studyUnknownVersion => '画布版本不受支持';
+
+  @override
+  String studyLocalVideoError(String error) {
+    return '无法播放此视频：$error';
+  }
+
+  @override
+  String get localCourse => '本地课程';
+
+  @override
+  String get localCourseCreate => '新建本地课程';
+
+  @override
+  String get localCourseName => '课程名称';
+
+  @override
+  String get localCourseNameRequired => '请填写课程名称';
+
+  @override
+  String get localCourseTeacher => '讲师或来源（可选）';
+
+  @override
+  String get localCourseImportHint => '视频按文件名顺序生成独立课次。也可以先创建课程，稍后添加视频。';
+
+  @override
+  String get localVideosChoose => '选择视频';
+
+  @override
+  String get localVideosAdd => '添加视频';
+
+  @override
+  String get localVideosImporting => '正在导入';
+
+  @override
+  String get localVideosPartialSaved => '已创建的课程和成功导入的课次已保留。重试会从失败的文件继续。';
+
+  @override
+  String get localVideoLimit => '单个视频不能超过 4 GiB';
 }

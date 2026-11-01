@@ -11,6 +11,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"os"
 	"path"
 	"path/filepath"
@@ -31,6 +32,7 @@ import (
 	"lookstudio/lookd/internal/library"
 	"lookstudio/lookd/internal/localasr"
 	"lookstudio/lookd/internal/mineru"
+	"lookstudio/lookd/internal/nasbridge"
 	"lookstudio/lookd/internal/notify"
 	"lookstudio/lookd/internal/notion"
 	"lookstudio/lookd/internal/store"
@@ -41,15 +43,18 @@ import (
 var Version = "0.1.0"
 
 type Server struct {
-	Token string
-	Sess  *tongji.Session
-	Cl    *tongji.Client
-	St    *store.Store
-	Lib   *library.Library
-	Jobs  *jobs.Manager
-	Eng   *dl.Engine
-	Bus   *events.Bus
-	Agent *agent.Supervisor
+	nasLinksMu sync.Mutex
+	nasOnce    sync.Once
+	nasClient  *nasbridge.Bridge
+	Token      string
+	Sess       *tongji.Session
+	Cl         *tongji.Client
+	St         *store.Store
+	Lib        *library.Library
+	Jobs       *jobs.Manager
+	Eng        *dl.Engine
+	Bus        *events.Bus
+	Agent      *agent.Supervisor
 	// Runtime installs Node.js and the agent's dependencies.
 	Runtime *agentenv.Manager
 	// Ctx lives as long as the daemon; background work started by a request uses it.
@@ -89,12 +94,20 @@ func (s *Server) Handler() http.Handler {
 				writeErr(w, err)
 				return
 			}
+			if s.Data != nil && r.Method != "GET" && !strings.HasPrefix(r.URL.Path, "/api/sync") && !strings.HasPrefix(r.URL.Path, "/api/data") {
+				s.Data.Soon(s.Ctx)
+			}
 			if v != nil {
 				writeJSON(w, http.StatusOK, v)
 			}
 		})
 	}
 	h("GET /api/health", s.health)
+	h("GET /api/nas", s.nasSnapshot)
+	h("PUT /api/nas/links", s.nasLink)
+	h("POST /api/nas/actions/{action}", s.nasAction)
+	h("GET /api/nas/files/{id}", s.nasFile)
+	h("GET /api/nas/files/{id}/text", s.nasText)
 	h("GET /api/auth", func(http.ResponseWriter, *http.Request) (any, error) { return s.Sess.State(), nil })
 	h("GET /api/schools", func(http.ResponseWriter, *http.Request) (any, error) { return schools, nil })
 	h("POST /api/auth/login", s.login)
@@ -110,6 +123,8 @@ func (s *Server) Handler() http.Handler {
 	h("GET /api/me", func(_ http.ResponseWriter, r *http.Request) (any, error) { return s.Cl.UserInfo(r.Context()) })
 
 	h("GET /api/courses", s.courses)
+	h("POST /api/local-courses", s.createLocalCourse)
+	h("POST /api/courses/{id}/local-videos", s.importLocalVideo)
 	h("PATCH /api/courses/{id}", s.patchCourse)
 	h("GET /api/courses/{id}/lectures", s.lectures)
 	h("GET /api/lectures/{id}", s.lecture)
@@ -193,6 +208,13 @@ func (s *Server) Handler() http.Handler {
 	h("GET /api/settings", func(_ http.ResponseWriter, r *http.Request) (any, error) { return s.St.Settings(r.Context()) })
 	h("PUT /api/settings", s.putSettings)
 	h("GET /api/library", s.library)
+	h("GET /api/library/catalog", func(_ http.ResponseWriter, r *http.Request) (any, error) {
+		return s.Lib.CourseCatalog(r.Context(), r.URL.Query().Get("course_id"))
+	})
+	h("GET /api/lectures/{id}/transcript-review", s.transcriptReview)
+	h("PUT /api/lectures/{id}/transcript-review", s.transcriptReview)
+	h("PATCH /api/lectures/{id}/transcript-review", s.transcriptReview)
+	h("GET /api/lectures/{id}/transcript-review/context", s.transcriptReviewContext)
 	h("POST /api/library/reindex", func(_ http.ResponseWriter, r *http.Request) (any, error) {
 		n, err := s.Lib.Reindex(r.Context())
 		return map[string]int{"indexed": n}, err
@@ -284,6 +306,18 @@ func (s *Server) Handler() http.Handler {
 	h("GET /api/lectures/{id}/timeline", s.timeline)
 	h("PUT /api/lectures/{id}/timeline", s.putTimeline)
 	h("DELETE /api/lectures/{id}/timeline", s.deleteTimeline)
+	h("GET /api/lectures/{id}/study-canvas", s.studyCanvas)
+	h("PUT /api/lectures/{id}/study-canvas", s.studyCanvas)
+	h("POST /api/lectures/{id}/study-canvas/assets", s.studyCanvasImport)
+	h("POST /api/lectures/{id}/study-canvas/context", s.studyCanvasContext)
+	h("GET /api/lectures/{id}/study-canvas/conversations/{conversation}", s.studyConversation)
+	h("PUT /api/lectures/{id}/study-canvas/conversations/{conversation}", s.studyConversation)
+	h("POST /api/lectures/{id}/study-canvas/material", s.studyMaterial)
+	h("GET /api/lectures/{id}/study-canvas/pdf-page", s.studyPDFPage)
+	h("GET /api/lectures/{id}/study-canvas/media-file/{object}", s.studyVideoFile)
+	h("POST /api/lectures/{id}/study-canvas/media", s.studyMedia)
+	h("GET /api/lectures/{id}/study-canvas/media/{media}", s.studyMedia)
+	h("DELETE /api/lectures/{id}/study-canvas/media/{media}", s.studyMedia)
 	h("GET /api/lectures/{id}/courseware", s.courseware)
 	h("POST /api/lectures/{id}/courseware", s.uploadCourseware)
 	h("DELETE /api/lectures/{id}/courseware", s.deleteCourseware)
@@ -307,6 +341,11 @@ func (s *Server) Handler() http.Handler {
 	})
 	h("GET /api/sync", func(http.ResponseWriter, *http.Request) (any, error) { return s.Data.Status(), nil })
 	h("PUT /api/sync", s.syncConfigure)
+	h("POST /api/sync/folder/preview", s.folderPreview)
+	h("POST /api/lectures/{id}/study-canvas/draft", s.folderDraft)
+	h("GET /api/sync/folder/conflicts", s.folderConflicts)
+	h("GET /api/sync/folder/conflicts/{conflict}", s.folderConflict)
+	h("POST /api/sync/folder/conflicts/{conflict}/resolve", s.folderConflict)
 	h("POST /api/sync/auto", func(_ http.ResponseWriter, r *http.Request) (any, error) {
 		var in struct {
 			Auto bool `json:"auto"`
@@ -478,6 +517,9 @@ func (s *Server) courses(_ http.ResponseWriter, r *http.Request) (any, error) {
 	if err != nil {
 		return nil, err
 	}
+	if s.Sess != nil && s.Sess.State().Status != "active" {
+		return cs, nil
+	}
 	if r.URL.Query().Get("sync") == "1" || len(cs) == 0 {
 		if err := s.syncCourses(ctx); err != nil {
 			if len(cs) == 0 {
@@ -506,6 +548,9 @@ func (s *Server) patchCourse(_ http.ResponseWriter, r *http.Request) (any, error
 }
 
 func (s *Server) syncLectures(ctx context.Context, courseID string) error {
+	if store.IsLocalCourse(courseID) {
+		return nil
+	}
 	d, err := s.Cl.CourseDetail(ctx, courseID)
 	if err != nil {
 		return err
@@ -571,8 +616,26 @@ func (s *Server) media(_ http.ResponseWriter, r *http.Request) (any, error) {
 	if err != nil {
 		return nil, err
 	}
+	localStream := s.localVideoStream(r, id)
+	localResult := func() (any, error) {
+		return map[string]any{"streams": []tongji.Stream{*localStream}, "duration": l.DurationS,
+			"courseware": []any{}, "allow_drag": true, "headers": map[string]string{},
+			"local_path": "", "relayed": false}, nil
+	}
+	if store.IsLocalCourse(l.CourseID) {
+		if localStream == nil {
+			return nil, apiError{404, "无法播放：本地视频文件不存在，请重新导入"}
+		}
+		return localResult()
+	}
+	if localStream != nil && s.Sess.State().Status != "active" {
+		return localResult()
+	}
 	m, err := s.Cl.LectureMedia(ctx, l.CourseID, id)
 	if err != nil {
+		if localStream != nil {
+			return localResult()
+		}
 		return nil, err
 	}
 	s.St.SetLectureMedia(ctx, id, m.Duration, firstThumb(m))
@@ -605,6 +668,35 @@ func (s *Server) media(_ http.ResponseWriter, r *http.Request) (any, error) {
 	}
 	return map[string]any{"streams": m.Streams, "duration": m.Duration, "courseware": m.Courseware,
 		"allow_drag": m.AllowDrag, "headers": headers, "local_path": local, "relayed": relayed}, nil
+}
+
+// Downloaded video remains readable after campus sign-in expires. The existing
+// authenticated /files endpoint confines it to the library and supports Range.
+func (s *Server) localVideoStream(r *http.Request, id string) *tongji.Stream {
+	assets, err := s.St.Assets(r.Context(), id)
+	if err != nil {
+		return nil
+	}
+	root, err := os.OpenRoot(s.Lib.Root)
+	if err != nil {
+		return nil
+	}
+	defer root.Close()
+	for _, a := range assets {
+		if a.Kind != "video" {
+			continue
+		}
+		info, err := root.Stat(a.Path)
+		if err != nil || !info.Mode().IsRegular() {
+			continue
+		}
+		parts := strings.Split(filepath.ToSlash(a.Path), "/")
+		for i := range parts {
+			parts[i] = url.PathEscape(parts[i])
+		}
+		return &tongji.Stream{Label: "本机录像", URL: fmt.Sprintf("http://%s/files/%s?token=%s", r.Host, strings.Join(parts, "/"), s.Token)}
+	}
+	return nil
 }
 
 func firstThumb(m *tongji.Media) string {
@@ -647,6 +739,9 @@ func (s *Server) lectureSlides(ctx context.Context, id string) ([]store.Slide, e
 		l, err := s.St.Lecture(ctx, id)
 		if err != nil {
 			return nil, err
+		}
+		if store.IsLocalCourse(l.CourseID) {
+			return sl, nil
 		}
 		snaps, err := s.Cl.Slides(ctx, l.CourseID, id)
 		if err != nil {
@@ -813,6 +908,9 @@ func (s *Server) putNote(_ http.ResponseWriter, r *http.Request) (any, error) {
 		return nil, err
 	}
 	n, err := s.Lib.SaveNote(r.Context(), n)
+	if errors.Is(err, library.ErrStudyConflict) {
+		return nil, apiError{409, "其他设备已修改此笔记，请另存本机编辑"}
+	}
 	if err == nil {
 		s.Bus.Publish("notes_changed", map[string]string{"id": n.ID, "lecture_id": n.LectureID, "course_id": n.CourseID})
 		s.knowledgeChanged()

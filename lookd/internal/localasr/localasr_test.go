@@ -13,6 +13,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 )
 
 func TestParse(t *testing.T) {
@@ -20,6 +21,13 @@ func TestParse(t *testing.T) {
 	us := parse(out)
 	if len(us) != 2 || us[0].StartMs != 1542 || us[0].EndMs != 7116 || us[1].Text != "今天讲 Go" {
 		t.Fatalf("got %+v", us)
+	}
+}
+
+func TestParseRepairsInvalidModelBytes(t *testing.T) {
+	us := parse(append([]byte("1.0 -- 2.0: 已知"), []byte{0xbe, '\n'}...))
+	if len(us) != 1 || !utf8.ValidString(us[0].Text) || us[0].Text != "已知[此处未识别]" {
+		t.Fatalf("invalid model bytes escaped into transcript: %+v", us)
 	}
 }
 

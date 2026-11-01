@@ -81,6 +81,28 @@ func TestPoolBalancesAndMerges(t *testing.T) {
 	}
 }
 
+type seamEngine struct{}
+
+func (seamEngine) Transcribe(ctx context.Context, audio string, _ Stage) ([]Utterance, error) {
+	if probeSeconds(ctx, audio) > 1000 {
+		return []Utterance{{StartMs: 1190000, EndMs: 1209000, Text: "我们介绍虚拟地址。它由页号和偏移量组成。"}}, nil
+	}
+	return []Utterance{{StartMs: 20000, EndMs: 35000, Text: "他由页号和偏移量组成。页号用于查找页表。"}}, nil
+}
+
+// The two recognitions straddle the seam with different sentence boundaries.
+// Midpoint ownership alone retains both copies of the shared phrase.
+func TestPoolMergesShiftedSeamSentences(t *testing.T) {
+	p := testPool(t, seamEngine{}, seamEngine{})
+	us, _, err := p.Transcribe(context.Background(), testAudio(t, "1500"), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(us) != 1 || us[0].Text != "我们介绍虚拟地址。它由页号和偏移量组成。页号用于查找页表。" || us[0].StartMs != 1190000 || us[0].EndMs != 1220000 {
+		t.Fatalf("seam repeated or lost text: %+v", us)
+	}
+}
+
 func TestPoolFailsOver(t *testing.T) {
 	audio := testAudio(t, "2700")
 	bad, good := &fake{fail: httpErr{path: "/x", code: 412}}, &fake{}

@@ -14,10 +14,12 @@ import '../../widgets/report_screen.dart';
 import '../../widgets/states.dart';
 import '../assistant/assistant_panel.dart';
 import '../player/player_page.dart';
+import '../nas/nas_page.dart';
 import '../canvas/canvas_course.dart';
 import '../plugins/plugin_views.dart';
 import 'courses_page.dart';
 import 'download_sheet.dart';
+import 'local_course_dialog.dart';
 import '../../l10n/l10n.dart';
 import '../../shell.dart';
 
@@ -34,6 +36,7 @@ class _CoursePageState extends State<CoursePage> {
   Object? _error;
   bool _loading = true;
   bool _syncing = false;
+  bool _localNewestFirst = false;
   final Set<String> _sel = {};
   StreamSubscription? _sub;
 
@@ -46,7 +49,10 @@ class _CoursePageState extends State<CoursePage> {
     _load();
     _sub = context.read<AppState>().events.listen((e) {
       final d = e['data'];
-      if (e['type'] == 'lecture_changed' && d is Map && d['course_id'] == widget.courseId) _load(quiet: true);
+      if (e['type'] == 'lecture_changed' &&
+          d is Map &&
+          d['course_id'] == widget.courseId)
+        _load(quiet: true);
     });
   }
 
@@ -59,11 +65,16 @@ class _CoursePageState extends State<CoursePage> {
   Future<void> _load({bool sync = false, bool quiet = false}) async {
     if (sync) setState(() => _syncing = true);
     try {
-      final r = await context.read<AppState>().api.get('/api/courses/${widget.courseId}/lectures', sync ? {'sync': '1'} : null) as Map;
+      final r = await context.read<AppState>().api.get(
+        '/api/courses/${widget.courseId}/lectures',
+        sync ? {'sync': '1'} : null,
+      ) as Map;
       if (!mounted) return;
       setState(() {
         _course = Course((r['course'] as Map).cast<String, dynamic>());
-        _lectures = jsonList(r['lectures']).map((e) => Lecture((e as Map).cast<String, dynamic>())).toList();
+        _lectures = jsonList(r['lectures'])
+            .map((e) => Lecture((e as Map).cast<String, dynamic>()))
+            .toList();
         _error = null;
       });
     } catch (e) {
@@ -93,9 +104,16 @@ class _CoursePageState extends State<CoursePage> {
     final pad = compact ? Space.lg : Space.xl;
 
     final prefs = context.watch<UiPrefs>();
-    final newestFirst = prefs.lecturesNewestFirst;
+    final newestFirst = course?.isLocal == true
+        ? _localNewestFirst
+        : prefs.lecturesNewestFirst;
     // Lectures are numbered from the first to the last, whichever way they are shown.
-    final ordered = [..._lectures]..sort((a, b) => a.beginAt != b.beginAt ? a.beginAt - b.beginAt : a.id.compareTo(b.id));
+    final ordered = [..._lectures]
+      ..sort(
+        (a, b) => a.beginAt != b.beginAt
+            ? a.beginAt - b.beginAt
+            : a.id.compareTo(b.id),
+      );
     final ordinal = {for (final (i, l) in ordered.indexed) l.id: i + 1};
     final list = newestFirst ? ordered.reversed.toList() : ordered;
     final playable = list.where((l) => l.hasPlayback).toList();
@@ -110,178 +128,337 @@ class _CoursePageState extends State<CoursePage> {
     } else {
       final l = chrono[lastIdx];
       final done = l.durationS > 0 && l.positionMs >= l.durationS * 900;
-      resume = done ? (lastIdx + 1 < chrono.length ? chrono[lastIdx + 1] : null) : l;
+      resume = done
+          ? (lastIdx + 1 < chrono.length ? chrono[lastIdx + 1] : null)
+          : l;
     }
     // Interleave month headings with lectures.
     final rows = <Object>[];
     String? month;
     for (final l in list) {
       final d = l.begin;
-      final m = d == null ? l10n.courseUnscheduled : l10n.dateYearMonth(d.year, d.month);
+      final m = course?.isLocal == true
+          ? l10n.localCourse
+          : d == null
+          ? l10n.courseUnscheduled
+          : l10n.dateYearMonth(d.year, d.month);
       if (m != month) rows.add(m);
       month = m;
       rows.add(l);
     }
 
     return ReportScreen(
-      value: {'screen': l10n.screenCourse, 'course_id': widget.courseId, if (course != null) 'course': course.title},
+      value: {
+        'screen': l10n.screenCourse,
+        'course_id': widget.courseId,
+        if (course != null) 'course': course.title,
+      },
       child: Theme(
-        data: base.copyWith(colorScheme: base.colorScheme.copyWith(primary: s.primary, primaryContainer: s.primaryContainer, onPrimaryContainer: s.onPrimaryContainer, secondaryContainer: s.secondaryContainer, onSecondaryContainer: s.onSecondaryContainer)),
+        data: base.copyWith(
+          colorScheme: base.colorScheme.copyWith(
+            primary: s.primary,
+            primaryContainer: s.primaryContainer,
+            onPrimaryContainer: s.onPrimaryContainer,
+            secondaryContainer: s.secondaryContainer,
+            onSecondaryContainer: s.onSecondaryContainer,
+          ),
+        ),
         child: Scaffold(
           backgroundColor: Colors.transparent,
-          body: CustomScrollView(slivers: [
-            SliverAppBar(
-              pinned: true,
-              backgroundColor: base.colorScheme.surfaceContainerLowest,
-              title: AnimatedSwitcher(
-                duration: Motion.short4,
-                child: _selecting ? Text(l10n.courseSelectedCount(_sel.length), key: const ValueKey(1)) : const SizedBox.shrink(key: ValueKey(0)),
-              ),
-              leading: _selecting ? IconButton(onPressed: () => setState(_sel.clear), icon: const Icon(Icons.close_rounded)) : null,
-              actions: _selecting
-                  ? [
-                      TextButton(
-                        onPressed: () => setState(() => _sel.length == playable.length ? _sel.clear() : _sel.addAll(playable.map((l) => l.id))),
-                        child: Text(_sel.length == playable.length ? l10n.commonDeselectAll : l10n.commonSelectAll),
-                      ),
-                    ]
-                  : [
-                      if (course != null)
-                        Padding(
-                          padding: const EdgeInsets.only(right: Space.xs),
-                          child: FilledButton.tonalIcon(
-                            onPressed: () => openCourseAssistant(context, widget.courseId, course.title),
-                            icon: const Icon(Icons.forum_outlined, size: 18),
-                            label: Text(l10n.courseAssistant),
+          body: CustomScrollView(
+            slivers: [
+              SliverAppBar(
+                pinned: true,
+                backgroundColor: base.colorScheme.surfaceContainerLowest,
+                title: AnimatedSwitcher(
+                  duration: Motion.short4,
+                  child: _selecting
+                      ? Text(
+                          l10n.courseSelectedCount(_sel.length),
+                          key: const ValueKey(1),
+                        )
+                      : const SizedBox.shrink(key: ValueKey(0)),
+                ),
+                leading: _selecting
+                    ? IconButton(
+                        onPressed: () => setState(_sel.clear),
+                        icon: const Icon(Icons.close_rounded),
+                      )
+                    : null,
+                actions: _selecting
+                    ? [
+                        TextButton(
+                          onPressed: () => setState(
+                            () => _sel.length == playable.length
+                                ? _sel.clear()
+                                : _sel.addAll(playable.map((l) => l.id)),
+                          ),
+                          child: Text(
+                            _sel.length == playable.length
+                                ? l10n.commonDeselectAll
+                                : l10n.commonSelectAll,
                           ),
                         ),
-                      IconButton(
-                        tooltip: l10n.courseRefreshSchedule,
-                        onPressed: _syncing ? null : () => _load(sync: true),
-                        icon: _syncing ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2.5)) : const Icon(Icons.sync_rounded),
-                      ),
-                      if (course != null) PluginMenuButton(surface: 'course.menu', exportScope: 'course', context_: {'course_id': widget.courseId}),
-                      if (course != null)
-                        Builder(
-                          builder: (ctx) => IconButton(
-                            tooltip: l10n.commonMore,
-                            onPressed: () {
-                              final box = ctx.findRenderObject() as RenderBox;
-                              showCourseMenu(context, course, box.localToGlobal(box.size.bottomCenter(Offset.zero)));
+                      ]
+                    : [
+                        if (course?.isLocal == true)
+                          IconButton(
+                            tooltip: l10n.localVideosAdd,
+                            icon: const Icon(Icons.video_call_outlined),
+                            onPressed: () async {
+                              await openLocalCourseDialog(
+                                context,
+                                app.api,
+                                courseId: widget.courseId,
+                              );
+                              if (!mounted) return;
+                              await _load();
+                              await app.loadCourses(quiet: true);
                             },
-                            icon: const Icon(Icons.more_vert_rounded),
+                          ),
+                        IconButton(
+                          tooltip: l10n.nasTitle,
+                          icon: const Icon(Icons.hub_outlined),
+                          onPressed: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  NasPage(courseId: widget.courseId),
+                            ),
                           ),
                         ),
-                      const SizedBox(width: Space.sm),
-                    ],
-            ),
-            if (course != null)
-              SliverToBoxAdapter(
-                child: ContentWidth(
-                  child: Padding(
-                    padding: EdgeInsets.fromLTRB(pad, 0, pad, Space.lg),
-                    child: _Header(
-                      course: course,
-                      scheme: s,
-                      lectures: list.length,
-                      local: local,
-                      resume: resume,
-                      resumeStarted: resume != null && resume.positionMs > 0,
-                      onResume: resume == null ? null : () => _open(resume!),
+                        if (course != null)
+                          Padding(
+                            padding: const EdgeInsets.only(right: Space.xs),
+                            child: FilledButton.tonalIcon(
+                              onPressed: () => openCourseAssistant(
+                                context,
+                                widget.courseId,
+                                course.title,
+                              ),
+                              icon: const Icon(Icons.forum_outlined, size: 18),
+                              label: Text(l10n.courseAssistant),
+                            ),
+                          ),
+                        IconButton(
+                          tooltip: l10n.courseRefreshSchedule,
+                          onPressed: _syncing ? null : () => _load(sync: true),
+                          icon: _syncing
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.5,
+                                  ),
+                                )
+                              : const Icon(Icons.sync_rounded),
+                        ),
+                        if (course != null)
+                          PluginMenuButton(
+                            surface: 'course.menu',
+                            exportScope: 'course',
+                            context_: {'course_id': widget.courseId},
+                          ),
+                        if (course != null)
+                          Builder(
+                            builder: (ctx) => IconButton(
+                              tooltip: l10n.commonMore,
+                              onPressed: () {
+                                final box = ctx.findRenderObject() as RenderBox;
+                                showCourseMenu(
+                                  context,
+                                  course,
+                                  box.localToGlobal(
+                                    box.size.bottomCenter(Offset.zero),
+                                  ),
+                                );
+                              },
+                              icon: const Icon(Icons.more_vert_rounded),
+                            ),
+                          ),
+                        const SizedBox(width: Space.sm),
+                      ],
+              ),
+              if (course != null)
+                SliverToBoxAdapter(
+                  child: ContentWidth(
+                    child: Padding(
+                      padding: EdgeInsets.fromLTRB(pad, 0, pad, Space.lg),
+                      child: _Header(
+                        course: course,
+                        scheme: s,
+                        lectures: list.length,
+                        local: local,
+                        resume: resume,
+                        resumeStarted: resume != null && resume.positionMs > 0,
+                        onResume: resume == null ? null : () => _open(resume!),
+                      ),
                     ),
                   ),
                 ),
-              ),
-            SliverToBoxAdapter(
-              child: ContentWidth(
-                child: Padding(padding: EdgeInsets.fromLTRB(pad, 0, pad, 0), child: CanvasCourseSection(courseId: widget.courseId)),
-              ),
-            ),
-            if (_loading)
-              SliverFillRemaining(hasScrollBody: false, child: CenteredLoader(label: l10n.courseLoadingSchedule))
-            else if (_error != null && list.isEmpty)
-              SliverFillRemaining(hasScrollBody: false, child: ErrorState(error: _error!, onRetry: () => _load(sync: true)))
-            else ...[
               SliverToBoxAdapter(
                 child: ContentWidth(
                   child: Padding(
-                    padding: EdgeInsets.fromLTRB(pad, Space.sm, pad - Space.sm, Space.sm),
-                    child: Row(children: [
-                      Text(l10n.courseLectureTotal(list.length), style: tt.titleMedium),
-                      const Spacer(),
-                      TextButton.icon(
-                        onPressed: () => prefs.update((p) => p.lecturesNewestFirst = !newestFirst),
-                        icon: AnimatedRotation(
-                          turns: newestFirst ? 0 : 0.5,
-                          duration: Motion.medium2,
-                          curve: Motion.emphasized,
-                          child: const Icon(Icons.arrow_downward_rounded, size: 18),
-                        ),
-                        label: Text(newestFirst ? l10n.courseNewestFirst : l10n.courseOldestFirst),
-                      ),
-                      TextButton.icon(
-                        onPressed: playable.isEmpty
-                            ? null
-                            : () {
-                                // Start with the lectures that have nothing downloaded; when all have something, with all of them.
-                                final missing = playable.where((l) => l.assets.isEmpty);
-                                setState(() => _sel.addAll((missing.isEmpty ? playable : missing).map((l) => l.id)));
-                              },
-                        icon: const Icon(Icons.checklist_rounded, size: 18),
-                        label: Text(l10n.courseBatchDownload),
-                      ),
-                    ]),
+                    padding: EdgeInsets.fromLTRB(pad, 0, pad, 0),
+                    child: CanvasCourseSection(courseId: widget.courseId),
                   ),
                 ),
               ),
-              SliverPadding(
-                padding: EdgeInsets.fromLTRB(pad, 0, pad, 120),
-                sliver: SliverList.builder(
-                  itemCount: rows.length,
-                  itemBuilder: (context, i) {
-                    final row = rows[i];
-                    if (row is String) {
+              if (_loading)
+                SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: CenteredLoader(label: l10n.courseLoadingSchedule),
+                )
+              else if (_error != null && list.isEmpty)
+                SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: ErrorState(
+                    error: _error!,
+                    onRetry: () => _load(sync: true),
+                  ),
+                )
+              else ...[
+                SliverToBoxAdapter(
+                  child: ContentWidth(
+                    child: Padding(
+                      padding: EdgeInsets.fromLTRB(
+                        pad,
+                        Space.sm,
+                        pad - Space.sm,
+                        Space.sm,
+                      ),
+                      child: Row(
+                        children: [
+                          Text(
+                            l10n.courseLectureTotal(list.length),
+                            style: tt.titleMedium,
+                          ),
+                          const Spacer(),
+                          TextButton.icon(
+                            onPressed: () => course?.isLocal == true
+                                ? setState(
+                                    () => _localNewestFirst = !newestFirst,
+                                  )
+                                : prefs.update(
+                                    (p) => p.lecturesNewestFirst = !newestFirst,
+                                  ),
+                            icon: AnimatedRotation(
+                              turns: newestFirst ? 0 : 0.5,
+                              duration: Motion.medium2,
+                              curve: Motion.emphasized,
+                              child: const Icon(
+                                Icons.arrow_downward_rounded,
+                                size: 18,
+                              ),
+                            ),
+                            label: Text(
+                              newestFirst
+                                  ? l10n.courseNewestFirst
+                                  : l10n.courseOldestFirst,
+                            ),
+                          ),
+                          TextButton.icon(
+                            onPressed: playable.isEmpty
+                                ? null
+                                : () {
+                                    // Start with the lectures that have nothing downloaded; when all have something, with all of them.
+                                    final missing = playable.where(
+                                      (l) => l.assets.isEmpty,
+                                    );
+                                    setState(
+                                      () => _sel.addAll(
+                                        (missing.isEmpty ? playable : missing)
+                                            .map((l) => l.id),
+                                      ),
+                                    );
+                                  },
+                            icon: const Icon(Icons.checklist_rounded, size: 18),
+                            label: Text(l10n.courseBatchDownload),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                SliverPadding(
+                  padding: EdgeInsets.fromLTRB(pad, 0, pad, 120),
+                  sliver: SliverList.builder(
+                    itemCount: rows.length,
+                    itemBuilder: (context, i) {
+                      final row = rows[i];
+                      if (row is String) {
+                        return ContentWidth(
+                          child: Padding(
+                            padding: EdgeInsets.fromLTRB(
+                              Space.xs,
+                              i == 0 ? 0 : Space.lg,
+                              0,
+                              Space.sm,
+                            ),
+                            child: Row(
+                              children: [
+                                Text(
+                                  row,
+                                  style: tt.labelLarge?.copyWith(
+                                    color: s.primary,
+                                    letterSpacing: 0.3,
+                                  ),
+                                ),
+                                const SizedBox(width: Space.md),
+                                Expanded(
+                                  child: Divider(
+                                    height: 1,
+                                    color: base.colorScheme.outlineVariant
+                                        .withValues(alpha: 0.6),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }
+                      final l = row as Lecture;
                       return ContentWidth(
-                        child: Padding(
-                          padding: EdgeInsets.fromLTRB(Space.xs, i == 0 ? 0 : Space.lg, 0, Space.sm),
-                          child: Row(children: [
-                            Text(row, style: tt.labelLarge?.copyWith(color: s.primary, letterSpacing: 0.3)),
-                            const SizedBox(width: Space.md),
-                            Expanded(child: Divider(height: 1, color: base.colorScheme.outlineVariant.withValues(alpha: 0.6))),
-                          ]),
+                        child: _LectureTile(
+                          key: ValueKey(l.id),
+                          lecture: l,
+                          ordinal: ordinal[l.id]!,
+                          selecting: _selecting,
+                          selected: _sel.contains(l.id),
+                          onTap: () {
+                            if (_selecting) {
+                              if (l.hasPlayback)
+                                setState(
+                                  () => _sel.contains(l.id)
+                                      ? _sel.remove(l.id)
+                                      : _sel.add(l.id),
+                                );
+                            } else if (l.hasPlayback) {
+                              _open(l);
+                            }
+                          },
+                          onLongPress: l.hasPlayback
+                              ? () => setState(() => _sel.add(l.id))
+                              : null,
+                          onDownload: () => showDownloadSheet(context, [
+                            l.id,
+                          ], title: l.shortTitle),
                         ),
                       );
-                    }
-                    final l = row as Lecture;
-                    return ContentWidth(
-                      child: _LectureTile(
-                        key: ValueKey(l.id),
-                        lecture: l,
-                        ordinal: ordinal[l.id]!,
-                        selecting: _selecting,
-                        selected: _sel.contains(l.id),
-                        onTap: () {
-                          if (_selecting) {
-                            if (l.hasPlayback) setState(() => _sel.contains(l.id) ? _sel.remove(l.id) : _sel.add(l.id));
-                          } else if (l.hasPlayback) {
-                            _open(l);
-                          }
-                        },
-                        onLongPress: l.hasPlayback ? () => setState(() => _sel.add(l.id)) : null,
-                        onDownload: () => showDownloadSheet(context, [l.id], title: l.shortTitle),
-                      ),
-                    );
-                  },
+                    },
+                  ),
                 ),
-              ),
+              ],
             ],
-          ]),
+          ),
           floatingActionButton: PageFab(
             visible: _selecting,
             child: AnimatedScale(
               scale: _selecting ? 1 : 0,
               duration: Motion.medium2,
-              curve: _selecting ? Motion.emphasizedDecelerate : Motion.emphasizedAccelerate,
+              curve: _selecting
+                  ? Motion.emphasizedDecelerate
+                  : Motion.emphasizedAccelerate,
               child: FloatingActionButton.extended(
                 heroTag: null,
                 onPressed: !_selecting
@@ -325,7 +502,10 @@ class _Header extends StatefulWidget {
 
 class _HeaderState extends State<_Header> with SingleTickerProviderStateMixin {
   // One full turn every 90 s: barely perceptible, gives the art a breathing quality.
-  late final _spin = AnimationController(vsync: this, duration: const Duration(seconds: 90));
+  late final _spin = AnimationController(
+    vsync: this,
+    duration: const Duration(seconds: 90),
+  );
   bool _hover = false;
 
   @override
@@ -349,7 +529,9 @@ class _HeaderState extends State<_Header> with SingleTickerProviderStateMixin {
     final course = widget.course;
     final scheme = widget.scheme;
     final tt = Theme.of(context).textTheme;
-    final teachers = course.teachers.isNotEmpty ? course.teachers.join(l10n.listSeparator) : course.teacher;
+    final teachers = course.teachers.isNotEmpty
+        ? course.teachers.join(l10n.listSeparator)
+        : course.teacher;
     final compact = context.isCompact;
     final art = MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
@@ -364,53 +546,124 @@ class _HeaderState extends State<_Header> with SingleTickerProviderStateMixin {
             curve: Motion.emphasized,
             builder: (_, t, _) => AnimatedBuilder(
               animation: _spin,
-              builder: (_, _) => CourseArt(course: course, t: t, spin: _spin.value),
+              builder: (_, _) =>
+                  CourseArt(course: course, t: t, spin: _spin.value),
             ),
           ),
         ),
       ),
     );
-    final info = Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-      Text(course.title, style: (compact ? tt.headlineSmall : tt.headlineMedium)?.copyWith(color: scheme.onSurface)),
-      if (course.alias.isNotEmpty) Text(course.rawTitle, style: tt.bodySmall?.copyWith(color: scheme.onSurfaceVariant)),
-      const SizedBox(height: Space.sm),
-      Text([if (teachers.isNotEmpty) teachers, if (course.college.isNotEmpty) course.college, course.termLabel].join(' · '),
-          style: tt.bodyMedium?.copyWith(color: scheme.onSurfaceVariant)),
-      const SizedBox(height: Space.lg),
-      Wrap(spacing: Space.sm, runSpacing: Space.sm, children: [
-        _Pill(icon: Icons.play_lesson_outlined, text: l10n.courseStatLectures(widget.lectures), scheme: scheme),
-        _Pill(icon: Icons.download_done_rounded, text: l10n.courseStatLocal(widget.local), scheme: scheme),
-        _Pill(icon: Icons.trending_up_rounded, text: l10n.courseProgress((course.progress * 100).round()), scheme: scheme),
-      ]),
-      if (widget.resume != null) ...[
-        const SizedBox(height: Space.lg),
-        FilledButton.icon(
-          onPressed: widget.onResume,
-          style: FilledButton.styleFrom(backgroundColor: scheme.primary, foregroundColor: scheme.onPrimary),
-          icon: Icon(widget.resumeStarted ? Icons.play_circle_rounded : Icons.play_arrow_rounded),
-          label: Text(
-            '${widget.resumeStarted ? l10n.courseContinue : l10n.courseStart} · ${widget.resume!.date.isNotEmpty ? widget.resume!.date : widget.resume!.shortTitle}'
-            '${widget.resumeStarted ? ' ${fmtClock(widget.resume!.positionMs)}' : ''}',
+    final info = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          course.title,
+          style: (compact ? tt.headlineSmall : tt.headlineMedium)?.copyWith(
+            color: scheme.onSurface,
           ),
         ),
+        if (course.alias.isNotEmpty)
+          Text(
+            course.rawTitle,
+            style: tt.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+          ),
+        const SizedBox(height: Space.sm),
+        Text(
+          [
+            if (teachers.isNotEmpty) teachers,
+            if (course.college.isNotEmpty) course.college,
+            course.termLabel,
+          ].join(' · '),
+          style: tt.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+        ),
+        const SizedBox(height: Space.lg),
+        Wrap(
+          spacing: Space.sm,
+          runSpacing: Space.sm,
+          children: [
+            _Pill(
+              icon: Icons.play_lesson_outlined,
+              text: l10n.courseStatLectures(widget.lectures),
+              scheme: scheme,
+            ),
+            _Pill(
+              icon: Icons.download_done_rounded,
+              text: l10n.courseStatLocal(widget.local),
+              scheme: scheme,
+            ),
+            _Pill(
+              icon: Icons.trending_up_rounded,
+              text: l10n.courseProgress((course.progress * 100).round()),
+              scheme: scheme,
+            ),
+          ],
+        ),
+        if (widget.resume != null) ...[
+          const SizedBox(height: Space.lg),
+          FilledButton.icon(
+            onPressed: widget.onResume,
+            style: FilledButton.styleFrom(
+              backgroundColor: scheme.primary,
+              foregroundColor: scheme.onPrimary,
+            ),
+            icon: Icon(
+              widget.resumeStarted
+                  ? Icons.play_circle_rounded
+                  : Icons.play_arrow_rounded,
+            ),
+            label: Text(
+              '${widget.resumeStarted ? l10n.courseContinue : l10n.courseStart} · ${widget.resume!.date.isNotEmpty ? widget.resume!.date : widget.resume!.shortTitle}'
+              '${widget.resumeStarted ? ' ${fmtClock(widget.resume!.positionMs)}' : ''}',
+            ),
+          ),
+        ],
       ],
-    ]);
+    );
     return Container(
       padding: const EdgeInsets.all(Space.sm),
       decoration: BoxDecoration(
-        color: Color.alphaBlend(scheme.primary.withValues(alpha: 0.04), scheme.surfaceContainerLow),
+        color: Color.alphaBlend(
+          scheme.primary.withValues(alpha: 0.04),
+          scheme.surfaceContainerLow,
+        ),
         borderRadius: BorderRadius.circular(Corners.xlIncreased + Space.xs),
       ),
       child: compact
-          ? Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              SizedBox(height: 150, child: art),
-              Padding(padding: const EdgeInsets.fromLTRB(Space.md, Space.lg, Space.md, Space.md), child: info),
-            ])
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                SizedBox(height: 150, child: art),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    Space.md,
+                    Space.lg,
+                    Space.md,
+                    Space.md,
+                  ),
+                  child: info,
+                ),
+              ],
+            )
           : IntrinsicHeight(
-              child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                Expanded(child: Padding(padding: const EdgeInsets.all(Space.xl), child: Align(alignment: Alignment.centerLeft, child: info))),
-                ConstrainedBox(constraints: const BoxConstraints(minHeight: 180), child: SizedBox(width: 300, child: art)),
-              ]),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.all(Space.xl),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: info,
+                      ),
+                    ),
+                  ),
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(minHeight: 180),
+                    child: SizedBox(width: 300, child: art),
+                  ),
+                ],
+              ),
             ),
     );
   }
@@ -423,14 +676,28 @@ class _Pill extends StatelessWidget {
   final ColorScheme scheme;
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-        decoration: BoxDecoration(color: scheme.secondaryContainer, borderRadius: BorderRadius.circular(Corners.full)),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Icon(icon, size: 14, color: scheme.onSecondaryContainer),
-          const SizedBox(width: 4),
-          Flexible(child: Text(text, maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.labelMedium?.copyWith(color: scheme.onSecondaryContainer))),
-        ]),
-      );
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+    decoration: BoxDecoration(
+      color: scheme.secondaryContainer,
+      borderRadius: BorderRadius.circular(Corners.full),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 14, color: scheme.onSecondaryContainer),
+        const SizedBox(width: 4),
+        Flexible(
+          child: Text(
+            text,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.labelMedium
+                ?.copyWith(color: scheme.onSecondaryContainer),
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 class _LectureTile extends StatefulWidget {
@@ -463,9 +730,15 @@ class _LectureTileState extends State<_LectureTile> {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
     final app = context.watch<AppState>();
-    final active = ['video', 'slides', 'courseware', 'transcript'].map((k) => app.jobFor(l.id, k)).whereType<Job>().where((j) => j.active).toList();
+    final active = ['video', 'slides', 'courseware', 'transcript']
+        .map((k) => app.jobFor(l.id, k))
+        .whereType<Job>()
+        .where((j) => j.active)
+        .toList();
     final d = l.begin;
-    final watched = l.durationS > 0 && l.positionMs > 0 ? (l.positionMs / (l.durationS * 1000)).clamp(0.0, 1.0) : 0.0;
+    final watched = l.durationS > 0 && l.positionMs > 0
+        ? (l.positionMs / (l.durationS * 1000)).clamp(0.0, 1.0)
+        : 0.0;
     final disabled = !l.hasPlayback;
 
     return Padding(
@@ -480,9 +753,11 @@ class _LectureTileState extends State<_LectureTile> {
             color: widget.selected
                 ? cs.secondaryContainer
                 : _hover && !disabled
-                    ? cs.surfaceContainerHigh
-                    : cs.surfaceContainer,
-            borderRadius: BorderRadius.circular(widget.selected ? Corners.xl : Corners.lg),
+                ? cs.surfaceContainerHigh
+                : cs.surfaceContainer,
+            borderRadius: BorderRadius.circular(
+              widget.selected ? Corners.xl : Corners.lg,
+            ),
           ),
           child: Material(
             type: MaterialType.transparency,
@@ -493,61 +768,112 @@ class _LectureTileState extends State<_LectureTile> {
               child: Opacity(
                 opacity: disabled ? 0.55 : 1,
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(Space.md, Space.md, Space.sm, Space.md),
-                  child: Row(children: [
-                    AnimatedSwitcher(
-                      duration: Motion.short4,
-                      transitionBuilder: (c, a) => ScaleTransition(scale: a, child: c),
-                      child: widget.selecting
-                          ? SizedBox(
-                              key: const ValueKey('cb'),
-                              width: 52,
-                              child: Checkbox(value: widget.selected, onChanged: disabled ? null : (_) => widget.onTap()),
-                            )
-                          : _DateBlock(key: const ValueKey('date'), date: d),
-                    ),
-                    const SizedBox(width: Space.md),
-                    Expanded(
-                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Text(l.shortTitle, style: tt.titleSmall, maxLines: 1, overflow: TextOverflow.ellipsis),
-                        const SizedBox(height: 2),
-                        Text(
-                          [
-                            l10n.lectureOrdinal(widget.ordinal),
-                            fmtLectureDate(d),
-                            if (l.durationS > 0) fmtDuration(l.durationS),
-                            if (l.room.isNotEmpty) l.room,
-                            if (disabled) (l.upcoming ? l10n.lectureNotStarted : l10n.lectureNoReplay),
-                          ].join(' · '),
-                          style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        if (l.assets.isNotEmpty || l.segments > 0) ...[
-                          const SizedBox(height: Space.xs),
-                          AssetBadges(assets: l.assets, segments: l.segments),
-                        ],
-                        if (watched > 0) ...[
-                          const SizedBox(height: Space.sm),
-                          SizedBox(width: 120, child: LinearProgressIndicator(value: watched, minHeight: 3, borderRadius: BorderRadius.circular(2))),
-                        ],
-                        AnimatedSize(
-                          duration: Motion.medium2,
-                          curve: Motion.emphasized,
-                          child: active.isEmpty
-                              ? const SizedBox(width: double.infinity)
-                              : Padding(
-                                  padding: const EdgeInsets.only(top: Space.sm),
-                                  child: Column(children: [for (final j in active) JobProgressLine(job: j)]),
+                  padding: const EdgeInsets.fromLTRB(
+                    Space.md,
+                    Space.md,
+                    Space.sm,
+                    Space.md,
+                  ),
+                  child: Row(
+                    children: [
+                      AnimatedSwitcher(
+                        duration: Motion.short4,
+                        transitionBuilder: (c, a) =>
+                            ScaleTransition(scale: a, child: c),
+                        child: widget.selecting
+                            ? SizedBox(
+                                key: const ValueKey('cb'),
+                                width: 52,
+                                child: Checkbox(
+                                  value: widget.selected,
+                                  onChanged: disabled
+                                      ? null
+                                      : (_) => widget.onTap(),
                                 ),
+                              )
+                            : _DateBlock(key: const ValueKey('date'), date: d),
+                      ),
+                      const SizedBox(width: Space.md),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              l.shortTitle,
+                              style: tt.titleSmall,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              [
+                                l10n.lectureOrdinal(widget.ordinal),
+                                fmtLectureDate(d),
+                                if (l.durationS > 0) fmtDuration(l.durationS),
+                                if (l.room.isNotEmpty) l.room,
+                                if (disabled)
+                                  (l.upcoming
+                                      ? l10n.lectureNotStarted
+                                      : l10n.lectureNoReplay),
+                              ].join(' · '),
+                              style: tt.bodySmall?.copyWith(
+                                color: cs.onSurfaceVariant,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            if (l.assets.isNotEmpty || l.segments > 0) ...[
+                              const SizedBox(height: Space.xs),
+                              AssetBadges(
+                                assets: l.assets,
+                                segments: l.segments,
+                              ),
+                            ],
+                            if (watched > 0) ...[
+                              const SizedBox(height: Space.sm),
+                              SizedBox(
+                                width: 120,
+                                child: LinearProgressIndicator(
+                                  value: watched,
+                                  minHeight: 3,
+                                  borderRadius: BorderRadius.circular(2),
+                                ),
+                              ),
+                            ],
+                            AnimatedSize(
+                              duration: Motion.medium2,
+                              curve: Motion.emphasized,
+                              child: active.isEmpty
+                                  ? const SizedBox(width: double.infinity)
+                                  : Padding(
+                                      padding: const EdgeInsets.only(
+                                        top: Space.sm,
+                                      ),
+                                      child: Column(
+                                        children: [
+                                          for (final j in active)
+                                            JobProgressLine(job: j),
+                                        ],
+                                      ),
+                                    ),
+                            ),
+                          ],
                         ),
-                      ]),
-                    ),
-                    if (!widget.selecting && !disabled) ...[
-                      IconButton(tooltip: l10n.commonDownload, onPressed: widget.onDownload, icon: const Icon(Icons.download_outlined)),
-                      IconButton.filledTonal(tooltip: l10n.commonPlay, onPressed: widget.onTap, icon: const Icon(Icons.play_arrow_rounded)),
+                      ),
+                      if (!widget.selecting && !disabled) ...[
+                        IconButton(
+                          tooltip: l10n.commonDownload,
+                          onPressed: widget.onDownload,
+                          icon: const Icon(Icons.download_outlined),
+                        ),
+                        IconButton.filledTonal(
+                          tooltip: l10n.commonPlay,
+                          onPressed: widget.onTap,
+                          icon: const Icon(Icons.play_arrow_rounded),
+                        ),
+                      ],
                     ],
-                  ]),
+                  ),
                 ),
               ),
             ),
@@ -568,13 +894,29 @@ class _DateBlock extends StatelessWidget {
     return Container(
       width: 52,
       height: 56,
-      decoration: BoxDecoration(color: cs.primaryContainer, borderRadius: BorderRadius.circular(Corners.md)),
+      decoration: BoxDecoration(
+        color: cs.primaryContainer,
+        borderRadius: BorderRadius.circular(Corners.md),
+      ),
       child: date == null
           ? Icon(Icons.event_outlined, color: cs.onPrimaryContainer)
-          : Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-              Text(l10n.dateMonth(date!.month), style: tt.labelSmall?.copyWith(color: cs.onPrimaryContainer)),
-              Text('${date!.day}', style: tt.titleLarge?.copyWith(color: cs.onPrimaryContainer, height: 1.1, fontWeight: FontWeight.w600)),
-            ]),
+          : Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  l10n.dateMonth(date!.month),
+                  style: tt.labelSmall?.copyWith(color: cs.onPrimaryContainer),
+                ),
+                Text(
+                  '${date!.day}',
+                  style: tt.titleLarge?.copyWith(
+                    color: cs.onPrimaryContainer,
+                    height: 1.1,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
     );
   }
 }

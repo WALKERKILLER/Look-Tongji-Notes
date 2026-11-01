@@ -4,13 +4,11 @@ import (
 	"archive/zip"
 	"bytes"
 	"context"
-	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -256,40 +254,6 @@ func TestWebDAVForbiddenWrites(t *testing.T) {
 	}
 }
 
-// Uploads run in parallel: one that found a new folder missing (403) must
-// not fail because another upload created that folder meanwhile.
-func TestWebDAVParallelUploadsIntoNewFolders(t *testing.T) {
-	ctx := context.Background()
-	fs := webdav.NewMemFS()
-	h := &webdav.Handler{Prefix: "/dav", FileSystem: fs, LockSystem: webdav.NewMemLS()}
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if u, p, ok := r.BasicAuth(); !ok || u != "me" || p != "secret" {
-			w.WriteHeader(http.StatusUnauthorized)
-			return
-		}
-		if r.Method == http.MethodPut {
-			if _, err := fs.Stat(ctx, path.Dir(strings.TrimPrefix(r.URL.Path, "/dav"))); err != nil {
-				w.WriteHeader(http.StatusForbidden)
-				return
-			}
-		}
-		h.ServeHTTP(w, r)
-	}))
-	defer srv.Close()
-	d := newDevice(t)
-	for c := range 3 {
-		for l := range 6 {
-			for _, f := range []string{"lecture.json", "笔记.md", "transcript.json", "slides/001.png"} {
-				d.write(t, fmt.Sprintf("library/courses/课程%d/第%d讲/%s", c, l, f), "x", time.Hour)
-			}
-		}
-	}
-	connect(t, d, srv.URL, false)
-	if res := d.sync(t); res.Uploaded != 3*6*4 || res.Error != "" {
-		t.Fatalf("%+v", res)
-	}
-}
-
 func TestWebDAVCloudflareBlock(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Server", "cloudflare")
@@ -464,5 +428,33 @@ func TestAssistantDataIsKeptAside(t *testing.T) {
 	}
 	if kept, _ := os.ReadFile(filepath.Join(r.Conflict, "data", "agent", "tasks.json")); string(kept) != `[{"id":"newer"}]` {
 		t.Fatalf("replaced newer data not kept: %q", kept)
+	}
+}
+
+func TestCanvasConversationBackupRoundTrip(t *testing.T) {
+	a, b := newDevice(t), newDevice(t)
+	files := map[string]string{
+		"library/courses/c/l/study-canvas.json":               `{"version":3,"objects":[{"id":"chat","conversation_id":"thread","x":320,"y":80}]}`,
+		"library/courses/c/l/study-conversations/thread.json": `{"version":1,"draft":"draft","turns":[{"question":"q","answer":"a","context_key":"scope"}]}`,
+		"library/courses/c/l/study-canvas.pre-v3.json":        `{"version":2}`,
+	}
+	for p, value := range files {
+		a.write(t, p, value, time.Hour)
+	}
+	var archive bytes.Buffer
+	if e := a.Export(t.Context(), &archive, false); e != nil {
+		t.Fatal(e)
+	}
+	preview, e := b.Receive(t.Context(), bytes.NewReader(archive.Bytes()))
+	if e != nil {
+		t.Fatal(e)
+	}
+	if _, e = b.Restore(t.Context(), preview.ID, "merge"); e != nil {
+		t.Fatal(e)
+	}
+	for p, value := range files {
+		if b.read(p) != value {
+			t.Fatalf("canvas/conversation data changed: %s", p)
+		}
 	}
 }

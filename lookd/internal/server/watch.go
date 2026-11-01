@@ -83,7 +83,7 @@ func maxTime(a, b time.Time) time.Time {
 
 // current reports whether a course belongs to the running term.
 func current(c store.Course, now time.Time) bool {
-	if c.Hidden {
+	if c.Hidden || store.IsLocalCourse(c.ID) {
 		return false
 	}
 	if c.EndAt > 0 && time.Unix(c.EndAt, 0).Before(now.Add(-14*24*time.Hour)) {

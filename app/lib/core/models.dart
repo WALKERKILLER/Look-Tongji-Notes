@@ -1,7 +1,9 @@
 import '../l10n/l10n.dart';
+
 // Plain data classes mirroring lookd JSON.
 
-int _i(dynamic v) => v is int ? v : (v is num ? v.toInt() : int.tryParse('$v') ?? 0);
+int _i(dynamic v) =>
+    v is int ? v : (v is num ? v.toInt() : int.tryParse('$v') ?? 0);
 double _d(dynamic v) => v is num ? v.toDouble() : double.tryParse('$v') ?? 0;
 String _s(dynamic v) => v?.toString() ?? '';
 bool _b(dynamic v) => v == true || v == 1 || v == '1';
@@ -22,7 +24,10 @@ class AuthState {
   DateTime? get renewedAt => _time(j['renewed_at']);
 
   /// lookd sends Go's zero time when there is none (Fudan's session has no expiry).
-  static DateTime? _time(dynamic v) => switch (DateTime.tryParse(_s(v))) { final t? when t.year > 2000 => t.toLocal(), _ => null };
+  static DateTime? _time(dynamic v) => switch (DateTime.tryParse(_s(v))) {
+    final t? when t.year > 2000 => t.toLocal(),
+    _ => null,
+  };
   bool get signedIn => status == 'active' || status == 'renewing';
   static final empty = AuthState({'status': 'signed_out'});
 }
@@ -30,6 +35,7 @@ class AuthState {
 class Course {
   Course(this.j);
   final Map<String, dynamic> j;
+  bool get isLocal => id.startsWith('local-');
   String get id => _s(j['id']);
   String get rawTitle => _s(j['title']);
   String get alias => _s(j['alias']);
@@ -45,11 +51,14 @@ class Course {
   String get lastSubId => _s(j['last_sub_id']);
   String get lastLearnAt => _s(j['last_learn_at']);
   int get localLectures => _i(j['local_lectures']);
-  List<String> get teachers =>
-      ((j['teachers'] as List?) ?? []).map((t) => _s((t as Map)['realname'])).where((s) => s.isNotEmpty).toList();
+  List<String> get teachers => ((j['teachers'] as List?) ?? [])
+      .map((t) => _s((t as Map)['realname']))
+      .where((s) => s.isNotEmpty)
+      .toList();
 
   /// "20261" → "2026 秋", "20252" → "2026 春"
   String get termLabel {
+    if (isLocal) return l10n.localCourse;
     if (term.length != 5) return term;
     final y = int.tryParse(term.substring(0, 4)) ?? 0;
     return term.endsWith('1') ? l10n.termAutumn(y) : l10n.termSpring(y + 1);
@@ -75,12 +84,16 @@ class Lecture {
   int get positionMs => _i(j['position_ms']);
   int get segments => _i(j['segments']);
   bool has(String kind) => assets.contains(kind);
-  DateTime? get begin => beginAt > 0 ? DateTime.fromMillisecondsSinceEpoch(beginAt * 1000) : null;
-  bool get upcoming => beginAt > 0 && DateTime.now().millisecondsSinceEpoch < beginAt * 1000;
+  DateTime? get begin =>
+      beginAt > 0 ? DateTime.fromMillisecondsSinceEpoch(beginAt * 1000) : null;
+  bool get upcoming =>
+      beginAt > 0 && DateTime.now().millisecondsSinceEpoch < beginAt * 1000;
 
   /// Title without a leading date that the platform repeats in titles.
   String get shortTitle {
-    final t = title.startsWith(date) ? title.substring(date.length).trim() : title;
+    final t = title.startsWith(date)
+        ? title.substring(date.length).trim()
+        : title;
     return t.isEmpty ? title : t;
   }
 }
@@ -105,7 +118,9 @@ class Job {
   bool get active => state == 'running' || state == 'queued';
 
   /// When a queued job retries by itself after a network failure.
-  DateTime? get retryAt => _i(j['retry_at']) > 0 ? DateTime.fromMillisecondsSinceEpoch(_i(j['retry_at']) * 1000) : null;
+  DateTime? get retryAt => _i(j['retry_at']) > 0
+      ? DateTime.fromMillisecondsSinceEpoch(_i(j['retry_at']) * 1000)
+      : null;
 }
 
 class Slide {
@@ -173,15 +188,19 @@ class Stream_ {
 class LectureMedia {
   LectureMedia(this.j);
   final Map<String, dynamic> j;
-  List<Stream_> get streams => ((j['streams'] as List?) ?? []).map((e) => Stream_(e as Map<String, dynamic>)).toList();
+  List<Stream_> get streams => ((j['streams'] as List?) ?? [])
+      .map((e) => Stream_(e as Map<String, dynamic>))
+      .toList();
   int get duration => _i(j['duration']);
-  Map<String, String> get headers =>
-      ((j['headers'] as Map?) ?? {}).map((k, v) => MapEntry(k.toString(), v.toString()));
+  Map<String, String> get headers => ((j['headers'] as Map?) ?? {}).map(
+    (k, v) => MapEntry(k.toString(), v.toString()),
+  );
   String get localPath => _s(j['local_path']);
 
   /// Streams are lookd paths (relayed for Fudan, whose media only lookd reaches).
   bool get relayed => _b(j['relayed']);
-  List<Map<String, dynamic>> get courseware => ((j['courseware'] as List?) ?? []).cast<Map<String, dynamic>>();
+  List<Map<String, dynamic>> get courseware =>
+      ((j['courseware'] as List?) ?? []).cast<Map<String, dynamic>>();
 }
 
 /// A dated item on the schedule (homework, exam, activity, deadline, task).
@@ -236,5 +255,6 @@ class CoursewareFile {
   String get mdPath => _s(_p?['md']);
   String get parseError => _s(_p?['error']);
   bool get parsed => parseState == 'done';
-  String get ext => name.contains('.') ? name.split('.').last.toLowerCase() : '';
+  String get ext =>
+      name.contains('.') ? name.split('.').last.toLowerCase() : '';
 }

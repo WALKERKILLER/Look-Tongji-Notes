@@ -33,17 +33,20 @@ var (
 
 // Service owns backups and the WebDAV sync.
 type Service struct {
-	Roots Roots
-	App   string // version written into backups
-	HC    *http.Client
+	ApplyFiles func(func() error) error
+	Roots      Roots
+	App        string // version written into backups
+	HC         *http.Client
 	// State and MergeState carry the personal state kept in the index.
 	State      func(ctx context.Context) ([]byte, error)
 	MergeState func(ctx context.Context, b []byte) (bool, error)
 	// Changed runs after files arrived from elsewhere.
-	Changed func(ctx context.Context, library, data bool)
-	Publish func(kind string, data any)
-	Seal    func(string) (string, error)
-	Unseal  func(string) (string, error)
+	Changed          func(ctx context.Context, library, data bool)
+	Publish          func(kind string, data any)
+	Seal             func(string) (string, error)
+	Unseal           func(string) (string, error)
+	CourseState      func(context.Context, []string) ([]byte, error)
+	MergeCourseState func(context.Context, []string, []byte) (bool, error)
 
 	mu       sync.Mutex
 	cfg      config
@@ -56,26 +59,36 @@ type Service struct {
 }
 
 type config struct {
-	URL       string           `json:"url,omitempty"`
-	User      string           `json:"user,omitempty"`
-	Pass      string           `json:"pass_sealed,omitempty"`
-	Folder    string           `json:"folder,omitempty"`
-	Auto      bool             `json:"auto"`
-	Media     bool             `json:"media"`
-	DeviceID  string           `json:"device_id,omitempty"`
-	Base      map[string]Entry `json:"base,omitempty"` // what both sides last agreed on
-	StateHash string           `json:"state_hash,omitempty"`
-	Last      *Result          `json:"last,omitempty"`
+	Kind        string           `json:"kind,omitempty"`
+	LocalFolder string           `json:"local_folder,omitempty"`
+	CourseIDs   []string         `json:"course_ids,omitempty"`
+	BridgeURL   string           `json:"bridge_url,omitempty"`
+	BridgeToken string           `json:"bridge_token_sealed,omitempty"`
+	URL         string           `json:"url,omitempty"`
+	User        string           `json:"user,omitempty"`
+	Pass        string           `json:"pass_sealed,omitempty"`
+	Folder      string           `json:"folder,omitempty"`
+	Auto        bool             `json:"auto"`
+	Media       bool             `json:"media"`
+	DeviceID    string           `json:"device_id,omitempty"`
+	Base        map[string]Entry `json:"base,omitempty"` // what both sides last agreed on
+	StateHash   string           `json:"state_hash,omitempty"`
+	Last        *Result          `json:"last,omitempty"`
 }
 
 // Settings are the user-editable part of the sync configuration.
 type Settings struct {
-	URL    string  `json:"url"`
-	User   string  `json:"user"`
-	Pass   *string `json:"password,omitempty"` // nil keeps the saved one
-	Folder string  `json:"folder"`
-	Auto   bool    `json:"auto"`
-	Media  bool    `json:"media"`
+	Kind        string   `json:"kind,omitempty"`
+	LocalFolder string   `json:"local_folder,omitempty"`
+	CourseIDs   []string `json:"course_ids,omitempty"`
+	BridgeURL   string   `json:"bridge_url,omitempty"`
+	BridgeToken string   `json:"bridge_token,omitempty"`
+	URL         string   `json:"url"`
+	User        string   `json:"user"`
+	Pass        *string  `json:"password,omitempty"` // nil keeps the saved one
+	Folder      string   `json:"folder"`
+	Auto        bool     `json:"auto"`
+	Media       bool     `json:"media"`
 }
 
 type Progress struct {
@@ -99,6 +112,9 @@ type Result struct {
 }
 
 type Status struct {
+	Kind        string    `json:"kind"`
+	LocalFolder string    `json:"local_folder,omitempty"`
+	CourseIDs   []string  `json:"course_ids,omitempty"`
 	Configured  bool      `json:"configured"`
 	URL         string    `json:"url,omitempty"`
 	User        string    `json:"user,omitempty"`
@@ -174,7 +190,11 @@ func (s *Service) Status() Status {
 	defer s.mu.Unlock()
 	s.loadLocked()
 	c := s.cfg
-	return Status{Configured: c.URL != "", URL: c.URL, User: c.User, HasPassword: s.pass != "", Folder: c.Folder,
+	kind := c.Kind
+	if kind == "" {
+		kind = "webdav"
+	}
+	return Status{Kind: kind, LocalFolder: c.LocalFolder, CourseIDs: c.CourseIDs, Configured: c.URL != "" || c.Kind == "folder", URL: c.URL, User: c.User, HasPassword: s.pass != "", Folder: c.Folder,
 		Auto: c.Auto, Media: c.Media, Device: s.deviceName(), Files: len(c.Base), Running: s.running,
 		Progress: s.progress, Last: c.Last}
 }
@@ -228,6 +248,12 @@ func (s *Service) client(rawURL, folder, user, pass string) (*Client, error) {
 // Configure saves the WebDAV account after checking it can create the
 // sync folder and write and delete files in it.
 func (s *Service) Configure(ctx context.Context, in Settings) (Status, error) {
+	if in.Kind == "folder" {
+		return s.configureFolder(ctx, in)
+	}
+	if in.Kind != "" && in.Kind != "webdav" {
+		return Status{}, errors.New("不支持的同步方式")
+	}
 	addr, folder, err := normalize(in.URL, in.Folder)
 	if err != nil {
 		return Status{}, err
@@ -280,6 +306,7 @@ func (s *Service) Configure(ctx context.Context, in Settings) (Status, error) {
 		}
 	}
 	s.cfg.URL, s.cfg.User, s.cfg.Pass, s.cfg.Folder = addr, strings.TrimSpace(in.User), sealed, folder
+	s.cfg.Kind, s.cfg.LocalFolder, s.cfg.CourseIDs, s.cfg.BridgeURL, s.cfg.BridgeToken = "webdav", "", nil, "", ""
 	s.cfg.Auto, s.cfg.Media, s.pass = in.Auto, in.Media, pass
 	s.saveLocked()
 	s.mu.Unlock()
@@ -312,7 +339,7 @@ func (s *Service) autoOn() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.loadLocked()
-	return s.cfg.URL != "" && s.cfg.Auto
+	return (s.cfg.URL != "" || s.cfg.Kind == "folder") && s.cfg.Auto
 }
 
 // Run syncs shortly after start and then every half hour while automatic
@@ -324,11 +351,13 @@ func (s *Service) Run(ctx context.Context) {
 		return
 	case <-time.After(20 * time.Second):
 	}
-	t := time.NewTicker(autoEvery)
+	t := time.NewTicker(5 * time.Second)
 	defer t.Stop()
+	var last time.Time
 	for {
-		if s.autoOn() {
+		if s.autoOn() && (s.Status().Kind == "folder" || time.Since(last) >= autoEvery) {
 			s.runLogged(ctx)
+			last = time.Now()
 		}
 		select {
 		case <-ctx.Done():
@@ -348,7 +377,11 @@ func (s *Service) Soon(ctx context.Context) {
 	if s.timer != nil {
 		s.timer.Stop()
 	}
-	s.timer = time.AfterFunc(autoDelay, func() { s.runLogged(ctx) })
+	delay := autoDelay
+	if s.cfg.Kind == "folder" {
+		delay = 2 * time.Second
+	}
+	s.timer = time.AfterFunc(delay, func() { s.runLogged(ctx) })
 }
 
 func (s *Service) runLogged(ctx context.Context) {

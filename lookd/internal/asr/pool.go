@@ -564,6 +564,9 @@ func (p *Pool) Transcribe(ctx context.Context, audio string, onStage Stage) ([]U
 		}
 	}
 	sort.SliceStable(out, func(a, b int) bool { return out[a].StartMs < out[b].StartMs })
+	if len(chunks) > 1 {
+		out = MergeChunkSeams(out)
+	}
 	p.mu.Lock()
 	for _, ck := range chunks {
 		delete(p.cache, ck.key)

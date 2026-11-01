@@ -1,6 +1,8 @@
 package tongji
 
 import (
+	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -334,6 +336,16 @@ func (s *Session) Token(ctx context.Context) (string, error) {
 // Renew refreshes the token; concurrent callers share one renewal.
 func (s *Session) Renew(ctx context.Context) error {
 	s.mu.Lock()
+	// A failed Fudan renewal needs explicit sign-in. Background reads must
+	// not emit renewing/needs_password forever and retrigger UI reloads.
+	if s.state.School == Fudan && s.state.Status == "needs_password" {
+		err := s.state.Error
+		s.mu.Unlock()
+		if err == "" {
+			err = "复旦登录需要重新认证，请重新登录"
+		}
+		return errors.New(err)
+	}
 	if s.renewing != nil {
 		ch := s.renewing
 		s.mu.Unlock()
@@ -508,12 +520,33 @@ func (s *Session) viaVPN(ctx context.Context, req *http.Request) (*http.Response
 	return resp, nil
 }
 
-// VPNSignedOut reports a WebVPN answer that is not the service's: the gateway
-// redirects to its sign-in page (or UIS) once its session is gone.
+// VPNSignedOut recognizes gateway redirects and HTML sign-in responses.
+// iCourse's course-detail API labels successful JSON as text/html, so the
+// header alone cannot establish that a session expired.
 func VPNSignedOut(resp *http.Response) bool {
-	return resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden ||
-		!strings.HasPrefix(resp.Request.URL.Path, "/http") ||
-		strings.Contains(resp.Header.Get("Content-Type"), "text/html")
+	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden ||
+		!strings.HasPrefix(resp.Request.URL.Path, "/http") {
+		return true
+	}
+	if !strings.Contains(strings.ToLower(resp.Header.Get("Content-Type")), "text/html") {
+		return false
+	}
+	if resp.Body == nil {
+		return true
+	}
+	original := resp.Body
+	reader := bufio.NewReader(original)
+	// Peek leaves the bytes available to the JSON decoder. Keep the original
+	// closer so HTTP connections are released by the caller as usual.
+	resp.Body = struct {
+		io.Reader
+		io.Closer
+	}{reader, original}
+	prefix, _ := reader.Peek(512)
+	prefix = bytes.TrimSpace(prefix)
+	// JSON-looking responses proceed to normal decoding and API-code checks;
+	// malformed JSON must not become a misleading "session expired" error.
+	return len(prefix) == 0 || (prefix[0] != '{' && prefix[0] != '[')
 }
 
 func (s *Session) fetchRealname() {

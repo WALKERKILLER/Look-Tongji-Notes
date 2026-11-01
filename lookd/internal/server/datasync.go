@@ -75,6 +75,11 @@ func (s *Server) DataArrived(ctx context.Context, library, data bool) {
 			s.Bus.Publish(kind, map[string]string{"reason": "sync"})
 		}
 	}
+	if data {
+		if err := s.mergeFolderSessionMetadata(); err != nil {
+			slog.Warn("merge folder conversation metadata", "err", err)
+		}
+	}
 	if data && s.Agent != nil {
 		s.Agent.Restart("") // the assistant reads its sessions and tasks at start
 	}

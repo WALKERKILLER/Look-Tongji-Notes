@@ -64,6 +64,10 @@ func hashFile(p string) (string, error) {
 // localFiles lists this device's files with their hashes, reusing hashes of
 // files whose size and time did not change.
 func (s *Service) localFiles(ctx context.Context, media bool) (map[string]File, map[string]string, error) {
+	return s.localFilesScoped(ctx, media, nil)
+}
+
+func (s *Service) localFilesScoped(ctx context.Context, media bool, accept func(File) bool) (map[string]File, map[string]string, error) {
 	cache := map[string]hashRec{}
 	if b, err := os.ReadFile(s.cachePath()); err == nil {
 		json.Unmarshal(b, &cache)
@@ -73,6 +77,9 @@ func (s *Service) localFiles(ctx context.Context, media bool) (map[string]File, 
 	next := map[string]hashRec{}
 	all := append(s.Roots.ScanLibrary(media), s.Roots.ScanData()...)
 	for i, f := range all {
+		if accept != nil && !accept(f) {
+			continue
+		}
 		if err := ctx.Err(); err != nil {
 			return nil, nil, err
 		}
@@ -119,7 +126,7 @@ func (s *Service) Sync(ctx context.Context) (Result, error) {
 	defer s.runMu.Unlock()
 	s.mu.Lock()
 	s.loadLocked()
-	if s.cfg.URL == "" {
+	if s.cfg.URL == "" && s.cfg.Kind != "folder" {
 		s.mu.Unlock()
 		return Result{}, ErrNotConfigured
 	}
@@ -129,7 +136,11 @@ func (s *Service) Sync(ctx context.Context) (Result, error) {
 	var res Result
 	var err error
 	for try := 0; try < 3; try++ {
-		res, err = s.syncOnce(ctx)
+		if s.Status().Kind == "folder" {
+			res, err = s.syncFolder(ctx)
+		} else {
+			res, err = s.syncOnce(ctx)
+		}
 		if !errors.Is(err, ErrChanged) {
 			break
 		}

@@ -350,16 +350,12 @@ func (c *Client) LectureMedia(ctx context.Context, courseID, subID string) (*Med
 	var r struct {
 		Code any `json:"code"`
 		Data struct {
-			VideoList   map[string]rawVideo `json:"video_list"`
-			SegmentList map[string]struct {
-				Teacher json.RawMessage `json:"teacher_list"`
-				Student json.RawMessage `json:"student_list"`
-				PPT     json.RawMessage `json:"ppt_list"`
-			} `json:"segment_video_list"`
-			PlayURL   map[string]any `json:"playurl"`
-			Now       flex           `json:"now"`
-			Duration  flex           `json:"duration"`
-			AllowDrag flex           `json:"is_allow_video_drag"`
+			VideoList   map[string]json.RawMessage `json:"video_list"`
+			SegmentList map[string]json.RawMessage `json:"segment_video_list"`
+			PlayURL     map[string]any             `json:"playurl"`
+			Now         flex                       `json:"now"`
+			Duration    flex                       `json:"duration"`
+			AllowDrag   flex                       `json:"is_allow_video_drag"`
 		} `json:"data"`
 	}
 	q := url.Values{"course_id": {courseID}, "sub_id": {subID}, "tenant_code": {TenantCode}}
@@ -385,7 +381,14 @@ func (c *Client) LectureMedia(ctx context.Context, courseID, subID string) (*Med
 	}
 	sort.Strings(keys)
 	for _, k := range keys {
-		seg := r.Data.SegmentList[k]
+		var seg struct {
+			Teacher json.RawMessage `json:"teacher_list"`
+			Student json.RawMessage `json:"student_list"`
+			PPT     json.RawMessage `json:"ppt_list"`
+		}
+		if json.Unmarshal(r.Data.SegmentList[k], &seg) != nil {
+			continue
+		}
 		for _, pair := range []struct {
 			label string
 			raw   json.RawMessage
@@ -402,7 +405,11 @@ func (c *Client) LectureMedia(ctx context.Context, courseID, subID string) (*Med
 	}
 	sort.Strings(vkeys)
 	for _, k := range vkeys {
-		addStream("视频", r.Data.VideoList[k])
+		// iCourse includes scalar metadata such as "now" beside video objects.
+		var video rawVideo
+		if json.Unmarshal(r.Data.VideoList[k], &video) == nil {
+			addStream("视频", video)
+		}
 	}
 	if len(m.Streams) == 0 {
 		for k, v := range r.Data.PlayURL {
@@ -412,6 +419,12 @@ func (c *Client) LectureMedia(ctx context.Context, courseID, subID string) (*Med
 		}
 	}
 	now := r.Data.Now.Int()
+	if now == 0 {
+		var nestedNow flex
+		if json.Unmarshal(r.Data.VideoList["now"], &nestedNow) == nil {
+			now = nestedNow.Int()
+		}
+	}
 	for i := range m.Streams {
 		signed, err := c.Sign(ctx, m.Streams[i].RawURL, now)
 		if err != nil {

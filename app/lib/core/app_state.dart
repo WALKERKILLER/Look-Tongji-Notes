@@ -1,14 +1,45 @@
 import 'dart:async';
 
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/widgets.dart';
+
 import 'package:flutter/foundation.dart';
 
 import 'api.dart';
+import 'android_bridge.dart';
 import 'lookd_service.dart';
 import 'models.dart';
 import '../l10n/l10n.dart';
 
 /// Global app state fed by lookd's SSE event stream.
-class AppState extends ChangeNotifier {
+class AppState extends ChangeNotifier with WidgetsBindingObserver {
+  bool localMode = false;
+  Future<void> enterLocalMode() async {
+    localMode = true;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('look-local-mode', true);
+    notifyListeners();
+    unawaited(loadCourses());
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && connected) {
+      unawaited(
+        api
+            .get('/api/sync')
+            .then((s) {
+              if (s is Map && s['kind'] == 'folder' && s['configured'] == true)
+                return api.post('/api/sync/run');
+              return null;
+            })
+            .catchError((_) {
+              return null;
+            }),
+      );
+    }
+  }
+
   AppState(this.daemon);
   final LookdService daemon;
 
@@ -38,6 +69,9 @@ class AppState extends ChangeNotifier {
   bool _disposed = false;
 
   Future<void> init() async {
+    WidgetsBinding.instance.addObserver(this);
+    final prefs = await SharedPreferences.getInstance();
+    localMode = prefs.getBool('look-local-mode') ?? false;
     daemon.addListener(_onDaemon);
     await _onDaemon();
   }
@@ -52,24 +86,54 @@ class AppState extends ChangeNotifier {
     _api = Api(base, daemon.token);
     try {
       health = (await api.get('/api/health') as Map).cast<String, dynamic>();
-      auth = AuthState((await api.get('/api/auth') as Map).cast<String, dynamic>());
+      if (defaultTargetPlatform == TargetPlatform.android) {
+        final sync = await api.get('/api/sync') as Map;
+        if (sync['kind'] == 'folder') {
+          try {
+            final bridge = await AndroidBridge.syncFolderBridge();
+            if (bridge != null &&
+                bridge['local_folder'] == sync['local_folder']) {
+              await api.put('/api/sync', {
+                'kind': 'folder',
+                ...bridge,
+                'course_ids': sync['course_ids'],
+                'auto': sync['auto'],
+                'media': sync['media'],
+              });
+              unawaited(api.post('/api/sync/run'));
+            }
+          } catch (_) {}
+        }
+      }
+      auth = AuthState(
+        (await api.get('/api/auth') as Map).cast<String, dynamic>(),
+      );
       authKnown = true;
       final js = jsonList(await api.get('/api/jobs'));
       jobs
         ..clear()
-        ..addEntries(js.map((e) => Job((e as Map).cast<String, dynamic>())).map((j) => MapEntry(j.id, j)));
-      unreadNotifications = ((await api.get('/api/notifications') as Map)['unread'] as num?)?.toInt() ?? 0;
+        ..addEntries(
+          js
+              .map((e) => Job((e as Map).cast<String, dynamic>()))
+              .map((j) => MapEntry(j.id, j)),
+        );
+      unreadNotifications =
+          ((await api.get('/api/notifications') as Map)['unread'] as num?)
+              ?.toInt() ??
+          0;
     } catch (e) {
       debugPrint('init failed: $e');
     }
     _connectEvents();
     notifyListeners();
-    if (auth.signedIn) unawaited(loadCourses());
+    if (auth.signedIn || localMode) unawaited(loadCourses());
   }
 
   void _connectEvents() {
     _sse?.cancel();
-    _sse = api.sse('/api/events').listen(_onEvent, onError: (_) => _reconnect(), onDone: _reconnect);
+    _sse = api
+        .sse('/api/events')
+        .listen(_onEvent, onError: (_) => _reconnect(), onDone: _reconnect);
   }
 
   void _reconnect() {
@@ -132,8 +196,12 @@ class AppState extends ChangeNotifier {
       notifyListeners();
     }
     try {
-      final list = jsonList(await api.get('/api/courses', sync ? {'sync': '1'} : null));
-      courses = list.map((e) => Course((e as Map).cast<String, dynamic>())).toList();
+      final list = jsonList(
+        await api.get('/api/courses', sync ? {'sync': '1'} : null),
+      );
+      courses = list
+          .map((e) => Course((e as Map).cast<String, dynamic>()))
+          .toList();
       coursesError = null;
     } catch (e) {
       coursesError = e;
@@ -154,7 +222,11 @@ class AppState extends ChangeNotifier {
   /// `{school, username, password, captcha, remember}`.
   Future<void> login(Map<String, Object> body) async {
     // Fudan signs in twice (WebVPN, then iCourse through it) and can take a while.
-    final r = await api.post('/api/auth/login', body, const Duration(seconds: 130));
+    final r = await api.post(
+      '/api/auth/login',
+      body,
+      const Duration(seconds: 130),
+    );
     auth = AuthState((r as Map).cast<String, dynamic>());
     notifyListeners();
   }
@@ -172,7 +244,9 @@ class AppState extends ChangeNotifier {
   }
 
   Future<List<Job>> enqueue(List<String> lectureIds, List<String> kinds) async {
-    final r = jsonList(await api.post('/api/jobs', {'lecture_ids': lectureIds, 'kinds': kinds}));
+    final r = jsonList(
+      await api.post('/api/jobs', {'lecture_ids': lectureIds, 'kinds': kinds}),
+    );
     final js = r.map((e) => Job((e as Map).cast<String, dynamic>())).toList();
     for (final j in js) {
       jobs[j.id] = j;
@@ -225,8 +299,17 @@ class AppState extends ChangeNotifier {
 
   List<Job> get sortedJobs {
     final l = jobs.values.toList();
-    int rank(Job j) => switch (j.state) { 'running' => 0, 'queued' => 1, 'paused' => 2, 'failed' => 3, _ => 4 };
-    l.sort((a, b) => rank(a) != rank(b) ? rank(a) - rank(b) : b.updatedAt - a.updatedAt);
+    int rank(Job j) => switch (j.state) {
+      'running' => 0,
+      'queued' => 1,
+      'paused' => 2,
+      'failed' => 3,
+      _ => 4,
+    };
+    l.sort(
+      (a, b) =>
+          rank(a) != rank(b) ? rank(a) - rank(b) : b.updatedAt - a.updatedAt,
+    );
     return l;
   }
 
@@ -238,6 +321,7 @@ class AppState extends ChangeNotifier {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _disposed = true;
     _sse?.cancel();
     daemon.removeListener(_onDaemon);

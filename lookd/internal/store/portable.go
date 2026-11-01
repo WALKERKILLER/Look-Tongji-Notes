@@ -56,18 +56,27 @@ func (s *Store) ExportUserState(ctx context.Context) (UserState, error) {
 			rows.Close()
 			return st, err
 		}
+		if p.UpdatedAt < 100000000000 {
+			p.UpdatedAt *= 1000
+		}
 		st.Playback[id] = p
 	}
 	rows.Close()
-	rows, err = s.DB.QueryContext(ctx, `SELECT lecture_id,t_ms,label,created_at FROM bookmarks ORDER BY lecture_id,t_ms,id`)
+	rows, err = s.DB.QueryContext(ctx, `SELECT lecture_id,t_ms,label,created_at,sync_id,updated_at,deleted FROM bookmarks ORDER BY lecture_id,t_ms,id`)
 	if err != nil {
 		return st, err
 	}
 	defer rows.Close()
 	for rows.Next() {
 		var b Bookmark
-		if err := rows.Scan(&b.LectureID, &b.TMs, &b.Label, &b.CreatedAt); err != nil {
+		if err := rows.Scan(&b.LectureID, &b.TMs, &b.Label, &b.CreatedAt, &b.SyncID, &b.UpdatedAt, &b.Deleted); err != nil {
 			return st, err
+		}
+		if b.SyncID == "" {
+			b.SyncID = bookmarkID(b)
+		}
+		if b.UpdatedAt == 0 {
+			b.UpdatedAt = b.CreatedAt * 1000
 		}
 		st.Bookmarks = append(st.Bookmarks, b)
 	}
@@ -84,9 +93,12 @@ func (s *Store) MergeUserState(ctx context.Context, in UserState) (bool, error) 
 	defer tx.Rollback()
 	changed := false
 	for id, p := range in.Playback {
+		if p.UpdatedAt < 100000000000 {
+			p.UpdatedAt *= 1000
+		}
 		r, err := tx.ExecContext(ctx, `INSERT INTO playback(lecture_id,position_ms,duration_ms,speed,updated_at) VALUES(?,?,?,?,?)
  ON CONFLICT(lecture_id) DO UPDATE SET position_ms=excluded.position_ms,duration_ms=excluded.duration_ms,speed=excluded.speed,
- updated_at=excluded.updated_at WHERE excluded.updated_at>playback.updated_at`, id, p.PositionMs, p.DurationMs, p.Speed, p.UpdatedAt)
+ updated_at=excluded.updated_at WHERE excluded.updated_at>CASE WHEN playback.updated_at<100000000000 THEN playback.updated_at*1000 ELSE playback.updated_at END`, id, p.PositionMs, p.DurationMs, p.Speed, p.UpdatedAt)
 		if err != nil {
 			return false, err
 		}
@@ -95,16 +107,27 @@ func (s *Store) MergeUserState(ctx context.Context, in UserState) (bool, error) 
 		}
 	}
 	for _, b := range in.Bookmarks {
-		var one int
-		err := tx.QueryRowContext(ctx, `SELECT 1 FROM bookmarks WHERE lecture_id=? AND t_ms=? AND label=?`, b.LectureID, b.TMs, b.Label).Scan(&one)
+		if b.SyncID == "" {
+			b.SyncID = bookmarkID(b)
+		}
+		if b.UpdatedAt == 0 {
+			b.UpdatedAt = b.CreatedAt * 1000
+		}
+		var id, updated int64
+		err := tx.QueryRowContext(ctx, `SELECT id,updated_at FROM bookmarks WHERE sync_id=? OR (sync_id='' AND lecture_id=? AND t_ms=? AND label=? AND created_at=?) LIMIT 1`, b.SyncID, b.LectureID, b.TMs, b.Label, b.CreatedAt).Scan(&id, &updated)
 		if err == nil {
+			if b.UpdatedAt > updated || b.Deleted && b.UpdatedAt == updated {
+				if _, err = tx.ExecContext(ctx, `UPDATE bookmarks SET sync_id=?,updated_at=?,deleted=? WHERE id=?`, b.SyncID, b.UpdatedAt, b.Deleted, id); err != nil {
+					return false, err
+				}
+				changed = true
+			}
 			continue
 		}
 		if err != sql.ErrNoRows {
 			return false, err
 		}
-		if _, err := tx.ExecContext(ctx, `INSERT INTO bookmarks(lecture_id,t_ms,label,created_at) VALUES(?,?,?,?)`,
-			b.LectureID, b.TMs, b.Label, b.CreatedAt); err != nil {
+		if _, err = tx.ExecContext(ctx, `INSERT INTO bookmarks(lecture_id,t_ms,label,created_at,sync_id,updated_at,deleted) VALUES(?,?,?,?,?,?,?)`, b.LectureID, b.TMs, b.Label, b.CreatedAt, b.SyncID, b.UpdatedAt, b.Deleted); err != nil {
 			return false, err
 		}
 		changed = true

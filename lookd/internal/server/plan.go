@@ -45,7 +45,7 @@ func (s *Server) schedule(_ http.ResponseWriter, r *http.Request) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	return mergeSchedule(items, s.canvasItems(r.Context(), sq)), nil
+	return s.nasSchedule(r.Context(), sq, mergeSchedule(items, s.canvasItems(r.Context(), sq))), nil
 }
 
 func checkItem(it *store.ScheduleItem) error {
@@ -117,6 +117,9 @@ func (s *Server) addSchedule(_ http.ResponseWriter, r *http.Request) (any, error
 
 func (s *Server) patchSchedule(_ http.ResponseWriter, r *http.Request) (any, error) {
 	ctx, id := r.Context(), r.PathValue("id")
+	if strings.HasPrefix(id, "nas:") {
+		return nil, badRequest("NAS 日程由来源维护，请在课程自动化页面查看")
+	}
 	if isCanvasItem(id) {
 		return s.patchCanvasItem(r, id)
 	}
@@ -162,6 +165,9 @@ func (s *Server) patchSchedule(_ http.ResponseWriter, r *http.Request) (any, err
 
 func (s *Server) deleteSchedule(_ http.ResponseWriter, r *http.Request) (any, error) {
 	ctx, id := r.Context(), r.PathValue("id")
+	if strings.HasPrefix(id, "nas:") {
+		return nil, badRequest("NAS 日程由来源维护，请在课程自动化页面查看")
+	}
 	if isCanvasItem(id) {
 		if err := s.Canvas.Hide(id); err != nil {
 			return nil, canvasErr(err)
