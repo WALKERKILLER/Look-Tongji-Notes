@@ -53,12 +53,20 @@ func (s *Service) mergeFolderRecords(ctx context.Context, f *folderStorage, entr
 			continue
 		}
 		versions := append([]Entry{v.Entry}, v.Alternatives...)
-		contents := [][]byte{}
+		// Bound the whole merge, not just each version: alternatives are remote input.
+		var mergeBytes int64
 		for _, entry := range versions {
-			if entry.Size > 32<<20 {
-				contents = nil
+			if entry.Size < 0 || entry.Size > folderRecordLimit-mergeBytes {
+				mergeBytes = folderRecordLimit + 1
 				break
 			}
+			mergeBytes += entry.Size
+		}
+		if mergeBytes > folderRecordLimit {
+			continue
+		}
+		contents := [][]byte{}
+		for _, entry := range versions {
 			r, e := f.open(ctx, "objects/"+entry.Hash)
 			if e != nil {
 				return e

@@ -442,6 +442,9 @@ func (s *Service) syncFolder(ctx context.Context) (Result, error) {
 				if old := dirs[id]; old != "" && old != dir {
 					return result, errors.New("同一课程使用了不同目录，请先处理课程冲突")
 				}
+				if e := s.validateFolderCourseDir(id, dir, dirs); e != nil {
+					return result, e
+				}
 				dirs[id] = dir
 			}
 		}
@@ -560,7 +563,13 @@ func (s *Service) syncFolder(ctx context.Context) (Result, error) {
 
 		combined[p] = combine(combined[p], v)
 	}
+	if err := validateFolderTransfer(combined, hashes); err != nil {
+		return result, err
+	}
 	if err := s.mergeFolderRecords(ctx, f, combined); err != nil {
+		return result, err
+	}
+	if err := validateFolderTransfer(combined, hashes); err != nil {
 		return result, err
 	}
 	// Stage and verify every incoming file before changing any working files.
@@ -570,6 +579,7 @@ func (s *Service) syncFolder(ctx context.Context) (Result, error) {
 	}
 	defer os.RemoveAll(stage)
 	staged := map[string]string{}
+	var stagedBytes int64
 	stageObject := func(entry Entry) (string, error) {
 		if len(entry.Hash) != 64 {
 			return "", errors.New("文件哈希无效")
@@ -580,6 +590,10 @@ func (s *Service) syncFolder(ctx context.Context) (Result, error) {
 		if p, ok := staged[entry.Hash]; ok {
 			return p, nil
 		}
+		if entry.Size < 0 || entry.Size > folderObjectLimit || entry.Size > folderStageLimit-stagedBytes {
+			return "", errors.New("同步对象超出暂存大小限制，请缩小同步范围")
+		}
+		stagedBytes += entry.Size
 		r, e := f.open(ctx, "objects/"+entry.Hash)
 		if e != nil {
 			return "", fmt.Errorf("文件尚未完整同步，请稍后重试：%w", e)
@@ -626,6 +640,15 @@ func (s *Service) syncFolder(ctx context.Context) (Result, error) {
 	next := map[string]folderEntry{}
 
 	apply := func() error {
+		// Recheck ownership after staging and before the first working-file write.
+		if err := s.validateFolderTargets(combined, staged); err != nil {
+			return err
+		}
+		for id, dir := range dirs {
+			if err := s.validateFolderCourseDir(id, dir, dirs); err != nil {
+				return err
+			}
+		}
 		for _, p := range keys {
 			v := combined[p]
 			abs, ok := s.folderAbs(p)
@@ -834,7 +857,11 @@ func (s *Service) FolderPreview(ctx context.Context, in Settings) (map[string]an
 		}
 	}
 	var n, size int64
-	for _, f := range s.Roots.ScanLibrary(in.Media) {
+	files, err := s.Roots.ScanLibrary(in.Media)
+	if err != nil {
+		return nil, err
+	}
+	for _, f := range files {
 		if folderScoped(f.Path, dirs) {
 			n++
 			size += f.Size

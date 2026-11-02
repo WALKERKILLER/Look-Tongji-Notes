@@ -21,6 +21,8 @@ Constraints: files stay the source of truth and the index can always be rebuilt 
 - **Storage.** `GET /api/storage` → `{library, total, categories[{key, label, bytes, files}], cleanable{cache, sync, index}, models, assistant, runtime}` with categories video, slides, courseware, text, index, cache, sync, other. `POST /api/storage/clean {cache?, sync?, compact?}` → `{freed}`: `cache` removes `.cache` entries of lectures without a queued, running or paused job (transcription chunk folders only when no transcription runs or after six hours); `sync` empties `.sync-conflicts` and `.sync-trash`; `compact` checkpoints the WAL and runs `VACUUM`.
 - **App.** 设置 → 数据与同步: a WebDAV entry with status (presets for 坚果云, Nextcloud, AList and others, the connect form, automatic sync, media, progress, last result, conflicts with 查看, errors, edit, stop), backup export through the system save dialog with progress and an optional media switch, restore through the system open dialog with a preview and the merge/overwrite choice, and the storage bar with cleanup actions. The assistant can open it with the sections `sync`, `backup` and `storage`.
 
+Directory traversal and file hashing errors abort synchronization and backup export; unreadable files are not treated as deletions. The storage estimate may be partial when files are unreadable and is not proof that an export will succeed.
+
 ## Plan
 
 1. `lookd/internal/datasync` (scope, archive, WebDAV client, sync, service), `store.Adopt*`/`UserState`/`Compact`, `library.reindexLectures`/`pruneNotes`, routes in `lookd/internal/server/datasync.go`.

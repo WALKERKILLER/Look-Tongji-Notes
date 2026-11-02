@@ -75,7 +75,15 @@ func (s *Service) localFilesScoped(ctx context.Context, media bool, accept func(
 	files := map[string]File{}
 	hashes := map[string]string{}
 	next := map[string]hashRec{}
-	all := append(s.Roots.ScanLibrary(media), s.Roots.ScanData()...)
+	library, err := s.Roots.ScanLibrary(media)
+	if err != nil {
+		return nil, nil, err
+	}
+	data, err := s.Roots.ScanData()
+	if err != nil {
+		return nil, nil, err
+	}
+	all := append(library, data...)
 	for i, f := range all {
 		if accept != nil && !accept(f) {
 			continue
@@ -90,7 +98,7 @@ func (s *Service) localFilesScoped(ctx context.Context, media bool, accept func(
 			}
 			h, err := hashFile(f.Abs)
 			if err != nil {
-				continue
+				return nil, nil, err
 			}
 			rec = hashRec{Size: f.Size, MTime: f.ModTime.UnixNano(), Hash: h}
 		}

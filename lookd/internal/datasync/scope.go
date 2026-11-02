@@ -115,13 +115,19 @@ func dataAllowed(rel string) bool {
 }
 
 // ScanLibrary lists the library's files, sorted by path.
-func (r Roots) ScanLibrary(withMedia bool) []File {
+func (r Roots) ScanLibrary(withMedia bool) ([]File, error) {
 	var out []File
-	filepath.WalkDir(r.Library, func(p string, d fs.DirEntry, err error) error {
+	err := filepath.WalkDir(r.Library, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
-			return nil
+			if p == r.Library && os.IsNotExist(err) {
+				return nil
+			}
+			return err
 		}
-		rel, _ := filepath.Rel(r.Library, p)
+		rel, err := filepath.Rel(r.Library, p)
+		if err != nil {
+			return err
+		}
 		rel = filepath.ToSlash(rel)
 		if d.IsDir() {
 			if rel != "." && strings.HasPrefix(d.Name(), ".") {
@@ -132,40 +138,63 @@ func (r Roots) ScanLibrary(withMedia bool) []File {
 		if !d.Type().IsRegular() || !libraryFile(rel, withMedia) {
 			return nil
 		}
-		if fi, err := d.Info(); err == nil {
-			out = append(out, File{Path: "library/" + rel, Abs: p, Size: fi.Size(), ModTime: fi.ModTime()})
+		fi, err := d.Info()
+		if err != nil {
+			return err
 		}
+		out = append(out, File{Path: "library/" + rel, Abs: p, Size: fi.Size(), ModTime: fi.ModTime()})
 		return nil
 	})
 	sort.Slice(out, func(i, j int) bool { return out[i].Path < out[j].Path })
-	return out
+	return out, err
 }
 
-// ScanData lists the assistant's portable files.
-func (r Roots) ScanData() []File {
+// ScanData lists portable files; an unreadable subtree is not a deletion.
+func (r Roots) ScanData() ([]File, error) {
 	var out []File
-	add := func(rel string) {
+	add := func(rel string) error {
 		p := filepath.Join(r.Data, filepath.FromSlash(rel))
-		if fi, err := os.Lstat(p); err == nil && fi.Mode().IsRegular() {
+		fi, err := os.Lstat(p)
+		if err != nil {
+			return err
+		}
+		if fi.Mode().IsRegular() {
 			out = append(out, File{Path: "data/" + rel, Abs: p, Size: fi.Size(), ModTime: fi.ModTime()})
 		}
+		return nil
 	}
 	for _, f := range dataFiles {
-		add(f)
+		if err := add(f); err != nil && !os.IsNotExist(err) {
+			return out, err
+		}
 	}
 	for _, d := range dataDirs {
-		filepath.WalkDir(filepath.Join(r.Data, filepath.FromSlash(d)), func(p string, e fs.DirEntry, err error) error {
-			if err == nil && e.Type().IsRegular() {
-				rel, _ := filepath.Rel(r.Data, p)
-				if dataAllowed(filepath.ToSlash(rel)) {
-					add(filepath.ToSlash(rel))
+		root := filepath.Join(r.Data, filepath.FromSlash(d))
+		err := filepath.WalkDir(root, func(p string, e fs.DirEntry, err error) error {
+			if err != nil {
+				if p == root && os.IsNotExist(err) {
+					return nil
 				}
+				return err
+			}
+			rel, err := filepath.Rel(r.Data, p)
+			if err != nil {
+				return err
+			}
+			if e.IsDir() && p != root && !dataAllowed(filepath.ToSlash(rel)+"/") {
+				return filepath.SkipDir
+			}
+			if e.Type().IsRegular() && dataAllowed(filepath.ToSlash(rel)) {
+				return add(filepath.ToSlash(rel))
 			}
 			return nil
 		})
+		if err != nil {
+			return out, err
+		}
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Path < out[j].Path })
-	return out
+	return out, nil
 }
 
 // writeFile replaces dst atomically with the bytes from fill.

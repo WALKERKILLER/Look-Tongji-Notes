@@ -56,7 +56,10 @@ type Estimate struct {
 
 func (s *Service) Estimate() Estimate {
 	var e Estimate
-	for _, f := range append(s.Roots.ScanLibrary(true), s.Roots.ScanData()...) {
+	// Estimates may be partial; export and sync require a complete scan.
+	library, _ := s.Roots.ScanLibrary(true)
+	data, _ := s.Roots.ScanData()
+	for _, f := range append(library, data...) {
 		if IsMedia(f.Path) {
 			e.MediaFiles++
 			e.MediaBytes += f.Size
@@ -74,7 +77,15 @@ var stored = map[string]bool{".jpg": true, ".jpeg": true, ".png": true, ".webp":
 
 // Export writes a backup archive to w.
 func (s *Service) Export(ctx context.Context, w io.Writer, withMedia bool) error {
-	files := append(s.Roots.ScanLibrary(withMedia), s.Roots.ScanData()...)
+	library, err := s.Roots.ScanLibrary(withMedia)
+	if err != nil {
+		return err
+	}
+	data, err := s.Roots.ScanData()
+	if err != nil {
+		return err
+	}
+	files := append(library, data...)
 	m := BackupManifest{Format: backupFormat, Version: 1, Created: time.Now().UnixMilli(), Device: s.deviceName(),
 		App: s.App, Media: withMedia, Files: map[string]Entry{}}
 	for _, f := range files {

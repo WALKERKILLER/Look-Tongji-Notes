@@ -51,22 +51,21 @@ func (s *Service) folderExtras(ctx context.Context, ids []string) ([]File, error
 	}
 	quizzes, _ := filepath.Glob(filepath.Join(s.Roots.Library, "quizzes", "*.json"))
 	for _, abs := range quizzes {
-		b, e := os.ReadFile(abs)
 		var v struct {
 			Quiz struct {
 				CourseID string `json:"course_id"`
 			} `json:"quiz"`
 		}
-		if e == nil && json.Unmarshal(b, &v) == nil && wanted[v.Quiz.CourseID] {
+		if err := readFolderJSON(abs, &v); err != nil {
+			return nil, err
+		}
+		if wanted[v.Quiz.CourseID] {
 			add("course-data/"+v.Quiz.CourseID+"/quizzes/"+filepath.Base(abs), abs)
 		}
 	}
 	meta := map[string]map[string]any{}
-	b, e := os.ReadFile(filepath.Join(s.Roots.Data, "agent", "sessions-meta.json"))
-	if e == nil {
-		if json.Unmarshal(b, &meta) != nil {
-			return nil, errors.New("助手会话索引无法解析")
-		}
+	if err := readFolderJSON(filepath.Join(s.Roots.Data, "agent", "sessions-meta.json"), &meta); err != nil && !os.IsNotExist(err) {
+		return nil, err
 	}
 	for _, course := range ids {
 		selected := map[string]map[string]any{}
@@ -78,18 +77,22 @@ func (s *Service) folderExtras(ctx context.Context, ids []string) ([]File, error
 		generated := filepath.Join(s.Roots.Data, "agent", "course-sessions", course+".json")
 		if len(selected) > 0 {
 			b, _ := json.Marshal(selected)
-			if e = writeFile(generated, time.Time{}, func(f *os.File) error { _, e := f.Write(b); return e }); e != nil {
+			if e := writeFile(generated, time.Time{}, func(f *os.File) error { _, e := f.Write(b); return e }); e != nil {
 				return nil, e
 			}
 			add("course-data/"+course+"/metadata.json", generated)
 		}
+		if len(selected) == 0 {
+			continue
+		}
 		sessions, _ := filepath.Glob(filepath.Join(s.Roots.Data, "agent", "sessions", "*.jsonl"))
 		for _, abs := range sessions {
-			for id := range selected {
-				if strings.Contains(filepath.Base(abs), id) {
-					add("course-data/"+course+"/assistant/"+filepath.Base(abs), abs)
-					break
-				}
+			id, err := folderSessionID(abs)
+			if err != nil {
+				return nil, err
+			}
+			if _, ok := selected[id]; ok {
+				add("course-data/"+course+"/assistant/"+filepath.Base(abs), abs)
 			}
 		}
 	}
@@ -135,10 +138,6 @@ func validateFolderDocument(p, staged string, dirs map[string]string) error {
 	if name != "course.json" && name != "lecture.json" && !strings.Contains(p, "/quizzes/") {
 		return nil
 	}
-	b, e := os.ReadFile(staged)
-	if e != nil {
-		return e
-	}
 	var v struct {
 		ID       string `json:"id"`
 		CourseID string `json:"course_id"`
@@ -146,8 +145,8 @@ func validateFolderDocument(p, staged string, dirs map[string]string) error {
 			CourseID string `json:"course_id"`
 		} `json:"quiz"`
 	}
-	if json.Unmarshal(b, &v) != nil {
-		return errors.New("同步索引文档格式无效")
+	if err := readFolderJSON(staged, &v); err != nil {
+		return errors.New("同步索引文档格式无效或超过 32 MiB")
 	}
 	if name == "course.json" {
 		if v.ID != course {

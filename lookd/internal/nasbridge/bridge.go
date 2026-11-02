@@ -164,7 +164,7 @@ func (b *Bridge) Files() ([]File, error) {
 	}
 	err := filepath.WalkDir(b.Root, func(p string, d fs.DirEntry, e error) error {
 		if e != nil {
-			return nil
+			return e
 		}
 		rel, _ := filepath.Rel(b.Root, p)
 		if rel == "." {
@@ -201,7 +201,10 @@ func (b *Bridge) Files() ([]File, error) {
 			return nil
 		}
 		fi, err := d.Info()
-		if err != nil || !fi.Mode().IsRegular() {
+		if err != nil {
+			return err
+		}
+		if !fi.Mode().IsRegular() {
 			return nil
 		}
 		if len(out) >= 10000 {

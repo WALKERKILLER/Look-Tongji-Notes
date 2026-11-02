@@ -190,3 +190,24 @@ func TestBoundedTransportAndCancellation(t *testing.T) {
 		t.Fatal("cancelled SSH succeeded")
 	}
 }
+
+func TestFilesReportsUnreadableSubdirectory(t *testing.T) {
+	root := t.TempDir()
+	fixture(t, root, "A/3.课程资料/visible.md", "visible")
+	fixture(t, root, "B/3.课程资料/blocked/hidden.md", "unreadable")
+	blocked := filepath.Join(root, "B/3.课程资料/blocked")
+	if err := os.Chmod(blocked, 0000); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.Chmod(blocked, 0700) })
+	if _, err := os.ReadDir(blocked); err == nil {
+		t.Skip("filesystem/user does not enforce directory read permissions")
+	}
+	files, err := (&Bridge{Root: root}).Files()
+	if err == nil {
+		t.Fatal("partial scan reported success")
+	}
+	if len(files) != 1 || files[0].Course != "A" {
+		t.Fatalf("expected partial prefix plus error, got %v, %v", files, err)
+	}
+}
