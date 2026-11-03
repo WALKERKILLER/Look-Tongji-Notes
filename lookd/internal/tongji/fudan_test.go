@@ -251,6 +251,9 @@ func newFakeFudan(t *testing.T) (*fakeFudan, http.RoundTripper) {
 func fudanSession(t *testing.T, path string, tr http.RoundTripper) *Session {
 	s := NewSession(path, nil)
 	s.hc.Transport, s.api.Transport = tr, tr
+	// Login finishes the realname lookup in the background. Wait for it before
+	// the temp directory is removed, or the write lands during cleanup.
+	t.Cleanup(s.waitBackground)
 	return s
 }
 
