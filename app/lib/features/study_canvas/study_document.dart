@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/painting.dart' show HSLColor;
 
 import '../../l10n/l10n.dart';
 import 'study_content.dart';
@@ -188,14 +189,20 @@ class StudyStroke {
   );
   // Pictures are bounded to 64 segments. Long input never regenerates its prefix.
   // CustomPainter's repaint boundary: https://api.flutter.dev/flutter/rendering/CustomPainter-class.html
-  Picture? _picture;
-  void paint(Canvas canvas) {
-    _picture ??= () {
+  Picture? _picture, _darkPicture;
+
+  /// [dark] draws dark ink light for dark paper (see [inkOnDark]).
+  void paint(Canvas canvas, {bool dark = false}) {
+    Picture record(int c) {
       final recorder = PictureRecorder();
-      paintInk(Canvas(recorder), points, color, width, tool, brush: brush);
+      paintInk(Canvas(recorder), points, c, width, tool, brush: brush);
       return recorder.endRecording();
-    }();
-    canvas.drawPicture(_picture!);
+    }
+
+    final picture = dark
+        ? (_darkPicture ??= record(inkOnDark(color, tool)))
+        : (_picture ??= record(color));
+    canvas.drawPicture(picture);
   }
 
   Map<String, dynamic> json() => {
@@ -226,6 +233,20 @@ class StudyStroke {
     ],
   );
 }
+
+/// The colour ink takes on dark paper: dark ink turns light with its hue
+/// kept, so notes written on white paper stay legible in dark mode. Saved
+/// colours never change; highlighters and light ink stay as they are.
+int inkOnDark(int color, [String tool = 'pen']) {
+  if (tool == 'highlighter') return color;
+  final hsl = HSLColor.fromColor(Color(color));
+  if (hsl.lightness >= .55) return color;
+  return hsl.withLightness((1 - hsl.lightness).clamp(.74, .92)).toColor().toARGB32();
+}
+
+/// Whether ink anchored to [type] sits on a printed page (PDF, image) that
+/// keeps its light background in dark mode.
+bool studyOnPrintedPage(String? type) => type == 'pdf' || type == 'pdfdoc' || type == 'image';
 
 void paintInk(
   Canvas canvas,

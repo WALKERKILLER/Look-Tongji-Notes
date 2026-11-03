@@ -2,6 +2,9 @@ part of 'study_canvas.dart';
 
 enum StudyDockEdge { top, right, bottom, left }
 
+/// Space between a dock and the window edge it sits on.
+const studyDockMargin = Space.sm;
+
 class StudyDockPlacement {
   const StudyDockPlacement(this.edge, [this.offset = .5]);
   final StudyDockEdge edge;
@@ -142,7 +145,6 @@ class _StudyEdgeDockState extends State<StudyEdgeDock> {
     return Positioned.fill(
       child: LayoutBuilder(
         builder: (context, size) {
-          final chrome = StudyChrome.of(context);
           final centered = widget.centerHandle && !vertical;
           final extent = math.min(
             widget.maxLength ?? double.infinity,
@@ -178,27 +180,31 @@ class _StudyEdgeDockState extends State<StudyEdgeDock> {
               curve: Curves.easeOut,
               alignment: placement.alignment,
               child: Padding(
+                // Docks float a step off the window edge so their glass and
+                // shadow read as a layer instead of being cut by the edge.
                 padding: vertical
-                    ? const EdgeInsets.symmetric(vertical: 64)
-                    : EdgeInsets.only(left: widget.startInset + 12, right: 12),
+                    ? const EdgeInsets.symmetric(
+                        vertical: 64,
+                        horizontal: studyDockMargin,
+                      )
+                    : EdgeInsets.fromLTRB(
+                        widget.startInset + 12,
+                        studyDockMargin,
+                        12,
+                        studyDockMargin,
+                      ),
                 child: SizedBox(
                   key: ValueKey('study-dock-${widget.id}'),
                   width: vertical ? widget.thickness * widget.scale : null,
                   height: vertical ? null : widget.thickness * widget.scale,
                   child: FittedBox(
                     fit: BoxFit.contain,
-                    child: Material(
+                    child: GlassSurface(
                       key: widget.surfaceKey,
-                      color: chrome.surface,
-                      elevation: _drag == null ? 2 : 6,
-                      shadowColor: chrome.shadow,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(
-                          widget.centerHandle ? Corners.md : 26,
-                        ),
-                        side: BorderSide(color: chrome.line),
-                      ),
-                      clipBehavior: Clip.antiAlias,
+                      selected: _drag != null,
+                      radius: widget.centerHandle
+                          ? Corners.lg
+                          : widget.thickness / 2,
                       child: ConstrainedBox(
                         constraints: BoxConstraints(
                           maxWidth: vertical ? widget.thickness : logicalExtent,

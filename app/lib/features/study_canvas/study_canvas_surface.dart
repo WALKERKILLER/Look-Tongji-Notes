@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../theme/prefs.dart';
-import '../../theme/theme.dart';
 
-/// Paper and material cards use light surfaces, including in a dark app theme.
+/// The study canvas follows the app's theme: paper, cards and ink are toned
+/// for dark mode (see studyPaperTone and inkOnDark); printed pages (PDF,
+/// images) keep their own light background.
 class StudyCanvasSurface extends StatelessWidget {
   const StudyCanvasSurface({
     super.key,
@@ -19,30 +20,21 @@ class StudyCanvasSurface extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ambient = Theme.of(context);
-    final scheme = ambient.brightness == Brightness.light
-        ? ambient.colorScheme
-        : buildScheme(
-            prefs,
-            Brightness.light,
-            systemAccent: ambient.colorScheme.primary,
-          );
-    final paper = buildTheme(scheme, prefs);
+    final cs = Theme.of(context).colorScheme;
+    final dark = cs.brightness == Brightness.dark;
     return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: fullscreen
+      value: fullscreen || dark
           ? SystemUiOverlayStyle.light
           : SystemUiOverlayStyle.dark,
-      child: Theme(
-        data: paper,
-        child: Material(
-          color: fullscreen ? Colors.black : scheme.surface,
-          child: SafeArea(
-            top: !fullscreen,
-            bottom: !fullscreen,
-            left: !fullscreen,
-            right: !fullscreen,
-            child: child,
-          ),
+      child: Material(
+        color: fullscreen ? Colors.black : cs.surfaceContainerLow,
+        child: SafeArea(
+          top: !fullscreen,
+          bottom: !fullscreen,
+          left: !fullscreen,
+          right: !fullscreen,
+          // The canvas's glass panes share one backdrop capture.
+          child: BackdropGroup(child: child),
         ),
       ),
     );

@@ -16,17 +16,23 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:window_manager/window_manager.dart';
 
 import '../../core/api.dart';
+import '../../core/format.dart';
+import '../../core/models.dart';
+import '../../theme/glass.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/look_markdown.dart';
 import '../../l10n/l10n.dart';
 import '../player/lecture_player.dart';
+import '../practice/quiz.dart';
 import 'study_document.dart';
 import 'study_pdf_column.dart';
 import 'study_shape.dart';
 
-import 'package:val_latex_flutter/val_latex_flutter.dart';
+import 'package:val_latex_flutter/val_latex_flutter.dart' hide Segment;
 
 part 'study_agent_ui.dart';
+part 'study_agent_stage.dart';
+part 'study_shelf_ui.dart';
 part 'study_brush_ui.dart';
 part 'study_interaction.dart';
 part 'study_conversation_ui.dart';
@@ -65,6 +71,9 @@ class StudyCanvas extends StatefulWidget {
 class StudyCanvasState extends State<StudyCanvas> with WidgetsBindingObserver {
   /// Theme-derived chrome colours for the whole workspace.
   StudyChrome get chrome => StudyChrome.of(context);
+
+  /// Dark paper: ink and paper are toned for the dark scheme.
+  bool get _dark => Theme.of(context).brightness == Brightness.dark;
   StudyDocument? document;
   Object? _loadError, _saveError;
   StudyTool _tool = StudyTool.select;
@@ -122,6 +131,27 @@ class StudyCanvasState extends State<StudyCanvas> with WidgetsBindingObserver {
   final _conversationKeys = <String, GlobalKey<_ConversationBodyState>>{};
   final _initialConversations = <String, Map>{};
   String? _activeConversation;
+
+  /// Conversations mounted this session; a hidden one keeps its run going.
+  final _liveThreads = <String>{};
+
+  /// Last known turn count and question per conversation, for thread nodes.
+  final _threadSummary = <String, Map>{};
+  final _threadTick = ValueNotifier(0);
+  final _stageKeys = <GlobalKey>{};
+  final _composerFocus = FocusNode(debugLabel: 'study-composer');
+  final _idleInput = TextEditingController();
+
+  /// True while a stroke, pan or drag is under way; the stage steps back.
+  final _gesturing = ValueNotifier(false);
+  bool _stageOpen = true;
+
+  /// The open 课次素材 tab, or null when the shelf is away.
+  _ShelfTab? _shelfTab, _shelfShown;
+  final _shelfKey = GlobalKey();
+
+  /// Where a dragged shelf item would land, in canvas pixels.
+  final _dropHint = ValueNotifier<Rect?>(null);
   bool _moduleSmall = false, _toolbarSmall = false;
   String _status = l10n.studyOpening;
   bool _importing = false, _disposed = false;
@@ -232,6 +262,7 @@ class StudyCanvasState extends State<StudyCanvas> with WidgetsBindingObserver {
         _remoteDocument = data;
         _remotePending = true;
         document = StudyDocument.fromJson(jsonDecode(draft) as Map);
+        _adoptThreads(document!);
         document!.edit = 1;
         _savedEdit = 0;
         document!.addListener(_changed);
@@ -240,6 +271,7 @@ class StudyCanvasState extends State<StudyCanvas> with WidgetsBindingObserver {
       }
       document?.dispose();
       document = d;
+      _adoptThreads(d);
       d.addListener(_changed);
       _savedEdit = d.edit;
       setState(() {
@@ -383,6 +415,12 @@ class StudyCanvasState extends State<StudyCanvas> with WidgetsBindingObserver {
 
   bool handleKey(KeyEvent e) {
     if (e is! KeyDownEvent || document == null) return false;
+    // Typing in the composer or a card must not switch tools.
+    final focus = FocusManager.instance.primaryFocus?.context;
+    if (focus != null &&
+        (focus.widget is EditableText ||
+            focus.findAncestorWidgetOfExactType<EditableText>() != null))
+      return false;
     final k = e.logicalKey;
     if ((HardwareKeyboard.instance.isMetaPressed ||
             HardwareKeyboard.instance.isControlPressed) &&
@@ -419,6 +457,11 @@ class StudyCanvasState extends State<StudyCanvas> with WidgetsBindingObserver {
     unawaited(_stylusEvents?.cancel());
     _camera.dispose();
     _cursor.dispose();
+    _threadTick.dispose();
+    _composerFocus.dispose();
+    _idleInput.dispose();
+    _gesturing.dispose();
+    _dropHint.dispose();
     document?.removeListener(_changed);
     document?.dispose();
     _scene.dispose();
@@ -454,6 +497,8 @@ class StudyCanvasState extends State<StudyCanvas> with WidgetsBindingObserver {
       _selectionMenuKey,
       _moduleKey,
       _toolbarKey,
+      _shelfKey,
+      ..._stageKeys,
     ]) {
       final box = key.currentContext?.findRenderObject() as RenderBox?;
       if (box != null &&
@@ -637,6 +682,7 @@ class StudyCanvasState extends State<StudyCanvas> with WidgetsBindingObserver {
       _lastStylus = DateTime.now();
     }
     _pointers[e.pointer] = e.localPosition;
+    if (!_gesturing.value) _gesturing.value = true;
     if (_pointers.length == 2 &&
         _pinchDistance != null &&
         _drawingPointer == null) {
@@ -740,11 +786,11 @@ class StudyCanvasState extends State<StudyCanvas> with WidgetsBindingObserver {
               old.left,
               old.top,
               math.max(
-                c.type == 'conversation' ? 420 : 280,
+                c.type == 'conversation' ? 240 : 280,
                 old.width + delta.dx,
               ),
               math.max(
-                c.type == 'conversation' ? 480 : 180,
+                c.type == 'conversation' ? 160 : 180,
                 old.height + delta.dy,
               ),
             )
@@ -776,6 +822,7 @@ class StudyCanvasState extends State<StudyCanvas> with WidgetsBindingObserver {
     _pressureOrigin = null;
     _pressureStart = null;
     _pointers.remove(e.pointer);
+    if (_pointers.isEmpty) _gesturing.value = false;
     if (e is PointerCancelEvent && _drawingPointer == e.pointer) {
       _resetShape();
       _points = [];
@@ -963,7 +1010,11 @@ class StudyCanvasState extends State<StudyCanvas> with WidgetsBindingObserver {
     }
   }
 
-  Future<void> _import({String? courseware, bool wholeCourse = false}) async {
+  Future<void> _import({
+    String? courseware,
+    bool wholeCourse = false,
+    Offset? at,
+  }) async {
     if (_importing) return;
     XFile? file;
     if (courseware == null) {
@@ -1029,9 +1080,9 @@ class StudyCanvasState extends State<StudyCanvas> with WidgetsBindingObserver {
       ];
       if (cards.length + d.cards.length > 2000)
         throw FormatException(l10n.studyCardLimit);
-      final center = _world(_viewport.center(Offset.zero));
+      final center = at ?? _world(_viewport.center(Offset.zero));
       d.checkpoint();
-      var y = center.dy - 120;
+      var y = center.dy - (at == null ? 120 : 60);
       for (final c in cards) {
         c.layer = d.activeLayer;
         c.rect = Rect.fromLTWH(center.dx - 160, y, c.rect.width, c.rect.height);
@@ -1116,6 +1167,18 @@ class StudyCanvasState extends State<StudyCanvas> with WidgetsBindingObserver {
   Future<void> _ask() async {
     await _openConversation();
   }
+
+  /// The player's full side panel (outline, AI tools) as a dialog.
+  void _openPlayerPanel() => showDialog<void>(
+    context: context,
+    builder: (_) => Dialog(
+      child: SizedBox(
+        width: 480,
+        height: math.min(600, _viewport.height - 48),
+        child: widget.panel,
+      ),
+    ),
+  );
 
   void _layers() {
     showModalBottomSheet(
@@ -1333,6 +1396,7 @@ class StudyCanvasState extends State<StudyCanvas> with WidgetsBindingObserver {
                                 repaint: _camera,
                                 style: _paperStyle,
                                 color: _paperColor,
+                                scheme: Theme.of(context).colorScheme,
                               ),
                             ),
                           ),
@@ -1398,6 +1462,7 @@ class StudyCanvasState extends State<StudyCanvas> with WidgetsBindingObserver {
                                           live: _prefix,
                                           stage: stage,
                                           repaint: _scene,
+                                          dark: _dark,
                                         ),
                                       ),
                                     ),
@@ -1423,7 +1488,16 @@ class StudyCanvasState extends State<StudyCanvas> with WidgetsBindingObserver {
                                             ]),
                                   start: () =>
                                       _predicted.isEmpty ? _prefixEnd : 0,
-                                  color: () => _gestureColor,
+                                  color: () =>
+                                      _dark &&
+                                          !studyOnPrintedPage(
+                                            d.cards
+                                                .where((c) => c.id == _anchor)
+                                                .firstOrNull
+                                                ?.type,
+                                          )
+                                      ? inkOnDark(_gestureColor, _tool == StudyTool.highlighter ? 'highlighter' : 'pen')
+                                      : _gestureColor,
                                   width: () => _gestureWidth,
                                   brush: () => _gestureBrush,
                                   tool: () => _tool,
@@ -1462,46 +1536,65 @@ class StudyCanvasState extends State<StudyCanvas> with WidgetsBindingObserver {
                     height: 22,
                     child: DragToMoveArea(child: SizedBox.expand()),
                   ),
+                _assetDropTarget(),
+                _dropOutline(),
+                _agentStage(),
                 _topToolbar(),
                 _moduleRail(),
                 _penDock(),
                 _selectionToolbar(),
-                Positioned(
-                  right: 12,
-                  bottom: 12,
-                  child: Material(
-                    key: _zoomKey,
-                    elevation: 2,
-                    borderRadius: BorderRadius.circular(20),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          tooltip: l10n.studyZoomOut,
-                          onPressed: () => _zoomBy(1 / 1.2),
-                          icon: const Icon(Icons.remove, size: 18),
-                        ),
-                        ValueListenableBuilder<int>(
-                          valueListenable: _camera,
-                          builder: (_, value, child) => Text(
-                            '${(d.zoom * 100).round()}%',
-                            style: const TextStyle(fontSize: 12),
+                _shelf(),
+                if (_viewport.width >= 600)
+                  Positioned(
+                    right: studyZoomInset,
+                    bottom: studyZoomInset,
+                    child: GlassSurface(
+                      key: _zoomKey,
+                      radius: Corners.full,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: Space.xxs,
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            tooltip: l10n.studyZoomOut,
+                            visualDensity: VisualDensity.compact,
+                            onPressed: () => _zoomBy(1 / 1.2),
+                            icon: const Icon(Icons.remove_rounded, size: 18),
                           ),
-                        ),
-                        IconButton(
-                          tooltip: l10n.studyZoomIn,
-                          onPressed: () => _zoomBy(1.2),
-                          icon: const Icon(Icons.add, size: 18),
-                        ),
-                        IconButton(
-                          tooltip: l10n.studyFit,
-                          onPressed: _fit,
-                          icon: const Icon(Icons.fit_screen, size: 19),
-                        ),
-                      ],
+                          ValueListenableBuilder<int>(
+                            valueListenable: _camera,
+                            builder: (_, value, child) => SizedBox(
+                              width: 44,
+                              child: Text(
+                                '${(d.zoom * 100).round()}%',
+                                textAlign: TextAlign.center,
+                                style: Theme.of(context).textTheme.labelMedium
+                                    ?.copyWith(
+                                      fontFeatures: const [
+                                        FontFeature.tabularFigures(),
+                                      ],
+                                    ),
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            tooltip: l10n.studyZoomIn,
+                            visualDensity: VisualDensity.compact,
+                            onPressed: () => _zoomBy(1.2),
+                            icon: const Icon(Icons.add_rounded, size: 18),
+                          ),
+                          IconButton(
+                            tooltip: l10n.studyFit,
+                            visualDensity: VisualDensity.compact,
+                            onPressed: _fit,
+                            icon: const Icon(Icons.fit_screen_outlined, size: 18),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
               ],
             ),
           ),
@@ -1513,162 +1606,224 @@ class StudyCanvasState extends State<StudyCanvas> with WidgetsBindingObserver {
   Widget _card(StudyCard c) {
     final d = document!,
         selected = _selection.contains(c.id),
-        chrome = StudyChrome.of(context);
+        chrome = StudyChrome.of(context),
+        cs = Theme.of(context).colorScheme;
+    final shape = RoundedSuperellipseBorder(
+      borderRadius: BorderRadius.circular(Corners.lg),
+      side: BorderSide(
+        color: selected
+            ? chrome.accent
+            : cs.onSurface.withValues(alpha: _dark ? .12 : .08),
+        width: selected ? 2 : 1,
+      ),
+    );
+    Widget action(
+      String tooltip,
+      IconData icon,
+      VoidCallback? onPressed,
+    ) => IconButton(
+      tooltip: tooltip,
+      onPressed: onPressed,
+      iconSize: 16,
+      visualDensity: VisualDensity.compact,
+      constraints: const BoxConstraints.tightFor(width: 32, height: 32),
+      padding: EdgeInsets.zero,
+      color: cs.onSurfaceVariant,
+      icon: Icon(icon),
+    );
+    final pdfColumn = c.type == 'pdfdoc' && c.pdfColumn.isNotEmpty;
+    // Rare actions live in one menu so the header never runs out of room.
+    final more = <(String, IconData, VoidCallback?)>[
+      if (!pdfColumn)
+        (
+          c.collapsed ? l10n.studyCardExpand : l10n.studyCardCollapse,
+          c.collapsed ? Icons.unfold_more_rounded : Icons.unfold_less_rounded,
+          () {
+            d.checkpoint();
+            c.collapsed = !c.collapsed;
+            if (c.collapsed) {
+              c.expandedH = c.rect.height;
+              c.rect = Rect.fromLTWH(c.rect.left, c.rect.top, c.rect.width, 60);
+            } else {
+              c.rect = Rect.fromLTWH(
+                c.rect.left,
+                c.rect.top,
+                c.rect.width,
+                math.max(c.type == 'conversation' ? 160 : 240, c.expandedH),
+              );
+            }
+            d.changed();
+          },
+        ),
+      if (c.pdfColumn.isNotEmpty)
+        (
+          l10n.studyCardFoldColumn,
+          Icons.vertical_align_center_rounded,
+          _importing ? null : () => _collapsePDFColumn(c.pdfColumn),
+        ),
+      if (c.type == 'pdf' || c.type == 'pdfdoc')
+        (
+          l10n.studyCardSelectText,
+          Icons.text_snippet_outlined,
+          () => _documentSelection(c),
+        ),
+      if (c.generated)
+        (
+          l10n.studyCardEditKnowledge,
+          Icons.edit_outlined,
+          () => _editKnowledge(c),
+        ),
+      if (c.type == 'text')
+        (l10n.studyEditText, Icons.edit_outlined, () => _text(c)),
+      if (c.type != 'lecture' && !pdfColumn)
+        (l10n.studyCardDelete, Icons.delete_outline_rounded, () {
+          d.checkpoint();
+          d.cards.removeWhere((v) => v.id == c.id);
+          d.connections.removeWhere((v) => v.from == c.id || v.to == c.id);
+          d.strokes.removeWhere((v) => v.anchor == c.id);
+          d.changed();
+        }),
+    ];
     return IgnorePointer(
       ignoring: _writing || _tool == StudyTool.hand || !d.editable(c.layer),
       child: Container(
-        decoration: BoxDecoration(
+        decoration: ShapeDecoration(
           color: chrome.paper,
-          borderRadius: BorderRadius.circular(Corners.md),
-          border: Border.all(
-            color: selected ? chrome.accent : chrome.line,
-            width: selected ? 2 : 1,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: chrome.shadow,
-              blurRadius: 20,
-              offset: const Offset(0, 5),
-            ),
-          ],
+          shape: shape,
+          // Dark cards separate by a tonal step; a shadow would only muddy.
+          shadows: _dark
+              ? null
+              : [
+                  BoxShadow(
+                    color: chrome.shadow,
+                    blurRadius: 24,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
         ),
         clipBehavior: Clip.antiAlias,
         child: Column(
           children: [
             SizedBox(
               height: 36,
-              child: ColoredBox(
-                color: c.type == 'lecture'
-                    ? chrome.accentSoft
-                    : chrome.surfaceSoft,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: c.type == 'lecture'
+                      ? chrome.accentSoft
+                      : Colors.transparent,
+                  border: Border(
+                    bottom: BorderSide(
+                      color: cs.onSurface.withValues(alpha: .08),
+                    ),
+                  ),
+                ),
                 child: Row(
                   children: [
-                    const SizedBox(width: 12),
+                    const SizedBox(width: Space.md),
                     Icon(
-                      c.type == 'lecture' || c.type == 'video'
-                          ? Icons.play_circle_outline
-                          : c.type == 'text'
-                          ? Icons.notes
-                          : Icons.description_outlined,
+                      switch (c.type) {
+                        'lecture' || 'video' => Icons.smart_display_outlined,
+                        'text' => Icons.notes_rounded,
+                        'conversation' => Icons.forum_outlined,
+                        'image' => Icons.image_outlined,
+                        'note' ||
+                        'explanation' ||
+                        'knowledge' => Icons.lightbulb_outline_rounded,
+                        'practice' => Icons.quiz_outlined,
+                        _ => Icons.description_outlined,
+                      },
                       size: 16,
-                      color: chrome.inkSoft,
+                      color: c.type == 'conversation'
+                          ? cs.primary
+                          : cs.onSurfaceVariant,
                     ),
-                    const SizedBox(width: 7),
+                    const SizedBox(width: Space.sm),
                     Expanded(
-                      child: Text(
-                        c.type == 'pdf' && c.pdfColumn.isNotEmpty
-                            ? '${c.title} · 第 ${c.page}/${c.pageCount} 页'
-                            : c.title,
-                        style: TextStyle(fontSize: 12, color: chrome.ink),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                      child: Tooltip(
+                        message: c.title,
+                        waitDuration: const Duration(milliseconds: 600),
+                        child: Text(
+                          c.type == 'pdf' && c.pdfColumn.isNotEmpty
+                              ? l10n.studyCardPdfPage(c.title, c.page, c.pageCount)
+                              : c.title,
+                          style: Theme.of(context).textTheme.labelLarge
+                              ?.copyWith(color: chrome.ink),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
                     ),
+                    if (c.type == 'pdfdoc' &&
+                        (c.pdfColumn.isEmpty ||
+                            d.pdfPages(c.id).length < c.pageCount))
+                      action(
+                        c.pdfColumn.isEmpty ? '在画布展开为一列' : '继续展开整列',
+                        Icons.view_agenda_outlined,
+                        _importing ? null : () => _expandPDFColumn(c),
+                      ),
                     if (c.type != 'conversation')
                       Draggable<String>(
                         data: c.id,
                         feedback: Material(
-                          child: Padding(
-                            padding: const EdgeInsets.all(8),
-                            child: Text(c.title),
+                          type: MaterialType.transparency,
+                          child: GlassSurface(
+                            depth: GlassDepth.float,
+                            radius: Corners.full,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: Space.md,
+                              vertical: Space.sm,
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.add_comment_outlined,
+                                  size: 16,
+                                  color: cs.primary,
+                                ),
+                                const SizedBox(width: Space.sm),
+                                ConstrainedBox(
+                                  constraints: const BoxConstraints(
+                                    maxWidth: 220,
+                                  ),
+                                  child: Text(
+                                    c.title,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
-                        child: IconButton(
-                          tooltip: '加入 AI 对话（或拖到引用条）',
-                          onPressed: () => _chooseConversation(c),
-                          icon: const Icon(
-                            Icons.add_comment_outlined,
-                            size: 15,
-                          ),
+                        child: action(
+                          l10n.studyCardAsk,
+                          Icons.add_comment_outlined,
+                          () => _chooseConversation(c),
                         ),
                       ),
-                    IconButton(
-                      tooltip: c.collapsed ? '展开模块' : '折叠模块',
-                      onPressed: c.type == 'pdfdoc' && c.pdfColumn.isNotEmpty
-                          ? null
-                          : () {
-                              d.checkpoint();
-                              c.collapsed = !c.collapsed;
-                              if (c.collapsed) {
-                                c.expandedH = c.rect.height;
-                                c.rect = Rect.fromLTWH(
-                                  c.rect.left,
-                                  c.rect.top,
-                                  c.rect.width,
-                                  60,
-                                );
-                              } else {
-                                c.rect = Rect.fromLTWH(
-                                  c.rect.left,
-                                  c.rect.top,
-                                  c.rect.width,
-                                  math.max(240, c.expandedH),
-                                );
-                              }
-                              d.changed();
-                            },
-                      icon: Icon(
-                        c.collapsed ? Icons.expand_more : Icons.expand_less,
-                        size: 16,
-                      ),
-                    ),
-                    if (c.type != 'lecture' &&
-                        !(c.type == 'pdfdoc' && c.pdfColumn.isNotEmpty))
-                      IconButton(
-                        tooltip: '删除模块',
-                        onPressed: () {
-                          d.checkpoint();
-                          d.cards.removeWhere((v) => v.id == c.id);
-                          d.connections.removeWhere(
-                            (v) => v.from == c.id || v.to == c.id,
-                          );
-                          d.strokes.removeWhere((v) => v.anchor == c.id);
-                          d.changed();
-                        },
-                        icon: const Icon(Icons.close, size: 15),
-                      ),
-                    if (c.type == 'pdfdoc' &&
-                        (c.pdfColumn.isEmpty ||
-                            d.pdfPages(c.id).length < c.pageCount))
-                      IconButton(
-                        tooltip: c.pdfColumn.isEmpty ? '在画布展开为一列' : '继续展开整列',
-                        onPressed: _importing
-                            ? null
-                            : () => _expandPDFColumn(c),
-                        icon: const Icon(Icons.unfold_more, size: 16),
-                      ),
-                    if (c.pdfColumn.isNotEmpty)
-                      IconButton(
-                        tooltip: '收起整列',
-                        onPressed: _importing
-                            ? null
-                            : () => _collapsePDFColumn(c.pdfColumn),
-                        icon: const Icon(Icons.unfold_less, size: 16),
-                      ),
-                    if (c.type == 'pdf' || c.type == 'pdfdoc')
-                      IconButton(
-                        tooltip: '选择文档文字',
-                        onPressed: () => _documentSelection(c),
-                        icon: const Icon(Icons.text_snippet_outlined, size: 16),
-                      ),
-                    if (c.generated)
-                      IconButton(
-                        tooltip: '编辑知识卡片',
-                        onPressed: () => _editKnowledge(c),
-                        icon: const Icon(Icons.edit_outlined, size: 15),
-                      ),
-                    if (c.type == 'text')
-                      IconButton(
-                        tooltip: l10n.studyEditText,
-                        onPressed: () => _text(c),
-                        icon: const Icon(Icons.edit_outlined, size: 15),
+                    if (more.isNotEmpty)
+                      MenuAnchor(
+                        menuChildren: [
+                          for (final (label, icon, run) in more)
+                            MenuItemButton(
+                              leadingIcon: Icon(icon, size: 18),
+                              onPressed: run,
+                              child: Text(label),
+                            ),
+                        ],
+                        builder: (context, menu, _) => action(
+                          l10n.studyCardMore,
+                          Icons.more_horiz_rounded,
+                          () => menu.isOpen ? menu.close() : menu.open(),
+                        ),
                       ),
                     Icon(
-                      Icons.drag_indicator,
+                      Icons.drag_indicator_rounded,
                       size: 16,
                       color: chrome.inkFaint,
                     ),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: Space.sm),
                   ],
                 ),
               ),
@@ -1681,32 +1836,16 @@ class StudyCanvasState extends State<StudyCanvas> with WidgetsBindingObserver {
                   offstage: c.collapsed,
                   child: switch (c.type) {
                     'pdfdoc' => _PDFBody(owner: this, card: c),
-                    'conversation' => _ConversationBody(
-                      key: _conversationKeys.putIfAbsent(
-                        c.id,
-                        () => GlobalKey<_ConversationBodyState>(),
-                      ),
-                      owner: this,
-                      card: c,
-                      initial: _initialConversations[c.id],
-                    ),
+                    'conversation' => _ThreadNode(owner: this, card: c),
                     'lecture' => Column(
                       children: [
                         Expanded(child: widget.video),
                         SizedBox(
                           height: 30,
-                          child: TextButton(
-                            onPressed: () => showDialog<void>(
-                              context: context,
-                              builder: (_) => Dialog(
-                                child: SizedBox(
-                                  width: 480,
-                                  height: 600,
-                                  child: widget.panel,
-                                ),
-                              ),
-                            ),
-                            child: const Text('大纲 · 字幕 · 课程资料'),
+                          child: TextButton.icon(
+                            onPressed: () => _toggleShelf(_ShelfTab.transcript),
+                            icon: const Icon(Icons.subtitles_outlined, size: 16),
+                            label: Text(l10n.studyShelfFromVideo),
                           ),
                         ),
                       ],
@@ -1854,19 +1993,30 @@ class _LocalVideoState extends State<_LocalVideo> {
       : Center(child: Text(l10n.studyLocalVideoError(_error!)));
 }
 
+/// The paper colour as shown: in dark mode each paper keeps a trace of its
+/// hue over the scheme's low container surface.
+Color studyPaperTone(int color, ColorScheme cs) => cs.brightness == Brightness.dark
+    ? Color.alphaBlend(Color(color).withValues(alpha: color == 0xffffffff ? 0 : .06), cs.surfaceContainerLow)
+    : Color(color);
+
 class _Paper extends CustomPainter {
   _Paper({
     this.document,
     Listenable? repaint,
     this.style = 'ruled',
     this.color = 0xffffffff,
+    this.scheme,
   }) : super(repaint: repaint);
   final String style;
   final int color;
   final StudyDocument? document;
+
+  /// Tones the paper for dark mode; null paints [color] as stored.
+  final ColorScheme? scheme;
   @override
   void paint(Canvas c, Size s) {
-    c.drawRect(Offset.zero & s, Paint()..color = Color(color));
+    final tone = scheme == null ? Color(color) : studyPaperTone(color, scheme!);
+    c.drawRect(Offset.zero & s, Paint()..color = tone);
     if (style == 'blank') return;
     var spacing = document == null ? 14.0 : 36 * document!.zoom;
     while (document != null && spacing < 22) {
@@ -1874,9 +2024,9 @@ class _Paper extends CustomPainter {
     }
     final camera = document?.camera ?? Offset.zero;
     final line = Paint()
-      ..color = Color(color).computeLuminance() > .5
+      ..color = tone.computeLuminance() > .5
           ? const Color(0x1826354a)
-          : const Color(0x26ffffff)
+          : const Color(0x1fffffff)
       ..strokeWidth = .7;
     for (var y = camera.dy % spacing; y < s.height; y += spacing) {
       if (style == 'ruled' || style == 'grid') {
@@ -1904,26 +2054,31 @@ class _InkScene extends CustomPainter {
     required this.live,
     required this.stage,
     required Listenable repaint,
+    this.dark = false,
   }) : super(repaint: repaint);
   final StudyDocument document;
   final List<StudyStroke> live;
   final Rect stage;
+  final bool dark;
   @override
   void paint(Canvas c, Size s) {
     final d = document;
     c.save();
     c.translate(-stage.left, -stage.top);
     final viewport = stage;
+    final printed = dark
+        ? {for (final card in d.cards) if (studyOnPrintedPage(card.type)) card.id}
+        : const <String>{};
     for (final stroke in [...d.strokes, ...live]) {
       if (d.strokeVisible(stroke) && stroke.bounds.overlaps(viewport))
-        stroke.paint(c);
+        stroke.paint(c, dark: dark && !printed.contains(stroke.anchor));
     }
     c.restore();
   }
 
   @override
   bool shouldRepaint(_InkScene old) =>
-      old.stage != stage || old.document != document;
+      old.stage != stage || old.document != document || old.dark != dark;
   @override
   bool shouldRebuildSemantics(_InkScene old) => false;
 }

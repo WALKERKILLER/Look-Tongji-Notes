@@ -15,6 +15,7 @@ import '../lib/features/player/lecture_player.dart';
 import '../lib/features/study_canvas/study_canvas.dart';
 import '../lib/features/study_canvas/study_document.dart';
 import '../lib/features/study_canvas/study_canvas_surface.dart';
+import '../lib/theme/glass.dart';
 import '../lib/theme/prefs.dart';
 import '../lib/theme/theme.dart';
 
@@ -140,6 +141,7 @@ Future<GlobalKey<StudyCanvasState>> open(
   GlobalKey? capture,
   Brightness brightness = Brightness.light,
   bool resetPreferences = true,
+  LecturePlayer? player,
 }) async {
   if (resetPreferences) SharedPreferences.setMockInitialValues({});
   final prefs = await UiPrefs.load();
@@ -158,7 +160,7 @@ Future<GlobalKey<StudyCanvasState>> open(
             child: StudyCanvas(
               key: key,
               api: api,
-              ctl: FixturePlayer(),
+              ctl: player ?? FixturePlayer(),
               video: const Text('视频占位'),
               panel: const SizedBox(width: 240),
               onClassic: () {},
@@ -256,11 +258,16 @@ void main() {
       await t.pumpAndSettle();
     }
 
+    // Docks keep an 8 px margin from the edge they snap to.
+    const margin = 8.0;
     await dragDock(stage.centerLeft);
-    expect(t.getRect(find.byKey(const ValueKey('study-dock-pens'))).left, 0);
+    expect(
+      t.getRect(find.byKey(const ValueKey('study-dock-pens'))).left,
+      margin,
+    );
     expect(
       t.getRect(find.byKey(const ValueKey('study-dock-modules'))).top,
-      stage.top,
+      stage.top + margin,
     );
     for (final target in [
       stage.topCenter,
@@ -285,7 +292,10 @@ void main() {
     await t.pumpWidget(const SizedBox());
     await t.pumpAndSettle();
     await open(t, api, resetPreferences: false);
-    expect(t.getRect(find.byKey(const ValueKey('study-dock-pens'))).left, 0);
+    expect(
+      t.getRect(find.byKey(const ValueKey('study-dock-pens'))).left,
+      margin,
+    );
     await t.pumpWidget(const SizedBox());
     await api.syncEvents.close();
   });
@@ -369,12 +379,27 @@ void main() {
             .descendant(of: control, matching: find.byType(RichText))
             .first;
         final foreground = t.widget<RichText>(glyph).text.style!.color!;
-        final background = find
+        final page = find
             .ancestor(of: glyph, matching: find.byType(Material))
             .evaluate()
             .map((e) => e.widget as Material)
             .firstWhere((m) => m.color?.a == 1)
             .color!;
+        // Glass panes composite their fill over what lies beneath.
+        final glass = find.ancestor(
+          of: glyph,
+          matching: find.byType(GlassSurface),
+        );
+        final background = glass.evaluate().isEmpty
+            ? page
+            : Color.alphaBlend(
+                GlassSurface.fillOf(
+                  t.element(glass.first),
+                  depth: t.widget<GlassSurface>(glass.first).depth,
+                  tint: t.widget<GlassSurface>(glass.first).tint,
+                ),
+                page,
+              );
         final ink = Color.alphaBlend(foreground, background).computeLuminance();
         final paper = background.computeLuminance();
         final ratio =
@@ -661,7 +686,7 @@ void main() {
       );
     final api = FixtureApi(d.json());
     final key = await open(t, api);
-    final input = find.byType(TextField);
+    final input = find.widgetWithText(TextField, '我的作答');
     await t.tap(input);
     await t.enterText(input, '需要访问下一层存储');
     await t.pumpAndSettle();
@@ -702,7 +727,7 @@ void main() {
         }
       });
       await t.pumpAndSettle();
-      await t.tap(find.byType(Checkbox));
+      await t.tap(find.byType(FilterChip));
       await t.enterText(find.byType(TextField).last, '解释这条实际笔迹');
       // Real raster readback must run outside the widget test's fake clock.
       await t.runAsync(() async {

@@ -18,7 +18,8 @@ extension _StudyToolbars on StudyCanvasState {
     bool selected = false,
     bool compact = false,
   }) {
-    final c = StudyChrome.of(context);
+    final cs = Theme.of(context).colorScheme;
+    // A chosen tool sits in a tonal pill (M3 selected icon button).
     return IconButton(
       key: key,
       tooltip: label,
@@ -28,9 +29,11 @@ extension _StudyToolbars on StudyCanvasState {
         minimumSize: compact ? const Size(32, 32) : const Size(40, 40),
         padding: EdgeInsets.all(compact ? 5 : 8),
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        backgroundColor: Colors.transparent,
-        foregroundColor: selected ? c.accent : c.ink,
-        disabledForegroundColor: c.inkFaint,
+        backgroundColor: selected
+            ? cs.secondaryContainer
+            : Colors.transparent,
+        foregroundColor: selected ? cs.onSecondaryContainer : cs.onSurface,
+        disabledForegroundColor: cs.onSurface.withValues(alpha: .38),
       ),
       icon: Icon(icon, size: compact ? 20 : 22),
     );
@@ -43,7 +46,7 @@ extension _StudyToolbars on StudyCanvasState {
       child: Container(
         width: vertical ? 28 : 1,
         height: vertical ? 1 : 28,
-        color: StudyChrome.of(context).line,
+        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: .14),
       ),
     ),
   );
@@ -61,12 +64,25 @@ extension _StudyToolbars on StudyCanvasState {
       label: '导航栏',
       surfaceKey: _moduleKey,
       placement: placement,
-      maxLength: 232,
+      maxLength: 330,
       startInset: Platform.isMacOS && !narrow ? 80 : 0,
       onChanged: (p) => _moveDock('modules', p),
       children: (vertical) => [
         _action('返回', Icons.arrow_back, widget.onBack),
+        _action(
+          l10n.studyExitCanvas,
+          Icons.smart_display_outlined,
+          widget.onClassic,
+          key: const ValueKey('study-exit-canvas'),
+        ),
         _action('页面与材料', Icons.view_sidebar_outlined, _pageIndex),
+        _action(
+          l10n.studyShelf,
+          Icons.inventory_2_outlined,
+          () => _toggleShelf(),
+          key: const ValueKey('study-open-shelf'),
+          selected: _shelfTab != null,
+        ),
         PopupMenuButton<String>(
           tooltip: '添加模块',
           icon: const Icon(Icons.grid_view_outlined, size: 22),
@@ -144,11 +160,6 @@ extension _StudyToolbars on StudyCanvasState {
             key: const ValueKey('study-tool-hand'),
             selected: _tool == StudyTool.hand,
           ),
-          _action('插入文字笔记', Icons.text_fields, () => _text()),
-          _action('插入图片、PDF 或文件', Icons.image_outlined, () => _import()),
-          _action('课程资料', Icons.folder_open_outlined, _courseMaterials),
-          _action(l10n.studyLayers, Icons.layers_outlined, _layers),
-          _action('纸张背景', Icons.wallpaper_outlined, _paperSettings),
           _action(
             '套索 / 框选',
             Icons.gesture,
@@ -156,10 +167,14 @@ extension _StudyToolbars on StudyCanvasState {
             key: const ValueKey('study-tool-region'),
             selected: _tool == StudyTool.region,
           ),
-          _action('问 AI', Icons.auto_awesome_outlined, _ask),
-          _action('管理知识关联', Icons.hub_outlined, _connectionSettings),
           _divider(vertical),
-          _action('导出画布副本', Icons.ios_share, exportRecovery),
+          _action('插入文字笔记', Icons.text_fields, () => _text()),
+          _action('插入图片、PDF 或文件', Icons.image_outlined, () => _import()),
+          _action('课程资料', Icons.folder_open_outlined, _courseMaterials),
+          _divider(vertical),
+          _action(l10n.studyLayers, Icons.layers_outlined, _layers),
+          _action('纸张背景', Icons.wallpaper_outlined, _paperSettings),
+          _action('问 AI', Icons.auto_awesome_outlined, _ask),
         ],
         if (_remotePending) ...[
           TextButton(
@@ -183,6 +198,10 @@ extension _StudyToolbars on StudyCanvasState {
             switch (v) {
               case 'classic':
                 widget.onClassic();
+              case 'links':
+                _connectionSettings();
+              case 'export':
+                exportRecovery();
               case 'fit':
                 _fit();
               case 'brush':
@@ -197,9 +216,11 @@ extension _StudyToolbars on StudyCanvasState {
               child: Text(widget.ctl.lecture?.shortTitle ?? '学习画布'),
             ),
             const PopupMenuItem(value: 'fit', child: Text('显示全部材料')),
-            const PopupMenuItem(value: 'classic', child: Text('传统播放器')),
-            const PopupMenuItem(value: 'paper', child: Text('纸张背景')),
             const PopupMenuItem(value: 'brush', child: Text('画笔与橡皮设置')),
+            const PopupMenuItem(value: 'links', child: Text('管理知识关联')),
+            const PopupMenuItem(value: 'export', child: Text('导出画布副本')),
+            const PopupMenuDivider(),
+            PopupMenuItem(value: 'classic', child: Text(l10n.studyExitCanvas)),
           ],
         ),
       ],

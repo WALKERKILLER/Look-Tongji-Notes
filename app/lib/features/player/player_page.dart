@@ -65,7 +65,8 @@ class _PlayerPageState extends State<PlayerPage> {
   final _view = GlobalKey<PlayerViewState>();
   final _focus = FocusNode(debugLabel: 'player');
   bool _fullscreen = false;
-  bool _canvasMode = true, _allowPop = false;
+  // The classic player opens first; the canvas is entered on request.
+  bool _canvasMode = false, _allowPop = false;
   final _canvas = GlobalKey<StudyCanvasState>();
   bool _panel = true;
   StreamSubscription? _sub;
@@ -323,6 +324,7 @@ class _PlayerPageState extends State<PlayerPage> {
             onTogglePanel: wide && !_fullscreen
                 ? () => setState(() => _panel = !_panel)
                 : null,
+            onCanvas: _canvasMode ? null : () => setState(() => _canvasMode = true),
           );
           final panel = PlayerSidePanel(
             ctl: ctl,
@@ -400,25 +402,6 @@ class _PlayerPageState extends State<PlayerPage> {
               ),
             );
           }
-        }
-        if (!_canvasMode &&
-            !_fullscreen &&
-            !ctl.loading &&
-            ctl.loadError == null) {
-          body = Stack(
-            children: [
-              Positioned.fill(child: body),
-              Positioned(
-                top: 20,
-                left: 190,
-                child: ActionChip(
-                  avatar: const Icon(Icons.draw_outlined, size: 16),
-                  label: Text(l10n.studyTitle),
-                  onPressed: () => setState(() => _canvasMode = true),
-                ),
-              ),
-            ],
-          );
         }
         return PopScope(
           canPop: !_canvasMode || _allowPop,

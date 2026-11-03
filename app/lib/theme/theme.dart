@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'glass.dart';
 import 'prefs.dart';
 import 'tokens.dart';
 
@@ -41,6 +42,7 @@ ThemeData buildTheme(ColorScheme cs, UiPrefs p) {
   const btnPadding = EdgeInsets.symmetric(horizontal: 24, vertical: 10);
 
   return base.copyWith(
+    extensions: [GlassStyle(enabled: p.glass && p.contrast != ContrastLevel.high)],
     textTheme: text,
     scaffoldBackgroundColor: cs.surface,
     pageTransitionsTheme: const PageTransitionsTheme(builders: {

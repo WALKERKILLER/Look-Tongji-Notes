@@ -40,7 +40,8 @@ class StudyChrome {
       onAccentSoft: cs.onPrimaryContainer,
       danger: cs.error,
       shadow: cs.shadow.withValues(alpha: dark ? 0.45 : 0.12),
-      paper: dark ? cs.surfaceContainerLowest : Colors.white,
+      // Cards sit one tonal step above the paper (lighter in dark mode).
+      paper: dark ? cs.surfaceContainerHigh : Colors.white,
       paperInk: dark ? cs.onSurface : const Color(0xff25344a),
     );
   }

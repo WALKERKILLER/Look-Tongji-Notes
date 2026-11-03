@@ -35,90 +35,44 @@ extension _StudyModules on StudyCanvasState {
     };
   }
 
+  /// Brings the agent forward. With [newConversation] a new conversation
+  /// node starts; otherwise the selection joins the one on stage, or starts
+  /// one when nothing is on stage yet.
   Future<void> _openConversation({
     bool newConversation = false,
     bool bind = true,
   }) async {
-    if (document == null || !document!.editable(document!.activeLayer)) return;
-    final query = bind
-        ? _selectedQuery()
-        : <String, dynamic>{
-            'objects': <String>[],
-            'selection': <String, dynamic>{},
-            'include_video': false,
-          };
-    final visual = bind && _regionSelection != null
-        ? await _captureSelection()
-        : <Map<String, dynamic>>[];
-    if (!mounted) return;
-    StudyCard? card;
-    if (!newConversation)
-      card = document!.cards
-          .where((c) => c.id == _activeConversation && c.type == 'conversation')
-          .firstOrNull;
-    if (card == null) {
-      final p = _world(_viewport.center(Offset.zero));
-      var rect = Rect.fromLTWH(p.dx, p.dy - 200, 520, 620);
-      for (
-        var i = 0;
-        i < 80 && document!.cards.any((c) => c.rect.inflate(20).overlaps(rect));
-        i++
-      ) {
-        rect = rect.shift(const Offset(120, 80));
-      }
-      card = StudyCard(
-        id: studyId(),
-        type: 'conversation',
-        layer: document!.activeLayer,
-        rect: rect,
-        title: 'AI 对话',
-        conversationId: studyId(),
-      );
-      document!.checkpoint();
-      document!.cards.add(card);
-      document!.changed();
-      _initialConversations[card.id] = {'query': query, 'visuals': visual};
-    } else {
-      final state = _conversationKeys[card.id]?.currentState;
-      if (bind) await state?.bind(query, visual);
+    final d = document;
+    if (d == null || !d.editable(d.activeLayer)) return;
+    final picked =
+        bind &&
+        (_selection.isNotEmpty ||
+            _detail.objectId != null ||
+            _regionSelection != null);
+    final state = _conversationKeys[_activeConversation]?.currentState;
+    if (newConversation || (state == null && picked)) {
+      await _startConversation(bind: bind);
+    } else if (state != null && picked) {
+      final visual = _regionSelection != null
+          ? await _captureSelection()
+          : <Map<String, dynamic>>[];
+      if (!mounted) return;
+      await state.bind(_selectedQuery(), visual);
     }
-    _activeConversation = card.id;
-    _tool = StudyTool.select;
-    document!.camera =
-        _viewport.center(Offset.zero) - card.rect.center * document!.zoom;
-    _cameraChanged();
-    _update(() {});
+    if (!mounted) return;
+    _update(() {
+      _tool = StudyTool.select;
+      _stageOpen = true;
+    });
+    _composerFocus.requestFocus();
   }
 
+  /// A card's 「加入对话」: it joins the conversation on stage.
   Future<void> _chooseConversation(StudyCard source) async {
     _selection
       ..clear()
       ..add(source.id);
     _detail.clear();
-    final conversations = document!.cards
-        .where((c) => c.type == 'conversation')
-        .toList();
-    if (conversations.isNotEmpty) {
-      final target = await showDialog<String>(
-        context: context,
-        builder: (c) => SimpleDialog(
-          title: const Text('加入哪个 AI 对话？'),
-          children: [
-            for (final card in conversations)
-              SimpleDialogOption(
-                onPressed: () => Navigator.pop(c, card.id),
-                child: Text(card.title),
-              ),
-            SimpleDialogOption(
-              onPressed: () => Navigator.pop(c, 'new'),
-              child: const Text('新建 AI 对话'),
-            ),
-          ],
-        ),
-      );
-      if (target == null || !mounted) return;
-      _activeConversation = target == 'new' ? null : target;
-    }
     await _openConversation();
   }
 
@@ -361,10 +315,12 @@ class _ConversationBody extends StatefulWidget {
     super.key,
     required this.owner,
     required this.card,
+    required this.active,
     this.initial,
   });
   final StudyCanvasState owner;
   final StudyCard card;
+  final bool active;
   final Map? initial;
   @override
   State<_ConversationBody> createState() => _ConversationBodyState();
@@ -402,25 +358,47 @@ class _ConversationBodyState extends State<_ConversationBody> {
       for (final t in turns) {
         if (t['state'] == 'running' || t['state'] == 'preparing') {
           t['state'] = 'interrupted';
-          t['error'] = '应用已重开，请重试此问题';
+          t['error'] = l10n.studyTurnReopened;
         }
       }
       setState(() {});
-      if (widget.initial != null && (data!['revision'] as num) == 0)
+      _summarize();
+      final initial = widget.initial;
+      if (initial != null && (data!['revision'] as num) == 0) {
         await bind(
-          Map<String, dynamic>.from(widget.initial!['query'] as Map),
-          (widget.initial!['visuals'] as List).cast<Map<String, dynamic>>(),
+          Map<String, dynamic>.from(initial['query'] as Map),
+          (initial['visuals'] as List).cast<Map<String, dynamic>>(),
         );
-      else
+        // The first question typed on the idle stage, or 「选择参考资料」.
+        owner._initialConversations.remove(widget.card.id);
+        if (!mounted) return;
+        if (initial['send'] is String) {
+          input.text = initial['send'] as String;
+          await start();
+        } else if (initial['pick'] == true) {
+          await pickSources();
+        }
+      } else
         await refreshContext();
     } catch (e) {
       if (mounted) setState(() => error = '$e');
     }
   }
 
+  /// Tells this conversation's node how far it went.
+  void _summarize() {
+    if (data == null || owner._disposed) return;
+    owner._threadSummary[widget.card.id] = {
+      'turns': turns.length,
+      'last': turns.isEmpty ? '' : '${(turns.last as Map)['question'] ?? ''}',
+    };
+    owner._threadTick.value++;
+  }
+
   Future<bool> save() async {
     saveTimer?.cancel();
     if (data == null) return false;
+    _summarize();
     bool ok = true;
     final draft = input.text;
     saving = saving.catchError((_) {}).then((_) async {
@@ -435,7 +413,7 @@ class _ConversationBodyState extends State<_ConversationBody> {
         data!['revision'] = out['revision'];
       } catch (e) {
         ok = false;
-        if (mounted) setState(() => error = '对话保存失败：$e');
+        if (mounted) setState(() => error = l10n.studyConversationSaveFailed('$e'));
       }
     });
     await saving;
@@ -487,7 +465,8 @@ class _ConversationBodyState extends State<_ConversationBody> {
     if (data == null || !mounted) return;
     setState(() => loading = true);
     try {
-      if (!await owner.flush()) throw const FormatException('画布尚未保存，请先重试保存');
+      if (!await owner.flush())
+        throw FormatException(l10n.studyConversationUnsaved);
       final q = query..['revision'] = owner.document!.revision;
       data!['query'] = q;
       final out = await owner.widget.api.studyContext(
@@ -550,7 +529,7 @@ class _ConversationBodyState extends State<_ConversationBody> {
             visualFingerprints[id] != '${source['anchor']['fingerprint']}') {
           setState(() {
             busy = false;
-            error = '视觉选区已改变，请重新圈选并加入对话';
+            error = l10n.studyVisualChanged;
           });
           return;
         }
@@ -559,7 +538,7 @@ class _ConversationBodyState extends State<_ConversationBody> {
     if (turns.length >= 300) {
       setState(() {
         busy = false;
-        error = '此对话已达 300 轮，请新建对话';
+        error = l10n.studyConversationFull;
       });
       return;
     }
@@ -655,281 +634,46 @@ class _ConversationBodyState extends State<_ConversationBody> {
 
   @override
   Widget build(BuildContext context) {
-    if (data == null)
-      return Center(
-        child: error == null
-            ? const CircularProgressIndicator()
-            : Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(error!),
-                  TextButton(onPressed: load, child: const Text('重试加载')),
-                ],
-              ),
-      );
-    final sources = preview?['sources'] as List? ?? [];
-    final chrome = StudyChrome.of(context);
-    return Listener(
-      onPointerDown: (_) => owner._activeConversation = widget.card.id,
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            DragTarget<String>(
-              onAcceptWithDetails: (v) {
-                final card = owner.document!.cards
-                    .where((c) => c.id == v.data)
-                    .firstOrNull;
-                if (card != null) {
-                  owner._selection
-                    ..clear()
-                    ..add(card.id);
-                  owner._detail.clear();
-                  bind(owner._selectedQuery(), []);
-                }
-              },
-              builder: (_, __, ___) => Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: chrome.accentSoft,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Expanded(
-                          child: Text(
-                            '本对话的参考资料',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ),
-                        IconButton(
-                          tooltip: '查看本次资料内容',
-                          onPressed: inspectSources,
-                          icon: const Icon(Icons.visibility_outlined, size: 17),
-                        ),
-                        IconButton(
-                          tooltip: '选择参考资料',
-                          onPressed: busy ? null : pickSources,
-                          icon: const Icon(Icons.add, size: 18),
-                        ),
-                      ],
-                    ),
-                    if (sources.isEmpty)
-                      const Text(
-                        '未指定资料 · 可普通提问，或添加参考资料',
-                        style: TextStyle(fontSize: 11),
-                      ),
-                    ConstrainedBox(
-                      constraints: const BoxConstraints(maxHeight: 110),
-                      child: SingleChildScrollView(
-                        child: Wrap(
-                          spacing: 4,
-                          runSpacing: 3,
-                          children: [
-                            for (final source in sources)
-                              InputChip(
-                                label: Text(
-                                  '${source['label']}${source['anchor']['page'] != null ? ' · 第${source['anchor']['page']}页' : ''}',
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(fontSize: 11),
-                                ),
-                                onPressed: () => owner._focusSource(
-                                  StudyAnchor.fromJson(source['anchor'] as Map),
-                                ),
-                                onDeleted: busy
-                                    ? null
-                                    : () => removeSource(source as Map),
-                              ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    if (sources.any((s) => s['kind'] == 'video'))
-                      SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children: [
-                            for (final source in sources)
-                              if (source['kind'] == 'video')
-                                TextButton.icon(
-                                  onPressed: busy
-                                      ? null
-                                      : () => editVideo(source as Map),
-                                  icon: const Icon(Icons.schedule, size: 14),
-                                  label: Text(
-                                    '${((source['anchor']['time_start_ms'] as num? ?? 0) / 1000).toStringAsFixed(0)}–${((source['anchor']['time_end_ms'] as num? ?? 0) / 1000).toStringAsFixed(0)} 秒',
-                                    style: const TextStyle(fontSize: 11),
-                                  ),
-                                ),
-                          ],
-                        ),
-                      ),
-                    Row(
-                      children: [
-                        Checkbox(
-                          value: data!['allow_images'] == true,
-                          onChanged: busy
-                              ? null
-                              : (v) {
-                                  setState(() => data!['allow_images'] = v);
-                                  unawaited(save());
-                                },
-                        ),
-                        const Expanded(
-                          child: Text(
-                            '允许读取指定的视觉选区',
-                            style: TextStyle(fontSize: 11),
-                          ),
-                        ),
-                        if (loading)
-                          const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            Expanded(
-              child: ListView(
-                children: [
-                  if (turns.isEmpty)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 22),
-                      child: Text(
-                        l10n.studyConversationEmpty,
-                        style: TextStyle(color: chrome.inkSoft),
-                      ),
-                    ),
-                  for (final raw in turns) ...[
-                    Padding(
-                      padding: const EdgeInsets.only(top: 14, bottom: 8),
-                      child: Text(
-                        '你：${raw['question']}',
-                        style: const TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                    ),
-                    if ('${raw['answer'] ?? ''}'.isNotEmpty)
-                      SelectionArea(child: LookMarkdown('${raw['answer']}')),
-                    if ((raw['result'] as Map?)?['sources'] is List)
-                      Wrap(
-                        spacing: 6,
-                        children: [
-                          for (final source
-                              in (raw['result'] as Map)['sources'] as List)
-                            ActionChip(
-                              avatar: const Icon(Icons.link, size: 14),
-                              label: Text('${source['label'] ?? '查看来源'}'),
-                              onPressed: () => owner._focusSource(
-                                StudyAnchor.fromJson(source as Map),
-                              ),
-                            ),
-                        ],
-                      ),
-                    if (raw['state'] == 'pending')
-                      const Text(
-                        '历史画布操作已停用，回答仍保留在对话中。',
-                        style: TextStyle(fontSize: 11),
-                      ),
-                    if (raw['error'] != null || raw['state'] == 'interrupted')
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              '${raw['error'] ?? '任务中断'}',
-                              style: const TextStyle(
-                                color: Colors.red,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ),
-                          TextButton(
-                            onPressed: busy
-                                ? null
-                                : () => start('${raw['question']}'),
-                            child: const Text('重试'),
-                          ),
-                        ],
-                      ),
-                  ],
-                ],
-              ),
-            ),
-            if (error != null)
-              Text(
-                error!,
-                maxLines: 3,
-                style: const TextStyle(color: Colors.red, fontSize: 11),
-              ),
-            if (busy)
-              Row(
-                children: [
-                  const SizedBox(
-                    width: 14,
-                    height: 14,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      (live?['trace'] as List? ?? []).isEmpty
-                          ? '正在准备模型与资料…'
-                          : '正在执行：${(live!['trace'] as List).last['tool']}',
-                      style: const TextStyle(fontSize: 11),
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: runId == null
-                        ? null
-                        : () async {
-                            await owner.widget.api.cancelCanvasRun(runId!);
-                          },
-                    child: const Text('取消'),
-                  ),
-                ],
-              ),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: input,
-                    minLines: 1,
-                    maxLines: 4,
-                    maxLength: 4000,
-                    decoration: const InputDecoration(
-                      hintText: '提问、解释或整理资料…',
-                      counterText: '',
-                    ),
-                    onChanged: (_) {
-                      saveTimer?.cancel();
-                      saveTimer = Timer(
-                        const Duration(milliseconds: 500),
-                        () => save(),
-                      );
-                    },
-                  ),
-                ),
-                IconButton(
-                  tooltip: '发送',
-                  onPressed: busy || loading ? null : () => start(),
-                  icon: const Icon(Icons.arrow_upward),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
+    final ready = data != null;
+    return _StageView(
+      owner: owner,
+      active: widget.active,
+      thread: widget.card,
+      input: input,
+      turns: ready ? turns : const [],
+      sources: preview?['sources'] as List? ?? const [],
+      busy: busy,
+      loading: loading || (!ready && error == null),
+      live: live,
+      error: error,
+      onSend: (_) => start(),
+      onStop: runId == null
+          ? null
+          : () => owner.widget.api.cancelCanvasRun(runId!),
+      onRetry: start,
+      onRemoveSource: removeSource,
+      onEditVideo: editVideo,
+      onPickSources: ready ? pickSources : load,
+      onInspectSources: preview == null ? null : inspectSources,
+      allowImages: ready && (visuals.isNotEmpty || data!['allow_images'] == true)
+          ? data!['allow_images'] == true
+          : null,
+      onAllowImages: (v) {
+        setState(() => data!['allow_images'] = v);
+        unawaited(save());
+      },
+      onDraft: () {
+        saveTimer?.cancel();
+        saveTimer = Timer(const Duration(milliseconds: 500), save);
+      },
+      onDrop: (id) {
+        if (!ready || !owner.document!.cards.any((c) => c.id == id)) return;
+        owner._selection
+          ..clear()
+          ..add(id);
+        owner._detail.clear();
+        bind(owner._selectedQuery(), []);
+      },
     );
   }
 
