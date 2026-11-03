@@ -344,6 +344,9 @@ func TestFudanRenewalWithoutRememberedPassword(t *testing.T) {
 	if err := s.Login(t.Context(), Fudan, "21300", "secret", "", false); err != nil {
 		t.Fatal(err)
 	}
+	// Login looks the realname up in the background; let it finish so it
+	// cannot deliver an auth event after the counter below starts.
+	s.waitBackground()
 	f.mu.Lock()
 	f.vpn, f.vpnUIS, f.course = map[string]bool{}, map[string]bool{}, map[string]bool{}
 	f.mu.Unlock()
@@ -358,7 +361,7 @@ func TestFudanRenewalWithoutRememberedPassword(t *testing.T) {
 	// renewing -> needs_password repeatedly hides and shows the login banner.
 	var eventMu sync.Mutex
 	events := 0
-	s.onChange = func(AuthState) { eventMu.Lock(); events++; eventMu.Unlock() }
+	s.setOnChange(func(AuthState) { eventMu.Lock(); events++; eventMu.Unlock() })
 	for i := 0; i < 3; i++ {
 		if _, err := (&Client{S: s}).Courses(t.Context()); err == nil {
 			t.Fatal("expected a request to require sign-in")

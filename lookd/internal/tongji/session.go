@@ -63,6 +63,7 @@ type Session struct {
 	renewing chan struct{}
 	onChange func(AuthState)
 	kick     chan struct{}
+	bg       sync.WaitGroup // fire-and-forget work started by Login
 }
 
 type persisted struct {
@@ -98,6 +99,17 @@ func NewSession(statePath string, onChange func(AuthState)) *Session {
 	s.load()
 	return s
 }
+
+// setOnChange replaces the state callback. Login leaves a realname lookup
+// running, so the callback is swapped under the lock like every other field.
+func (s *Session) setOnChange(fn func(AuthState)) {
+	s.mu.Lock()
+	s.onChange = fn
+	s.mu.Unlock()
+}
+
+// waitBackground waits for the work Login starts in the background.
+func (s *Session) waitBackground() { s.bg.Wait() }
 
 // Client is the HTTP client carrying the IAM single sign-on cookies; other
 // Tongji services (such as Canvas) sign in through it.
@@ -162,9 +174,10 @@ func (s *Session) setState(f func(*AuthState)) {
 	f(&s.state)
 	st := s.state
 	s.saveLocked()
+	cb := s.onChange
 	s.mu.Unlock()
-	if s.onChange != nil {
-		s.onChange(st)
+	if cb != nil {
+		cb(st)
 	}
 }
 
@@ -254,7 +267,8 @@ func (s *Session) Login(ctx context.Context, school, username, password, captcha
 	}
 	s.mu.Unlock()
 	s.adopt(tok, "password")
-	go s.fetchRealname()
+	s.bg.Add(1)
+	go func() { defer s.bg.Done(); s.fetchRealname() }()
 	return nil
 }
 
@@ -275,7 +289,8 @@ func (s *Session) loginFudan(ctx context.Context, username, password string, rem
 		st.Status, st.Method, st.Error, st.School, st.Username, st.Remember = "active", "password", "", Fudan, username, remember
 		st.ExpiresAt, st.RenewedAt = time.Time{}, time.Now()
 	})
-	go s.fetchRealname()
+	s.bg.Add(1)
+	go func() { defer s.bg.Done(); s.fetchRealname() }()
 	return nil
 }
 
