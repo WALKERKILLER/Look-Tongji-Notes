@@ -75,6 +75,11 @@ func TestSyncedBookmarkDeletionDoesNotResurrect(t *testing.T) {
 	if _, e = b.MergeUserState(ctx, deleted); e != nil {
 		t.Fatal(e)
 	}
+	for i := 0; i < 3; i++ {
+		if changed, err := b.MergeUserState(ctx, deleted); err != nil || changed {
+			t.Fatalf("replayed deletion changed state: %v %v", changed, err)
+		}
+	}
 	b.MergeUserState(ctx, state)
 	bs, e := b.Bookmarks(ctx, "one")
 	if e != nil || len(bs) != 0 {

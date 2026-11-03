@@ -253,3 +253,7 @@ func validateFolderDocument(p, staged string, dirs map[string]string) error {
 	}
 	return nil
 }
+
+func folderPrivateData(p string) bool {
+	return strings.HasPrefix(p, "course-data/") && (strings.Contains(p, "/assistant/") || strings.HasSuffix(p, "/metadata.json"))
+}

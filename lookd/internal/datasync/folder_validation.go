@@ -155,7 +155,7 @@ func (s *Service) validateFolderTargets(ctx context.Context, entries map[string]
 			return errors.New("同步文件路径无效")
 		}
 		root := s.Roots.Library
-		if strings.Contains(p, "/assistant/") || strings.HasSuffix(p, "/metadata.json") {
+		if folderPrivateData(p) {
 			root = s.Roots.Data
 		}
 		if err := safeWorkingPath(abs, root); err != nil {

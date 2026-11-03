@@ -65,7 +65,11 @@ func (f *folderStorage) get(ctx context.Context, p string) ([]byte, error) {
 		return nil, e
 	}
 	defer r.Close()
-	return io.ReadAll(io.LimitReader(r, 32<<20))
+	b, err := io.ReadAll(io.LimitReader(r, folderRecordLimit+1))
+	if err == nil && int64(len(b)) > folderRecordLimit {
+		return nil, fmt.Errorf("同步清单超过 32 MiB：%s", p)
+	}
+	return b, err
 }
 func (f *folderStorage) open(ctx context.Context, p string) (io.ReadCloser, error) {
 	if !validFolderPath(p) {
@@ -322,14 +326,15 @@ func combine(a, b folderEntry) folderEntry {
 	if b.Clock == nil {
 		return a
 	}
-	if dominates(a.Clock, b.Clock) {
+	aDominates, bDominates := dominates(a.Clock, b.Clock), dominates(b.Clock, a.Clock)
+	if aDominates && !bDominates {
 		return a
 	}
-	if dominates(b.Clock, a.Clock) {
+	if bDominates && !aDominates {
 		return b
 	}
 	winner, loser := a, b
-	if (a.Deleted != 0 && b.Deleted == 0) || (a.Deleted == b.Deleted && (b.MTime > a.MTime || b.MTime == a.MTime && b.Hash > a.Hash)) {
+	if (a.Deleted != 0 && b.Deleted == 0) || ((a.Deleted == 0) == (b.Deleted == 0) && (b.MTime > a.MTime || b.MTime == a.MTime && b.Hash > a.Hash)) {
 		winner, loser = b, a
 	}
 	winner.Clock = joinClock(a.Clock, b.Clock)
@@ -398,6 +403,16 @@ func (s *Service) folderDirs(ids []string) (map[string]string, error) {
 }
 func (s *Service) syncFolder(ctx context.Context) (Result, error) {
 	var result Result
+	checkRoots, e := s.Roots.retainIdentity()
+	if e != nil {
+		return result, e
+	}
+	checkReady := func() error {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		return checkRoots()
+	}
 	s.mu.Lock()
 	c := s.cfg
 	s.mu.Unlock()
@@ -455,10 +470,14 @@ func (s *Service) syncFolder(ctx context.Context) (Result, error) {
 	}
 	basePath := filepath.Join(s.Roots.Data, "folder-base-"+marker.ID+".json")
 	base := folderBase{Library: marker.ID, Files: map[string]folderEntry{}}
-	if b, e := os.ReadFile(basePath); e == nil {
-		if json.Unmarshal(b, &base) != nil || base.Library != marker.ID {
-			return result, errors.New("本机同步记录损坏，请从备份恢复")
+	if b, err := os.ReadFile(basePath); err == nil {
+		var saved *folderBase
+		if json.Unmarshal(b, &saved) != nil || saved == nil || saved.Library != marker.ID || saved.Files == nil {
+			return result, fmt.Errorf("本机同步记录损坏，请从备份恢复：%s", basePath)
 		}
+		base = *saved
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return result, fmt.Errorf("无法读取本机同步记录：%w", err)
 	}
 	combined := map[string]folderEntry{}
 	for _, m := range manifests {
@@ -485,6 +504,9 @@ func (s *Service) syncFolder(ctx context.Context) (Result, error) {
 				tracked[p] = true
 			}
 		}
+	}
+	if err := checkReady(); err != nil {
+		return result, err
 	}
 	extras, err := s.folderExtras(ctx, c.CourseIDs, tracked)
 	if err != nil {
@@ -521,11 +543,14 @@ func (s *Service) syncFolder(ctx context.Context) (Result, error) {
 	}
 	releasedSessions := map[string]bool{}
 	for p := range base.Files {
-		if strings.Contains(p, "/assistant/") && hashes[p] == "" {
+		if strings.HasPrefix(p, "course-data/") && strings.Contains(p, "/assistant/") && hashes[p] == "" {
 			releasedSessions[p] = true
 		}
 	}
 	for p := range paths {
+		if err := checkReady(); err != nil {
+			return result, err
+		}
 		lf, present := local[p]
 		old, known := base.Files[p]
 		h := hashes[p]
@@ -623,7 +648,9 @@ func (s *Service) syncFolder(ctx context.Context) (Result, error) {
 		}
 		h := sha256.New()
 		n, e := io.Copy(io.MultiWriter(w, h), io.LimitReader(r, entry.Size+1))
-		w.Close()
+		if closeErr := w.Close(); e == nil {
+			e = closeErr
+		}
 		if e != nil || n != entry.Size || hex.EncodeToString(h.Sum(nil)) != entry.Hash {
 			return "", errors.New("收到的文件校验不通过，保留本地版本并等待重传")
 		}
@@ -656,7 +683,31 @@ func (s *Service) syncFolder(ctx context.Context) (Result, error) {
 	dataChanged := false
 	next := map[string]folderEntry{}
 
+	currentHash := func(p string) (string, error) {
+		abs, ok := s.folderAbs(p)
+		if !ok {
+			return "", errors.New("同步文件超出资料库")
+		}
+		hash, err := hashFile(abs)
+		if errors.Is(err, os.ErrNotExist) {
+			return "", nil
+		}
+		return hash, err
+	}
+	checkCurrent := func(p string) error {
+		current, err := currentHash(p)
+		if err != nil {
+			return err
+		}
+		if current != hashes[p] {
+			return fmt.Errorf("本机文件在同步期间已修改，已保留内容，请重试：%s", p)
+		}
+		return nil
+	}
 	apply := func() error {
+		if err := checkReady(); err != nil {
+			return err
+		}
 		// Recheck ownership after staging and before the first working-file write.
 		if err := s.validateFolderTargets(ctx, combined, staged, releasedSessions); err != nil {
 			return err
@@ -666,7 +717,21 @@ func (s *Service) syncFolder(ctx context.Context) (Result, error) {
 				return err
 			}
 		}
+		// Check the entire batch before writing its first file, then recheck
+		// each destination immediately before replacement.
 		for _, p := range keys {
+			v := combined[p]
+			if v.Deleted != 0 && releasedSessions[p] || v.Hash == hashes[p] && (v.Deleted == 0 || hashes[p] == "") {
+				continue
+			}
+			if err := checkCurrent(p); err != nil {
+				return err
+			}
+		}
+		for _, p := range keys {
+			if err := checkReady(); err != nil {
+				return err
+			}
 			v := combined[p]
 			if v.Deleted != 0 && releasedSessions[p] {
 				// Leaving a logical course scope must not delete a session
@@ -679,7 +744,7 @@ func (s *Service) syncFolder(ctx context.Context) (Result, error) {
 				return errors.New("同步文件超出资料库")
 			}
 			root := s.Roots.Library
-			if strings.Contains(p, "/assistant/") || strings.HasSuffix(p, "/metadata.json") {
+			if folderPrivateData(p) {
 				root = s.Roots.Data
 			}
 			if err := safeWorkingPath(abs, root); err != nil {
@@ -703,17 +768,10 @@ func (s *Service) syncFolder(ctx context.Context) (Result, error) {
 				}
 			}
 			if v.Hash != hashes[p] || v.Deleted != 0 && hashes[p] != "" {
-				// Check again: an editor may have saved while a large video was staging.
-				current := ""
-				if _, e := os.Stat(abs); e == nil {
-					current, e = hashFile(abs)
-					if e != nil {
-						return e
-					}
+				if err := checkCurrent(p); err != nil {
+					return err
 				}
-				if current != hashes[p] {
-					return errors.New("本机编辑尚未完成，已保留内容，稍后重试")
-				}
+				current := hashes[p]
 				if current != "" {
 					dest := filepath.Join(s.Roots.Library, TrashDir, "folder-"+current[:12], filepath.FromSlash(p))
 					if e = copyAside(abs, dest); e != nil {
@@ -742,7 +800,7 @@ func (s *Service) syncFolder(ctx context.Context) (Result, error) {
 					result.Bytes += v.Size
 				}
 				changed = true
-				if strings.Contains(p, "/assistant/") || strings.HasSuffix(p, "/metadata.json") {
+				if folderPrivateData(p) {
 					dataChanged = true
 				}
 			}
@@ -755,13 +813,22 @@ func (s *Service) syncFolder(ctx context.Context) (Result, error) {
 	} else {
 		e = apply()
 	}
+	if changed && checkRoots() == nil {
+		// Even a partial apply must refresh the index; cancellation must not hide
+		// already installed files. The original error still reaches the caller.
+		refreshCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
+		s.changed(refreshCtx, true, dataChanged)
+		cancel()
+	}
 	if e != nil {
+		result.Partial = changed
 		return result, e
 	}
-
-	if changed {
-		s.changed(ctx, true, dataChanged)
+	if err := checkReady(); err != nil {
+		result.Partial = changed
+		return result, err
 	}
+
 	if s.MergeCourseState != nil {
 		for _, m := range manifests {
 			if len(m.State) > 0 {
@@ -782,8 +849,16 @@ func (s *Service) syncFolder(ctx context.Context) (Result, error) {
 			return result, e
 		}
 	}
+	if err := checkReady(); err != nil {
+		result.Partial = changed
+		return result, err
+	}
 	manifest := folderManifest{Format: folderFormat, Version: folderVersion, Library: marker.ID, Device: c.DeviceID, Courses: dirs, Files: next, State: state}
 	out, _ := json.Marshal(manifest)
+	if int64(len(out)) > folderRecordLimit {
+		result.Partial = changed
+		return result, errors.New("同步清单超过 32 MiB，请缩小同步范围")
+	}
 	own := "devices/" + c.DeviceID + ".json"
 	previous, _ := f.get(ctx, own)
 	if !bytes.Equal(out, previous) {
@@ -791,7 +866,15 @@ func (s *Service) syncFolder(ctx context.Context) (Result, error) {
 			return result, e
 		}
 	}
-	base.Files = next
+	// Keep causal history for disabled courses/media locally, without
+	// publishing their content in this device's selected-course manifest.
+	for p, v := range next {
+		base.Files[p] = v
+	}
+	if err := checkReady(); err != nil {
+		result.Partial = changed
+		return result, err
+	}
 	b, _ := json.Marshal(base)
 	if e = writeFile(basePath, time.Time{}, func(w *os.File) error { _, e := w.Write(b); return e }); e != nil {
 		return result, e

@@ -114,9 +114,10 @@ func (s *Store) MergeUserState(ctx context.Context, in UserState) (bool, error) 
 			b.UpdatedAt = b.CreatedAt * 1000
 		}
 		var id, updated int64
-		err := tx.QueryRowContext(ctx, `SELECT id,updated_at FROM bookmarks WHERE sync_id=? OR (sync_id='' AND lecture_id=? AND t_ms=? AND label=? AND created_at=?) LIMIT 1`, b.SyncID, b.LectureID, b.TMs, b.Label, b.CreatedAt).Scan(&id, &updated)
+		var deleted bool
+		err := tx.QueryRowContext(ctx, `SELECT id,updated_at,deleted FROM bookmarks WHERE sync_id=? OR (sync_id='' AND lecture_id=? AND t_ms=? AND label=? AND created_at=?) LIMIT 1`, b.SyncID, b.LectureID, b.TMs, b.Label, b.CreatedAt).Scan(&id, &updated, &deleted)
 		if err == nil {
-			if b.UpdatedAt > updated || b.Deleted && b.UpdatedAt == updated {
+			if b.UpdatedAt > updated || b.Deleted && !deleted && b.UpdatedAt == updated {
 				if _, err = tx.ExecContext(ctx, `UPDATE bookmarks SET sync_id=?,updated_at=?,deleted=? WHERE id=?`, b.SyncID, b.UpdatedAt, b.Deleted, id); err != nil {
 					return false, err
 				}

@@ -241,3 +241,32 @@ func writeFile(dst string, mod time.Time, fill func(f *os.File) error) error {
 	}
 	return nil
 }
+
+// Retain directory identity across a sync round: an unmounted or replaced root
+// must not be recreated or mistaken for the library that was scanned.
+func (r Roots) retainIdentity() (func() error, error) {
+	roots := []string{r.Library, r.Data}
+	infos := make([]os.FileInfo, len(roots))
+	for i, root := range roots {
+		info, err := os.Stat(root)
+		if err != nil {
+			return nil, err
+		}
+		if !info.IsDir() {
+			return nil, fmt.Errorf("同步根目录不是目录：%s", root)
+		}
+		infos[i] = info
+	}
+	return func() error {
+		for i, root := range roots {
+			current, err := os.Stat(root)
+			if err != nil {
+				return err
+			}
+			if !os.SameFile(infos[i], current) {
+				return fmt.Errorf("同步根目录已被替换，请恢复原目录后重试：%s", root)
+			}
+		}
+		return nil
+	}, nil
+}

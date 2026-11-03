@@ -138,11 +138,10 @@ func (s *Service) Sync(ctx context.Context) (Result, error) {
 		s.mu.Unlock()
 		return Result{}, ErrNotConfigured
 	}
-	for _, root := range []string{s.Roots.Library, s.Roots.Data} {
-		if err := checkScanRoot(root); err != nil {
-			s.mu.Unlock()
-			return Result{}, err
-		}
+	checkRoots, rootErr := s.Roots.retainIdentity()
+	if rootErr != nil {
+		s.mu.Unlock()
+		return Result{}, rootErr
 	}
 	s.running = true
 	s.mu.Unlock()
@@ -170,7 +169,7 @@ func (s *Service) Sync(ctx context.Context) (Result, error) {
 	s.running, s.progress = false, nil
 	s.cfg.Last = &res
 	// Do not recreate a private root that disappeared during the round.
-	if checkScanRoot(s.Roots.Data) == nil {
+	if checkRoots() == nil {
 		s.saveLocked()
 	}
 	s.mu.Unlock()
