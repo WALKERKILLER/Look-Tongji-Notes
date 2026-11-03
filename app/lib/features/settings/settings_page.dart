@@ -345,7 +345,7 @@ class _SettingsPageState extends State<SettingsPage> {
         _twoPane ? Space.lg : pad,
         compact ? Space.xl : Space.xxl,
         _twoPane ? Space.sm : pad,
-        Space.huge,
+        Space.huge + MediaQuery.paddingOf(context).bottom,
       ),
       children: [
         ContentWidth(
@@ -445,7 +445,7 @@ class _SettingsPageState extends State<SettingsPage> {
             header ? Space.lg : pad,
             header ? Space.xxl : Space.sm,
             header ? Space.xl : pad,
-            Space.huge,
+            Space.huge + MediaQuery.paddingOf(context).bottom,
           ),
           children: [
             ContentWidth(
@@ -1117,6 +1117,19 @@ class _Appearance extends StatelessWidget {
               value: p.reduceMotion,
               onChanged: (v) => p.update((x) => x.reduceMotion = v),
               title: Text(l10n.settingsReduceMotion),
+            ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              value: p.glass,
+              onChanged: p.contrast == ContrastLevel.high
+                  ? null
+                  : (v) => p.update((x) => x.glass = v),
+              title: Text(l10n.settingsGlass),
+              subtitle: Text(
+                p.contrast == ContrastLevel.high
+                    ? l10n.settingsGlassHighContrast
+                    : l10n.settingsGlassHint,
+              ),
             ),
           ],
         );

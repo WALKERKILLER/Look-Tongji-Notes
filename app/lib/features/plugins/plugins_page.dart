@@ -330,7 +330,7 @@ class _PluginsPageState extends State<PluginsPage> {
 
     final list = RefreshIndicator(
       onRefresh: _refresh,
-      child: ListView(padding: EdgeInsets.fromLTRB(pad, 0, pad, Space.huge), children: [
+      child: ListView(padding: EdgeInsets.fromLTRB(pad, 0, pad, Space.huge + MediaQuery.paddingOf(context).bottom), children: [
         SearchBar(
           hintText: l10n.pluginsSearch,
           constraints: const BoxConstraints(minHeight: 52, maxWidth: 640),
@@ -464,7 +464,7 @@ class _PluginsPageState extends State<PluginsPage> {
     if (!wide) {
       return RefreshIndicator(
         onRefresh: _refresh,
-        child: ListView(padding: EdgeInsets.fromLTRB(pad, 0, pad, 120), children: [
+        child: ListView(padding: EdgeInsets.fromLTRB(pad, 0, pad, 120 + MediaQuery.paddingOf(context).bottom), children: [
           ContentWidth(max: 760, child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: rows(cards: true))),
         ]),
       );

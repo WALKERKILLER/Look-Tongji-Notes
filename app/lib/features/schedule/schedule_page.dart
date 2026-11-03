@@ -407,7 +407,7 @@ class _Agenda extends StatelessWidget {
         child: _DayRow(day: d, items: byDay[k]!, today: k == today, selected: d == selected, onSelect: onSelect),
       ));
     }
-    return ListView(padding: const EdgeInsets.fromLTRB(Space.md, 0, Space.lg, 96), children: children);
+    return ListView(padding: EdgeInsets.fromLTRB(Space.md, 0, Space.lg, 96 + MediaQuery.paddingOf(context).bottom), children: children);
   }
 }
 

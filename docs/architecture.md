@@ -65,8 +65,8 @@ The app starts lookd ([lookd_service.dart](../app/lib/core/lookd_service.dart) s
 | `app/lib/features/study_canvas` | Canvas rendering, materials, local ink, docked controls, source selection and scoped conversation UI ([controls](drawing-controls.md)) |
 | `app/lib/features/<area>` | Screens: activity, assistant, courses, courseware, downloads, home, library, login, notifications, player, plugins, practice, profile, schedule, settings, setup (Android workspace) |
 | `app/android/workspace/prepare.py` | Fetches the pinned Termux proot build and builds `liblookd.so` and the agent's sources for the APK; [NOTICE](../app/android/workspace/NOTICE) for the shipped programs |
-| `app/lib/widgets` | Shared widgets, including the Markdown/LaTeX renderer and reader, statistics charts (`charts.dart`) and the activity heatmap (`heatmap.dart`) |
-| `app/lib/theme` | Material 3 theme and spacing/motion tokens |
+| `app/lib/widgets` | Shared widgets, including the Markdown/LaTeX renderer and reader, statistics charts (`charts.dart`), the activity heatmap (`heatmap.dart`) and the phone's glass navigation dock (`glass_dock.dart`) |
+| `app/lib/theme` | Material 3 theme, spacing/motion tokens and the glass material for floating chrome (`glass.dart`) |
 | `app/lib/l10n` | Interface text: `app_zh.arb` and the `app_localizations*.dart` that `flutter gen-l10n` generates from it, read through the global `l10n` in `l10n.dart` |
 
 ## Seams
@@ -87,6 +87,7 @@ The app starts lookd ([lookd_service.dart](../app/lib/core/lookd_service.dart) s
 - Explicit > implicit at boundaries: defaulting is an explicit step in the owning implementation, never a hidden fallback.
 - Long-running work in lookd takes a `context.Context` and stops on cancellation; asynchronous Flutter callbacks check `mounted` before touching `BuildContext`.
 - UI spacing, shape and motion come from `app/lib/theme/tokens.dart` rather than literals.
+- Glass (`GlassSurface`) is reserved for chrome that floats over content: the phone dock and its assistant button, the tablet and desktop rail, canvas docks, the canvas composer and shelf. Pages, cards and lists stay tonal Material 3 surfaces. On phones the dock floats over the tab's root page, shrinks to the current tab while the page scrolls down and hides on pushed pages and while the keyboard is open; root pages add `MediaQuery.paddingOf(context).bottom` to their last scroll padding so content clears it.
 - User-visible text comes from `app/lib/l10n/app_zh.arb` (`l10n.<key>`, placeholders for values) rather than string literals in widgets; edit the ARB file and run `flutter gen-l10n`. Copy names UI elements and paths in 「」, starts failures with 无法, and calls this device 本机.
 
 ## Change procedure

@@ -577,7 +577,9 @@ class _NasPageState extends State<NasPage> {
   }) {
     final cs = Theme.of(context).colorScheme, tt = Theme.of(context).textTheme;
     return ListView(
-      padding: const EdgeInsets.all(Space.lg),
+      padding: const EdgeInsets.all(
+        Space.lg,
+      ).copyWith(bottom: Space.lg + MediaQuery.paddingOf(context).bottom),
       children: [
         if (empty)
           Padding(

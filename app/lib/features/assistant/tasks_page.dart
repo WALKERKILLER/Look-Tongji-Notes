@@ -201,7 +201,7 @@ class _TasksPageState extends State<TasksPage> {
         } else {
           body = RefreshIndicator(
             onRefresh: _load,
-            child: ListView(padding: EdgeInsets.fromLTRB(pad, 0, pad, 120), children: [
+            child: ListView(padding: EdgeInsets.fromLTRB(pad, 0, pad, 120 + MediaQuery.paddingOf(context).bottom), children: [
               ContentWidth(
                 max: 760,
                 child: Column(children: [
@@ -321,7 +321,7 @@ class _TasksPageState extends State<TasksPage> {
     }
     return RefreshIndicator(
       onRefresh: _load,
-      child: ListView(padding: EdgeInsets.fromLTRB(pad, 0, pad, 120), children: [
+      child: ListView(padding: EdgeInsets.fromLTRB(pad, 0, pad, 120 + MediaQuery.paddingOf(context).bottom), children: [
         ContentWidth(
           max: 840,
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
