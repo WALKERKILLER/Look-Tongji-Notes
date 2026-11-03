@@ -49,3 +49,40 @@ func TestMergeUserState(t *testing.T) {
 		t.Fatalf("duplicate bookmark: %+v", bs)
 	}
 }
+
+func TestSyncedBookmarkDeletionDoesNotResurrect(t *testing.T) {
+	ctx := context.Background()
+	a, e := Open(filepath.Join(t.TempDir(), "a.db"))
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer a.Close()
+	b, e := Open(filepath.Join(t.TempDir(), "b.db"))
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer b.Close()
+	id, e := a.AddBookmark(ctx, Bookmark{LectureID: "one", TMs: 42, Label: "重点"})
+	if e != nil {
+		t.Fatal(e)
+	}
+	state, _ := a.ExportUserState(ctx)
+	b.MergeUserState(ctx, state)
+	if e = a.DeleteBookmark(ctx, id); e != nil {
+		t.Fatal(e)
+	}
+	deleted, _ := a.ExportUserState(ctx)
+	if _, e = b.MergeUserState(ctx, deleted); e != nil {
+		t.Fatal(e)
+	}
+	for i := 0; i < 3; i++ {
+		if changed, err := b.MergeUserState(ctx, deleted); err != nil || changed {
+			t.Fatalf("replayed deletion changed state: %v %v", changed, err)
+		}
+	}
+	b.MergeUserState(ctx, state)
+	bs, e := b.Bookmarks(ctx, "one")
+	if e != nil || len(bs) != 0 {
+		t.Fatalf("deleted bookmark returned: %+v %v", bs, e)
+	}
+}

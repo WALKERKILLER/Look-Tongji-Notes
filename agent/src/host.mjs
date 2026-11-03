@@ -14,6 +14,8 @@ import { DATA_DIR, ModelPipeline } from "./models.mjs";
 import { createTools, guard, TURN_TOOL_BUDGET } from "./tools.mjs";
 import { bundledPluginsDir, PluginHost } from "./plugins.mjs";
 import { generateTimeline } from "./timeline.mjs";
+import { TranscriptReviewer } from "./transcript-review.mjs";
+import { CanvasRunner } from "./canvas-agent.mjs";
 import { api } from "./lookd.mjs";
 import { fmtStamp, TASK_WRITES, TaskScheduler } from "./tasks.mjs";
 import { httpError, readJson, replyError } from "./http.mjs";
@@ -33,6 +35,8 @@ const pipeline = new ModelPipeline();
 await pipeline.init();
 const usage = new UsageLedger(DATA_DIR);
 pipeline.usage = usage;
+const transcriptReviewer = new TranscriptReviewer(pipeline);
+const canvasRunner = new CanvasRunner(pipeline);
 try {
 	await usage.backfill(SESSIONS);
 	await usage.prune();
@@ -450,6 +454,14 @@ route("GET", "/catalog/providers/([^/]+)/models", async (_req, [id]) => ({
 	models: await pipeline.catalog.providerModels(decodeURIComponent(id)),
 }));
 route("POST", "/import/pi", async () => ({ imported: await pipeline.importPiCli(), models: await pipeline.describe() }));
+
+// User-triggered review is a fixed workflow, not a chat-tool write capability.
+route("POST", "/canvas/runs", async req => canvasRunner.start(await readJson(req, 2 << 20)));
+route("GET", "/canvas/runs/([^/]+)", async (_req,[id]) => canvasRunner.status(decodeURIComponent(id)));
+route("DELETE", "/canvas/runs/([^/]+)", async (_req,[id]) => canvasRunner.cancel(decodeURIComponent(id)));
+route("GET", "/transcript-review/([^/]+)", async (_req,[id]) => transcriptReviewer.status(decodeURIComponent(id)));
+route("POST", "/transcript-review/([^/]+)", async (_req,[id]) => transcriptReviewer.start(decodeURIComponent(id)));
+route("DELETE", "/transcript-review/([^/]+)", async (_req,[id]) => transcriptReviewer.cancel(decodeURIComponent(id)));
 
 // POST /timeline generates and saves a lecture outline (the player's button).
 route("POST", "/timeline", async (req, _m, res) => {
@@ -922,7 +934,7 @@ for (const sig of ["SIGINT", "SIGTERM"]) {
 		server.close();
 		// Finished model calls reach the ledger and plugin cleanups (spawned
 		// processes) run first; lookd allows 5 s before killing us.
-		await Promise.race([Promise.allSettled([usage.flush(), plugins.close()]), new Promise((r) => setTimeout(r, 3000))]);
+		await Promise.race([Promise.allSettled([canvasRunner.close(),transcriptReviewer.close().then(() => usage.flush()), plugins.close()]), new Promise((r) => setTimeout(r, 3000))]);
 		process.exit(0);
 	});
 }

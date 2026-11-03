@@ -404,6 +404,12 @@ func pickStream(ss []tongji.Stream, pref string) (tongji.Stream, error) {
 }
 
 func (m *Manager) runVideo(ctx context.Context, j store.Job, p progressFn) error {
+	if store.IsLocalCourse(j.CourseID) {
+		if m.localVideo(ctx, j.LectureID) != "" {
+			return nil
+		}
+		return fmt.Errorf("本地视频文件不存在，请重新导入")
+	}
 	_, _, dir, err := m.Lib.EnsureLecture(ctx, j.LectureID)
 	if err != nil {
 		return err

@@ -117,7 +117,7 @@ func parse(out []byte) []asr.Utterance {
 		if m == nil {
 			continue
 		}
-		text := strings.TrimSpace(m[3])
+		text := strings.TrimSpace(strings.ToValidUTF8(m[3], "[此处未识别]"))
 		if text == "" {
 			continue
 		}

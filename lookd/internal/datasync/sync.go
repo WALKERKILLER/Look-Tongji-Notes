@@ -64,6 +64,10 @@ func hashFile(p string) (string, error) {
 // localFiles lists this device's files with their hashes, reusing hashes of
 // files whose size and time did not change.
 func (s *Service) localFiles(ctx context.Context, media bool) (map[string]File, map[string]string, error) {
+	return s.localFilesScoped(ctx, media, nil)
+}
+
+func (s *Service) localFilesScoped(ctx context.Context, media bool, accept func(File) bool) (map[string]File, map[string]string, error) {
 	cache := map[string]hashRec{}
 	if b, err := os.ReadFile(s.cachePath()); err == nil {
 		json.Unmarshal(b, &cache)
@@ -71,8 +75,19 @@ func (s *Service) localFiles(ctx context.Context, media bool) (map[string]File, 
 	files := map[string]File{}
 	hashes := map[string]string{}
 	next := map[string]hashRec{}
-	all := append(s.Roots.ScanLibrary(media), s.Roots.ScanData()...)
+	library, err := s.Roots.ScanLibrary(media)
+	if err != nil {
+		return nil, nil, err
+	}
+	data, err := s.Roots.ScanData()
+	if err != nil {
+		return nil, nil, err
+	}
+	all := append(library, data...)
 	for i, f := range all {
+		if accept != nil && !accept(f) {
+			continue
+		}
 		if err := ctx.Err(); err != nil {
 			return nil, nil, err
 		}
@@ -83,7 +98,7 @@ func (s *Service) localFiles(ctx context.Context, media bool) (map[string]File, 
 			}
 			h, err := hashFile(f.Abs)
 			if err != nil {
-				continue
+				return nil, nil, err
 			}
 			rec = hashRec{Size: f.Size, MTime: f.ModTime.UnixNano(), Hash: h}
 		}
@@ -119,9 +134,14 @@ func (s *Service) Sync(ctx context.Context) (Result, error) {
 	defer s.runMu.Unlock()
 	s.mu.Lock()
 	s.loadLocked()
-	if s.cfg.URL == "" {
+	if s.cfg.URL == "" && s.cfg.Kind != "folder" {
 		s.mu.Unlock()
 		return Result{}, ErrNotConfigured
+	}
+	checkRoots, rootErr := s.Roots.retainIdentity()
+	if rootErr != nil {
+		s.mu.Unlock()
+		return Result{}, rootErr
 	}
 	s.running = true
 	s.mu.Unlock()
@@ -129,7 +149,11 @@ func (s *Service) Sync(ctx context.Context) (Result, error) {
 	var res Result
 	var err error
 	for try := 0; try < 3; try++ {
-		res, err = s.syncOnce(ctx)
+		if s.Status().Kind == "folder" {
+			res, err = s.syncFolder(ctx)
+		} else {
+			res, err = s.syncOnce(ctx)
+		}
 		if !errors.Is(err, ErrChanged) {
 			break
 		}
@@ -144,7 +168,10 @@ func (s *Service) Sync(ctx context.Context) (Result, error) {
 	s.mu.Lock()
 	s.running, s.progress = false, nil
 	s.cfg.Last = &res
-	s.saveLocked()
+	// Do not recreate a private root that disappeared during the round.
+	if checkRoots() == nil {
+		s.saveLocked()
+	}
 	s.mu.Unlock()
 	s.publish("sync_done", res)
 	return res, err

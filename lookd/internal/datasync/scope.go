@@ -4,6 +4,7 @@
 package datasync
 
 import (
+	"fmt"
 	"io/fs"
 	"os"
 	"path"
@@ -114,14 +115,32 @@ func dataAllowed(rel string) bool {
 	return false
 }
 
+// Optional children may be absent; the configured root itself must exist.
+func checkScanRoot(root string) error {
+	st, err := os.Stat(root)
+	if err != nil {
+		return fmt.Errorf("工作目录不可用 %s：%w", root, err)
+	}
+	if !st.IsDir() {
+		return fmt.Errorf("工作目录不是目录：%s", root)
+	}
+	return nil
+}
+
 // ScanLibrary lists the library's files, sorted by path.
-func (r Roots) ScanLibrary(withMedia bool) []File {
+func (r Roots) ScanLibrary(withMedia bool) ([]File, error) {
+	if err := checkScanRoot(r.Library); err != nil {
+		return nil, err
+	}
 	var out []File
-	filepath.WalkDir(r.Library, func(p string, d fs.DirEntry, err error) error {
+	err := filepath.WalkDir(r.Library, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
-			return nil
+			return err
 		}
-		rel, _ := filepath.Rel(r.Library, p)
+		rel, err := filepath.Rel(r.Library, p)
+		if err != nil {
+			return err
+		}
 		rel = filepath.ToSlash(rel)
 		if d.IsDir() {
 			if rel != "." && strings.HasPrefix(d.Name(), ".") {
@@ -132,40 +151,66 @@ func (r Roots) ScanLibrary(withMedia bool) []File {
 		if !d.Type().IsRegular() || !libraryFile(rel, withMedia) {
 			return nil
 		}
-		if fi, err := d.Info(); err == nil {
-			out = append(out, File{Path: "library/" + rel, Abs: p, Size: fi.Size(), ModTime: fi.ModTime()})
+		fi, err := d.Info()
+		if err != nil {
+			return err
 		}
+		out = append(out, File{Path: "library/" + rel, Abs: p, Size: fi.Size(), ModTime: fi.ModTime()})
 		return nil
 	})
 	sort.Slice(out, func(i, j int) bool { return out[i].Path < out[j].Path })
-	return out
+	return out, err
 }
 
-// ScanData lists the assistant's portable files.
-func (r Roots) ScanData() []File {
+// ScanData lists portable files; an unreadable subtree is not a deletion.
+func (r Roots) ScanData() ([]File, error) {
+	if err := checkScanRoot(r.Data); err != nil {
+		return nil, err
+	}
 	var out []File
-	add := func(rel string) {
+	add := func(rel string) error {
 		p := filepath.Join(r.Data, filepath.FromSlash(rel))
-		if fi, err := os.Lstat(p); err == nil && fi.Mode().IsRegular() {
+		fi, err := os.Lstat(p)
+		if err != nil {
+			return err
+		}
+		if fi.Mode().IsRegular() {
 			out = append(out, File{Path: "data/" + rel, Abs: p, Size: fi.Size(), ModTime: fi.ModTime()})
 		}
+		return nil
 	}
 	for _, f := range dataFiles {
-		add(f)
+		if err := add(f); err != nil && !os.IsNotExist(err) {
+			return out, err
+		}
 	}
 	for _, d := range dataDirs {
-		filepath.WalkDir(filepath.Join(r.Data, filepath.FromSlash(d)), func(p string, e fs.DirEntry, err error) error {
-			if err == nil && e.Type().IsRegular() {
-				rel, _ := filepath.Rel(r.Data, p)
-				if dataAllowed(filepath.ToSlash(rel)) {
-					add(filepath.ToSlash(rel))
+		root := filepath.Join(r.Data, filepath.FromSlash(d))
+		err := filepath.WalkDir(root, func(p string, e fs.DirEntry, err error) error {
+			if err != nil {
+				if p == root && os.IsNotExist(err) {
+					return nil
 				}
+				return err
+			}
+			rel, err := filepath.Rel(r.Data, p)
+			if err != nil {
+				return err
+			}
+			if e.IsDir() && p != root && !dataAllowed(filepath.ToSlash(rel)+"/") {
+				return filepath.SkipDir
+			}
+			if e.Type().IsRegular() && dataAllowed(filepath.ToSlash(rel)) {
+				return add(filepath.ToSlash(rel))
 			}
 			return nil
 		})
+		if err != nil {
+			return out, err
+		}
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Path < out[j].Path })
-	return out
+	return out, nil
 }
 
 // writeFile replaces dst atomically with the bytes from fill.
@@ -195,4 +240,33 @@ func writeFile(dst string, mod time.Time, fill func(f *os.File) error) error {
 		return err
 	}
 	return nil
+}
+
+// Retain directory identity across a sync round: an unmounted or replaced root
+// must not be recreated or mistaken for the library that was scanned.
+func (r Roots) retainIdentity() (func() error, error) {
+	roots := []string{r.Library, r.Data}
+	infos := make([]os.FileInfo, len(roots))
+	for i, root := range roots {
+		info, err := os.Stat(root)
+		if err != nil {
+			return nil, err
+		}
+		if !info.IsDir() {
+			return nil, fmt.Errorf("同步根目录不是目录：%s", root)
+		}
+		infos[i] = info
+	}
+	return func() error {
+		for i, root := range roots {
+			current, err := os.Stat(root)
+			if err != nil {
+				return err
+			}
+			if !os.SameFile(infos[i], current) {
+				return fmt.Errorf("同步根目录已被替换，请恢复原目录后重试：%s", root)
+			}
+		}
+		return nil
+	}, nil
 }

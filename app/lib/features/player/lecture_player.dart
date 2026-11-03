@@ -14,7 +14,12 @@ import '../../l10n/l10n.dart';
 
 /// One video source: a remote stream or the downloaded file.
 class Source {
-  Source({required this.label, required this.uri, this.local = false, this.headers = const {}});
+  Source({
+    required this.label,
+    required this.uri,
+    this.local = false,
+    this.headers = const {},
+  });
   final String label;
   final String uri;
   final bool local;
@@ -23,7 +28,11 @@ class Source {
 
 /// Owns the media_kit players and everything the player UI shows.
 class LecturePlayer extends ChangeNotifier implements PlayerHandle {
-  LecturePlayer({required this.api, required this.lectureId, required this.prefs}) {
+  LecturePlayer({
+    required this.api,
+    required this.lectureId,
+    required this.prefs,
+  }) {
     _subs.addAll([
       player.stream.position.listen((p) {
         position.value = p;
@@ -69,9 +78,17 @@ class LecturePlayer extends ChangeNotifier implements PlayerHandle {
   final String lectureId;
   final UiPrefs prefs;
 
-  late final _watch = ActivityTracker.instance?.clock('watch', lectureId: lectureId);
+  late final _watch = ActivityTracker.instance?.clock(
+    'watch',
+    lectureId: lectureId,
+  );
 
-  final player = Player(configuration: const PlayerConfiguration(title: 'Look Studio', bufferSize: 64 * 1024 * 1024));
+  final player = Player(
+    configuration: const PlayerConfiguration(
+      title: 'Look Studio',
+      bufferSize: 64 * 1024 * 1024,
+    ),
+  );
   late final video = VideoController(player);
   Player? pip;
   VideoController? pipVideo;
@@ -118,29 +135,60 @@ class LecturePlayer extends ChangeNotifier implements PlayerHandle {
     loadError = null;
     notifyListeners();
     try {
-      final d = (await api.get('/api/lectures/$lectureId') as Map).cast<String, dynamic>();
+      final d = (await api.get('/api/lectures/$lectureId') as Map)
+          .cast<String, dynamic>();
       lecture = Lecture((d['lecture'] as Map).cast<String, dynamic>());
-      if (d['course'] is Map) course = Course((d['course'] as Map).cast<String, dynamic>());
-      bookmarks = jsonList(d['bookmarks']).map((e) => Bookmark((e as Map).cast<String, dynamic>())).toList();
-      notes = jsonList(d['notes']).map((e) => Note((e as Map).cast<String, dynamic>())).toList();
-      chapters = jsonList(d['timeline']).map((e) => Chapter((e as Map).cast<String, dynamic>())).toList();
+      if (d['course'] is Map)
+        course = Course((d['course'] as Map).cast<String, dynamic>());
+      bookmarks = jsonList(d['bookmarks'])
+          .map((e) => Bookmark((e as Map).cast<String, dynamic>()))
+          .toList();
+      notes = jsonList(d['notes'])
+          .map((e) => Note((e as Map).cast<String, dynamic>()))
+          .toList();
+      chapters = jsonList(d['timeline'])
+          .map((e) => Chapter((e as Map).cast<String, dynamic>()))
+          .toList();
       var localLabel = '';
       for (final a in jsonList(d['assets'])) {
         if (a is Map && a['kind'] == 'video') {
           final meta = a['meta'];
-          localLabel = (meta is Map ? meta['stream'] : meta is String ? (jsonDecode(meta) as Map)['stream'] : null)?.toString() ?? '';
+          localLabel =
+              (meta is Map
+                      ? meta['stream']
+                      : meta is String
+                      ? (jsonDecode(meta) as Map)['stream']
+                      : null)
+                  ?.toString() ??
+              '';
         }
       }
       final pb = d['playback'];
       final resumeMs = pb is Map ? (pb['position_ms'] as num? ?? 0).toInt() : 0;
 
-      media = LectureMedia((await api.get('/api/lectures/$lectureId/media') as Map).cast<String, dynamic>());
+      media = LectureMedia(
+        (await api.get('/api/lectures/$lectureId/media') as Map)
+            .cast<String, dynamic>(),
+      );
       sources = [
         for (final s in media!.streams)
-          Source(label: s.label, uri: media!.relayed ? api.uri(s.url, {'token': api.token}).toString() : s.url, headers: media!.headers),
+          Source(
+            label: s.label,
+            uri: media!.relayed
+                ? api.uri(s.url, {'token': api.token}).toString()
+                : s.url,
+            headers: media!.headers,
+          ),
       ];
       if (media!.localPath.isNotEmpty) {
-        sources.insert(0, Source(label: localLabel.isEmpty ? l10n.commonLocal : localLabel, uri: Uri.file(media!.localPath).toString(), local: true));
+        sources.insert(
+          0,
+          Source(
+            label: localLabel.isEmpty ? l10n.commonLocal : localLabel,
+            uri: Uri.file(media!.localPath).toString(),
+            local: true,
+          ),
+        );
       }
       if (sources.isEmpty) throw StateError(l10n.playerNoVideo);
       sourceIdx = 0;
@@ -149,7 +197,12 @@ class LecturePlayer extends ChangeNotifier implements PlayerHandle {
       notifyListeners();
 
       final durMs = duration.inMilliseconds;
-      final start = prefs.autoResume && resumeMs > 10000 && (durMs == 0 || resumeMs < durMs - 30000) ? resumeMs : 0;
+      final start =
+          prefs.autoResume &&
+              resumeMs > 10000 &&
+              (durMs == 0 || resumeMs < durMs - 30000)
+          ? resumeMs
+          : 0;
       resumedFrom = start;
       await _open(source!, Duration(milliseconds: start));
       await player.setRate(prefs.defaultSpeed);
@@ -164,7 +217,8 @@ class LecturePlayer extends ChangeNotifier implements PlayerHandle {
   Future<void> _loadSide() async {
     try {
       final sl = jsonList(await api.get('/api/lectures/$lectureId/slides'));
-      slides = sl.map((e) => Slide((e as Map).cast<String, dynamic>())).toList()..sort((a, b) => a.tSec - b.tSec);
+      slides = sl.map((e) => Slide((e as Map).cast<String, dynamic>())).toList()
+        ..sort((a, b) => a.tSec - b.tSec);
       notifyListeners();
     } catch (_) {}
     await reloadTranscript();
@@ -174,7 +228,9 @@ class LecturePlayer extends ChangeNotifier implements PlayerHandle {
   Future<void> reloadTimeline() async {
     try {
       final r = jsonList(await api.get('/api/lectures/$lectureId/timeline'));
-      chapters = r.map((e) => Chapter((e as Map).cast<String, dynamic>())).toList();
+      chapters = r
+          .map((e) => Chapter((e as Map).cast<String, dynamic>()))
+          .toList();
       notifyListeners();
     } catch (_) {}
   }
@@ -182,7 +238,9 @@ class LecturePlayer extends ChangeNotifier implements PlayerHandle {
   Future<void> reloadCourseware() async {
     try {
       final r = jsonList(await api.get('/api/lectures/$lectureId/courseware'));
-      courseware = r.map((e) => CoursewareFile((e as Map).cast<String, dynamic>())).toList();
+      courseware = r
+          .map((e) => CoursewareFile((e as Map).cast<String, dynamic>()))
+          .toList();
       notifyListeners();
     } catch (_) {}
   }
@@ -195,8 +253,12 @@ class LecturePlayer extends ChangeNotifier implements PlayerHandle {
     outlineError = null;
     notifyListeners();
     try {
-      final r = (await api.post('/agent/timeline', {'lecture_id': lectureId}, const Duration(minutes: 4)) as Map).cast<String, dynamic>();
-      chapters = jsonList(r['chapters']).map((e) => Chapter((e as Map).cast<String, dynamic>())).toList();
+      final r = (await api.post('/agent/timeline', {
+        'lecture_id': lectureId,
+      }, const Duration(minutes: 4)) as Map).cast<String, dynamic>();
+      chapters = jsonList(r['chapters'])
+          .map((e) => Chapter((e as Map).cast<String, dynamic>()))
+          .toList();
     } catch (e) {
       outlineError = '$e';
     } finally {
@@ -221,14 +283,18 @@ class LecturePlayer extends ChangeNotifier implements PlayerHandle {
   Future<void> reloadTranscript() async {
     try {
       final sg = jsonList(await api.get('/api/lectures/$lectureId/transcript'));
-      segments = sg.map((e) => Segment((e as Map).cast<String, dynamic>())).toList();
+      segments = sg
+          .map((e) => Segment((e as Map).cast<String, dynamic>()))
+          .toList();
       notifyListeners();
     } catch (_) {}
   }
 
   Future<void> reloadNotes() async {
     try {
-      final ns = jsonList(await api.get('/api/notes', {'lecture_id': lectureId}));
+      final ns = jsonList(
+        await api.get('/api/notes', {'lecture_id': lectureId}),
+      );
       notes = ns.map((e) => Note((e as Map).cast<String, dynamic>())).toList();
       notifyListeners();
     } catch (_) {}
@@ -236,7 +302,16 @@ class LecturePlayer extends ChangeNotifier implements PlayerHandle {
 
   Future<void> _open(Source s, Duration start) async {
     error = null;
-    await player.open(Media(s.uri, httpHeaders: s.headers, start: start > Duration.zero ? start : null));
+    // Attach video output before opening a silent video (study canvas).
+    await video.platform.future;
+    if (_disposed) return;
+    await player.open(
+      Media(
+        s.uri,
+        httpHeaders: s.headers,
+        start: start > Duration.zero ? start : null,
+      ),
+    );
   }
 
   Future<void> switchSource(int i) async {
@@ -260,12 +335,20 @@ class LecturePlayer extends ChangeNotifier implements PlayerHandle {
     pipVideo = null;
     pipIdx = i;
     if (i != null) {
-      final p = Player(configuration: const PlayerConfiguration(title: 'Look Studio PiP', muted: true));
+      final p = Player(
+        configuration: const PlayerConfiguration(
+          title: 'Look Studio PiP',
+          muted: true,
+        ),
+      );
       pip = p;
       pipVideo = VideoController(p);
       final s = sources[i];
       await p.setVolume(0);
-      await p.open(Media(s.uri, httpHeaders: s.headers, start: position.value), play: playing);
+      await p.open(
+        Media(s.uri, httpHeaders: s.headers, start: position.value),
+        play: playing,
+      );
       await p.setRate(rate);
     }
     notifyListeners();
@@ -284,7 +367,12 @@ class LecturePlayer extends ChangeNotifier implements PlayerHandle {
 
   @override
   void seekTo(int ms) {
-    final d = Duration(milliseconds: ms.clamp(0, duration.inMilliseconds > 0 ? duration.inMilliseconds : ms));
+    final d = Duration(
+      milliseconds: ms.clamp(
+        0,
+        duration.inMilliseconds > 0 ? duration.inMilliseconds : ms,
+      ),
+    );
     position.value = d;
     player.seek(d);
     pip?.seek(d);
@@ -347,10 +435,13 @@ class LecturePlayer extends ChangeNotifier implements PlayerHandle {
   }
 
   String slideUrl(Slide s) => switch (s) {
-        _ when s.path.isNotEmpty => api.fileUrl(s.path),
-        _ when media?.relayed ?? false => api.uri('/api/lectures/$lectureId/slides/${s.idx}/image', {'token': api.token}).toString(),
-        _ => s.remoteUrl,
-      };
+    _ when s.path.isNotEmpty => api.fileUrl(s.path),
+    _ when media?.relayed ?? false => api.uri(
+      '/api/lectures/$lectureId/slides/${s.idx}/image',
+      {'token': api.token},
+    ).toString(),
+    _ => s.remoteUrl,
+  };
 
   // ---- persistence ----
 
@@ -367,9 +458,28 @@ class LecturePlayer extends ChangeNotifier implements PlayerHandle {
     } catch (_) {}
   }
 
+  Future<void> reloadSyncedState() async {
+    try {
+      final d = await api.get('/api/lectures/$lectureId') as Map;
+      if (_disposed) return;
+      bookmarks = jsonList(d['bookmarks'])
+          .map((e) => Bookmark((e as Map).cast<String, dynamic>()))
+          .toList();
+      notifyListeners();
+      await Future.wait([
+        reloadNotes(),
+        reloadTranscript(),
+        reloadCourseware(),
+      ]);
+    } catch (_) {}
+  }
+
   Future<Bookmark?> addBookmark([String label = '']) async {
     try {
-      final r = await api.post('/api/lectures/$lectureId/bookmarks', {'t_ms': positionMs, 'label': label});
+      final r = await api.post('/api/lectures/$lectureId/bookmarks', {
+        't_ms': positionMs,
+        'label': label,
+      });
       final b = Bookmark((r as Map).cast<String, dynamic>());
       bookmarks = [...bookmarks, b]..sort((a, b) => a.tMs - b.tMs);
       notifyListeners();

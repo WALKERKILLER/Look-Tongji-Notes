@@ -15,6 +15,7 @@ import 'features/courses/courses_page.dart';
 import 'features/downloads/downloads_page.dart';
 import 'features/home/home_page.dart';
 import 'features/library/library_page.dart';
+import 'features/nas/nas_page.dart';
 import 'features/login/login_page.dart';
 import 'features/notifications/notification_center.dart';
 import 'features/plugins/plugins_page.dart';
@@ -39,29 +40,87 @@ class _Dest {
 
 /// Tab indices, shared with pages that switch tabs.
 abstract final class Tabs {
-  static const home = 0, courses = 1, schedule = 2, downloads = 3, library = 4, tasks = 5, plugins = 6, settings = 7;
+  static const home = 0,
+      courses = 1,
+      schedule = 2,
+      downloads = 3,
+      library = 4,
+      tasks = 5,
+      plugins = 6,
+      settings = 7,
+      nas = 8;
 }
 
 final _dests = [
-  _Dest(l10n.screenHome, Icons.home_outlined, Icons.home_rounded, l10n.screenHome),
-  _Dest(l10n.commonCourses, Icons.school_outlined, Icons.school_rounded, l10n.navCourses),
-  _Dest(l10n.commonSchedule, Icons.event_note_outlined, Icons.event_note_rounded, l10n.commonSchedule),
-  _Dest(l10n.commonDownload, Icons.download_outlined, Icons.download_rounded, l10n.screenDownloads),
-  _Dest(l10n.screenLibrary, Icons.auto_stories_outlined, Icons.auto_stories_rounded, l10n.screenLibrary),
-  _Dest(l10n.navTasks, Icons.schedule_outlined, Icons.schedule_rounded, l10n.commonScheduledTasks),
-  _Dest(l10n.commonPlugins, Icons.extension_outlined, Icons.extension_rounded, l10n.commonPlugins),
-  _Dest(l10n.commonSettings, Icons.tune_outlined, Icons.tune_rounded, l10n.commonSettings),
+  // Keep tab indices stable; NAS is appended below.
+  _Dest(
+    l10n.screenHome,
+    Icons.home_outlined,
+    Icons.home_rounded,
+    l10n.screenHome,
+  ),
+  _Dest(
+    l10n.commonCourses,
+    Icons.school_outlined,
+    Icons.school_rounded,
+    l10n.navCourses,
+  ),
+  _Dest(
+    l10n.commonSchedule,
+    Icons.event_note_outlined,
+    Icons.event_note_rounded,
+    l10n.commonSchedule,
+  ),
+  _Dest(
+    l10n.commonDownload,
+    Icons.download_outlined,
+    Icons.download_rounded,
+    l10n.screenDownloads,
+  ),
+  _Dest(
+    l10n.screenLibrary,
+    Icons.auto_stories_outlined,
+    Icons.auto_stories_rounded,
+    l10n.screenLibrary,
+  ),
+  _Dest(
+    l10n.navTasks,
+    Icons.schedule_outlined,
+    Icons.schedule_rounded,
+    l10n.commonScheduledTasks,
+  ),
+  _Dest(
+    l10n.commonPlugins,
+    Icons.extension_outlined,
+    Icons.extension_rounded,
+    l10n.commonPlugins,
+  ),
+  _Dest(
+    l10n.commonSettings,
+    Icons.tune_outlined,
+    Icons.tune_rounded,
+    l10n.commonSettings,
+  ),
+  _Dest(l10n.nasTitle, Icons.hub_outlined, Icons.hub, l10n.nasTitle),
 ];
 
 /// The bottom bar leaves out 定时 and 插件, reached from 设置 and the
 /// assistant there.
-const _barTabs = [Tabs.home, Tabs.courses, Tabs.schedule, Tabs.downloads, Tabs.library, Tabs.settings];
+const _barTabs = [
+  Tabs.home,
+  Tabs.courses,
+  Tabs.schedule,
+  Tabs.downloads,
+  Tabs.library,
+  Tabs.settings,
+];
 
 /// Lets any page switch tabs (e.g. "see all downloads").
 class ShellScope extends InheritedWidget {
   const ShellScope({super.key, required this.goTo, required super.child});
   final void Function(int index) goTo;
-  static ShellScope of(BuildContext context) => context.dependOnInheritedWidgetOfExactType<ShellScope>()!;
+  static ShellScope of(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<ShellScope>()!;
   @override
   bool updateShouldNotify(ShellScope old) => false;
 }
@@ -86,7 +145,8 @@ abstract final class ShellNav {
   static void push(int tab, Widget page) {
     _goTo?.call(tab);
     if (tab >= _keys.length) return;
-    void go() => _keys[tab].currentState?.push(MaterialPageRoute(builder: (_) => page));
+    void go() =>
+        _keys[tab].currentState?.push(MaterialPageRoute(builder: (_) => page));
     if (_keys[tab].currentState != null) {
       go();
     } else {
@@ -103,13 +163,17 @@ class AppShell extends StatefulWidget {
 
 class _AppShellState extends State<AppShell> {
   int _index = 0;
-  final _navKeys = List.generate(_dests.length, (_) => GlobalKey<NavigatorState>());
+  final _navKeys = List.generate(
+    _dests.length,
+    (_) => GlobalKey<NavigatorState>(),
+  );
   final _built = <int>{0};
   StreamSubscription<String>? _notices;
   StreamSubscription? _botOps;
   StreamSubscription? _daemonNotes;
   late final UiPrefs _prefs = context.read<UiPrefs>();
-  late final AssistantController _assistant = context.read<AssistantController>();
+  late final AssistantController _assistant = context
+      .read<AssistantController>();
 
   @override
   void initState() {
@@ -127,11 +191,20 @@ class _AppShellState extends State<AppShell> {
       if (mounted) BotOps.run(context, op);
     });
     // New replays, lectures and Canvas items (docs/specs/0010-live-refresh.md).
-    _daemonNotes = context.read<AppState>().events.where((e) => e['type'] == 'notification').listen((e) {
-      if (!mounted) return;
-      final n = (e['data'] as Map).cast<String, dynamic>();
-      showSnack(context, '${n['title']}', action: l10n.commonView, onAction: () => openNotification(context, n));
-    });
+    _daemonNotes = context
+        .read<AppState>()
+        .events
+        .where((e) => e['type'] == 'notification')
+        .listen((e) {
+          if (!mounted) return;
+          final n = (e['data'] as Map).cast<String, dynamic>();
+          showSnack(
+            context,
+            '${n['title']}',
+            action: l10n.commonView,
+            onAction: () => openNotification(context, n),
+          );
+        });
     _prefs.addListener(_pushPrefs);
     _pushPrefs();
   }
@@ -148,15 +221,16 @@ class _AppShellState extends State<AppShell> {
   }
 
   Widget _root(int i) => switch (i) {
-        Tabs.home => const HomePage(),
-        Tabs.courses => const CoursesPage(),
-        Tabs.schedule => const SchedulePage(),
-        Tabs.downloads => const DownloadsPage(),
-        Tabs.library => const LibraryPage(),
-        Tabs.tasks => const TasksPage(),
-        Tabs.plugins => const PluginsPage(),
-        _ => const SettingsPage(),
-      };
+    Tabs.home => const HomePage(),
+    Tabs.courses => const CoursesPage(),
+    Tabs.schedule => const SchedulePage(),
+    Tabs.downloads => const DownloadsPage(),
+    Tabs.library => const LibraryPage(),
+    Tabs.tasks => const TasksPage(),
+    Tabs.plugins => const PluginsPage(),
+    Tabs.nas => const NasPage(),
+    _ => const SettingsPage(),
+  };
 
   void _select(int i) {
     if (i == _index) {
@@ -183,37 +257,51 @@ class _AppShellState extends State<AppShell> {
     final attention = context.watch<PluginStore>().attention;
 
     // Tabs keep their navigators alive; switching uses an MD3 fade-through.
-    final stack = Stack(fit: StackFit.expand, children: [
-      for (var i = 0; i < _dests.length; i++)
-        if (_built.contains(i))
-          _TabSlot(
-            key: ValueKey(i),
-            active: i == _index,
-            child: HeroControllerScope(
-              controller: MaterialApp.createMaterialHeroController(),
-              child: Navigator(
-                key: _navKeys[i],
-                onGenerateRoute: (_) => MaterialPageRoute(builder: (_) => _root(i)),
+    final stack = Stack(
+      fit: StackFit.expand,
+      children: [
+        for (var i = 0; i < _dests.length; i++)
+          if (_built.contains(i))
+            _TabSlot(
+              key: ValueKey(i),
+              active: i == _index,
+              child: HeroControllerScope(
+                controller: MaterialApp.createMaterialHeroController(),
+                child: Navigator(
+                  key: _navKeys[i],
+                  onGenerateRoute: (_) =>
+                      MaterialPageRoute(builder: (_) => _root(i)),
+                ),
               ),
             ),
-          ),
-    ]);
+      ],
+    );
 
     Widget icon(int i, bool sel) {
       final d = _dests[i];
       final ic = Icon(sel ? d.selected : d.icon);
-      if (i == Tabs.downloads && downloads > 0) return Badge.count(count: downloads, child: ic);
-      if (i == Tabs.schedule && dueSoon > 0) return Badge.count(count: dueSoon, child: ic);
-      if (i == Tabs.tasks && unread > 0) return Badge.count(count: unread, child: ic);
-      if (i == Tabs.plugins && attention > 0) return Badge.count(count: attention, child: ic);
-      if (i == Tabs.settings && sc == SizeClass.compact && unread + attention > 0) return Badge(child: ic);
+      if (i == Tabs.downloads && downloads > 0)
+        return Badge.count(count: downloads, child: ic);
+      if (i == Tabs.schedule && dueSoon > 0)
+        return Badge.count(count: dueSoon, child: ic);
+      if (i == Tabs.tasks && unread > 0)
+        return Badge.count(count: unread, child: ic);
+      if (i == Tabs.plugins && attention > 0)
+        return Badge.count(count: attention, child: ic);
+      if (i == Tabs.settings &&
+          sc == SizeClass.compact &&
+          unread + attention > 0)
+        return Badge(child: ic);
       return ic;
     }
 
-    final body = Column(children: [
-      if (app.auth.status == 'needs_password') _ReauthBanner(error: app.auth.error),
-      Expanded(child: stack),
-    ]);
+    final body = Column(
+      children: [
+        if (app.auth.status == 'needs_password')
+          _ReauthBanner(error: app.auth.error),
+        Expanded(child: stack),
+      ],
+    );
 
     final content = NavigatorPopHandler(
       onPopWithResult: (_) => _navKeys[_index].currentState?.maybePop(),
@@ -223,77 +311,116 @@ class _AppShellState extends State<AppShell> {
     if (sc == SizeClass.compact) {
       return Scaffold(
         body: SafeArea(bottom: false, child: content),
-        floatingActionButton: const PageFabClearance(child: _AssistantFab(compact: true)),
+        floatingActionButton: const PageFabClearance(
+          child: _AssistantFab(compact: true),
+        ),
         bottomNavigationBar: NavigationBar(
-          selectedIndex: _barTabs.contains(_index) ? _barTabs.indexOf(_index) : _barTabs.indexOf(Tabs.settings),
+          selectedIndex: _barTabs.contains(_index)
+              ? _barTabs.indexOf(_index)
+              : _barTabs.indexOf(Tabs.settings),
           onDestinationSelected: (b) => _select(_barTabs[b]),
           labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
           destinations: [
-            for (final i in _barTabs) NavigationDestination(icon: icon(i, false), selectedIcon: icon(i, true), label: _dests[i].label),
+            for (final i in _barTabs)
+              NavigationDestination(
+                icon: icon(i, false),
+                selectedIcon: icon(i, true),
+                label: _dests[i].label,
+              ),
           ],
         ),
       );
     }
 
-    final docked = sc.index >= SizeClass.expanded.index && prefs.assistantDocked;
+    final docked =
+        sc.index >= SizeClass.expanded.index && prefs.assistantDocked;
     return Scaffold(
-      body: Row(children: [
-        NavigationRail(
-          selectedIndex: _index,
-          onDestinationSelected: _select,
-          leading: Padding(
-            padding: const EdgeInsets.only(top: Space.sm, bottom: Space.xl),
-            child: Column(children: [
-              Padding(
-                padding: const EdgeInsets.only(bottom: Space.lg),
-                child: const _BrandMark(),
+      body: Row(
+        children: [
+          NavigationRail(
+            selectedIndex: _index,
+            onDestinationSelected: _select,
+            leading: Padding(
+              padding: const EdgeInsets.only(top: Space.sm, bottom: Space.xl),
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: Space.lg),
+                    child: const _BrandMark(),
+                  ),
+                  if (!docked) _AssistantFab(compact: false),
+                ],
               ),
-              if (!docked) _AssistantFab(compact: false),
-            ]),
-          ),
-          trailingAtBottom: true,
-          trailing: Padding(
-            padding: const EdgeInsets.only(bottom: Space.lg),
-            child: Column(children: [
-              const NotificationBell(),
-              const SizedBox(height: Space.md),
-              Tooltip(
-                message: l10n.shellProfileTooltip(userDisplayName(context)),
-                child: InkWell(customBorder: const CircleBorder(), onTap: () => showProfileDialog(context), child: const UserAvatar(size: 40)),
-              ),
-            ]),
-          ),
-          destinations: [
-            for (var i = 0; i < _dests.length; i++)
-              NavigationRailDestination(icon: icon(i, false), selectedIcon: icon(i, true), label: Text(_dests[i].label)),
-          ],
-        ),
-        Expanded(
-          child: Padding(
-            padding: EdgeInsets.only(right: docked ? 0 : Space.lg, top: Space.sm, bottom: Space.lg),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(Corners.xl),
-              child: ColoredBox(color: cs.surfaceContainerLowest, child: content),
             ),
-          ),
-        ),
-        AnimatedSize(
-          duration: Motion.medium4,
-          curve: Motion.emphasized,
-          child: docked
-              ? Padding(
-                  padding: const EdgeInsets.fromLTRB(Space.sm, Space.sm, Space.lg, Space.lg),
-                  child: SizedBox(
-                    width: sc.index >= SizeClass.large.index ? 440 : 380,
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(Corners.xl),
-                      child: ColoredBox(color: cs.surfaceContainerLow, child: const AssistantPanel(docked: true)),
+            trailingAtBottom: true,
+            trailing: Padding(
+              padding: const EdgeInsets.only(bottom: Space.lg),
+              child: Column(
+                children: [
+                  const NotificationBell(),
+                  const SizedBox(height: Space.md),
+                  Tooltip(
+                    message: l10n.shellProfileTooltip(userDisplayName(context)),
+                    child: InkWell(
+                      customBorder: const CircleBorder(),
+                      onTap: () => showProfileDialog(context),
+                      child: const UserAvatar(size: 40),
                     ),
                   ),
-                )
-              : const SizedBox(height: double.infinity),
-        ),
-      ]),
+                ],
+              ),
+            ),
+            destinations: [
+              for (var i = 0; i < _dests.length; i++)
+                NavigationRailDestination(
+                  icon: icon(i, false),
+                  selectedIcon: icon(i, true),
+                  label: Text(_dests[i].label),
+                ),
+            ],
+          ),
+          Expanded(
+            child: Padding(
+              padding: EdgeInsets.only(
+                right: docked ? 0 : Space.lg,
+                top: Space.sm,
+                bottom: Space.lg,
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(Corners.xl),
+                child: ColoredBox(
+                  color: cs.surfaceContainerLowest,
+                  child: content,
+                ),
+              ),
+            ),
+          ),
+          AnimatedSize(
+            duration: Motion.medium4,
+            curve: Motion.emphasized,
+            child: docked
+                ? Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      Space.sm,
+                      Space.sm,
+                      Space.lg,
+                      Space.lg,
+                    ),
+                    child: SizedBox(
+                      width: sc.index >= SizeClass.large.index ? 440 : 380,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(Corners.xl),
+                        child: ColoredBox(
+                          color: cs.surfaceContainerLow,
+                          child: const AssistantPanel(docked: true),
+                        ),
+                      ),
+                    ),
+                  )
+                : const SizedBox(height: double.infinity),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -308,17 +435,30 @@ class _TabSlot extends StatefulWidget {
   State<_TabSlot> createState() => _TabSlotState();
 }
 
-class _TabSlotState extends State<_TabSlot> with SingleTickerProviderStateMixin {
-  late final _c = AnimationController(vsync: this, duration: Motion.medium2, value: widget.active ? 1 : 0);
-  late final _fade = CurvedAnimation(parent: _c, curve: const Interval(0.3, 1, curve: Motion.emphasizedDecelerate));
-  late final _scale = Tween(begin: 0.97, end: 1.0).animate(CurvedAnimation(parent: _c, curve: Motion.emphasizedDecelerate));
+class _TabSlotState extends State<_TabSlot>
+    with SingleTickerProviderStateMixin {
+  late final _c = AnimationController(
+    vsync: this,
+    duration: Motion.medium2,
+    value: widget.active ? 1 : 0,
+  );
+  late final _fade = CurvedAnimation(
+    parent: _c,
+    curve: const Interval(0.3, 1, curve: Motion.emphasizedDecelerate),
+  );
+  late final _scale = Tween(
+    begin: 0.97,
+    end: 1.0,
+  ).animate(CurvedAnimation(parent: _c, curve: Motion.emphasizedDecelerate));
 
   @override
   void didUpdateWidget(_TabSlot old) {
     super.didUpdateWidget(old);
     if (widget.active == old.active) return;
     if (widget.active) {
-      MediaQuery.disableAnimationsOf(context) ? _c.value = 1 : _c.forward(from: 0);
+      MediaQuery.disableAnimationsOf(context)
+          ? _c.value = 1
+          : _c.forward(from: 0);
     } else {
       _c.value = 0;
     }
@@ -333,12 +473,15 @@ class _TabSlotState extends State<_TabSlot> with SingleTickerProviderStateMixin 
 
   @override
   Widget build(BuildContext context) => Offstage(
-        offstage: !widget.active,
-        child: TickerMode(
-          enabled: widget.active,
-          child: FadeTransition(opacity: _fade, child: ScaleTransition(scale: _scale, child: widget.child)),
-        ),
-      );
+    offstage: !widget.active,
+    child: TickerMode(
+      enabled: widget.active,
+      child: FadeTransition(
+        opacity: _fade,
+        child: ScaleTransition(scale: _scale, child: widget.child),
+      ),
+    ),
+  );
 }
 
 /// App mark on the rail: a soft twelve-lobed cookie holding a play glyph.
@@ -352,7 +495,14 @@ class _BrandMark extends StatelessWidget {
       child: CustomPaint(
         size: const Size.square(36),
         painter: _BrandPainter(cs.primaryContainer, cs.primary),
-        child: SizedBox.square(dimension: 36, child: Icon(Icons.play_arrow_rounded, size: 20, color: cs.onPrimaryContainer)),
+        child: SizedBox.square(
+          dimension: 36,
+          child: Icon(
+            Icons.play_arrow_rounded,
+            size: 20,
+            color: cs.onPrimaryContainer,
+          ),
+        ),
       ),
     );
   }
@@ -364,7 +514,10 @@ class _BrandPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final r = Offset.zero & size;
-    canvas.drawPath(shapePath(shapeRadii(OrganicShape.cookie12), r), Paint()..color = fill);
+    canvas.drawPath(
+      shapePath(shapeRadii(OrganicShape.cookie12), r),
+      Paint()..color = fill,
+    );
     canvas.drawCircle(r.topRight.translate(-4, 4), 3.5, Paint()..color = ring);
   }
 
@@ -401,7 +554,9 @@ class _PageFabState extends State<PageFab> {
     _on = on;
     on ? PageFab._showing.add(this) : PageFab._showing.remove(this);
     // Reported after the frame: the shell's button may not rebuild during this build.
-    WidgetsBinding.instance.addPostFrameCallback((_) => PageFab.shown.value = PageFab._showing.isNotEmpty);
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => PageFab.shown.value = PageFab._showing.isNotEmpty,
+    );
   }
 
   @override
@@ -413,7 +568,11 @@ class _PageFabState extends State<PageFab> {
   @override
   Widget build(BuildContext context) {
     // Hidden tabs run with tickers off; covered routes are not current.
-    _report(widget.visible && TickerMode.valuesOf(context).enabled && (ModalRoute.isCurrentOf(context) ?? true));
+    _report(
+      widget.visible &&
+          TickerMode.valuesOf(context).enabled &&
+          (ModalRoute.isCurrentOf(context) ?? true),
+    );
     return widget.child;
   }
 }
@@ -426,15 +585,17 @@ class PageFabClearance extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => ValueListenableBuilder<bool>(
-        valueListenable: PageFab.shown,
-        builder: (context, up, child) => AnimatedPadding(
-          padding: EdgeInsets.only(bottom: up ? PageFab.height + Space.md : 0),
-          duration: MediaQuery.disableAnimationsOf(context) ? Duration.zero : Motion.medium2,
-          curve: Motion.emphasized,
-          child: child,
-        ),
-        child: child,
-      );
+    valueListenable: PageFab.shown,
+    builder: (context, up, child) => AnimatedPadding(
+      padding: EdgeInsets.only(bottom: up ? PageFab.height + Space.md : 0),
+      duration: MediaQuery.disableAnimationsOf(context)
+          ? Duration.zero
+          : Motion.medium2,
+      curve: Motion.emphasized,
+      child: child,
+    ),
+    child: child,
+  );
 }
 
 /// The bot on the rail and the compact layout's floating button: tap to
@@ -458,7 +619,13 @@ class _AssistantFab extends StatelessWidget {
           openAssistantPanel(context);
           if (a.view != 'bot') a.showBot();
         },
-        child: BotAvatar(size: 44, shape: a.botShape, color: a.botColor, mood: a.mood, followPointer: false),
+        child: BotAvatar(
+          size: 44,
+          shape: a.botShape,
+          color: a.botColor,
+          mood: a.mood,
+          followPointer: false,
+        ),
       ),
     );
   }
@@ -473,17 +640,30 @@ class _ReauthBanner extends StatelessWidget {
     return Material(
       color: cs.errorContainer,
       child: InkWell(
-        onTap: () => showDialog(context: context, builder: (_) => const Dialog(child: SizedBox(width: 420, child: LoginForm(dialog: true)))),
+        onTap: () => showDialog(
+          context: context,
+          builder: (_) => const Dialog(
+            child: SizedBox(width: 420, child: LoginForm(dialog: true)),
+          ),
+        ),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: Space.lg, vertical: Space.md),
-          child: Row(children: [
-            Icon(Icons.lock_clock_outlined, color: cs.onErrorContainer),
-            const SizedBox(width: Space.md),
-            Expanded(
-              child: Text(l10n.shellSessionExpired, style: TextStyle(color: cs.onErrorContainer)),
-            ),
-            Icon(Icons.chevron_right_rounded, color: cs.onErrorContainer),
-          ]),
+          padding: const EdgeInsets.symmetric(
+            horizontal: Space.lg,
+            vertical: Space.md,
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.lock_clock_outlined, color: cs.onErrorContainer),
+              const SizedBox(width: Space.md),
+              Expanded(
+                child: Text(
+                  l10n.shellSessionExpired,
+                  style: TextStyle(color: cs.onErrorContainer),
+                ),
+              ),
+              Icon(Icons.chevron_right_rounded, color: cs.onErrorContainer),
+            ],
+          ),
         ),
       ),
     );

@@ -35,9 +35,12 @@ The app starts lookd ([lookd_service.dart](../app/lib/core/lookd_service.dart) s
 | `lookd/internal/fudan` | Fudan UIS sign-in (directly or through WebVPN), WebVPN addresses, the iCourse sign-in |
 | `lookd/internal/mineru` | MinerU courseware parsing client and sealed token |
 | `lookd/internal/library` | On-disk library layout, courseware search, schedule, timeline, README for AI tools |
+| `lookd/internal/library/study_*.go` | Validated canvas documents, bounded material/PDF imports, source context and scoped conversation persistence ([study workspace](study-canvas.md)) |
+| `lookd/internal/nasbridge` | Opt-in SSH observation and fixed manual operations for an existing NAS deployment ([configuration](nas-services.md)) |
 | `lookd/internal/portable` | Converts library Markdown (`look://` links, timestamps, math) to plain Markdown for exports |
 | `lookd/internal/notion` | Notion API client (pacing, retries) and the one-way sync of `library.KnowledgeDocs` with edit detection ([spec 0013](specs/0013-notion-sync.md), [decision 0011](decisions/0011-notion-sync-through-an-internal-integration.md)) |
 | `lookd/internal/datasync` | Backup archives, a WebDAV client and the three-way sync of the library and the assistant's portable data ([spec 0014](specs/0014-data-sync-and-backup.md), [decision 0012](decisions/0012-webdav-sync-with-a-shared-manifest.md)) |
+| `lookd/internal/datasync/folder*.go` | Course-scoped folder transport, immutable objects, device manifests and portable record merging ([contract](specs/0023-course-folder-sync.md)) |
 | `lookd/internal/store` | SQLite schema and FTS index ([schema.sql](../lookd/internal/store/schema.sql)); rebuildable from library files (schedule and activity via their JSON mirrors) |
 | `lookd/internal/events` | SSE event fan-out |
 | `lookd/internal/agent` | Supervises the Node agent host and proxies `/agent/*` |
@@ -49,6 +52,7 @@ The app starts lookd ([lookd_service.dart](../app/lib/core/lookd_service.dart) s
 | `agent/src/tools.mjs` | Tool groups, `find_tools`, note playbook, write guards |
 | `agent/src/models.mjs`, `catalog.mjs` | Providers, model preferences, models.dev metadata |
 | `agent/src/timeline.mjs`, `vision.mjs`, `lookd.mjs` | Outline generation, image bridge for text-only models, lookd client |
+| `agent/src/canvas-agent.mjs`, `transcript-review.mjs` | Bounded, user-triggered canvas model runs and non-destructive transcript suggestions |
 | `agent/src/usage.mjs` | Usage ledger (`usage.jsonl`): one line per model call, summaries and call paging |
 | `agent/src/practice.mjs` | Quiz grounding checks and playbook for `create_quiz` |
 | `agent/src/tasks.mjs` | Scheduled tasks: validation, next-run computation, queue and run history (`tasks.json`, `tasks-runs.jsonl`) |
@@ -58,6 +62,7 @@ The app starts lookd ([lookd_service.dart](../app/lib/core/lookd_service.dart) s
 | `agent/src/plugins.mjs` | Plugin host: manifests, install state (`plugins.json`), catalogs, loading plugins as Pi extensions, the permission-gated Look API, actions |
 | `agent/plugins/` | Official plugins and their catalog; the [plugin author guide](../agent/plugins/README.md) |
 | `app/lib/core` | lookd client (`api.dart`), daemon discovery and startup, the Android workspace and platform bridge (`workspace.dart`, `android_bridge.dart`, `background_work.dart`), app state, models, study-time tracker (`activity_tracker.dart`), installed plugins and their contributions (`plugins.dart`) |
+| `app/lib/features/study_canvas` | Canvas rendering, materials, local ink, docked controls, source selection and scoped conversation UI ([controls](drawing-controls.md)) |
 | `app/lib/features/<area>` | Screens: activity, assistant, courses, courseware, downloads, home, library, login, notifications, player, plugins, practice, profile, schedule, settings, setup (Android workspace) |
 | `app/android/workspace/prepare.py` | Fetches the pinned Termux proot build and builds `liblookd.so` and the agent's sources for the APK; [NOTICE](../app/android/workspace/NOTICE) for the shipped programs |
 | `app/lib/widgets` | Shared widgets, including the Markdown/LaTeX renderer and reader, statistics charts (`charts.dart`) and the activity heatmap (`heatmap.dart`) |

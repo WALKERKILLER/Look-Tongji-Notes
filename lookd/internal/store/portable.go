@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 )
 
 // Moving a library between devices: course and lecture rows adopted from
@@ -56,18 +57,27 @@ func (s *Store) ExportUserState(ctx context.Context) (UserState, error) {
 			rows.Close()
 			return st, err
 		}
+		if p.UpdatedAt < 100000000000 {
+			p.UpdatedAt *= 1000
+		}
 		st.Playback[id] = p
 	}
 	rows.Close()
-	rows, err = s.DB.QueryContext(ctx, `SELECT lecture_id,t_ms,label,created_at FROM bookmarks ORDER BY lecture_id,t_ms,id`)
+	rows, err = s.DB.QueryContext(ctx, `SELECT lecture_id,t_ms,label,created_at,sync_id,updated_at,deleted FROM bookmarks ORDER BY lecture_id,t_ms,id`)
 	if err != nil {
 		return st, err
 	}
 	defer rows.Close()
 	for rows.Next() {
 		var b Bookmark
-		if err := rows.Scan(&b.LectureID, &b.TMs, &b.Label, &b.CreatedAt); err != nil {
+		if err := rows.Scan(&b.LectureID, &b.TMs, &b.Label, &b.CreatedAt, &b.SyncID, &b.UpdatedAt, &b.Deleted); err != nil {
 			return st, err
+		}
+		if b.SyncID == "" {
+			b.SyncID = bookmarkID(b)
+		}
+		if b.UpdatedAt == 0 {
+			b.UpdatedAt = b.CreatedAt * 1000
 		}
 		st.Bookmarks = append(st.Bookmarks, b)
 	}
@@ -77,6 +87,12 @@ func (s *Store) ExportUserState(ctx context.Context) (UserState, error) {
 // MergeUserState takes the newer playback position of each lecture and the
 // bookmarks this index lacks. It reports whether anything changed.
 func (s *Store) MergeUserState(ctx context.Context, in UserState) (bool, error) {
+	return s.MergeLearningState(ctx, in, nil)
+}
+
+// MergeLearningState commits portable user state and activity in one transaction.
+// Replayed activity takes the larger totals and reports only actual changes.
+func (s *Store) MergeLearningState(ctx context.Context, in UserState, activity []ActivityRow) (bool, error) {
 	tx, err := s.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return false, err
@@ -84,9 +100,12 @@ func (s *Store) MergeUserState(ctx context.Context, in UserState) (bool, error) 
 	defer tx.Rollback()
 	changed := false
 	for id, p := range in.Playback {
+		if p.UpdatedAt < 100000000000 {
+			p.UpdatedAt *= 1000
+		}
 		r, err := tx.ExecContext(ctx, `INSERT INTO playback(lecture_id,position_ms,duration_ms,speed,updated_at) VALUES(?,?,?,?,?)
  ON CONFLICT(lecture_id) DO UPDATE SET position_ms=excluded.position_ms,duration_ms=excluded.duration_ms,speed=excluded.speed,
- updated_at=excluded.updated_at WHERE excluded.updated_at>playback.updated_at`, id, p.PositionMs, p.DurationMs, p.Speed, p.UpdatedAt)
+ updated_at=excluded.updated_at WHERE excluded.updated_at>CASE WHEN playback.updated_at<100000000000 THEN playback.updated_at*1000 ELSE playback.updated_at END`, id, p.PositionMs, p.DurationMs, p.Speed, p.UpdatedAt)
 		if err != nil {
 			return false, err
 		}
@@ -95,21 +114,59 @@ func (s *Store) MergeUserState(ctx context.Context, in UserState) (bool, error) 
 		}
 	}
 	for _, b := range in.Bookmarks {
-		var one int
-		err := tx.QueryRowContext(ctx, `SELECT 1 FROM bookmarks WHERE lecture_id=? AND t_ms=? AND label=?`, b.LectureID, b.TMs, b.Label).Scan(&one)
+		if b.SyncID == "" {
+			b.SyncID = bookmarkID(b)
+		}
+		if b.UpdatedAt == 0 {
+			b.UpdatedAt = b.CreatedAt * 1000
+		}
+		var id, updated int64
+		var deleted bool
+		var lectureID string
+		err := tx.QueryRowContext(ctx, `SELECT id,updated_at,deleted,lecture_id FROM bookmarks WHERE sync_id=? OR (sync_id='' AND lecture_id=? AND t_ms=? AND label=? AND created_at=?) LIMIT 1`, b.SyncID, b.LectureID, b.TMs, b.Label, b.CreatedAt).Scan(&id, &updated, &deleted, &lectureID)
 		if err == nil {
+			if lectureID != b.LectureID {
+				return false, errors.New("同步书签标识已属于其他课次")
+			}
+			if b.UpdatedAt > updated || b.Deleted && !deleted && b.UpdatedAt == updated {
+				if _, err = tx.ExecContext(ctx, `UPDATE bookmarks SET sync_id=?,updated_at=?,deleted=? WHERE id=?`, b.SyncID, b.UpdatedAt, b.Deleted, id); err != nil {
+					return false, err
+				}
+				changed = true
+			}
 			continue
 		}
 		if err != sql.ErrNoRows {
 			return false, err
 		}
-		if _, err := tx.ExecContext(ctx, `INSERT INTO bookmarks(lecture_id,t_ms,label,created_at) VALUES(?,?,?,?)`,
-			b.LectureID, b.TMs, b.Label, b.CreatedAt); err != nil {
+		if _, err = tx.ExecContext(ctx, `INSERT INTO bookmarks(lecture_id,t_ms,label,created_at,sync_id,updated_at,deleted) VALUES(?,?,?,?,?,?,?)`, b.LectureID, b.TMs, b.Label, b.CreatedAt, b.SyncID, b.UpdatedAt, b.Deleted); err != nil {
 			return false, err
 		}
 		changed = true
 	}
-	return changed, tx.Commit()
+	for _, row := range activity {
+		if err := CheckActivityRow(row); err != nil {
+			return false, err
+		}
+		if err := checkDayRoom(ctx, tx, row.Day, row.Kind, row.CourseID, row.LectureID); err != nil {
+			return false, err
+		}
+		result, err := tx.ExecContext(ctx, `INSERT INTO activity(day,kind,course_id,lecture_id,seconds,count) VALUES(?,?,?,?,?,?)
+ ON CONFLICT(day,kind,course_id,lecture_id) DO UPDATE SET seconds=MAX(seconds,excluded.seconds), count=MAX(count,excluded.count)
+ WHERE excluded.seconds>activity.seconds OR excluded.count>activity.count`, row.Day, row.Kind, row.CourseID, row.LectureID, row.Seconds, row.Count)
+		if err != nil {
+			return false, err
+		}
+		n, err := result.RowsAffected()
+		if err != nil {
+			return false, err
+		}
+		changed = changed || n > 0
+	}
+	if err := tx.Commit(); err != nil {
+		return false, err
+	}
+	return changed, nil
 }
 
 // Compact folds the write-ahead log back and rebuilds the index file

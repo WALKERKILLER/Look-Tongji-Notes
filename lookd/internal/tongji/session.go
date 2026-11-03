@@ -1,6 +1,8 @@
 package tongji
 
 import (
+	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -61,6 +63,7 @@ type Session struct {
 	renewing chan struct{}
 	onChange func(AuthState)
 	kick     chan struct{}
+	bg       sync.WaitGroup // fire-and-forget work started by Login
 }
 
 type persisted struct {
@@ -96,6 +99,17 @@ func NewSession(statePath string, onChange func(AuthState)) *Session {
 	s.load()
 	return s
 }
+
+// setOnChange replaces the state callback. Login leaves a realname lookup
+// running, so the callback is swapped under the lock like every other field.
+func (s *Session) setOnChange(fn func(AuthState)) {
+	s.mu.Lock()
+	s.onChange = fn
+	s.mu.Unlock()
+}
+
+// waitBackground waits for the work Login starts in the background.
+func (s *Session) waitBackground() { s.bg.Wait() }
 
 // Client is the HTTP client carrying the IAM single sign-on cookies; other
 // Tongji services (such as Canvas) sign in through it.
@@ -160,9 +174,10 @@ func (s *Session) setState(f func(*AuthState)) {
 	f(&s.state)
 	st := s.state
 	s.saveLocked()
+	cb := s.onChange
 	s.mu.Unlock()
-	if s.onChange != nil {
-		s.onChange(st)
+	if cb != nil {
+		cb(st)
 	}
 }
 
@@ -252,7 +267,8 @@ func (s *Session) Login(ctx context.Context, school, username, password, captcha
 	}
 	s.mu.Unlock()
 	s.adopt(tok, "password")
-	go s.fetchRealname()
+	s.bg.Add(1)
+	go func() { defer s.bg.Done(); s.fetchRealname() }()
 	return nil
 }
 
@@ -273,7 +289,8 @@ func (s *Session) loginFudan(ctx context.Context, username, password string, rem
 		st.Status, st.Method, st.Error, st.School, st.Username, st.Remember = "active", "password", "", Fudan, username, remember
 		st.ExpiresAt, st.RenewedAt = time.Time{}, time.Now()
 	})
-	go s.fetchRealname()
+	s.bg.Add(1)
+	go func() { defer s.bg.Done(); s.fetchRealname() }()
 	return nil
 }
 
@@ -334,6 +351,16 @@ func (s *Session) Token(ctx context.Context) (string, error) {
 // Renew refreshes the token; concurrent callers share one renewal.
 func (s *Session) Renew(ctx context.Context) error {
 	s.mu.Lock()
+	// A failed Fudan renewal needs explicit sign-in. Background reads must
+	// not emit renewing/needs_password forever and retrigger UI reloads.
+	if s.state.School == Fudan && s.state.Status == "needs_password" {
+		err := s.state.Error
+		s.mu.Unlock()
+		if err == "" {
+			err = "复旦登录需要重新认证，请重新登录"
+		}
+		return errors.New(err)
+	}
 	if s.renewing != nil {
 		ch := s.renewing
 		s.mu.Unlock()
@@ -508,12 +535,33 @@ func (s *Session) viaVPN(ctx context.Context, req *http.Request) (*http.Response
 	return resp, nil
 }
 
-// VPNSignedOut reports a WebVPN answer that is not the service's: the gateway
-// redirects to its sign-in page (or UIS) once its session is gone.
+// VPNSignedOut recognizes gateway redirects and HTML sign-in responses.
+// iCourse's course-detail API labels successful JSON as text/html, so the
+// header alone cannot establish that a session expired.
 func VPNSignedOut(resp *http.Response) bool {
-	return resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden ||
-		!strings.HasPrefix(resp.Request.URL.Path, "/http") ||
-		strings.Contains(resp.Header.Get("Content-Type"), "text/html")
+	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden ||
+		!strings.HasPrefix(resp.Request.URL.Path, "/http") {
+		return true
+	}
+	if !strings.Contains(strings.ToLower(resp.Header.Get("Content-Type")), "text/html") {
+		return false
+	}
+	if resp.Body == nil {
+		return true
+	}
+	original := resp.Body
+	reader := bufio.NewReader(original)
+	// Peek leaves the bytes available to the JSON decoder. Keep the original
+	// closer so HTTP connections are released by the caller as usual.
+	resp.Body = struct {
+		io.Reader
+		io.Closer
+	}{reader, original}
+	prefix, _ := reader.Peek(512)
+	prefix = bytes.TrimSpace(prefix)
+	// JSON-looking responses proceed to normal decoding and API-code checks;
+	// malformed JSON must not become a misleading "session expired" error.
+	return len(prefix) == 0 || (prefix[0] != '{' && prefix[0] != '[')
 }
 
 func (s *Session) fetchRealname() {

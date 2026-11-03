@@ -36,7 +36,12 @@ func Open(path string) (*Store, error) {
 		db.Close()
 		return nil, err
 	}
-	return &Store{DB: db}, nil
+	st := &Store{DB: db}
+	if err := st.ensureBookmarkSync(); err != nil {
+		db.Close()
+		return nil, err
+	}
+	return st, nil
 }
 
 func (s *Store) Close() error { return s.DB.Close() }
@@ -86,7 +91,7 @@ func (s *Store) UpsertCourse(ctx context.Context, c Course) error {
 	return err
 }
 
-const courseCols = `c.id,c.title,c.teacher,c.teachers_json,c.college,c.term,c.thumb,c.start_at,c.end_at,c.lecture_total,c.progress,
+const courseCols = `c.id,c.title,c.teacher,c.teachers_json,c.college,c.term,c.thumb,c.start_at,c.end_at,CASE WHEN c.id LIKE 'local-%' THEN (SELECT COUNT(*) FROM lectures WHERE course_id=c.id) ELSE c.lecture_total END,c.progress,
  c.last_sub_id,c.last_learn_at,c.pinned,c.hidden,c.alias,c.color,c.dir,c.synced_at,
  (SELECT COUNT(DISTINCT a.lecture_id) FROM assets a JOIN lectures l ON l.id=a.lecture_id WHERE l.course_id=c.id)`
 
@@ -515,16 +520,17 @@ func (s *Store) Search(ctx context.Context, q, courseID string, limit int) ([]Hi
 // ---- notes ----
 
 type Note struct {
-	ID        string `json:"id"`
-	CourseID  string `json:"course_id"`
-	LectureID string `json:"lecture_id"`
-	Title     string `json:"title"`
-	Body      string `json:"body,omitempty"`
-	Source    string `json:"source"`
-	Pinned    bool   `json:"pinned"`
-	Path      string `json:"path"`
-	CreatedAt int64  `json:"created_at"`
-	UpdatedAt int64  `json:"updated_at"`
+	BaseBody  *string `json:"base_body,omitempty"`
+	ID        string  `json:"id"`
+	CourseID  string  `json:"course_id"`
+	LectureID string  `json:"lecture_id"`
+	Title     string  `json:"title"`
+	Body      string  `json:"body,omitempty"`
+	Source    string  `json:"source"`
+	Pinned    bool    `json:"pinned"`
+	Path      string  `json:"path"`
+	CreatedAt int64   `json:"created_at"`
+	UpdatedAt int64   `json:"updated_at"`
 }
 
 func (s *Store) PutNote(ctx context.Context, n Note) error {
@@ -658,7 +664,7 @@ type Playback struct {
 func (s *Store) SavePlayback(ctx context.Context, lectureID string, p Playback) error {
 	_, err := s.DB.ExecContext(ctx, `INSERT INTO playback(lecture_id,position_ms,duration_ms,speed,updated_at) VALUES(?,?,?,?,?)
  ON CONFLICT(lecture_id) DO UPDATE SET position_ms=excluded.position_ms,duration_ms=excluded.duration_ms,speed=excluded.speed,updated_at=excluded.updated_at`,
-		lectureID, p.PositionMs, p.DurationMs, p.Speed, now())
+		lectureID, p.PositionMs, p.DurationMs, p.Speed, time.Now().UnixMilli())
 	return err
 }
 
@@ -672,6 +678,9 @@ func (s *Store) Playback(ctx context.Context, lectureID string) (Playback, error
 }
 
 type Bookmark struct {
+	SyncID    string `json:"sync_id,omitempty"`
+	UpdatedAt int64  `json:"updated_at,omitempty"`
+	Deleted   bool   `json:"deleted,omitempty"`
 	ID        int64  `json:"id"`
 	LectureID string `json:"lecture_id"`
 	TMs       int64  `json:"t_ms"`
@@ -680,7 +689,7 @@ type Bookmark struct {
 }
 
 func (s *Store) AddBookmark(ctx context.Context, b Bookmark) (int64, error) {
-	r, err := s.DB.ExecContext(ctx, `INSERT INTO bookmarks(lecture_id,t_ms,label,created_at) VALUES(?,?,?,?)`, b.LectureID, b.TMs, b.Label, now())
+	r, err := s.DB.ExecContext(ctx, `INSERT INTO bookmarks(lecture_id,t_ms,label,created_at,sync_id,updated_at) VALUES(?,?,?,?,?,?)`, b.LectureID, b.TMs, b.Label, now(), newBookmarkID(), time.Now().UnixMilli())
 	if err != nil {
 		return 0, err
 	}
@@ -688,7 +697,7 @@ func (s *Store) AddBookmark(ctx context.Context, b Bookmark) (int64, error) {
 }
 
 func (s *Store) Bookmarks(ctx context.Context, lectureID string) ([]Bookmark, error) {
-	rows, err := s.DB.QueryContext(ctx, `SELECT id,lecture_id,t_ms,label,created_at FROM bookmarks WHERE lecture_id=? ORDER BY t_ms`, lectureID)
+	rows, err := s.DB.QueryContext(ctx, `SELECT id,lecture_id,t_ms,label,created_at FROM bookmarks WHERE lecture_id=? AND deleted=0 ORDER BY t_ms`, lectureID)
 	if err != nil {
 		return nil, err
 	}
@@ -702,11 +711,6 @@ func (s *Store) Bookmarks(ctx context.Context, lectureID string) ([]Bookmark, er
 		out = append(out, b)
 	}
 	return out, rows.Err()
-}
-
-func (s *Store) DeleteBookmark(ctx context.Context, id int64) error {
-	_, err := s.DB.ExecContext(ctx, `DELETE FROM bookmarks WHERE id=?`, id)
-	return err
 }
 
 // ---- settings ----

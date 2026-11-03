@@ -2,6 +2,8 @@ package cn.lookstudio.look_studio
 
 import android.content.ActivityNotFoundException
 import android.content.Intent
+import android.view.MotionEvent
+import android.view.KeyEvent
 import android.os.Build
 import android.webkit.MimeTypeMap
 import androidx.core.content.FileProvider
@@ -13,6 +15,29 @@ import java.io.File
 import kotlin.concurrent.thread
 
 class MainActivity : FlutterActivity() {
+    private var stylus: StylusBridge? = null
+
+    override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+        val handled = super.dispatchTouchEvent(event)
+        stylus?.touch(event)
+        return handled
+    }
+
+    override fun dispatchGenericMotionEvent(event: MotionEvent): Boolean {
+        stylus?.generic(event)
+        return super.dispatchGenericMotionEvent(event)
+    }
+
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean =
+        stylus?.key(event) == true || super.dispatchKeyEvent(event)
+
+    override fun onPause() { stylus?.reset(); super.onPause() }
+
+    override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
+        stylus?.dispose(); stylus = null
+        super.cleanUpFlutterEngine(flutterEngine)
+    }
+
     // "look/links": lookstudio:// links opened from other apps
     // (see app/lib/core/deep_links.dart).
     private var links: MethodChannel? = null
@@ -21,10 +46,12 @@ class MainActivity : FlutterActivity() {
     private var dartReady = false
 
     // A "saveAs" waiting for the system's create-document screen.
+    private var folderPicking: MethodChannel.Result? = null
     private var saving: Pair<File, MethodChannel.Result>? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        stylus = StylusBridge(this, flutterEngine.dartExecutor.binaryMessenger)
         linkOf(intent)?.let { pending.add(it) }
         links = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "look/links").apply {
             setMethodCallHandler { call, result ->
@@ -95,6 +122,15 @@ class MainActivity : FlutterActivity() {
                     result.success(false)
                 }
             }
+            "pickSyncFolder" -> {
+                folderPicking?.success(null);folderPicking=result
+                val pick=Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
+                try { startActivityForResult(pick, FOLDER_REQUEST) } catch (e:Exception) { folderPicking=null;result.error("folder",e.message,null) }
+            }
+            "syncFolderBridge" -> {
+                val saved=getSharedPreferences("look-folder",MODE_PRIVATE).getString("uri",null)
+                try { result.success(if(saved==null) null else SyncFolderBridge.open(this,android.net.Uri.parse(saved))) } catch(e:Exception) { result.error("folder","文件夹授权已失效，请重新选择",null) }
+            }
             "keepAlive" -> {
                 val service = Intent(this, WorkspaceService::class.java)
                 if (call.argument<Boolean>("on") == true) {
@@ -113,6 +149,15 @@ class MainActivity : FlutterActivity() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         @Suppress("DEPRECATION")
         super.onActivityResult(requestCode, resultCode, data)
+        if(requestCode==FOLDER_REQUEST) {
+            val result=folderPicking ?: return;folderPicking=null;val tree=data?.data
+            if(resultCode!=RESULT_OK || tree==null) { result.success(null);return }
+            try {
+                contentResolver.takePersistableUriPermission(tree, (data?.flags ?: 0) and (Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION))
+                getSharedPreferences("look-folder",MODE_PRIVATE).edit().putString("uri",tree.toString()).apply()
+                result.success(SyncFolderBridge.open(this,tree))
+            } catch(e:Exception) { result.error("folder",e.message,null) };return
+        }
         if (requestCode != SAVE_REQUEST) return
         val (file, result) = saving ?: return
         saving = null
@@ -161,5 +206,6 @@ class MainActivity : FlutterActivity() {
 
     companion object {
         private const val SAVE_REQUEST = 4101
+        private const val FOLDER_REQUEST = 4102
     }
 }

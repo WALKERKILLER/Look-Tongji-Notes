@@ -39,16 +39,26 @@ import (
 	"lookstudio/lookd/internal/tongji"
 )
 
+// packageFlavor is set only by the separate local test build.
+var packageFlavor = ""
+
 func defaultDataDir() string {
+	name := "look-studio"
+	if packageFlavor == "canvas-test" {
+		name = "look-studio-canvas-test"
+	}
 	if d := os.Getenv("XDG_DATA_HOME"); d != "" {
-		return filepath.Join(d, "look-studio")
+		return filepath.Join(d, name)
 	}
 	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".local", "share", "look-studio")
+	return filepath.Join(home, ".local", "share", name)
 }
 
 func defaultLibrary() string {
 	home, _ := os.UserHomeDir()
+	if packageFlavor == "canvas-test" {
+		return filepath.Join(home, "LookStudioCanvasTest")
+	}
 	return filepath.Join(home, "LookStudio")
 }
 
@@ -96,6 +106,11 @@ func prune(dirs []string) {
 }
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "package-info" {
+		json.NewEncoder(os.Stdout).Encode(map[string]string{"flavor": packageFlavor, "data": defaultDataDir(), "library": defaultLibrary()})
+		return
+	}
+
 	if len(os.Args) > 1 && os.Args[1] == "unpack" {
 		unpack(os.Args[2:])
 		return
@@ -174,6 +189,7 @@ func run(dataDir, libRoot, addr, node, agentScript string, watchStdin bool) erro
 	bus := events.New()
 	tongji.KeyPath = filepath.Join(dataDir, "seal.key")
 	sess := tongji.NewSession(filepath.Join(dataDir, "session.json"), func(s tongji.AuthState) { bus.Publish("auth", s) })
+	lib.SourceBase = sess.Base()
 	client := &tongji.Client{S: sess}
 	eng := dl.New(sess.Transport(), dl.Options{MaxConns: 8})
 	mgr := jobs.New(st, lib, client, eng, asr.NewPool(filepath.Join(dataDir, "asr-usage.json")), bus)
@@ -210,7 +226,7 @@ func run(dataDir, libRoot, addr, node, agentScript string, watchStdin bool) erro
 	srv.Notion = &notion.Service{Path: filepath.Join(dataDir, "notion.json"), Docs: srv.NotionDocs, Publish: bus.Publish,
 		HC: &http.Client{Timeout: 2 * time.Minute, Transport: sess.Transport()}}
 	srv.Data = &datasync.Service{Roots: datasync.Roots{Library: cfg.LibraryRoot, Data: dataDir}, App: server.Version,
-		State: srv.UserState, MergeState: srv.MergeUserState, Changed: srv.DataArrived, Publish: bus.Publish,
+		State: srv.UserState, MergeState: srv.MergeUserState, ApplyFiles: lib.ApplySyncFiles, CourseState: srv.CourseState, MergeCourseState: srv.MergeCourseState, Changed: srv.DataArrived, Publish: bus.Publish,
 		Seal: tongji.Seal, Unseal: tongji.Unseal}
 	go srv.Data.Run(ctx)
 	go srv.RunWatcher(ctx)

@@ -25,37 +25,53 @@ class LookApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final prefs = context.watch<UiPrefs>();
-    return DynamicColorBuilder(builder: (light, dark) {
-      final accent = light?.primary;
-      final lightTheme = buildTheme(buildScheme(prefs, Brightness.light, systemAccent: accent), prefs);
-      final darkTheme = buildTheme(buildScheme(prefs, Brightness.dark, systemAccent: dark?.primary ?? accent), prefs);
-      return MaterialApp(
-        onGenerateTitle: (context) => l10n.appTitle,
-        debugShowCheckedModeBanner: false,
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        locale: const Locale('zh'),
-        scaffoldMessengerKey: rootMessenger,
-        navigatorKey: rootNavigator,
-        theme: lightTheme,
-        darkTheme: darkTheme,
-        themeMode: prefs.themeMode,
-        themeAnimationDuration: Motion.medium2,
-        themeAnimationCurve: Motion.standard,
-        builder: (context, child) {
-          l10n = AppLocalizations.of(context);
-          final mq = MediaQuery.of(context);
-          return MediaQuery(
-            data: mq.copyWith(
-              textScaler: TextScaler.linear(prefs.textScale),
-              disableAnimations: prefs.reduceMotion || mq.disableAnimations,
-            ),
-            child: TaskRunListener(messenger: rootMessenger, navigator: rootNavigator, child: child!),
-          );
-        },
-        home: const RootGate(),
-      );
-    });
+    return DynamicColorBuilder(
+      builder: (light, dark) {
+        final accent = light?.primary;
+        final lightTheme = buildTheme(
+          buildScheme(prefs, Brightness.light, systemAccent: accent),
+          prefs,
+        );
+        final darkTheme = buildTheme(
+          buildScheme(
+            prefs,
+            Brightness.dark,
+            systemAccent: dark?.primary ?? accent,
+          ),
+          prefs,
+        );
+        return MaterialApp(
+          onGenerateTitle: (context) => l10n.appTitle,
+          debugShowCheckedModeBanner: false,
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          locale: const Locale('zh'),
+          scaffoldMessengerKey: rootMessenger,
+          navigatorKey: rootNavigator,
+          theme: lightTheme,
+          darkTheme: darkTheme,
+          themeMode: prefs.themeMode,
+          themeAnimationDuration: Motion.medium2,
+          themeAnimationCurve: Motion.standard,
+          builder: (context, child) {
+            l10n = AppLocalizations.of(context);
+            final mq = MediaQuery.of(context);
+            return MediaQuery(
+              data: mq.copyWith(
+                textScaler: TextScaler.linear(prefs.textScale),
+                disableAnimations: prefs.reduceMotion || mq.disableAnimations,
+              ),
+              child: TaskRunListener(
+                messenger: rootMessenger,
+                navigator: rootNavigator,
+                child: child!,
+              ),
+            );
+          },
+          home: const RootGate(),
+        );
+      },
+    );
   }
 }
 
@@ -77,12 +93,20 @@ class RootGate extends StatelessWidget {
           icon: Icons.power_off_rounded,
           title: l10n.appDaemonFailed,
           body: daemon.error,
-          action: FilledButton.tonal(onPressed: daemon.restart, child: Text(l10n.appRestart)),
+          action: FilledButton.tonal(
+            onPressed: daemon.restart,
+            child: Text(l10n.appRestart),
+          ),
         ),
       );
     } else if (!app.connected || !app.authKnown) {
-      child = Scaffold(key: ValueKey('splash'), body: CenteredLoader(label: l10n.commonStarting));
-    } else if (!app.auth.signedIn && app.auth.status != 'needs_password') {
+      child = Scaffold(
+        key: ValueKey('splash'),
+        body: CenteredLoader(label: l10n.commonStarting),
+      );
+    } else if (!app.localMode &&
+        !app.auth.signedIn &&
+        app.auth.status != 'needs_password') {
       child = const LoginPage(key: ValueKey('login'));
     } else {
       child = const AppShell(key: ValueKey('shell'));
@@ -94,7 +118,10 @@ class RootGate extends StatelessWidget {
       switchOutCurve: Motion.emphasizedAccelerate,
       transitionBuilder: (c, a) => FadeTransition(
         opacity: a,
-        child: ScaleTransition(scale: Tween(begin: 0.96, end: 1.0).animate(a), child: c),
+        child: ScaleTransition(
+          scale: Tween(begin: 0.96, end: 1.0).animate(a),
+          child: c,
+        ),
       ),
       child: child,
     );

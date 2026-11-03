@@ -11163,6 +11163,1002 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'微信赞赏码'**
   String get aboutRewardImage;
+
+  /// No description provided for @colorTongjiBlue.
+  ///
+  /// In zh, this message translates to:
+  /// **'同济蓝'**
+  String get colorTongjiBlue;
+
+  /// No description provided for @toolPrepareDownload.
+  ///
+  /// In zh, this message translates to:
+  /// **'准备下载'**
+  String get toolPrepareDownload;
+
+  /// No description provided for @toolPrepareTask.
+  ///
+  /// In zh, this message translates to:
+  /// **'准备定时任务'**
+  String get toolPrepareTask;
+
+  /// No description provided for @toolPreparePlugin.
+  ///
+  /// In zh, this message translates to:
+  /// **'准备开关插件'**
+  String get toolPreparePlugin;
+
+  /// No description provided for @loginWithTongji.
+  ///
+  /// In zh, this message translates to:
+  /// **'使用同济大学统一身份认证'**
+  String get loginWithTongji;
+
+  /// No description provided for @nasTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'课程自动化'**
+  String get nasTitle;
+
+  /// No description provided for @nasRunHomework.
+  ///
+  /// In zh, this message translates to:
+  /// **'运行一轮作业任务'**
+  String get nasRunHomework;
+
+  /// No description provided for @nasRunCalendar.
+  ///
+  /// In zh, this message translates to:
+  /// **'刷新 NAS 日历'**
+  String get nasRunCalendar;
+
+  /// No description provided for @nasHomeworkConfirm.
+  ///
+  /// In zh, this message translates to:
+  /// **'将使用 NAS 已配置的 Codex 服务，处理最多两项符合条件的作业。已有稿件保护和任务锁继续生效。生成完成后仍需检查，不会自动提交。'**
+  String get nasHomeworkConfirm;
+
+  /// No description provided for @nasCalendarConfirm.
+  ///
+  /// In zh, this message translates to:
+  /// **'请求 NAS 刷新日历。当天已成功同步时，现有程序可能跳过重复更新；不会运行作业生成。'**
+  String get nasCalendarConfirm;
+
+  /// No description provided for @nasRun.
+  ///
+  /// In zh, this message translates to:
+  /// **'开始运行'**
+  String get nasRun;
+
+  /// No description provided for @nasTextTruncated.
+  ///
+  /// In zh, this message translates to:
+  /// **'仅展示前 12000 字；全文保留在同步目录中。'**
+  String get nasTextTruncated;
+
+  /// No description provided for @nasReady.
+  ///
+  /// In zh, this message translates to:
+  /// **'已生成，待检查'**
+  String get nasReady;
+
+  /// No description provided for @nasSubmitted.
+  ///
+  /// In zh, this message translates to:
+  /// **'平台已提交'**
+  String get nasSubmitted;
+
+  /// No description provided for @nasFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'生成失败'**
+  String get nasFailed;
+
+  /// No description provided for @nasExisting.
+  ///
+  /// In zh, this message translates to:
+  /// **'已有文件'**
+  String get nasExisting;
+
+  /// No description provided for @nasRunning.
+  ///
+  /// In zh, this message translates to:
+  /// **'生成中'**
+  String get nasRunning;
+
+  /// No description provided for @nasQueued.
+  ///
+  /// In zh, this message translates to:
+  /// **'排队中'**
+  String get nasQueued;
+
+  /// No description provided for @nasNeedsInput.
+  ///
+  /// In zh, this message translates to:
+  /// **'需要补充材料或查看 NAS 运行记录'**
+  String get nasNeedsInput;
+
+  /// No description provided for @nasRefresh.
+  ///
+  /// In zh, this message translates to:
+  /// **'刷新状态'**
+  String get nasRefresh;
+
+  /// No description provided for @nasOnline.
+  ///
+  /// In zh, this message translates to:
+  /// **'NAS 已连接 · 资料来自本机同步目录'**
+  String get nasOnline;
+
+  /// No description provided for @nasOffline.
+  ///
+  /// In zh, this message translates to:
+  /// **'NAS 未连接 · 展示已有资料和上次状态'**
+  String get nasOffline;
+
+  /// No description provided for @nasObserved.
+  ///
+  /// In zh, this message translates to:
+  /// **'NAS 状态采集时间'**
+  String get nasObserved;
+
+  /// No description provided for @nasAllCourses.
+  ///
+  /// In zh, this message translates to:
+  /// **'全部课程'**
+  String get nasAllCourses;
+
+  /// No description provided for @nasSearch.
+  ///
+  /// In zh, this message translates to:
+  /// **'搜索资料与作业'**
+  String get nasSearch;
+
+  /// No description provided for @nasLinkCourse.
+  ///
+  /// In zh, this message translates to:
+  /// **'关联录播课程'**
+  String get nasLinkCourse;
+
+  /// No description provided for @nasUnlinked.
+  ///
+  /// In zh, this message translates to:
+  /// **'未关联录播课程'**
+  String get nasUnlinked;
+
+  /// No description provided for @nasOpenRecording.
+  ///
+  /// In zh, this message translates to:
+  /// **'打开课程录像'**
+  String get nasOpenRecording;
+
+  /// No description provided for @nasHomework.
+  ///
+  /// In zh, this message translates to:
+  /// **'作业'**
+  String get nasHomework;
+
+  /// No description provided for @nasDeadlines.
+  ///
+  /// In zh, this message translates to:
+  /// **'截止日程'**
+  String get nasDeadlines;
+
+  /// No description provided for @nasMaterials.
+  ///
+  /// In zh, this message translates to:
+  /// **'资料与成果'**
+  String get nasMaterials;
+
+  /// No description provided for @nasServices.
+  ///
+  /// In zh, this message translates to:
+  /// **'后台服务'**
+  String get nasServices;
+
+  /// No description provided for @nasSeparateStates.
+  ///
+  /// In zh, this message translates to:
+  /// **'生成状态与平台提交状态分别显示；生成稿请检查后使用。'**
+  String get nasSeparateStates;
+
+  /// No description provided for @nasUnconfirmed.
+  ///
+  /// In zh, this message translates to:
+  /// **'提交待确认'**
+  String get nasUnconfirmed;
+
+  /// No description provided for @nasDue.
+  ///
+  /// In zh, this message translates to:
+  /// **'截止'**
+  String get nasDue;
+
+  /// No description provided for @nasTimeout.
+  ///
+  /// In zh, this message translates to:
+  /// **'上次生成超过 45 分钟限制，需要处理后重试。'**
+  String get nasTimeout;
+
+  /// No description provided for @nasViewSource.
+  ///
+  /// In zh, this message translates to:
+  /// **'查看学校原页面'**
+  String get nasViewSource;
+
+  /// No description provided for @nasNoReport.
+  ///
+  /// In zh, this message translates to:
+  /// **'暂无已同步的报告入口，可在资料与成果中查找。'**
+  String get nasNoReport;
+
+  /// No description provided for @nasServicesHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'后台任务由 NAS 独立运行，关闭本页面不影响原有定时任务。状态刷新不会启动生成。'**
+  String get nasServicesHint;
+
+  /// No description provided for @nasServiceState.
+  ///
+  /// In zh, this message translates to:
+  /// **'服务状态'**
+  String get nasServiceState;
+
+  /// No description provided for @nasLastRun.
+  ///
+  /// In zh, this message translates to:
+  /// **'最近完成'**
+  String get nasLastRun;
+
+  /// No description provided for @nasNextRun.
+  ///
+  /// In zh, this message translates to:
+  /// **'下次计划'**
+  String get nasNextRun;
+
+  /// No description provided for @nasEntry.
+  ///
+  /// In zh, this message translates to:
+  /// **'课程自动化 · 资料、日程和作业'**
+  String get nasEntry;
+
+  /// No description provided for @nasDeadlineCompleted.
+  ///
+  /// In zh, this message translates to:
+  /// **'日历标记已完成'**
+  String get nasDeadlineCompleted;
+
+  /// No description provided for @nasHomeworkService.
+  ///
+  /// In zh, this message translates to:
+  /// **'作业生成'**
+  String get nasHomeworkService;
+
+  /// No description provided for @nasCalendarService.
+  ///
+  /// In zh, this message translates to:
+  /// **'日历同步定时任务'**
+  String get nasCalendarService;
+
+  /// No description provided for @nasLectureService.
+  ///
+  /// In zh, this message translates to:
+  /// **'录课订阅'**
+  String get nasLectureService;
+
+  /// No description provided for @nasCalendarContainer.
+  ///
+  /// In zh, this message translates to:
+  /// **'日历同步运行环境'**
+  String get nasCalendarContainer;
+
+  /// No description provided for @nasRelatedFiles.
+  ///
+  /// In zh, this message translates to:
+  /// **'查看本课程资料与代码'**
+  String get nasRelatedFiles;
+
+  /// No description provided for @nasFullFile.
+  ///
+  /// In zh, this message translates to:
+  /// **'打开完整文件'**
+  String get nasFullFile;
+
+  /// No description provided for @nasCalendarSource.
+  ///
+  /// In zh, this message translates to:
+  /// **'NAS 同步'**
+  String get nasCalendarSource;
+
+  /// No description provided for @nasScanResult.
+  ///
+  /// In zh, this message translates to:
+  /// **'最近扫描：任务数 / 失败数'**
+  String get nasScanResult;
+
+  /// No description provided for @nasCampusOffline.
+  ///
+  /// In zh, this message translates to:
+  /// **'iCourse 尚未登录：已同步资料、笔记和 NAS 任务仍可使用。点击登录以获取受保护的录课。'**
+  String get nasCampusOffline;
+
+  /// No description provided for @nasGenerationUnknown.
+  ///
+  /// In zh, this message translates to:
+  /// **'生成状态未单独记录'**
+  String get nasGenerationUnknown;
+
+  /// No description provided for @schoolLabel.
+  ///
+  /// In zh, this message translates to:
+  /// **'学校'**
+  String get schoolLabel;
+
+  /// No description provided for @schoolFudanLogin.
+  ///
+  /// In zh, this message translates to:
+  /// **'登录复旦 iCourse'**
+  String get schoolFudanLogin;
+
+  /// No description provided for @schoolFudanHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'在浏览器中完成复旦统一身份认证，密码仅在复旦认证页面输入。'**
+  String get schoolFudanHint;
+
+  /// No description provided for @schoolBrowserWaiting.
+  ///
+  /// In zh, this message translates to:
+  /// **'等待浏览器登录完成'**
+  String get schoolBrowserWaiting;
+
+  /// No description provided for @schoolBrowserLogin.
+  ///
+  /// In zh, this message translates to:
+  /// **'打开浏览器登录'**
+  String get schoolBrowserLogin;
+
+  /// No description provided for @schoolSwitching.
+  ///
+  /// In zh, this message translates to:
+  /// **'正在切换学校…'**
+  String get schoolSwitching;
+
+  /// No description provided for @schoolReconnectFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'学校已保存，但连接尚未恢复，请重新打开应用。'**
+  String get schoolReconnectFailed;
+
+  /// No description provided for @schoolChange.
+  ///
+  /// In zh, this message translates to:
+  /// **'切换学校'**
+  String get schoolChange;
+
+  /// No description provided for @catalogCourseware.
+  ///
+  /// In zh, this message translates to:
+  /// **'课件'**
+  String get catalogCourseware;
+
+  /// No description provided for @catalogHomework.
+  ///
+  /// In zh, this message translates to:
+  /// **'作业'**
+  String get catalogHomework;
+
+  /// No description provided for @catalogLab.
+  ///
+  /// In zh, this message translates to:
+  /// **'Lab / 实验'**
+  String get catalogLab;
+
+  /// No description provided for @catalogVideo.
+  ///
+  /// In zh, this message translates to:
+  /// **'录像'**
+  String get catalogVideo;
+
+  /// No description provided for @catalogSlides.
+  ///
+  /// In zh, this message translates to:
+  /// **'课堂截图'**
+  String get catalogSlides;
+
+  /// No description provided for @catalogReference.
+  ///
+  /// In zh, this message translates to:
+  /// **'参考资料'**
+  String get catalogReference;
+
+  /// No description provided for @catalogOther.
+  ///
+  /// In zh, this message translates to:
+  /// **'其他'**
+  String get catalogOther;
+
+  /// No description provided for @catalogCategory.
+  ///
+  /// In zh, this message translates to:
+  /// **'用途类别'**
+  String get catalogCategory;
+
+  /// No description provided for @catalogFileType.
+  ///
+  /// In zh, this message translates to:
+  /// **'文件类型'**
+  String get catalogFileType;
+
+  /// No description provided for @catalogAllCategories.
+  ///
+  /// In zh, this message translates to:
+  /// **'全部类别'**
+  String get catalogAllCategories;
+
+  /// No description provided for @catalogAllTypes.
+  ///
+  /// In zh, this message translates to:
+  /// **'全部文件类型'**
+  String get catalogAllTypes;
+
+  /// No description provided for @catalogClassificationHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'依据文件名与目录自动分类；原文件保留原位。展开类别查看资料。'**
+  String get catalogClassificationHint;
+
+  /// No description provided for @catalogEmpty.
+  ///
+  /// In zh, this message translates to:
+  /// **'没有符合筛选条件的资料。'**
+  String get catalogEmpty;
+
+  /// No description provided for @catalogSearchHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'搜索文件名；同时检索文字稿与笔记正文'**
+  String get catalogSearchHint;
+
+  /// No description provided for @catalogTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'资料 · {count} 项'**
+  String catalogTitle(int count);
+
+  /// No description provided for @catalogFulltextTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'正文检索（按课程）· {count} 条'**
+  String catalogFulltextTitle(int count);
+
+  /// No description provided for @catalogLoadFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'无法读取资料列表：{error}'**
+  String catalogLoadFailed(String error);
+
+  /// No description provided for @reviewStart.
+  ///
+  /// In zh, this message translates to:
+  /// **'AI 审校'**
+  String get reviewStart;
+
+  /// No description provided for @reviewCancel.
+  ///
+  /// In zh, this message translates to:
+  /// **'取消审校'**
+  String get reviewCancel;
+
+  /// No description provided for @reviewShow.
+  ///
+  /// In zh, this message translates to:
+  /// **'显示 AI 旁注'**
+  String get reviewShow;
+
+  /// No description provided for @reviewHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'保留原文，自动检查整节课的疑似识别错误。'**
+  String get reviewHint;
+
+  /// No description provided for @reviewConsent.
+  ///
+  /// In zh, this message translates to:
+  /// **'将这节课的完整文字稿、课程信息，以及可用的该节课堂 OCR / 课件文字发送给已配置的模型服务。按段检查可能产生模型费用。结果以「AI 推测」旁注显示，原文、字幕和时间戳保持不变；模型推测需要你核对。未完成的同版本审校会从已保存进度继续；重新审校已完成稿会替换已有旁注。'**
+  String get reviewConsent;
+
+  /// No description provided for @reviewStale.
+  ///
+  /// In zh, this message translates to:
+  /// **'文字稿已变化，这份旁注已过期。请重新审校。'**
+  String get reviewStale;
+
+  /// No description provided for @reviewProgress.
+  ///
+  /// In zh, this message translates to:
+  /// **'正在审校：{done} / {total} 段'**
+  String reviewProgress(Object done, Object total);
+
+  /// No description provided for @reviewCompleted.
+  ///
+  /// In zh, this message translates to:
+  /// **'整节课已审校 · {count} 条推测，供核对'**
+  String reviewCompleted(int count);
+
+  /// No description provided for @reviewCancelled.
+  ///
+  /// In zh, this message translates to:
+  /// **'已取消，保留已检查部分的旁注。'**
+  String get reviewCancelled;
+
+  /// No description provided for @reviewFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'审校未完成，请检查模型服务后重试；已保存部分结果。'**
+  String get reviewFailed;
+
+  /// No description provided for @reviewInterrupted.
+  ///
+  /// In zh, this message translates to:
+  /// **'审校进程已停止，可以重新审校。'**
+  String get reviewInterrupted;
+
+  /// No description provided for @reviewLoadFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'无法读取或更新审校结果：{error}'**
+  String reviewLoadFailed(String error);
+
+  /// No description provided for @reviewGuess.
+  ///
+  /// In zh, this message translates to:
+  /// **'（AI 推测：{guess}）'**
+  String reviewGuess(String guess);
+
+  /// No description provided for @reviewDetails.
+  ///
+  /// In zh, this message translates to:
+  /// **'原文：{original}\n\n推测理由：{reason}\n\n依据：{evidence}\n\n这是模型推测，请结合录音核对。'**
+  String reviewDetails(String original, String reason, String evidence);
+
+  /// No description provided for @reviewDismiss.
+  ///
+  /// In zh, this message translates to:
+  /// **'忽略这条建议'**
+  String get reviewDismiss;
+
+  /// No description provided for @reviewFiltered.
+  ///
+  /// In zh, this message translates to:
+  /// **'已过滤 {count} 条无法匹配原文或依据的候选建议。'**
+  String reviewFiltered(int count);
+
+  /// No description provided for @reviewModel.
+  ///
+  /// In zh, this message translates to:
+  /// **'审校模型：{model}'**
+  String reviewModel(String model);
+
+  /// No description provided for @studyOpening.
+  ///
+  /// In zh, this message translates to:
+  /// **'正在打开画布'**
+  String get studyOpening;
+
+  /// No description provided for @studySaved.
+  ///
+  /// In zh, this message translates to:
+  /// **'已保存到本机'**
+  String get studySaved;
+
+  /// No description provided for @studyPendingSave.
+  ///
+  /// In zh, this message translates to:
+  /// **'等待保存'**
+  String get studyPendingSave;
+
+  /// No description provided for @studySaving.
+  ///
+  /// In zh, this message translates to:
+  /// **'保存中…'**
+  String get studySaving;
+
+  /// No description provided for @studySaveFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'保存失败 · 点击重试'**
+  String get studySaveFailed;
+
+  /// No description provided for @studyLayerUnavailable.
+  ///
+  /// In zh, this message translates to:
+  /// **'当前图层已隐藏或锁定'**
+  String get studyLayerUnavailable;
+
+  /// No description provided for @studyInkLimit.
+  ///
+  /// In zh, this message translates to:
+  /// **'本画布笔迹已接近上限，请另建课次画布'**
+  String get studyInkLimit;
+
+  /// No description provided for @studyMaterials.
+  ///
+  /// In zh, this message translates to:
+  /// **'学习材料'**
+  String get studyMaterials;
+
+  /// No description provided for @studyPickLayer.
+  ///
+  /// In zh, this message translates to:
+  /// **'请先选择可编辑的图层'**
+  String get studyPickLayer;
+
+  /// No description provided for @studyImporting.
+  ///
+  /// In zh, this message translates to:
+  /// **'正在导入并处理素材…'**
+  String get studyImporting;
+
+  /// No description provided for @studyFileTooLarge.
+  ///
+  /// In zh, this message translates to:
+  /// **'文件超过 300 MiB，请拆分后导入'**
+  String get studyFileTooLarge;
+
+  /// No description provided for @studyCardLimit.
+  ///
+  /// In zh, this message translates to:
+  /// **'画布卡片超过 2000 张'**
+  String get studyCardLimit;
+
+  /// No description provided for @studyAddText.
+  ///
+  /// In zh, this message translates to:
+  /// **'添加文字笔记'**
+  String get studyAddText;
+
+  /// No description provided for @studyEditText.
+  ///
+  /// In zh, this message translates to:
+  /// **'编辑文字'**
+  String get studyEditText;
+
+  /// No description provided for @studyTextHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'写下思考，或粘贴 Markdown…'**
+  String get studyTextHint;
+
+  /// No description provided for @studyLocked.
+  ///
+  /// In zh, this message translates to:
+  /// **'图层已锁定或隐藏'**
+  String get studyLocked;
+
+  /// No description provided for @studyTextCard.
+  ///
+  /// In zh, this message translates to:
+  /// **'文字笔记'**
+  String get studyTextCard;
+
+  /// No description provided for @studyAskTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'向课程助手提问'**
+  String get studyAskTitle;
+
+  /// No description provided for @studyAskHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'助手会收到所选卡片的文字和视频时间点'**
+  String get studyAskHint;
+
+  /// No description provided for @studyAskSubmit.
+  ///
+  /// In zh, this message translates to:
+  /// **'提问'**
+  String get studyAskSubmit;
+
+  /// No description provided for @studyLayers.
+  ///
+  /// In zh, this message translates to:
+  /// **'图层'**
+  String get studyLayers;
+
+  /// No description provided for @studyAddLayer.
+  ///
+  /// In zh, this message translates to:
+  /// **'添加图层'**
+  String get studyAddLayer;
+
+  /// No description provided for @studyToggleVisible.
+  ///
+  /// In zh, this message translates to:
+  /// **'显示或隐藏'**
+  String get studyToggleVisible;
+
+  /// No description provided for @studyToggleLocked.
+  ///
+  /// In zh, this message translates to:
+  /// **'锁定或解锁'**
+  String get studyToggleLocked;
+
+  /// No description provided for @studyRecoverySaved.
+  ///
+  /// In zh, this message translates to:
+  /// **'已导出恢复文件；素材仍在本机课程目录'**
+  String get studyRecoverySaved;
+
+  /// No description provided for @studyClassic.
+  ///
+  /// In zh, this message translates to:
+  /// **'使用传统播放器'**
+  String get studyClassic;
+
+  /// No description provided for @studyBack.
+  ///
+  /// In zh, this message translates to:
+  /// **'返回课程'**
+  String get studyBack;
+
+  /// No description provided for @studyTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'学习画布'**
+  String get studyTitle;
+
+  /// No description provided for @studyPlayer.
+  ///
+  /// In zh, this message translates to:
+  /// **'播放器'**
+  String get studyPlayer;
+
+  /// No description provided for @studySidebar.
+  ///
+  /// In zh, this message translates to:
+  /// **'课程资料与助手'**
+  String get studySidebar;
+
+  /// No description provided for @studySelectTool.
+  ///
+  /// In zh, this message translates to:
+  /// **'选择 V'**
+  String get studySelectTool;
+
+  /// No description provided for @studyHandTool.
+  ///
+  /// In zh, this message translates to:
+  /// **'移动 H'**
+  String get studyHandTool;
+
+  /// No description provided for @studyPenTool.
+  ///
+  /// In zh, this message translates to:
+  /// **'钢笔 D'**
+  String get studyPenTool;
+
+  /// No description provided for @studyHighlighter.
+  ///
+  /// In zh, this message translates to:
+  /// **'荧光笔'**
+  String get studyHighlighter;
+
+  /// No description provided for @studyEraser.
+  ///
+  /// In zh, this message translates to:
+  /// **'橡皮 E'**
+  String get studyEraser;
+
+  /// No description provided for @studyRedo.
+  ///
+  /// In zh, this message translates to:
+  /// **'重做'**
+  String get studyRedo;
+
+  /// No description provided for @studyImport.
+  ///
+  /// In zh, this message translates to:
+  /// **'导入'**
+  String get studyImport;
+
+  /// No description provided for @studyCourseware.
+  ///
+  /// In zh, this message translates to:
+  /// **'放入课程资料'**
+  String get studyCourseware;
+
+  /// No description provided for @studyNewText.
+  ///
+  /// In zh, this message translates to:
+  /// **'添加文字'**
+  String get studyNewText;
+
+  /// No description provided for @studyAskAI.
+  ///
+  /// In zh, this message translates to:
+  /// **'问 AI'**
+  String get studyAskAI;
+
+  /// No description provided for @studyRemoveCards.
+  ///
+  /// In zh, this message translates to:
+  /// **'移除所选卡片（素材文件保留）'**
+  String get studyRemoveCards;
+
+  /// No description provided for @studyExportRecovery.
+  ///
+  /// In zh, this message translates to:
+  /// **'导出恢复文件'**
+  String get studyExportRecovery;
+
+  /// No description provided for @studyWriteHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'触控笔 / 鼠标书写 · 手指移动画布'**
+  String get studyWriteHint;
+
+  /// No description provided for @studyMoveHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'拖动卡片标题移动 · 右下角缩放 · ⌘/Ctrl + 滚轮缩放'**
+  String get studyMoveHint;
+
+  /// No description provided for @studyZoomOut.
+  ///
+  /// In zh, this message translates to:
+  /// **'缩小'**
+  String get studyZoomOut;
+
+  /// No description provided for @studyZoomIn.
+  ///
+  /// In zh, this message translates to:
+  /// **'放大'**
+  String get studyZoomIn;
+
+  /// No description provided for @studyFit.
+  ///
+  /// In zh, this message translates to:
+  /// **'显示全部材料'**
+  String get studyFit;
+
+  /// No description provided for @studyImageFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'无法读取图片，请重新导入'**
+  String get studyImageFailed;
+
+  /// No description provided for @studyUnsaved.
+  ///
+  /// In zh, this message translates to:
+  /// **'画布尚未保存'**
+  String get studyUnsaved;
+
+  /// No description provided for @studyUnsavedBody.
+  ///
+  /// In zh, this message translates to:
+  /// **'请检查本机服务后重试，或先导出恢复文件。当前内容仍保留在本窗口。'**
+  String get studyUnsavedBody;
+
+  /// No description provided for @studyKeepEditing.
+  ///
+  /// In zh, this message translates to:
+  /// **'继续编辑'**
+  String get studyKeepEditing;
+
+  /// No description provided for @studyImportError.
+  ///
+  /// In zh, this message translates to:
+  /// **'无法导入素材：{error}'**
+  String studyImportError(String error);
+
+  /// No description provided for @studyExportError.
+  ///
+  /// In zh, this message translates to:
+  /// **'无法导出：{error}'**
+  String studyExportError(String error);
+
+  /// No description provided for @studyOpenError.
+  ///
+  /// In zh, this message translates to:
+  /// **'无法打开学习画布：{error}'**
+  String studyOpenError(String error);
+
+  /// No description provided for @studyLayerName.
+  ///
+  /// In zh, this message translates to:
+  /// **'图层 {number}'**
+  String studyLayerName(int number);
+
+  /// No description provided for @studyPenWidth.
+  ///
+  /// In zh, this message translates to:
+  /// **'笔宽 {width}'**
+  String studyPenWidth(String width);
+
+  /// No description provided for @studyDefaultLayer.
+  ///
+  /// In zh, this message translates to:
+  /// **'学习笔记'**
+  String get studyDefaultLayer;
+
+  /// No description provided for @studyUnknownVersion.
+  ///
+  /// In zh, this message translates to:
+  /// **'画布版本不受支持'**
+  String get studyUnknownVersion;
+
+  /// No description provided for @studyLocalVideoError.
+  ///
+  /// In zh, this message translates to:
+  /// **'无法播放此视频：{error}'**
+  String studyLocalVideoError(String error);
+
+  /// No description provided for @localCourse.
+  ///
+  /// In zh, this message translates to:
+  /// **'本地课程'**
+  String get localCourse;
+
+  /// No description provided for @localCourseCreate.
+  ///
+  /// In zh, this message translates to:
+  /// **'新建本地课程'**
+  String get localCourseCreate;
+
+  /// No description provided for @localCourseName.
+  ///
+  /// In zh, this message translates to:
+  /// **'课程名称'**
+  String get localCourseName;
+
+  /// No description provided for @localCourseNameRequired.
+  ///
+  /// In zh, this message translates to:
+  /// **'请填写课程名称'**
+  String get localCourseNameRequired;
+
+  /// No description provided for @localCourseTeacher.
+  ///
+  /// In zh, this message translates to:
+  /// **'讲师或来源（可选）'**
+  String get localCourseTeacher;
+
+  /// No description provided for @localCourseImportHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'视频按文件名顺序生成独立课次。也可以先创建课程，稍后添加视频。'**
+  String get localCourseImportHint;
+
+  /// No description provided for @localVideosChoose.
+  ///
+  /// In zh, this message translates to:
+  /// **'选择视频'**
+  String get localVideosChoose;
+
+  /// No description provided for @localVideosAdd.
+  ///
+  /// In zh, this message translates to:
+  /// **'添加视频'**
+  String get localVideosAdd;
+
+  /// No description provided for @localVideosImporting.
+  ///
+  /// In zh, this message translates to:
+  /// **'正在导入'**
+  String get localVideosImporting;
+
+  /// No description provided for @localVideosPartialSaved.
+  ///
+  /// In zh, this message translates to:
+  /// **'已创建的课程和成功导入的课次已保留。重试会从失败的文件继续。'**
+  String get localVideosPartialSaved;
+
+  /// No description provided for @localVideoLimit.
+  ///
+  /// In zh, this message translates to:
+  /// **'单个视频不能超过 4 GiB'**
+  String get localVideoLimit;
 }
 
 class _AppLocalizationsDelegate

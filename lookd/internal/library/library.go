@@ -30,16 +30,20 @@ type Templates struct {
 var DefaultTemplates = Templates{Course: "{title}", Lecture: "{date} {title}"}
 
 type Library struct {
-	Root  string
-	Store *store.Store
-	mu    sync.Mutex
-	tpl   Templates
+	SourceBase string
+	Root       string
+	Store      *store.Store
+	mu         sync.Mutex
+	tpl        Templates
 
 	// mirrorMu serializes mirrored writes, recovery and Reindex (mirror.go).
 	mirrorMu sync.Mutex
 
 	// exportMu keeps exports to the same vault from interleaving.
 	exportMu sync.Mutex
+
+	reviewMu sync.Mutex
+	studyMu  sync.Mutex
 }
 
 func Open(root string, st *store.Store) (*Library, error) {
@@ -47,6 +51,7 @@ func Open(root string, st *store.Store) (*Library, error) {
 		return nil, err
 	}
 	l := &Library{Root: root, Store: st, tpl: DefaultTemplates}
+	l.SourceBase = "https://look.tongji.edu.cn"
 	l.writeReadme()
 	l.mirrorMu.Lock()
 	if err := l.recoverMirrors(context.Background()); err != nil {
@@ -217,11 +222,18 @@ func writeFileAtomic(path string, b []byte) error {
 	return os.Rename(tmp, path)
 }
 
-func (l *Library) writeCourseJSON(c store.Course) {
-	writeJSON(filepath.Join(l.Abs(c.Dir), "course.json"), map[string]any{
+func (l *Library) writeCourseJSON(c store.Course) error {
+	sourceURL := l.SourceBase + "/course/" + c.ID
+	if l.SourceBase == "https://icourse.fudan.edu.cn" {
+		sourceURL = l.SourceBase + "/coursedetail?course_id=" + c.ID
+	}
+	if store.IsLocalCourse(c.ID) {
+		sourceURL = ""
+	}
+	return writeJSON(filepath.Join(l.Abs(c.Dir), "course.json"), map[string]any{
 		"schema": "look-studio/course@1", "id": c.ID, "title": c.Title, "alias": c.Alias, "teacher": c.Teacher,
 		"teachers": c.Teachers, "college": c.College, "term": c.Term,
-		"source_url": "https://look.tongji.edu.cn/course/" + c.ID,
+		"source_url": sourceURL,
 	})
 }
 
@@ -244,11 +256,18 @@ func (l *Library) WriteLectureJSON(ctx context.Context, lectureID string) error 
 	for _, n := range notes {
 		noteFiles = append(noteFiles, strings.TrimPrefix(n.Path, lec.Dir+"/"))
 	}
+	sourceURL := fmt.Sprintf("%s/player?course_id=%s&sub_id=%s", l.SourceBase, lec.CourseID, lec.ID)
+	if l.SourceBase == "https://icourse.fudan.edu.cn" {
+		sourceURL = fmt.Sprintf("%s/coursevideo?id=%s&sub_id=%s", l.SourceBase, lec.CourseID, lec.ID)
+	}
+	if store.IsLocalCourse(c.ID) {
+		sourceURL = ""
+	}
 	return writeJSON(filepath.Join(l.Abs(lec.Dir), "lecture.json"), map[string]any{
 		"schema": "look-studio/lecture@1", "id": lec.ID, "course_id": lec.CourseID, "course_title": c.Title,
 		"title": lec.Title, "date": lec.Date, "begin_at": unixISO(lec.BeginAt), "end_at": unixISO(lec.EndAt),
 		"lecturer": lec.Lecturer, "room": lec.Room, "duration_seconds": lec.DurationS,
-		"source_url": fmt.Sprintf("https://look.tongji.edu.cn/player?course_id=%s&sub_id=%s", lec.CourseID, lec.ID),
+		"source_url": sourceURL,
 		"files":      files, "notes": noteFiles, "timeline": timelineFile(l.Abs(lec.Dir)),
 		"updated_at": time.Now().Format(time.RFC3339),
 	})
@@ -358,6 +377,17 @@ func NewID() string {
 
 // SaveNote writes notes/<title>-<id>.md with YAML front matter and indexes it.
 func (l *Library) SaveNote(ctx context.Context, n store.Note) (store.Note, error) {
+	l.mirrorMu.Lock()
+	defer l.mirrorMu.Unlock()
+	if n.ID != "" && n.BaseBody != nil {
+		if old, err := l.Store.Note(ctx, n.ID); err == nil && old.Path != "" {
+			current, ok := parseNote(l.Abs(old.Path))
+			if !ok || current.Body != *n.BaseBody {
+				return n, ErrStudyConflict
+			}
+		}
+	}
+
 	if n.ID == "" {
 		n.ID = NewID()
 	}
@@ -387,8 +417,9 @@ func (l *Library) SaveNote(ctx context.Context, n store.Note) (store.Note, error
 	default:
 		dir = "notes"
 	}
-	if old, err := l.Store.Note(ctx, n.ID); err == nil && old.Path != "" {
-		os.Remove(l.Abs(old.Path))
+	oldPath := ""
+	if old, err := l.Store.Note(ctx, n.ID); err == nil {
+		oldPath = old.Path
 	}
 	n.Path = dir + "/" + Sanitize(n.Title, "笔记") + "-" + n.ID + ".md"
 	if err := os.MkdirAll(l.Abs(dir), 0o755); err != nil {
@@ -396,8 +427,11 @@ func (l *Library) SaveNote(ctx context.Context, n store.Note) (store.Note, error
 	}
 	fm := fmt.Sprintf("---\nschema: look-studio/note@1\nid: %s\ntitle: %q\ncourse_id: %q\nlecture_id: %q\nsource: %s\nupdated_at: %s\n---\n\n",
 		n.ID, n.Title, n.CourseID, n.LectureID, orDefault(n.Source, "user"), time.Now().Format(time.RFC3339))
-	if err := os.WriteFile(l.Abs(n.Path), []byte(fm+strings.TrimLeft(n.Body, "\n")), 0o644); err != nil {
+	if err := writeFileAtomicNote(l.Abs(n.Path), []byte(fm+strings.TrimLeft(n.Body, "\n"))); err != nil {
 		return n, err
+	}
+	if oldPath != "" && oldPath != n.Path {
+		os.Remove(l.Abs(oldPath))
 	}
 	if err := l.Store.PutNote(ctx, n); err != nil {
 		return n, err
@@ -754,4 +788,18 @@ func SortedKinds(k []string) []string {
 	order := map[string]int{"video": 0, "slides": 1, "courseware": 2, "transcript": 3, "audio": 4, "material": 5}
 	sort.Slice(k, func(i, j int) bool { return order[k[i]] < order[k[j]] })
 	return k
+}
+
+func writeFileAtomicNote(p string, b []byte) error {
+	f, e := os.CreateTemp(filepath.Dir(p), ".note-*")
+	if e != nil {
+		return e
+	}
+	defer os.Remove(f.Name())
+	_, e = f.Write(b)
+	f.Close()
+	if e != nil {
+		return e
+	}
+	return os.Rename(f.Name(), p)
 }

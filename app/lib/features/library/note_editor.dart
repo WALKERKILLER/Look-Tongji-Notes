@@ -1,4 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+
+import '../../core/api.dart';
+
 import 'package:path/path.dart' as p;
 import 'package:provider/provider.dart';
 
@@ -46,20 +51,42 @@ class _NoteEditorState extends State<NoteEditor> {
   late final _title = TextEditingController(text: widget.note?.title ?? '');
   late final _body = TextEditingController(text: widget.note?.body ?? '');
   // Existing notes open in reading mode so timestamps are tappable.
-  late bool _preview = !widget.edit && (widget.note?.body ?? '').trim().isNotEmpty;
+  late bool _preview =
+      !widget.edit && (widget.note?.body ?? '').trim().isNotEmpty;
   bool _saving = false;
   bool _dirty = false;
   String? _id;
+  late String _baseBody = widget.note?.body ?? '';
+  StreamSubscription? _updates;
 
   @override
   void initState() {
     super.initState();
     _id = widget.note?.id;
+    _updates = context.read<AppState>().events.listen((e) {
+      if (e['type'] == 'notes_changed' && !_dirty && _id != null) {
+        unawaited(_reload());
+      }
+    });
     _title.addListener(_mark);
     _body.addListener(_mark);
   }
 
-  String get _lectureId => widget.lectureId.isNotEmpty ? widget.lectureId : widget.note?.lectureId ?? '';
+  Future<void> _reload() async {
+    try {
+      final r =
+          await context.read<AppState>().api.get('/api/notes/$_id') as Map;
+      if (!mounted || _dirty) return;
+      _title.text = '${r['title'] ?? ''}';
+      _body.text = '${r['body'] ?? ''}';
+      _baseBody = _body.text;
+      setState(() => _dirty = false);
+    } catch (_) {}
+  }
+
+  String get _lectureId => widget.lectureId.isNotEmpty
+      ? widget.lectureId
+      : widget.note?.lectureId ?? '';
 
   void _mark() {
     if (!_dirty) setState(() => _dirty = true);
@@ -67,6 +94,7 @@ class _NoteEditorState extends State<NoteEditor> {
 
   @override
   void dispose() {
+    _updates?.cancel();
     _title.dispose();
     _body.dispose();
     super.dispose();
@@ -77,7 +105,9 @@ class _NoteEditorState extends State<NoteEditor> {
     final s = ms ~/ 1000;
     final h = s ~/ 3600, m = (s % 3600) ~/ 60, sec = s % 60;
     String two(int n) => n.toString().padLeft(2, '0');
-    final tag = h > 0 ? '[${two(h)}:${two(m)}:${two(sec)}] ' : '[${two(m)}:${two(sec)}] ';
+    final tag = h > 0
+        ? '[${two(h)}:${two(m)}:${two(sec)}] '
+        : '[${two(m)}:${two(sec)}] ';
     final sel = _body.selection;
     final text = _body.text;
     final at = sel.isValid ? sel.start : text.length;
@@ -94,18 +124,48 @@ class _NoteEditorState extends State<NoteEditor> {
     try {
       final r = await context.read<AppState>().api.put('/api/notes', {
         'id': ?_id,
+        if (_id != null) 'base_body': _baseBody,
         'course_id': widget.note?.courseId ?? widget.courseId,
         'lecture_id': widget.note?.lectureId ?? widget.lectureId,
-        'title': _title.text.trim().isEmpty ? l10n.noteUntitled : _title.text.trim(),
+        'title': _title.text.trim().isEmpty
+            ? l10n.noteUntitled
+            : _title.text.trim(),
         'body': _body.text,
-        'source': widget.note?.source.isNotEmpty == true ? widget.note!.source : 'user',
+        'source': widget.note?.source.isNotEmpty == true
+            ? widget.note!.source
+            : 'user',
       });
       final n = Note((r as Map).cast<String, dynamic>()..['body'] = _body.text);
       _id = n.id;
+      _baseBody = _body.text;
       setState(() => _dirty = false);
       widget.onSaved?.call(n);
       if (mounted) showSnack(context, l10n.noteSaved);
     } catch (e) {
+      if (e is ApiError && e.status == 409 && mounted) {
+        final keep = await showDialog<bool>(
+          context: context,
+          builder: (c) => AlertDialog(
+            title: const Text('笔记已在另一端更新'),
+            content: const Text('本机文字仍保留在编辑器中，可以另存一份，避免覆盖另一端。'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(c, false),
+                child: const Text('继续编辑'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(c, true),
+                child: const Text('另存为新笔记'),
+              ),
+            ],
+          ),
+        );
+        if (keep == true) {
+          _id = null;
+          await _save();
+          return;
+        }
+      }
       if (mounted) showSnack(context, l10n.commonSaveFailed(e));
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -116,76 +176,128 @@ class _NoteEditorState extends State<NoteEditor> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      Row(children: [
-        if (widget.onClose != null) IconButton(onPressed: widget.onClose, icon: const Icon(Icons.arrow_back_rounded), tooltip: l10n.commonBack),
-        Expanded(
-          child: TextField(
-            controller: _title,
-            style: tt.titleLarge,
-            decoration: InputDecoration(hintText: l10n.commonTitle, border: InputBorder.none, filled: false, isDense: true),
-          ),
-        ),
-        SegmentedButton<bool>(
-          showSelectedIcon: false,
-          segments: [
-            ButtonSegment(value: false, icon: Icon(Icons.edit_outlined, size: 18), tooltip: l10n.commonEdit),
-            ButtonSegment(value: true, icon: Icon(Icons.visibility_outlined, size: 18), tooltip: l10n.commonPreview),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            if (widget.onClose != null)
+              IconButton(
+                onPressed: widget.onClose,
+                icon: const Icon(Icons.arrow_back_rounded),
+                tooltip: l10n.commonBack,
+              ),
+            Expanded(
+              child: TextField(
+                controller: _title,
+                style: tt.titleLarge,
+                decoration: InputDecoration(
+                  hintText: l10n.commonTitle,
+                  border: InputBorder.none,
+                  filled: false,
+                  isDense: true,
+                ),
+              ),
+            ),
+            SegmentedButton<bool>(
+              showSelectedIcon: false,
+              segments: [
+                ButtonSegment(
+                  value: false,
+                  icon: Icon(Icons.edit_outlined, size: 18),
+                  tooltip: l10n.commonEdit,
+                ),
+                ButtonSegment(
+                  value: true,
+                  icon: Icon(Icons.visibility_outlined, size: 18),
+                  tooltip: l10n.commonPreview,
+                ),
+              ],
+              selected: {_preview},
+              onSelectionChanged: (s) => setState(() => _preview = s.first),
+            ),
           ],
-          selected: {_preview},
-          onSelectionChanged: (s) => setState(() => _preview = s.first),
         ),
-      ]),
-      const SizedBox(height: Space.sm),
-      Expanded(
-        child: AnimatedSwitcher(
-          duration: Motion.medium1,
-          child: _preview
-              ? Container(
-                  key: const ValueKey('p'),
-                  padding: const EdgeInsets.all(Space.lg),
-                  decoration: BoxDecoration(color: cs.surfaceContainerLow, borderRadius: BorderRadius.circular(Corners.lg)),
-                  child: SingleChildScrollView(
-                    child: LookMarkdown(
-                      _body.text.isEmpty ? l10n.noteEmptyPreview : _body.text,
-                      style: tt.bodyMedium?.copyWith(height: 1.7),
-                      lectureId: _lectureId,
-                      baseDir: widget.note == null ? '' : p.posix.dirname(widget.note!.path),
-                      onRef: (r) => openRef(context, r, lectureId: _lectureId, onSeek: widget.onSeek),
+        const SizedBox(height: Space.sm),
+        Expanded(
+          child: AnimatedSwitcher(
+            duration: Motion.medium1,
+            child: _preview
+                ? Container(
+                    key: const ValueKey('p'),
+                    padding: const EdgeInsets.all(Space.lg),
+                    decoration: BoxDecoration(
+                      color: cs.surfaceContainerLow,
+                      borderRadius: BorderRadius.circular(Corners.lg),
+                    ),
+                    child: SingleChildScrollView(
+                      child: LookMarkdown(
+                        _body.text.isEmpty ? l10n.noteEmptyPreview : _body.text,
+                        style: tt.bodyMedium?.copyWith(height: 1.7),
+                        lectureId: _lectureId,
+                        baseDir: widget.note == null
+                            ? ''
+                            : p.posix.dirname(widget.note!.path),
+                        onRef: (r) => openRef(
+                          context,
+                          r,
+                          lectureId: _lectureId,
+                          onSeek: widget.onSeek,
+                        ),
+                      ),
+                    ),
+                  )
+                : TextField(
+                    key: const ValueKey('e'),
+                    controller: _body,
+                    maxLines: null,
+                    expands: true,
+                    textAlignVertical: TextAlignVertical.top,
+                    style: tt.bodyMedium?.copyWith(height: 1.6),
+                    decoration: InputDecoration(
+                      hintText: l10n.noteEditorHint(
+                        widget.timestamp != null
+                            ? l10n.noteEditorHintTimestamp
+                            : '',
+                      ),
+                      alignLabelWithHint: true,
                     ),
                   ),
-                )
-              : TextField(
-                  key: const ValueKey('e'),
-                  controller: _body,
-                  maxLines: null,
-                  expands: true,
-                  textAlignVertical: TextAlignVertical.top,
-                  style: tt.bodyMedium?.copyWith(height: 1.6),
-                  decoration: InputDecoration(
-                    hintText: l10n.noteEditorHint(widget.timestamp != null ? l10n.noteEditorHintTimestamp : ''),
-                    alignLabelWithHint: true,
-                  ),
-                ),
+          ),
         ),
-      ),
-      const SizedBox(height: Space.sm),
-      Row(children: [
-        if (widget.timestamp != null)
-          TextButton.icon(onPressed: _insertTimestamp, icon: const Icon(Icons.more_time_rounded, size: 18), label: Text(l10n.noteInsertTime)),
-        const Spacer(),
-        AnimatedOpacity(
-          opacity: _dirty ? 1 : 0,
-          duration: Motion.short4,
-          child: Text(l10n.noteUnsaved, style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant)),
+        const SizedBox(height: Space.sm),
+        Row(
+          children: [
+            if (widget.timestamp != null)
+              TextButton.icon(
+                onPressed: _insertTimestamp,
+                icon: const Icon(Icons.more_time_rounded, size: 18),
+                label: Text(l10n.noteInsertTime),
+              ),
+            const Spacer(),
+            AnimatedOpacity(
+              opacity: _dirty ? 1 : 0,
+              duration: Motion.short4,
+              child: Text(
+                l10n.noteUnsaved,
+                style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant),
+              ),
+            ),
+            const SizedBox(width: Space.sm),
+            FilledButton.icon(
+              onPressed: _saving || !_dirty && _id != null ? null : _save,
+              icon: _saving
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.check_rounded, size: 18),
+              label: Text(l10n.commonSave),
+            ),
+          ],
         ),
-        const SizedBox(width: Space.sm),
-        FilledButton.icon(
-          onPressed: _saving || !_dirty && _id != null ? null : _save,
-          icon: _saving ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.check_rounded, size: 18),
-          label: Text(l10n.commonSave),
-        ),
-      ]),
-    ]);
+      ],
+    );
   }
 }
