@@ -190,7 +190,7 @@ class _DownloadsPageState extends State<DownloadsPage> {
               ..._section(context, l10n.commonDone, done, pad, selecting: selecting, actions: [
                 TextButton.icon(onPressed: _clearFinished, icon: const Icon(Icons.cleaning_services_outlined, size: 18), label: Text(l10n.downloadsClearDone)),
               ]),
-              const SliverToBoxAdapter(child: SizedBox(height: Space.huge)),
+              SliverToBoxAdapter(child: SizedBox(height: Space.huge + MediaQuery.paddingOf(context).bottom)),
             ]),
     );
   }
@@ -527,7 +527,7 @@ class _LocalViewState extends State<_LocalView> {
             ),
           ],
         ],
-        const SliverToBoxAdapter(child: SizedBox(height: Space.huge)),
+        SliverToBoxAdapter(child: SizedBox(height: Space.huge + MediaQuery.paddingOf(context).bottom)),
       ]),
     );
   }

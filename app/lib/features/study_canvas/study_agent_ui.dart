@@ -662,11 +662,10 @@ class _KnowledgeBody extends StatelessWidget {
                 _ => SelectableText(b.text),
               },
             ),
-          const Divider(),
-          const Text(
-            '引用来源',
-            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-          ),
+          if (card.sources.isNotEmpty) ...[
+            const Divider(),
+            Text('引用来源', style: Theme.of(context).textTheme.labelMedium),
+          ],
           for (final a in card.sources)
             TextButton.icon(
               style: TextButton.styleFrom(alignment: Alignment.centerLeft),
@@ -674,7 +673,7 @@ class _KnowledgeBody extends StatelessWidget {
               icon: const Icon(Icons.link, size: 15),
               label: Text(
                 a.kind == 'video'
-                    ? '视频 · ${(a.timeStartMs / 1000).floor()}–${(a.timeEndMs / 1000).ceil()} 秒'
+                    ? '视频 · ${fmtClock(a.timeStartMs)}–${fmtClock(a.timeEndMs)}'
                     : a.kind == 'ink'
                     ? '手写选区 · ${a.strokeIds.length} 段'
                     : '${a.kind.toUpperCase()}${a.page > 0 ? ' · 第 ${a.page} 页' : ''} · ${a.quote.substring(0, math.min(50, a.quote.length))}',

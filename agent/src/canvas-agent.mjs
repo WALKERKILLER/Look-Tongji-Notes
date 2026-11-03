@@ -52,9 +52,9 @@ export class CanvasToolScope {
   }else if(name==="inspect_canvas_region"){
    const s=this.source(args.source_id);const r=await this.visual(s,signal);signal?.throwIfAborted();
    if(r.mode!=="unavailable")this.seen.add(s.id);
-   this.trace(name,r.mode);return {content:[{type:"text",text:JSON.stringify({source_id:s.id,availability:r.mode,anchor:s.anchor})},...r.content]};
+   this.trace(name,r.mode,s.id);return {content:[{type:"text",text:JSON.stringify({source_id:s.id,availability:r.mode,anchor:s.anchor})},...r.content]};
   }else throw new Error("未知或未授权的画布工具");
-  this.trace(name,"ok");return {content:[{type:"text",text:JSON.stringify(value)}]};
+  this.trace(name,"ok",args.source_id);return {content:[{type:"text",text:JSON.stringify(value)}]};
  }
 }
 
@@ -88,7 +88,8 @@ export class CanvasRunner {
  async close(){for(const j of this.jobs.values())j.ac.abort();await Promise.allSettled([...this.jobs.values()].map(j=>j.done));}
  async run(job,request){
   const {view,ac}=job,signal=AbortSignal.any([ac.signal,AbortSignal.timeout(this.timeoutMs)]);
-  const trace=(name,status)=>view.trace.push({tool:name,status});
+  // source_id lets the canvas show which bound material a step reads.
+  const trace=(name,status,source)=>view.trace.push({tool:name,status,...(typeof source==="string"&&source?{source_id:source}:{})});
   try{
    const context=await cancellable(this.call("POST",`/api/lectures/${encodeURIComponent(request.lecture_id)}/study-canvas/context`,request.selection),signal);
    signal.throwIfAborted();
@@ -102,7 +103,7 @@ export class CanvasRunner {
     const base=`/api/lectures/${encodeURIComponent(request.lecture_id)}/study-canvas/media`;
     let task;
     try {
-     trace("prepare_video_clip","running");
+     trace("prepare_video_clip","running",source.id);
      task=await cancellable(this.call("POST",base,{object_id:source.anchor.object_id,from_ms:source.anchor.time_start_ms,to_ms:source.anchor.time_end_ms,transcribe:!source.text?.trim(),frame:!!request.allow_images}),toolSignal);
      for(;;){
       toolSignal.throwIfAborted();
@@ -110,9 +111,9 @@ export class CanvasRunner {
       if(current.state==="done"){
        source.text=current.result.text||source.text;source.image_path=current.result.image_path||source.image_path;
        source.availability=current.result.availability;source.anchor.fingerprint=current.result.fingerprint;
-       trace("prepare_video_clip","done");return;
+       trace("prepare_video_clip","done",source.id);return;
       }
-      if(["error","cancelled"].includes(current.state)){source.availability=`unavailable: ${current.message}`;trace("prepare_video_clip","unavailable");return;}
+      if(["error","cancelled"].includes(current.state)){source.availability=`unavailable: ${current.message}`;trace("prepare_video_clip","unavailable",source.id);return;}
       await cancellable(new Promise(resolve=>setTimeout(resolve,700)),toolSignal);
      }
     }catch(e){toolSignal.throwIfAborted();source.availability="unavailable: 视频片段读取失败，请下载本地视频并检查 ffmpeg / 转录设置";}
@@ -157,7 +158,7 @@ export class CanvasRunner {
     }
     for(const t of toolCalls){
      if(++calls>20)throw new Error("工具调用超过20次，请缩小任务后重试");
-     trace(t.name,"running");let result,isError=false;
+     trace(t.name,"running",t.arguments?.source_id);let result,isError=false;
      try{result=await scope.execute(t.name,t.arguments,signal);}catch(e){signal.throwIfAborted();isError=true;result={content:[{type:"text",text:String(e.message).slice(0,500)}]};trace(t.name,"error");}
      messages.push({role:"toolResult",toolCallId:t.id,toolName:t.name,content:result.content,isError,timestamp:Date.now()});
     }

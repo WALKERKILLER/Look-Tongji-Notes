@@ -215,7 +215,7 @@ class _CoursesPageState extends State<CoursesPage> {
             SliverToBoxAdapter(
               child: ContentWidth(
                 child: Padding(
-                  padding: EdgeInsets.fromLTRB(pad, Space.sm, pad, Space.huge),
+                  padding: EdgeInsets.fromLTRB(pad, Space.sm, pad, Space.huge + MediaQuery.paddingOf(context).bottom),
                   child: LayoutBuilder(
                     builder: (context, c) {
                       final cols = (c.maxWidth / 280).floor().clamp(1, 4);

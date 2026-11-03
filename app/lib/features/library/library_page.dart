@@ -316,7 +316,7 @@ class _LibraryPageState extends State<LibraryPage> {
                   ),
                 ),
               ),
-            const SliverToBoxAdapter(child: SizedBox(height: 96)),
+            SliverToBoxAdapter(child: SizedBox(height: 96 + MediaQuery.paddingOf(context).bottom)),
           ],
         ),
       ),

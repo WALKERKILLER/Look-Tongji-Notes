@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:provider/provider.dart';
 
 import 'core/app_state.dart';
@@ -23,8 +24,10 @@ import 'features/profile/profile_dialog.dart';
 import 'features/schedule/schedule_page.dart';
 import 'features/schedule/schedule_store.dart';
 import 'features/settings/settings_page.dart';
+import 'theme/glass.dart';
 import 'theme/prefs.dart';
 import 'theme/tokens.dart';
+import 'widgets/glass_dock.dart';
 import 'widgets/organic_shapes.dart';
 import 'widgets/states.dart';
 import 'widgets/user_avatar.dart';
@@ -168,6 +171,14 @@ class _AppShellState extends State<AppShell> {
     (_) => GlobalKey<NavigatorState>(),
   );
   final _built = <int>{0};
+
+  /// Pages pushed above each tab's root; the phone dock shows on roots only
+  /// (M3: navigation bar on primary pages, toolbars on the ones below).
+  late final _depths = List.generate(_dests.length, (_) => ValueNotifier(0));
+  late final _observers = [for (final d in _depths) _DepthObserver(d)];
+
+  /// The phone dock shrinks to the current tab while a page scrolls down.
+  bool _dockSmall = false;
   StreamSubscription<String>? _notices;
   StreamSubscription? _botOps;
   StreamSubscription? _daemonNotes;
@@ -217,6 +228,9 @@ class _AppShellState extends State<AppShell> {
     _botOps?.cancel();
     _daemonNotes?.cancel();
     _prefs.removeListener(_pushPrefs);
+    for (final d in _depths) {
+      d.dispose();
+    }
     super.dispose();
   }
 
@@ -240,6 +254,7 @@ class _AppShellState extends State<AppShell> {
     setState(() {
       _index = i;
       _built.add(i);
+      _dockSmall = false;
     });
     context.read<TaskInbox>().viewing = i == Tabs.tasks;
     context.read<ScreenContext>().set({'screen': _dests[i].screen});
@@ -269,6 +284,7 @@ class _AppShellState extends State<AppShell> {
                 controller: MaterialApp.createMaterialHeroController(),
                 child: Navigator(
                   key: _navKeys[i],
+                  observers: [_observers[i]],
                   onGenerateRoute: (_) =>
                       MaterialPageRoute(builder: (_) => _root(i)),
                 ),
@@ -309,25 +325,69 @@ class _AppShellState extends State<AppShell> {
     );
 
     if (sc == SizeClass.compact) {
+      final keyboard = MediaQuery.viewInsetsOf(context).bottom > 0;
+      final selected = _barTabs.contains(_index)
+          ? _barTabs.indexOf(_index)
+          : _barTabs.indexOf(Tabs.settings);
       return Scaffold(
-        body: SafeArea(bottom: false, child: content),
-        floatingActionButton: const PageFabClearance(
-          child: _AssistantFab(compact: true),
-        ),
-        bottomNavigationBar: NavigationBar(
-          selectedIndex: _barTabs.contains(_index)
-              ? _barTabs.indexOf(_index)
-              : _barTabs.indexOf(Tabs.settings),
-          onDestinationSelected: (b) => _select(_barTabs[b]),
-          labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-          destinations: [
-            for (final i in _barTabs)
-              NavigationDestination(
-                icon: icon(i, false),
-                selectedIcon: icon(i, true),
-                label: _dests[i].label,
-              ),
-          ],
+        body: ValueListenableBuilder<int>(
+          valueListenable: _depths[_index],
+          builder: (context, depth, _) {
+            final mq = MediaQuery.of(context);
+            final show = depth == 0 && !keyboard;
+            final inset = mq.padding.bottom;
+            // Pages scroll beneath the glass; their padding clears its top.
+            final clear = show ? inset + Space.sm + GlassNavDock.clearance : inset;
+            return Stack(
+              children: [
+                MediaQuery(
+                  data: mq.copyWith(
+                    padding: mq.padding.copyWith(bottom: clear),
+                  ),
+                  child: SafeArea(
+                    bottom: false,
+                    child: NotificationListener<UserScrollNotification>(
+                      onNotification: _scrolled,
+                      child: content,
+                    ),
+                  ),
+                ),
+                Positioned(
+                  left: Space.lg,
+                  right: Space.lg,
+                  bottom: inset + Space.sm,
+                  child: AnimatedSlide(
+                    offset: show ? Offset.zero : const Offset(0, 1.6),
+                    duration: MediaQuery.disableAnimationsOf(context)
+                        ? Duration.zero
+                        : Motion.medium2,
+                    curve: show
+                        ? Motion.emphasizedDecelerate
+                        : Motion.emphasizedAccelerate,
+                    child: IgnorePointer(
+                      ignoring: !show,
+                      child: GlassNavDock(
+                        key: const ValueKey('shell-dock'),
+                        selected: selected,
+                        minimized: _dockSmall,
+                        onExpand: () => setState(() => _dockSmall = false),
+                        onSelected: (b) => _select(_barTabs[b]),
+                        items: [
+                          for (final i in _barTabs)
+                            GlassNavItem(
+                              icon: icon(i, false),
+                              selectedIcon: icon(i, true),
+                              label: _dests[i].label,
+                            ),
+                        ],
+                        accessory: const _AssistantDockButton(),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
         ),
       );
     }
@@ -337,47 +397,59 @@ class _AppShellState extends State<AppShell> {
     return Scaffold(
       body: Row(
         children: [
-          NavigationRail(
-            selectedIndex: _index,
-            onDestinationSelected: _select,
-            leading: Padding(
-              padding: const EdgeInsets.only(top: Space.sm, bottom: Space.xl),
-              child: Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: Space.lg),
-                    child: const _BrandMark(),
-                  ),
-                  if (!docked) _AssistantFab(compact: false),
-                ],
-              ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              Space.md,
+              Space.sm,
+              Space.xs,
+              Space.lg,
             ),
-            trailingAtBottom: true,
-            trailing: Padding(
-              padding: const EdgeInsets.only(bottom: Space.lg),
-              child: Column(
-                children: [
-                  const NotificationBell(),
-                  const SizedBox(height: Space.md),
-                  Tooltip(
-                    message: l10n.shellProfileTooltip(userDisplayName(context)),
-                    child: InkWell(
-                      customBorder: const CircleBorder(),
-                      onTap: () => showProfileDialog(context),
-                      child: const UserAvatar(size: 40),
-                    ),
+            child: GlassSurface(
+              radius: Corners.xl,
+              child: NavigationRail(
+                backgroundColor: Colors.transparent,
+                selectedIndex: _index,
+                onDestinationSelected: _select,
+                leading: Padding(
+                  padding: const EdgeInsets.only(top: Space.sm, bottom: Space.xl),
+                  child: Column(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: Space.lg),
+                        child: const _BrandMark(),
+                      ),
+                      if (!docked) _AssistantFab(compact: false),
+                    ],
                   ),
-                ],
-              ),
-            ),
-            destinations: [
-              for (var i = 0; i < _dests.length; i++)
-                NavigationRailDestination(
-                  icon: icon(i, false),
-                  selectedIcon: icon(i, true),
-                  label: Text(_dests[i].label),
                 ),
-            ],
+                trailingAtBottom: true,
+                trailing: Padding(
+                  padding: const EdgeInsets.only(bottom: Space.lg),
+                  child: Column(
+                    children: [
+                      const NotificationBell(),
+                      const SizedBox(height: Space.md),
+                      Tooltip(
+                        message: l10n.shellProfileTooltip(userDisplayName(context)),
+                        child: InkWell(
+                          customBorder: const CircleBorder(),
+                          onTap: () => showProfileDialog(context),
+                          child: const UserAvatar(size: 40),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                destinations: [
+                  for (var i = 0; i < _dests.length; i++)
+                    NavigationRailDestination(
+                      icon: icon(i, false),
+                      selectedIcon: icon(i, true),
+                      label: Text(_dests[i].label),
+                    ),
+                ],
+              ),
+            ),
           ),
           Expanded(
             child: Padding(
@@ -420,6 +492,90 @@ class _AppShellState extends State<AppShell> {
                 : const SizedBox(height: double.infinity),
           ),
         ],
+      ),
+    );
+  }
+
+  /// Shrinks the dock while the page scrolls toward its end and brings it
+  /// back on the way up (iOS 26 tab bars, M3 bottom bars on scroll).
+  bool _scrolled(UserScrollNotification n) {
+    if (n.metrics.axis != Axis.vertical) return false;
+    final small = switch (n.direction) {
+      ScrollDirection.reverse => n.metrics.pixels > Space.xxl,
+      ScrollDirection.forward => false,
+      ScrollDirection.idle => n.metrics.pixels > Space.xxl && _dockSmall,
+    };
+    if (small != _dockSmall) setState(() => _dockSmall = small);
+    return false;
+  }
+}
+
+/// Counts the pages pushed above a tab's root.
+class _DepthObserver extends NavigatorObserver {
+  _DepthObserver(this.depth);
+  final ValueNotifier<int> depth;
+  final _pages = <Route<dynamic>>{};
+
+  // Deferred: routes change while the navigator builds.
+  void _sync() => Future.microtask(() => depth.value = _pages.length);
+
+  @override
+  void didPush(Route<dynamic> route, Route<dynamic>? previous) {
+    if (route is PageRoute && previous != null) _pages.add(route);
+    _sync();
+  }
+
+  @override
+  void didPop(Route<dynamic> route, Route<dynamic>? previous) {
+    _pages.remove(route);
+    _sync();
+  }
+
+  @override
+  void didRemove(Route<dynamic> route, Route<dynamic>? previous) {
+    _pages.remove(route);
+    _sync();
+  }
+
+  @override
+  void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) {
+    if (_pages.remove(oldRoute) && newRoute is PageRoute) _pages.add(newRoute);
+    _sync();
+  }
+}
+
+/// The assistant beside the phone dock, in the same glass.
+class _AssistantDockButton extends StatelessWidget {
+  const _AssistantDockButton();
+
+  @override
+  Widget build(BuildContext context) {
+    final a = context.watch<AssistantController>();
+    return Semantics(
+      button: true,
+      label: l10n.botMoodLabel(a.botName, kBotMoodLabels[a.mood]!),
+      child: Tooltip(
+        message: a.botName,
+        child: GlassSurface(
+          radius: Corners.full,
+          child: InkWell(
+            key: const ValueKey('shell-assistant'),
+            customBorder: const CircleBorder(),
+            onTap: () {
+              openAssistantPanel(context);
+              if (a.view != 'bot') a.showBot();
+            },
+            child: Center(
+              child: BotAvatar(
+                size: 40,
+                shape: a.botShape,
+                color: a.botColor,
+                mood: a.mood,
+                followPointer: false,
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

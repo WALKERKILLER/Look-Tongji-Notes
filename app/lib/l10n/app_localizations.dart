@@ -12404,6 +12404,498 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'围绕指定资料持续提问，回答和整理结果都保留在此对话中。'**
   String get studyConversationEmpty;
+
+  /// No description provided for @studyOpenCanvas.
+  ///
+  /// In zh, this message translates to:
+  /// **'打开画布'**
+  String get studyOpenCanvas;
+
+  /// No description provided for @studyExitCanvas.
+  ///
+  /// In zh, this message translates to:
+  /// **'退出画布'**
+  String get studyExitCanvas;
+
+  /// No description provided for @studyThreadTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'对话 {n}'**
+  String studyThreadTitle(Object n);
+
+  /// No description provided for @studyThreadActive.
+  ///
+  /// In zh, this message translates to:
+  /// **'正在对话'**
+  String get studyThreadActive;
+
+  /// No description provided for @studyThreadActiveHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'这段对话在画布下方的输入框上继续。'**
+  String get studyThreadActiveHint;
+
+  /// No description provided for @studyThreadTurns.
+  ///
+  /// In zh, this message translates to:
+  /// **'{count, plural, =0{还没有提问} other{{count} 轮问答}}'**
+  String studyThreadTurns(int count);
+
+  /// No description provided for @studyThreadEmpty.
+  ///
+  /// In zh, this message translates to:
+  /// **'还没有提问'**
+  String get studyThreadEmpty;
+
+  /// No description provided for @studyThreadOpen.
+  ///
+  /// In zh, this message translates to:
+  /// **'继续'**
+  String get studyThreadOpen;
+
+  /// No description provided for @studyThreadNew.
+  ///
+  /// In zh, this message translates to:
+  /// **'新对话'**
+  String get studyThreadNew;
+
+  /// No description provided for @studyStageCollapse.
+  ///
+  /// In zh, this message translates to:
+  /// **'收起对话'**
+  String get studyStageCollapse;
+
+  /// No description provided for @studyStageExpand.
+  ///
+  /// In zh, this message translates to:
+  /// **'展开对话（{count} 轮）'**
+  String studyStageExpand(int count);
+
+  /// No description provided for @studyStageTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'从画布上的资料问起'**
+  String get studyStageTitle;
+
+  /// No description provided for @studyStageBody.
+  ///
+  /// In zh, this message translates to:
+  /// **'选中卡片、圈出一段笔迹，或把卡片拖进输入框，回答会以这些资料为依据。'**
+  String get studyStageBody;
+
+  /// No description provided for @studyIdeaSummary.
+  ///
+  /// In zh, this message translates to:
+  /// **'概括这一页的要点'**
+  String get studyIdeaSummary;
+
+  /// No description provided for @studyIdeaExplain.
+  ///
+  /// In zh, this message translates to:
+  /// **'把选中的部分讲得更易懂'**
+  String get studyIdeaExplain;
+
+  /// No description provided for @studyIdeaQuiz.
+  ///
+  /// In zh, this message translates to:
+  /// **'出三道题考考我'**
+  String get studyIdeaQuiz;
+
+  /// No description provided for @studyComposerHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'就画布上的资料提问'**
+  String get studyComposerHint;
+
+  /// No description provided for @studyComposerDrop.
+  ///
+  /// In zh, this message translates to:
+  /// **'松开，加入这段对话'**
+  String get studyComposerDrop;
+
+  /// No description provided for @studyPickSources.
+  ///
+  /// In zh, this message translates to:
+  /// **'选择参考资料'**
+  String get studyPickSources;
+
+  /// No description provided for @studyInspectSources.
+  ///
+  /// In zh, this message translates to:
+  /// **'查看本次资料内容'**
+  String get studyInspectSources;
+
+  /// No description provided for @studyAllowImages.
+  ///
+  /// In zh, this message translates to:
+  /// **'看图'**
+  String get studyAllowImages;
+
+  /// No description provided for @studyAllowImagesHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'允许读取圈选的画面'**
+  String get studyAllowImagesHint;
+
+  /// No description provided for @studyRemoveSource.
+  ///
+  /// In zh, this message translates to:
+  /// **'移出对话'**
+  String get studyRemoveSource;
+
+  /// No description provided for @studyVideoRange.
+  ///
+  /// In zh, this message translates to:
+  /// **'{from}–{to} 秒'**
+  String studyVideoRange(Object from, Object to);
+
+  /// No description provided for @studySourcePage.
+  ///
+  /// In zh, this message translates to:
+  /// **'第 {page} 页'**
+  String studySourcePage(Object page);
+
+  /// No description provided for @studySourceShow.
+  ///
+  /// In zh, this message translates to:
+  /// **'查看来源'**
+  String get studySourceShow;
+
+  /// No description provided for @studyStop.
+  ///
+  /// In zh, this message translates to:
+  /// **'停止'**
+  String get studyStop;
+
+  /// No description provided for @studySend.
+  ///
+  /// In zh, this message translates to:
+  /// **'发送'**
+  String get studySend;
+
+  /// No description provided for @studyTurnRetry.
+  ///
+  /// In zh, this message translates to:
+  /// **'重试'**
+  String get studyTurnRetry;
+
+  /// No description provided for @studyTurnInterrupted.
+  ///
+  /// In zh, this message translates to:
+  /// **'这次回答中断了'**
+  String get studyTurnInterrupted;
+
+  /// No description provided for @studyLegacyOperations.
+  ///
+  /// In zh, this message translates to:
+  /// **'历史画布操作已停用，回答仍保留在对话中。'**
+  String get studyLegacyOperations;
+
+  /// No description provided for @studyAgentPreparing.
+  ///
+  /// In zh, this message translates to:
+  /// **'正在准备资料…'**
+  String get studyAgentPreparing;
+
+  /// No description provided for @studyAgentLookingAround.
+  ///
+  /// In zh, this message translates to:
+  /// **'正在查看画布…'**
+  String get studyAgentLookingAround;
+
+  /// No description provided for @studyAgentThinking.
+  ///
+  /// In zh, this message translates to:
+  /// **'正在组织回答…'**
+  String get studyAgentThinking;
+
+  /// No description provided for @studyAgentListening.
+  ///
+  /// In zh, this message translates to:
+  /// **'正在听「{label}」'**
+  String studyAgentListening(Object label);
+
+  /// No description provided for @studyAgentTranscribing.
+  ///
+  /// In zh, this message translates to:
+  /// **'正在转写「{label}」的片段'**
+  String studyAgentTranscribing(Object label);
+
+  /// No description provided for @studyAgentLooking.
+  ///
+  /// In zh, this message translates to:
+  /// **'正在看「{label}」'**
+  String studyAgentLooking(Object label);
+
+  /// No description provided for @studyAgentReading.
+  ///
+  /// In zh, this message translates to:
+  /// **'正在读「{label}」'**
+  String studyAgentReading(Object label);
+
+  /// No description provided for @studyTurnReopened.
+  ///
+  /// In zh, this message translates to:
+  /// **'应用重开时这个问题还没答完，可以重试'**
+  String get studyTurnReopened;
+
+  /// No description provided for @studyConversationSaveFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'无法保存对话：{error}'**
+  String studyConversationSaveFailed(Object error);
+
+  /// No description provided for @studyConversationUnsaved.
+  ///
+  /// In zh, this message translates to:
+  /// **'无法整理资料：画布还没保存，请稍后重试'**
+  String get studyConversationUnsaved;
+
+  /// No description provided for @studyVisualChanged.
+  ///
+  /// In zh, this message translates to:
+  /// **'圈选的画面已经变了，请重新圈选后再加入对话'**
+  String get studyVisualChanged;
+
+  /// No description provided for @studyConversationFull.
+  ///
+  /// In zh, this message translates to:
+  /// **'这段对话已满 300 轮，请开始新对话'**
+  String get studyConversationFull;
+
+  /// No description provided for @studyCardExpand.
+  ///
+  /// In zh, this message translates to:
+  /// **'展开模块'**
+  String get studyCardExpand;
+
+  /// No description provided for @studyCardCollapse.
+  ///
+  /// In zh, this message translates to:
+  /// **'折叠模块'**
+  String get studyCardCollapse;
+
+  /// No description provided for @studyCardFoldColumn.
+  ///
+  /// In zh, this message translates to:
+  /// **'收起整列'**
+  String get studyCardFoldColumn;
+
+  /// No description provided for @studyCardSelectText.
+  ///
+  /// In zh, this message translates to:
+  /// **'选择文档文字'**
+  String get studyCardSelectText;
+
+  /// No description provided for @studyCardEditKnowledge.
+  ///
+  /// In zh, this message translates to:
+  /// **'编辑知识卡片'**
+  String get studyCardEditKnowledge;
+
+  /// No description provided for @studyCardDelete.
+  ///
+  /// In zh, this message translates to:
+  /// **'删除模块'**
+  String get studyCardDelete;
+
+  /// No description provided for @studyCardAsk.
+  ///
+  /// In zh, this message translates to:
+  /// **'加入对话，或拖进输入框'**
+  String get studyCardAsk;
+
+  /// No description provided for @studyCardMore.
+  ///
+  /// In zh, this message translates to:
+  /// **'更多'**
+  String get studyCardMore;
+
+  /// No description provided for @studyCardPdfPage.
+  ///
+  /// In zh, this message translates to:
+  /// **'{title} · 第 {page}/{count} 页'**
+  String studyCardPdfPage(Object title, Object page, Object count);
+
+  /// No description provided for @settingsGlass.
+  ///
+  /// In zh, this message translates to:
+  /// **'液态玻璃'**
+  String get settingsGlass;
+
+  /// No description provided for @settingsGlassHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'画布工具栏与输入框透出下方内容；关闭后改为实色'**
+  String get settingsGlassHint;
+
+  /// No description provided for @settingsGlassHighContrast.
+  ///
+  /// In zh, this message translates to:
+  /// **'高对比度下使用实色'**
+  String get settingsGlassHighContrast;
+
+  /// No description provided for @studyShelf.
+  ///
+  /// In zh, this message translates to:
+  /// **'课次素材'**
+  String get studyShelf;
+
+  /// No description provided for @studyShelfFromVideo.
+  ///
+  /// In zh, this message translates to:
+  /// **'字幕 · 资料 · 练习'**
+  String get studyShelfFromVideo;
+
+  /// No description provided for @studyShelfHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'拖到画布上，或点 ＋ 放到视野中央'**
+  String get studyShelfHint;
+
+  /// No description provided for @studyShelfHintTouch.
+  ///
+  /// In zh, this message translates to:
+  /// **'长按拖到画布上，或点 ＋ 放到视野中央'**
+  String get studyShelfHintTouch;
+
+  /// No description provided for @studyShelfTranscript.
+  ///
+  /// In zh, this message translates to:
+  /// **'字幕'**
+  String get studyShelfTranscript;
+
+  /// No description provided for @studyShelfFiles.
+  ///
+  /// In zh, this message translates to:
+  /// **'资料'**
+  String get studyShelfFiles;
+
+  /// No description provided for @studyShelfPractice.
+  ///
+  /// In zh, this message translates to:
+  /// **'练习'**
+  String get studyShelfPractice;
+
+  /// No description provided for @studyShelfNotes.
+  ///
+  /// In zh, this message translates to:
+  /// **'笔记'**
+  String get studyShelfNotes;
+
+  /// No description provided for @studyShelfThreads.
+  ///
+  /// In zh, this message translates to:
+  /// **'对话'**
+  String get studyShelfThreads;
+
+  /// No description provided for @studyShelfPanel.
+  ///
+  /// In zh, this message translates to:
+  /// **'打开播放器侧栏'**
+  String get studyShelfPanel;
+
+  /// No description provided for @studyShelfNow.
+  ///
+  /// In zh, this message translates to:
+  /// **'回到正在播放'**
+  String get studyShelfNow;
+
+  /// No description provided for @studyShelfNoTranscript.
+  ///
+  /// In zh, this message translates to:
+  /// **'这节课还没有字幕'**
+  String get studyShelfNoTranscript;
+
+  /// No description provided for @studyShelfNoFiles.
+  ///
+  /// In zh, this message translates to:
+  /// **'这门课还没有本机资料。可以先在资料库下载，或用「插入图片、PDF 或文件」导入。'**
+  String get studyShelfNoFiles;
+
+  /// No description provided for @studyShelfNoCourse.
+  ///
+  /// In zh, this message translates to:
+  /// **'课程信息还在加载，请稍后再打开'**
+  String get studyShelfNoCourse;
+
+  /// No description provided for @studyShelfNoPractice.
+  ///
+  /// In zh, this message translates to:
+  /// **'还没有练习。在播放器的「笔记」里可以让助手出一套题。'**
+  String get studyShelfNoPractice;
+
+  /// No description provided for @studyShelfNoNotes.
+  ///
+  /// In zh, this message translates to:
+  /// **'这节课还没有笔记'**
+  String get studyShelfNoNotes;
+
+  /// No description provided for @studyShelfPlace.
+  ///
+  /// In zh, this message translates to:
+  /// **'放到画布'**
+  String get studyShelfPlace;
+
+  /// No description provided for @studyShelfUnsupported.
+  ///
+  /// In zh, this message translates to:
+  /// **'暂不支持此格式'**
+  String get studyShelfUnsupported;
+
+  /// No description provided for @studyShelfFilesCount.
+  ///
+  /// In zh, this message translates to:
+  /// **'{count} 个文件'**
+  String studyShelfFilesCount(int count);
+
+  /// No description provided for @studyShelfThisLecture.
+  ///
+  /// In zh, this message translates to:
+  /// **'本课次'**
+  String get studyShelfThisLecture;
+
+  /// No description provided for @studyShelfBack.
+  ///
+  /// In zh, this message translates to:
+  /// **'返回全部资料'**
+  String get studyShelfBack;
+
+  /// No description provided for @studyShelfChapterLines.
+  ///
+  /// In zh, this message translates to:
+  /// **'{count} 句字幕'**
+  String studyShelfChapterLines(int count);
+
+  /// No description provided for @studyShelfThreadHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'放到画布上，在下方输入框提问'**
+  String get studyShelfThreadHint;
+
+  /// No description provided for @studyShelfLoadFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'无法加载：{error}'**
+  String studyShelfLoadFailed(Object error);
+
+  /// No description provided for @studyTranscriptTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'字幕 · {range}'**
+  String studyTranscriptTitle(Object range);
+
+  /// No description provided for @studyTranscriptExcerpt.
+  ///
+  /// In zh, this message translates to:
+  /// **'（只放入了前 {count} 句）'**
+  String studyTranscriptExcerpt(int count);
+
+  /// No description provided for @studyAnswerLabel.
+  ///
+  /// In zh, this message translates to:
+  /// **'答案：{letter}'**
+  String studyAnswerLabel(Object letter);
 }
 
 class _AppLocalizationsDelegate

@@ -4297,5 +4297,185 @@
     }
   },
   "folderSyncSettingsGroup": "课程同步",
-  "studyConversationEmpty": "围绕指定资料持续提问，回答和整理结果都保留在此对话中。"
+  "studyConversationEmpty": "围绕指定资料持续提问，回答和整理结果都保留在此对话中。",
+  "studyOpenCanvas": "打开画布",
+  "studyExitCanvas": "退出画布",
+  "studyThreadTitle": "对话 {n}",
+  "@studyThreadTitle": {
+    "placeholders": {
+      "n": {}
+    }
+  },
+  "studyThreadActive": "正在对话",
+  "studyThreadActiveHint": "这段对话在画布下方的输入框上继续。",
+  "studyThreadTurns": "{count, plural, =0{还没有提问} other{{count} 轮问答}}",
+  "@studyThreadTurns": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "studyThreadEmpty": "还没有提问",
+  "studyThreadOpen": "继续",
+  "studyThreadNew": "新对话",
+  "studyStageCollapse": "收起对话",
+  "studyStageExpand": "展开对话（{count} 轮）",
+  "@studyStageExpand": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "studyStageTitle": "从画布上的资料问起",
+  "studyStageBody": "选中卡片、圈出一段笔迹，或把卡片拖进输入框，回答会以这些资料为依据。",
+  "studyIdeaSummary": "概括这一页的要点",
+  "studyIdeaExplain": "把选中的部分讲得更易懂",
+  "studyIdeaQuiz": "出三道题考考我",
+  "studyComposerHint": "就画布上的资料提问",
+  "studyComposerDrop": "松开，加入这段对话",
+  "studyPickSources": "选择参考资料",
+  "studyInspectSources": "查看本次资料内容",
+  "studyAllowImages": "看图",
+  "studyAllowImagesHint": "允许读取圈选的画面",
+  "studyRemoveSource": "移出对话",
+  "studyVideoRange": "{from}–{to} 秒",
+  "@studyVideoRange": {
+    "placeholders": {
+      "from": {},
+      "to": {}
+    }
+  },
+  "studySourcePage": "第 {page} 页",
+  "@studySourcePage": {
+    "placeholders": {
+      "page": {}
+    }
+  },
+  "studySourceShow": "查看来源",
+  "studyStop": "停止",
+  "studySend": "发送",
+  "studyTurnRetry": "重试",
+  "studyTurnInterrupted": "这次回答中断了",
+  "studyLegacyOperations": "历史画布操作已停用，回答仍保留在对话中。",
+  "studyAgentPreparing": "正在准备资料…",
+  "studyAgentLookingAround": "正在查看画布…",
+  "studyAgentThinking": "正在组织回答…",
+  "studyAgentListening": "正在听「{label}」",
+  "@studyAgentListening": {
+    "placeholders": {
+      "label": {}
+    }
+  },
+  "studyAgentTranscribing": "正在转写「{label}」的片段",
+  "@studyAgentTranscribing": {
+    "placeholders": {
+      "label": {}
+    }
+  },
+  "studyAgentLooking": "正在看「{label}」",
+  "@studyAgentLooking": {
+    "placeholders": {
+      "label": {}
+    }
+  },
+  "studyAgentReading": "正在读「{label}」",
+  "@studyAgentReading": {
+    "placeholders": {
+      "label": {}
+    }
+  },
+  "studyTurnReopened": "应用重开时这个问题还没答完，可以重试",
+  "studyConversationSaveFailed": "无法保存对话：{error}",
+  "@studyConversationSaveFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "studyConversationUnsaved": "无法整理资料：画布还没保存，请稍后重试",
+  "studyVisualChanged": "圈选的画面已经变了，请重新圈选后再加入对话",
+  "studyConversationFull": "这段对话已满 300 轮，请开始新对话",
+  "studyCardExpand": "展开模块",
+  "studyCardCollapse": "折叠模块",
+  "studyCardFoldColumn": "收起整列",
+  "studyCardSelectText": "选择文档文字",
+  "studyCardEditKnowledge": "编辑知识卡片",
+  "studyCardDelete": "删除模块",
+  "studyCardAsk": "加入对话，或拖进输入框",
+  "studyCardMore": "更多",
+  "studyCardPdfPage": "{title} · 第 {page}/{count} 页",
+  "@studyCardPdfPage": {
+    "placeholders": {
+      "title": {},
+      "page": {},
+      "count": {}
+    }
+  },
+  "settingsGlass": "液态玻璃",
+  "settingsGlassHint": "画布工具栏与输入框透出下方内容；关闭后改为实色",
+  "settingsGlassHighContrast": "高对比度下使用实色",
+  "studyShelf": "课次素材",
+  "studyShelfFromVideo": "字幕 · 资料 · 练习",
+  "studyShelfHint": "拖到画布上，或点 ＋ 放到视野中央",
+  "studyShelfHintTouch": "长按拖到画布上，或点 ＋ 放到视野中央",
+  "studyShelfTranscript": "字幕",
+  "studyShelfFiles": "资料",
+  "studyShelfPractice": "练习",
+  "studyShelfNotes": "笔记",
+  "studyShelfThreads": "对话",
+  "studyShelfPanel": "打开播放器侧栏",
+  "studyShelfNow": "回到正在播放",
+  "studyShelfNoTranscript": "这节课还没有字幕",
+  "studyShelfNoFiles": "这门课还没有本机资料。可以先在资料库下载，或用「插入图片、PDF 或文件」导入。",
+  "studyShelfNoCourse": "课程信息还在加载，请稍后再打开",
+  "studyShelfNoPractice": "还没有练习。在播放器的「笔记」里可以让助手出一套题。",
+  "studyShelfNoNotes": "这节课还没有笔记",
+  "studyShelfPlace": "放到画布",
+  "studyShelfUnsupported": "暂不支持此格式",
+  "studyShelfFilesCount": "{count} 个文件",
+  "@studyShelfFilesCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "studyShelfThisLecture": "本课次",
+  "studyShelfBack": "返回全部资料",
+  "studyShelfChapterLines": "{count} 句字幕",
+  "@studyShelfChapterLines": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "studyShelfThreadHint": "放到画布上，在下方输入框提问",
+  "studyShelfLoadFailed": "无法加载：{error}",
+  "@studyShelfLoadFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "studyTranscriptTitle": "字幕 · {range}",
+  "@studyTranscriptTitle": {
+    "placeholders": {
+      "range": {}
+    }
+  },
+  "studyTranscriptExcerpt": "（只放入了前 {count} 句）",
+  "@studyTranscriptExcerpt": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "studyAnswerLabel": "答案：{letter}",
+  "@studyAnswerLabel": {
+    "placeholders": {
+      "letter": {}
+    }
+  }
 }

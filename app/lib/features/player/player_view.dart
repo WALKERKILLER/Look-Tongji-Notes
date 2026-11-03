@@ -27,12 +27,16 @@ class PlayerView extends StatefulWidget {
     required this.onBack,
     this.panelOpen,
     this.onTogglePanel,
+    this.onCanvas,
   });
   final LecturePlayer ctl;
   final bool fullscreen;
   final VoidCallback onFullscreen, onBack;
   final bool? panelOpen;
   final VoidCallback? onTogglePanel;
+
+  /// Opens the lecture on the study canvas; null inside the canvas.
+  final VoidCallback? onCanvas;
 
   @override
   State<PlayerView> createState() => PlayerViewState();
@@ -368,6 +372,21 @@ class PlayerViewState extends State<PlayerView> {
             ]),
           ),
           if (ctl.sources.length > 1) _sourcePicker(context),
+          if (widget.onCanvas != null && !widget.fullscreen)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: Space.xs),
+              child: TextButton.icon(
+                key: const ValueKey('player-open-canvas'),
+                onPressed: widget.onCanvas,
+                style: TextButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  backgroundColor: Colors.white.withValues(alpha: .14),
+                  visualDensity: VisualDensity.compact,
+                ),
+                icon: const Icon(Icons.draw_outlined, size: 18),
+                label: Text(l10n.studyOpenCanvas),
+              ),
+            ),
           if (widget.onTogglePanel != null)
             IconButton(
               tooltip: widget.panelOpen == true ? l10n.playerCollapsePanel : l10n.playerExpandPanel,

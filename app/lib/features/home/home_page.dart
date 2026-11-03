@@ -314,7 +314,7 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
           ],
-          const SliverToBoxAdapter(child: SizedBox(height: Space.huge)),
+          SliverToBoxAdapter(child: SizedBox(height: Space.huge + MediaQuery.paddingOf(context).bottom)),
         ],
       ),
     );

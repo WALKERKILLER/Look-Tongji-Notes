@@ -37,6 +37,9 @@ class UiPrefs extends ChangeNotifier {
   bool compactDensity = false;
   bool reduceMotion = false;
 
+  /// Floating chrome (the phone dock, canvas toolbars) as frosted glass.
+  bool glass = true;
+
   // Assistant rendering
   bool chatBubbles = true;
   bool showThinking = true;
@@ -76,6 +79,7 @@ class UiPrefs extends ChangeNotifier {
     fontFamily = m['fontFamily'];
     compactDensity = m['compactDensity'] ?? false;
     reduceMotion = m['reduceMotion'] ?? false;
+    glass = m['glass'] ?? true;
     chatBubbles = m['chatBubbles'] ?? true;
     showThinking = m['showThinking'] ?? true;
     streamAnimation = GptMarkdownAnimation.values.byName(m['streamAnimation'] ?? streamAnimation.name);
@@ -101,6 +105,7 @@ class UiPrefs extends ChangeNotifier {
         'fontFamily': fontFamily,
         'compactDensity': compactDensity,
         'reduceMotion': reduceMotion,
+        'glass': glass,
         'chatBubbles': chatBubbles,
         'showThinking': showThinking,
         'streamAnimation': streamAnimation.name,

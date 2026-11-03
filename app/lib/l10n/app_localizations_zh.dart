@@ -7085,4 +7085,290 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get studyConversationEmpty => '围绕指定资料持续提问，回答和整理结果都保留在此对话中。';
+
+  @override
+  String get studyOpenCanvas => '打开画布';
+
+  @override
+  String get studyExitCanvas => '退出画布';
+
+  @override
+  String studyThreadTitle(Object n) {
+    return '对话 $n';
+  }
+
+  @override
+  String get studyThreadActive => '正在对话';
+
+  @override
+  String get studyThreadActiveHint => '这段对话在画布下方的输入框上继续。';
+
+  @override
+  String studyThreadTurns(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 轮问答',
+      zero: '还没有提问',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get studyThreadEmpty => '还没有提问';
+
+  @override
+  String get studyThreadOpen => '继续';
+
+  @override
+  String get studyThreadNew => '新对话';
+
+  @override
+  String get studyStageCollapse => '收起对话';
+
+  @override
+  String studyStageExpand(int count) {
+    return '展开对话（$count 轮）';
+  }
+
+  @override
+  String get studyStageTitle => '从画布上的资料问起';
+
+  @override
+  String get studyStageBody => '选中卡片、圈出一段笔迹，或把卡片拖进输入框，回答会以这些资料为依据。';
+
+  @override
+  String get studyIdeaSummary => '概括这一页的要点';
+
+  @override
+  String get studyIdeaExplain => '把选中的部分讲得更易懂';
+
+  @override
+  String get studyIdeaQuiz => '出三道题考考我';
+
+  @override
+  String get studyComposerHint => '就画布上的资料提问';
+
+  @override
+  String get studyComposerDrop => '松开，加入这段对话';
+
+  @override
+  String get studyPickSources => '选择参考资料';
+
+  @override
+  String get studyInspectSources => '查看本次资料内容';
+
+  @override
+  String get studyAllowImages => '看图';
+
+  @override
+  String get studyAllowImagesHint => '允许读取圈选的画面';
+
+  @override
+  String get studyRemoveSource => '移出对话';
+
+  @override
+  String studyVideoRange(Object from, Object to) {
+    return '$from–$to 秒';
+  }
+
+  @override
+  String studySourcePage(Object page) {
+    return '第 $page 页';
+  }
+
+  @override
+  String get studySourceShow => '查看来源';
+
+  @override
+  String get studyStop => '停止';
+
+  @override
+  String get studySend => '发送';
+
+  @override
+  String get studyTurnRetry => '重试';
+
+  @override
+  String get studyTurnInterrupted => '这次回答中断了';
+
+  @override
+  String get studyLegacyOperations => '历史画布操作已停用，回答仍保留在对话中。';
+
+  @override
+  String get studyAgentPreparing => '正在准备资料…';
+
+  @override
+  String get studyAgentLookingAround => '正在查看画布…';
+
+  @override
+  String get studyAgentThinking => '正在组织回答…';
+
+  @override
+  String studyAgentListening(Object label) {
+    return '正在听「$label」';
+  }
+
+  @override
+  String studyAgentTranscribing(Object label) {
+    return '正在转写「$label」的片段';
+  }
+
+  @override
+  String studyAgentLooking(Object label) {
+    return '正在看「$label」';
+  }
+
+  @override
+  String studyAgentReading(Object label) {
+    return '正在读「$label」';
+  }
+
+  @override
+  String get studyTurnReopened => '应用重开时这个问题还没答完，可以重试';
+
+  @override
+  String studyConversationSaveFailed(Object error) {
+    return '无法保存对话：$error';
+  }
+
+  @override
+  String get studyConversationUnsaved => '无法整理资料：画布还没保存，请稍后重试';
+
+  @override
+  String get studyVisualChanged => '圈选的画面已经变了，请重新圈选后再加入对话';
+
+  @override
+  String get studyConversationFull => '这段对话已满 300 轮，请开始新对话';
+
+  @override
+  String get studyCardExpand => '展开模块';
+
+  @override
+  String get studyCardCollapse => '折叠模块';
+
+  @override
+  String get studyCardFoldColumn => '收起整列';
+
+  @override
+  String get studyCardSelectText => '选择文档文字';
+
+  @override
+  String get studyCardEditKnowledge => '编辑知识卡片';
+
+  @override
+  String get studyCardDelete => '删除模块';
+
+  @override
+  String get studyCardAsk => '加入对话，或拖进输入框';
+
+  @override
+  String get studyCardMore => '更多';
+
+  @override
+  String studyCardPdfPage(Object title, Object page, Object count) {
+    return '$title · 第 $page/$count 页';
+  }
+
+  @override
+  String get settingsGlass => '液态玻璃';
+
+  @override
+  String get settingsGlassHint => '画布工具栏与输入框透出下方内容；关闭后改为实色';
+
+  @override
+  String get settingsGlassHighContrast => '高对比度下使用实色';
+
+  @override
+  String get studyShelf => '课次素材';
+
+  @override
+  String get studyShelfFromVideo => '字幕 · 资料 · 练习';
+
+  @override
+  String get studyShelfHint => '拖到画布上，或点 ＋ 放到视野中央';
+
+  @override
+  String get studyShelfHintTouch => '长按拖到画布上，或点 ＋ 放到视野中央';
+
+  @override
+  String get studyShelfTranscript => '字幕';
+
+  @override
+  String get studyShelfFiles => '资料';
+
+  @override
+  String get studyShelfPractice => '练习';
+
+  @override
+  String get studyShelfNotes => '笔记';
+
+  @override
+  String get studyShelfThreads => '对话';
+
+  @override
+  String get studyShelfPanel => '打开播放器侧栏';
+
+  @override
+  String get studyShelfNow => '回到正在播放';
+
+  @override
+  String get studyShelfNoTranscript => '这节课还没有字幕';
+
+  @override
+  String get studyShelfNoFiles => '这门课还没有本机资料。可以先在资料库下载，或用「插入图片、PDF 或文件」导入。';
+
+  @override
+  String get studyShelfNoCourse => '课程信息还在加载，请稍后再打开';
+
+  @override
+  String get studyShelfNoPractice => '还没有练习。在播放器的「笔记」里可以让助手出一套题。';
+
+  @override
+  String get studyShelfNoNotes => '这节课还没有笔记';
+
+  @override
+  String get studyShelfPlace => '放到画布';
+
+  @override
+  String get studyShelfUnsupported => '暂不支持此格式';
+
+  @override
+  String studyShelfFilesCount(int count) {
+    return '$count 个文件';
+  }
+
+  @override
+  String get studyShelfThisLecture => '本课次';
+
+  @override
+  String get studyShelfBack => '返回全部资料';
+
+  @override
+  String studyShelfChapterLines(int count) {
+    return '$count 句字幕';
+  }
+
+  @override
+  String get studyShelfThreadHint => '放到画布上，在下方输入框提问';
+
+  @override
+  String studyShelfLoadFailed(Object error) {
+    return '无法加载：$error';
+  }
+
+  @override
+  String studyTranscriptTitle(Object range) {
+    return '字幕 · $range';
+  }
+
+  @override
+  String studyTranscriptExcerpt(int count) {
+    return '（只放入了前 $count 句）';
+  }
+
+  @override
+  String studyAnswerLabel(Object letter) {
+    return '答案：$letter';
+  }
 }
