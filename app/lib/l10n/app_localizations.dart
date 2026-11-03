@@ -11197,7 +11197,7 @@ abstract class AppLocalizations {
   /// No description provided for @nasTitle.
   ///
   /// In zh, this message translates to:
-  /// **'课程自动化'**
+  /// **'课程工作台'**
   String get nasTitle;
 
   /// No description provided for @nasRunHomework.
@@ -11419,7 +11419,7 @@ abstract class AppLocalizations {
   /// No description provided for @nasEntry.
   ///
   /// In zh, this message translates to:
-  /// **'课程自动化 · 资料、日程和作业'**
+  /// **'课程工作台'**
   String get nasEntry;
 
   /// No description provided for @nasDeadlineCompleted.
@@ -12159,6 +12159,251 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'单个视频不能超过 4 GiB'**
   String get localVideoLimit;
+
+  /// No description provided for @folderSyncTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'课程同步'**
+  String get folderSyncTitle;
+
+  /// No description provided for @folderSyncBody.
+  ///
+  /// In zh, this message translates to:
+  /// **'把选中的课程直接同步到 NAS 的 WebDAV 目录。每台设备只发布改动过的文件，接收端合并并保留冲突副本；学校登录、模型密钥和本机设置留在本机。'**
+  String get folderSyncBody;
+
+  /// No description provided for @folderSyncAccount.
+  ///
+  /// In zh, this message translates to:
+  /// **'NAS 账号'**
+  String get folderSyncAccount;
+
+  /// No description provided for @folderSyncAccountHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'和整库同步共用一个账号与目录，课程放在 courses/ 下'**
+  String get folderSyncAccountHint;
+
+  /// No description provided for @folderSyncCourses.
+  ///
+  /// In zh, this message translates to:
+  /// **'同步的课程'**
+  String get folderSyncCourses;
+
+  /// No description provided for @folderSyncNoCourses.
+  ///
+  /// In zh, this message translates to:
+  /// **'填好账号后点“刷新课程”，这里会列出本机和远端已有的课程。'**
+  String get folderSyncNoCourses;
+
+  /// No description provided for @folderSyncRefresh.
+  ///
+  /// In zh, this message translates to:
+  /// **'刷新课程'**
+  String get folderSyncRefresh;
+
+  /// No description provided for @folderSyncOptions.
+  ///
+  /// In zh, this message translates to:
+  /// **'同步选项'**
+  String get folderSyncOptions;
+
+  /// No description provided for @folderSyncAutoHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'保存后自动发布；接收到文件后自动刷新'**
+  String get folderSyncAutoHint;
+
+  /// No description provided for @folderSyncConnect.
+  ///
+  /// In zh, this message translates to:
+  /// **'连接并同步'**
+  String get folderSyncConnect;
+
+  /// No description provided for @folderSyncCheck.
+  ///
+  /// In zh, this message translates to:
+  /// **'立即检查'**
+  String get folderSyncCheck;
+
+  /// No description provided for @folderSyncConflicts.
+  ///
+  /// In zh, this message translates to:
+  /// **'冲突副本'**
+  String get folderSyncConflicts;
+
+  /// No description provided for @folderSyncNoConflicts.
+  ///
+  /// In zh, this message translates to:
+  /// **'没有待处理的冲突'**
+  String get folderSyncNoConflicts;
+
+  /// No description provided for @folderSyncOtherCopy.
+  ///
+  /// In zh, this message translates to:
+  /// **'保留的另一版本'**
+  String get folderSyncOtherCopy;
+
+  /// No description provided for @folderSyncBinaryCopy.
+  ///
+  /// In zh, this message translates to:
+  /// **'二进制文件，副本已完整保留。'**
+  String get folderSyncBinaryCopy;
+
+  /// No description provided for @folderSyncLater.
+  ///
+  /// In zh, this message translates to:
+  /// **'稍后处理'**
+  String get folderSyncLater;
+
+  /// No description provided for @folderSyncKeepCurrent.
+  ///
+  /// In zh, this message translates to:
+  /// **'保留当前版'**
+  String get folderSyncKeepCurrent;
+
+  /// No description provided for @folderSyncUseThis.
+  ///
+  /// In zh, this message translates to:
+  /// **'使用此副本'**
+  String get folderSyncUseThis;
+
+  /// No description provided for @folderSyncConfirmTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'连接课程同步'**
+  String get folderSyncConfirmTitle;
+
+  /// No description provided for @folderSyncConfirm.
+  ///
+  /// In zh, this message translates to:
+  /// **'连接并同步'**
+  String get folderSyncConfirm;
+
+  /// No description provided for @folderSyncSelected.
+  ///
+  /// In zh, this message translates to:
+  /// **'已选 {n} 门课程。'**
+  String folderSyncSelected(Object n);
+
+  /// No description provided for @folderSyncPreview.
+  ///
+  /// In zh, this message translates to:
+  /// **'本机 {files} 个文件（约 {mb} MB），远端 {remote} 个（约 {remoteMb} MB）。'**
+  String folderSyncPreview(
+    Object files,
+    Object mb,
+    Object remote,
+    Object remoteMb,
+  );
+
+  /// No description provided for @folderSyncLastRun.
+  ///
+  /// In zh, this message translates to:
+  /// **'已上传 {up} 项，已接收 {down} 项，冲突 {conflicts} 项。'**
+  String folderSyncLastRun(Object up, Object down, Object conflicts);
+
+  /// No description provided for @folderSyncPrivacy.
+  ///
+  /// In zh, this message translates to:
+  /// **'同步目录里的文件按原样保存，不做加密；视频音频{media}。请使用可信的 NAS 账号。'**
+  String folderSyncPrivacy(Object media);
+
+  /// No description provided for @folderSyncSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'选择课程，把学习成果同步到 NAS'**
+  String get folderSyncSubtitle;
+
+  /// No description provided for @folderSyncUsingCourseSync.
+  ///
+  /// In zh, this message translates to:
+  /// **'当前按课程同步；整库 WebDAV 同步尚未启用'**
+  String get folderSyncUsingCourseSync;
+
+  /// No description provided for @nasWorkspaceIntro.
+  ///
+  /// In zh, this message translates to:
+  /// **'资料、作业和日程都在本机；NAS 只负责在多台设备之间搬运课程文件夹。'**
+  String get nasWorkspaceIntro;
+
+  /// No description provided for @nasEmptyHomework.
+  ///
+  /// In zh, this message translates to:
+  /// **'还没有作业记录'**
+  String get nasEmptyHomework;
+
+  /// No description provided for @nasEmptyHomeworkBody.
+  ///
+  /// In zh, this message translates to:
+  /// **'在 NAS 上运行一次作业扫描，或等自动同步完成后，这里会列出每份作业的生成与提交状态。'**
+  String get nasEmptyHomeworkBody;
+
+  /// No description provided for @nasEmptyDeadlines.
+  ///
+  /// In zh, this message translates to:
+  /// **'还没有截止日程'**
+  String get nasEmptyDeadlines;
+
+  /// No description provided for @nasEmptyDeadlinesBody.
+  ///
+  /// In zh, this message translates to:
+  /// **'运行日程同步后，课程截止日期会汇总到这里。'**
+  String get nasEmptyDeadlinesBody;
+
+  /// No description provided for @nasEmptyMaterials.
+  ///
+  /// In zh, this message translates to:
+  /// **'还没有资料'**
+  String get nasEmptyMaterials;
+
+  /// No description provided for @nasEmptyMaterialsBody.
+  ///
+  /// In zh, this message translates to:
+  /// **'课程文件夹里的讲义、PDF 和笔记同步到本机后会出现在这里。'**
+  String get nasEmptyMaterialsBody;
+
+  /// No description provided for @nasFilesUnavailable.
+  ///
+  /// In zh, this message translates to:
+  /// **'本机课程目录还不可用'**
+  String get nasFilesUnavailable;
+
+  /// No description provided for @nasOpenSync.
+  ///
+  /// In zh, this message translates to:
+  /// **'打开课程同步'**
+  String get nasOpenSync;
+
+  /// No description provided for @nasServicesOptional.
+  ///
+  /// In zh, this message translates to:
+  /// **'NAS 服务是可选的：不连接也能浏览本机资料。连接后可以在这里手动触发作业扫描和日程同步。'**
+  String get nasServicesOptional;
+
+  /// No description provided for @nasEntryHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'连接 NAS 后，资料、作业和日程会同步到本机'**
+  String get nasEntryHint;
+
+  /// No description provided for @nasEntryConnected.
+  ///
+  /// In zh, this message translates to:
+  /// **'{host} · 同步 {n} 门课程'**
+  String nasEntryConnected(Object host, Object n);
+
+  /// No description provided for @folderSyncSettingsGroup.
+  ///
+  /// In zh, this message translates to:
+  /// **'课程同步'**
+  String get folderSyncSettingsGroup;
+
+  /// No description provided for @studyConversationEmpty.
+  ///
+  /// In zh, this message translates to:
+  /// **'围绕指定资料持续提问，回答和整理结果都保留在此对话中。'**
+  String get studyConversationEmpty;
 }
 
 class _AppLocalizationsDelegate

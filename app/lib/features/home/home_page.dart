@@ -37,7 +37,7 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   List<Lecture> _recent = [];
-  Map<String, dynamic>? _lib;
+  Map<String, dynamic>? _lib, _sync;
   StreamSubscription? _sub;
 
   @override
@@ -61,12 +61,14 @@ class _HomePageState extends State<HomePage> {
     try {
       final r = jsonList(await api.get('/api/recent'));
       final lib = await api.get('/api/library') as Map;
+      final sync = await api.get('/api/sync') as Map;
       if (!mounted) return;
       setState(() {
         _recent = r
             .map((e) => Lecture((e as Map).cast<String, dynamic>()))
             .toList();
         _lib = lib.cast<String, dynamic>();
+        _sync = sync.cast<String, dynamic>();
       });
     } catch (_) {}
   }
@@ -104,22 +106,6 @@ class _HomePageState extends State<HomePage> {
       child: CustomScrollView(
         slivers: [
           SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Card(
-                child: ListTile(
-                  leading: const Icon(Icons.hub_outlined),
-                  title: Text(l10n.nasEntry),
-                  trailing: const Icon(Icons.arrow_forward),
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const NasPage()),
-                  ),
-                ),
-              ),
-            ),
-          ),
-          SliverToBoxAdapter(
             child: ContentWidth(
               child: Padding(
                 padding: EdgeInsets.fromLTRB(
@@ -133,6 +119,14 @@ class _HomePageState extends State<HomePage> {
                   now: now,
                   compact: compact,
                 ),
+              ),
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: ContentWidth(
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(pad, 0, pad, Space.lg),
+                child: _WorkspaceEntry(sync: _sync),
               ),
             ),
           ),
@@ -874,6 +868,72 @@ class _LibraryStats extends StatelessWidget {
               ],
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Entry to the course workspace. Deliberately compact: the library, jobs and
+/// deadlines are the point of the home screen, and this is a doorway, not a
+/// banner.
+class _WorkspaceEntry extends StatelessWidget {
+  const _WorkspaceEntry({this.sync});
+  final Map<String, dynamic>? sync;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme, tt = Theme.of(context).textTheme;
+    final on = sync?['configured'] == true && sync?['kind'] == 'folder';
+    final courses = (sync?['course_ids'] as List?)?.length ?? 0;
+    final host = Uri.tryParse('${sync?['url'] ?? ''}')?.host ?? '';
+    return Material(
+      color: cs.surfaceContainerLow,
+      borderRadius: BorderRadius.circular(Corners.lg),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const NasPage()),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(Space.md),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: cs.primaryContainer,
+                  borderRadius: BorderRadius.circular(Corners.md),
+                ),
+                child: Icon(
+                  Icons.workspaces_outline,
+                  size: 22,
+                  color: cs.onPrimaryContainer,
+                ),
+              ),
+              const SizedBox(width: Space.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(l10n.nasEntry, style: tt.titleSmall),
+                    Text(
+                      on
+                          ? l10n.nasEntryConnected(
+                              host.isEmpty ? l10n.nasTitle : host,
+                              courses,
+                            )
+                          : l10n.nasEntryHint,
+                      style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant),
+            ],
+          ),
         ),
       ),
     );

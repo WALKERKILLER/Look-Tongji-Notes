@@ -280,7 +280,12 @@ extension _StudyBrushUI on StudyCanvasState {
                       SizedBox(
                         height: 100,
                         child: CustomPaint(
-                          painter: _BrushPreview(_color, _penWidth, _brush),
+                          painter: _BrushPreview(
+                            _color,
+                            _penWidth,
+                            _brush,
+                            chrome,
+                          ),
                           child: Center(
                             child: Align(
                               alignment: Alignment.bottomRight,
@@ -423,8 +428,8 @@ extension _StudyBrushUI on StudyCanvasState {
                                               border: Border.all(
                                                 width: _color == color ? 3 : 1,
                                                 color: _color == color
-                                                    ? const Color(0xff6254d7)
-                                                    : Colors.grey.shade300,
+                                                    ? chrome.accent
+                                                    : chrome.line,
                                               ),
                                             ),
                                             child: _color == color
@@ -595,18 +600,16 @@ extension _StudyBrushUI on StudyCanvasState {
 }
 
 class _BrushPreview extends CustomPainter {
-  _BrushPreview(this.color, this.width, this.brush);
+  _BrushPreview(this.color, this.width, this.brush, this.chrome);
   final int color;
   final double width;
   final StudyBrush brush;
+  final StudyChrome chrome;
   @override
   void paint(Canvas canvas, Size size) {
     canvas.save();
     canvas.clipRect(Offset.zero & size);
-    canvas.drawRect(
-      Offset.zero & size,
-      Paint()..color = const Color(0xfff7f7fc),
-    );
+    canvas.drawRect(Offset.zero & size, Paint()..color = chrome.surfaceSoft);
     final points = [
       for (var i = 0; i < 100; i++)
         InkPoint(

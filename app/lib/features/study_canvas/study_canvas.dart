@@ -16,12 +16,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:window_manager/window_manager.dart';
 
 import '../../core/api.dart';
+import '../../theme/tokens.dart';
 import '../../widgets/look_markdown.dart';
 import '../../l10n/l10n.dart';
 import '../player/lecture_player.dart';
 import 'study_document.dart';
 import 'study_pdf_column.dart';
-import 'study_edge_dock.dart';
 import 'study_shape.dart';
 
 import 'package:val_latex_flutter/val_latex_flutter.dart';
@@ -32,6 +32,8 @@ part 'study_interaction.dart';
 part 'study_conversation_ui.dart';
 part 'study_pdf_ui.dart';
 part 'study_toolbar_ui.dart';
+part 'study_edge_dock.dart';
+part 'study_theme.dart';
 part 'study_pen_palette.dart';
 part 'study_shape_interaction.dart';
 part 'study_stylus.dart';
@@ -61,6 +63,8 @@ class StudyCanvas extends StatefulWidget {
 }
 
 class StudyCanvasState extends State<StudyCanvas> with WidgetsBindingObserver {
+  /// Theme-derived chrome colours for the whole workspace.
+  StudyChrome get chrome => StudyChrome.of(context);
   StudyDocument? document;
   Object? _loadError, _saveError;
   StudyTool _tool = StudyTool.select;
@@ -1363,6 +1367,7 @@ class StudyCanvasState extends State<StudyCanvas> with WidgetsBindingObserver {
                                           d,
                                           stage,
                                           _scene,
+                                          chrome,
                                         ),
                                       ),
                                     ),
@@ -1508,22 +1513,22 @@ class StudyCanvasState extends State<StudyCanvas> with WidgetsBindingObserver {
   Widget _card(StudyCard c) {
     final d = document!,
         selected = _selection.contains(c.id),
-        cs = Theme.of(context).colorScheme;
+        chrome = StudyChrome.of(context);
     return IgnorePointer(
       ignoring: _writing || _tool == StudyTool.hand || !d.editable(c.layer),
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
+          color: chrome.paper,
+          borderRadius: BorderRadius.circular(Corners.md),
           border: Border.all(
-            color: selected ? cs.primary : const Color(0xffdce1ec),
+            color: selected ? chrome.accent : chrome.line,
             width: selected ? 2 : 1,
           ),
-          boxShadow: const [
+          boxShadow: [
             BoxShadow(
-              color: Color(0x140c1832),
+              color: chrome.shadow,
               blurRadius: 20,
-              offset: Offset(0, 5),
+              offset: const Offset(0, 5),
             ),
           ],
         ),
@@ -1534,8 +1539,8 @@ class StudyCanvasState extends State<StudyCanvas> with WidgetsBindingObserver {
               height: 36,
               child: ColoredBox(
                 color: c.type == 'lecture'
-                    ? const Color(0xffeae8ff)
-                    : const Color(0xfff5f6fb),
+                    ? chrome.accentSoft
+                    : chrome.surfaceSoft,
                 child: Row(
                   children: [
                     const SizedBox(width: 12),
@@ -1546,7 +1551,7 @@ class StudyCanvasState extends State<StudyCanvas> with WidgetsBindingObserver {
                           ? Icons.notes
                           : Icons.description_outlined,
                       size: 16,
-                      color: const Color(0xff615b86),
+                      color: chrome.inkSoft,
                     ),
                     const SizedBox(width: 7),
                     Expanded(
@@ -1554,10 +1559,7 @@ class StudyCanvasState extends State<StudyCanvas> with WidgetsBindingObserver {
                         c.type == 'pdf' && c.pdfColumn.isNotEmpty
                             ? '${c.title} · 第 ${c.page}/${c.pageCount} 页'
                             : c.title,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Color(0xff34415c),
-                        ),
+                        style: TextStyle(fontSize: 12, color: chrome.ink),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -1661,10 +1663,10 @@ class StudyCanvasState extends State<StudyCanvas> with WidgetsBindingObserver {
                         onPressed: () => _text(c),
                         icon: const Icon(Icons.edit_outlined, size: 15),
                       ),
-                    const Icon(
+                    Icon(
                       Icons.drag_indicator,
                       size: 16,
-                      color: Color(0xff949cb0),
+                      color: chrome.inkFaint,
                     ),
                     const SizedBox(width: 10),
                   ],
@@ -1764,10 +1766,10 @@ class StudyCanvasState extends State<StudyCanvas> with WidgetsBindingObserver {
                                 ..end = selection.end;
                             }
                           },
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 16,
                             height: 1.65,
-                            color: Color(0xff25344a),
+                            color: chrome.paperInk,
                           ),
                         ),
                       ),
@@ -1783,7 +1785,7 @@ class StudyCanvasState extends State<StudyCanvas> with WidgetsBindingObserver {
                 child: Icon(
                   Icons.south_east,
                   size: 12,
-                  color: selected ? cs.primary : const Color(0xffa2aabd),
+                  color: selected ? chrome.accent : chrome.inkFaint,
                 ),
               ),
             ),
@@ -1872,7 +1874,9 @@ class _Paper extends CustomPainter {
     }
     final camera = document?.camera ?? Offset.zero;
     final line = Paint()
-      ..color = const Color(0x1826354a)
+      ..color = Color(color).computeLuminance() > .5
+          ? const Color(0x1826354a)
+          : const Color(0x26ffffff)
       ..strokeWidth = .7;
     for (var y = camera.dy % spacing; y < s.height; y += spacing) {
       if (style == 'ruled' || style == 'grid') {

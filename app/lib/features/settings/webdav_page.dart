@@ -54,7 +54,7 @@ final _presets = [
 
 /// One line for the sync status, also used by the settings tile.
 String webdavSummary(Map<String, dynamic> st) {
-  if (st['kind'] == 'folder') return '当前使用同步文件夹；WebDAV 尚未启用';
+  if (st['kind'] == 'folder') return l10n.folderSyncUsingCourseSync;
   if (st['configured'] != true) return l10n.webdavSubtitle;
   if (st['running'] == true) return l10n.commonSyncing;
   final last = _map(st['last']);

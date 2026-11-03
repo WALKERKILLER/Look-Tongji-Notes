@@ -3945,7 +3945,7 @@
   "toolPrepareTask": "准备定时任务",
   "toolPreparePlugin": "准备开关插件",
   "loginWithTongji": "使用同济大学统一身份认证",
-  "nasTitle": "课程自动化",
+  "nasTitle": "课程工作台",
   "nasRunHomework": "运行一轮作业任务",
   "nasRunCalendar": "刷新 NAS 日历",
   "nasHomeworkConfirm": "将使用 NAS 已配置的 Codex 服务，处理最多两项符合条件的作业。已有稿件保护和任务锁继续生效。生成完成后仍需检查，不会自动提交。",
@@ -3982,7 +3982,7 @@
   "nasServiceState": "服务状态",
   "nasLastRun": "最近完成",
   "nasNextRun": "下次计划",
-  "nasEntry": "课程自动化 · 资料、日程和作业",
+  "nasEntry": "课程工作台",
   "nasDeadlineCompleted": "日历标记已完成",
   "nasHomeworkService": "作业生成",
   "nasCalendarService": "日历同步定时任务",
@@ -4226,5 +4226,76 @@
   "localVideosAdd": "添加视频",
   "localVideosImporting": "正在导入",
   "localVideosPartialSaved": "已创建的课程和成功导入的课次已保留。重试会从失败的文件继续。",
-  "localVideoLimit": "单个视频不能超过 4 GiB"
+  "localVideoLimit": "单个视频不能超过 4 GiB",
+  "folderSyncTitle": "课程同步",
+  "folderSyncBody": "把选中的课程直接同步到 NAS 的 WebDAV 目录。每台设备只发布改动过的文件，接收端合并并保留冲突副本；学校登录、模型密钥和本机设置留在本机。",
+  "folderSyncAccount": "NAS 账号",
+  "folderSyncAccountHint": "和整库同步共用一个账号与目录，课程放在 courses/ 下",
+  "folderSyncCourses": "同步的课程",
+  "folderSyncNoCourses": "填好账号后点“刷新课程”，这里会列出本机和远端已有的课程。",
+  "folderSyncRefresh": "刷新课程",
+  "folderSyncOptions": "同步选项",
+  "folderSyncAutoHint": "保存后自动发布；接收到文件后自动刷新",
+  "folderSyncConnect": "连接并同步",
+  "folderSyncCheck": "立即检查",
+  "folderSyncConflicts": "冲突副本",
+  "folderSyncNoConflicts": "没有待处理的冲突",
+  "folderSyncOtherCopy": "保留的另一版本",
+  "folderSyncBinaryCopy": "二进制文件，副本已完整保留。",
+  "folderSyncLater": "稍后处理",
+  "folderSyncKeepCurrent": "保留当前版",
+  "folderSyncUseThis": "使用此副本",
+  "folderSyncConfirmTitle": "连接课程同步",
+  "folderSyncConfirm": "连接并同步",
+  "folderSyncSelected": "已选 {n} 门课程。",
+  "@folderSyncSelected": {
+    "placeholders": {
+      "n": {}
+    }
+  },
+  "folderSyncPreview": "本机 {files} 个文件（约 {mb} MB），远端 {remote} 个（约 {remoteMb} MB）。",
+  "@folderSyncPreview": {
+    "placeholders": {
+      "files": {},
+      "mb": {},
+      "remote": {},
+      "remoteMb": {}
+    }
+  },
+  "folderSyncLastRun": "已上传 {up} 项，已接收 {down} 项，冲突 {conflicts} 项。",
+  "@folderSyncLastRun": {
+    "placeholders": {
+      "up": {},
+      "down": {},
+      "conflicts": {}
+    }
+  },
+  "folderSyncPrivacy": "同步目录里的文件按原样保存，不做加密；视频音频{media}。请使用可信的 NAS 账号。",
+  "@folderSyncPrivacy": {
+    "placeholders": {
+      "media": {}
+    }
+  },
+  "folderSyncSubtitle": "选择课程，把学习成果同步到 NAS",
+  "folderSyncUsingCourseSync": "当前按课程同步；整库 WebDAV 同步尚未启用",
+  "nasWorkspaceIntro": "资料、作业和日程都在本机；NAS 只负责在多台设备之间搬运课程文件夹。",
+  "nasEmptyHomework": "还没有作业记录",
+  "nasEmptyHomeworkBody": "在 NAS 上运行一次作业扫描，或等自动同步完成后，这里会列出每份作业的生成与提交状态。",
+  "nasEmptyDeadlines": "还没有截止日程",
+  "nasEmptyDeadlinesBody": "运行日程同步后，课程截止日期会汇总到这里。",
+  "nasEmptyMaterials": "还没有资料",
+  "nasEmptyMaterialsBody": "课程文件夹里的讲义、PDF 和笔记同步到本机后会出现在这里。",
+  "nasFilesUnavailable": "本机课程目录还不可用",
+  "nasOpenSync": "打开课程同步",
+  "nasServicesOptional": "NAS 服务是可选的：不连接也能浏览本机资料。连接后可以在这里手动触发作业扫描和日程同步。",
+  "nasEntryHint": "连接 NAS 后，资料、作业和日程会同步到本机",
+  "nasEntryConnected": "{host} · 同步 {n} 门课程",
+  "@nasEntryConnected": {
+    "placeholders": {
+      "host": {},
+      "n": {}
+    }
+  },
+  "folderSyncSettingsGroup": "课程同步",
+  "studyConversationEmpty": "围绕指定资料持续提问，回答和整理结果都保留在此对话中。"
 }

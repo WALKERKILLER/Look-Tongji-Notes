@@ -6430,7 +6430,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get loginWithTongji => '使用同济大学统一身份认证';
 
   @override
-  String get nasTitle => '课程自动化';
+  String get nasTitle => '课程工作台';
 
   @override
   String get nasRunHomework => '运行一轮作业任务';
@@ -6543,7 +6543,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get nasNextRun => '下次计划';
 
   @override
-  String get nasEntry => '课程自动化 · 资料、日程和作业';
+  String get nasEntry => '课程工作台';
 
   @override
   String get nasDeadlineCompleted => '日历标记已完成';
@@ -6947,4 +6947,142 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get localVideoLimit => '单个视频不能超过 4 GiB';
+
+  @override
+  String get folderSyncTitle => '课程同步';
+
+  @override
+  String get folderSyncBody =>
+      '把选中的课程直接同步到 NAS 的 WebDAV 目录。每台设备只发布改动过的文件，接收端合并并保留冲突副本；学校登录、模型密钥和本机设置留在本机。';
+
+  @override
+  String get folderSyncAccount => 'NAS 账号';
+
+  @override
+  String get folderSyncAccountHint => '和整库同步共用一个账号与目录，课程放在 courses/ 下';
+
+  @override
+  String get folderSyncCourses => '同步的课程';
+
+  @override
+  String get folderSyncNoCourses => '填好账号后点“刷新课程”，这里会列出本机和远端已有的课程。';
+
+  @override
+  String get folderSyncRefresh => '刷新课程';
+
+  @override
+  String get folderSyncOptions => '同步选项';
+
+  @override
+  String get folderSyncAutoHint => '保存后自动发布；接收到文件后自动刷新';
+
+  @override
+  String get folderSyncConnect => '连接并同步';
+
+  @override
+  String get folderSyncCheck => '立即检查';
+
+  @override
+  String get folderSyncConflicts => '冲突副本';
+
+  @override
+  String get folderSyncNoConflicts => '没有待处理的冲突';
+
+  @override
+  String get folderSyncOtherCopy => '保留的另一版本';
+
+  @override
+  String get folderSyncBinaryCopy => '二进制文件，副本已完整保留。';
+
+  @override
+  String get folderSyncLater => '稍后处理';
+
+  @override
+  String get folderSyncKeepCurrent => '保留当前版';
+
+  @override
+  String get folderSyncUseThis => '使用此副本';
+
+  @override
+  String get folderSyncConfirmTitle => '连接课程同步';
+
+  @override
+  String get folderSyncConfirm => '连接并同步';
+
+  @override
+  String folderSyncSelected(Object n) {
+    return '已选 $n 门课程。';
+  }
+
+  @override
+  String folderSyncPreview(
+    Object files,
+    Object mb,
+    Object remote,
+    Object remoteMb,
+  ) {
+    return '本机 $files 个文件（约 $mb MB），远端 $remote 个（约 $remoteMb MB）。';
+  }
+
+  @override
+  String folderSyncLastRun(Object up, Object down, Object conflicts) {
+    return '已上传 $up 项，已接收 $down 项，冲突 $conflicts 项。';
+  }
+
+  @override
+  String folderSyncPrivacy(Object media) {
+    return '同步目录里的文件按原样保存，不做加密；视频音频$media。请使用可信的 NAS 账号。';
+  }
+
+  @override
+  String get folderSyncSubtitle => '选择课程，把学习成果同步到 NAS';
+
+  @override
+  String get folderSyncUsingCourseSync => '当前按课程同步；整库 WebDAV 同步尚未启用';
+
+  @override
+  String get nasWorkspaceIntro => '资料、作业和日程都在本机；NAS 只负责在多台设备之间搬运课程文件夹。';
+
+  @override
+  String get nasEmptyHomework => '还没有作业记录';
+
+  @override
+  String get nasEmptyHomeworkBody =>
+      '在 NAS 上运行一次作业扫描，或等自动同步完成后，这里会列出每份作业的生成与提交状态。';
+
+  @override
+  String get nasEmptyDeadlines => '还没有截止日程';
+
+  @override
+  String get nasEmptyDeadlinesBody => '运行日程同步后，课程截止日期会汇总到这里。';
+
+  @override
+  String get nasEmptyMaterials => '还没有资料';
+
+  @override
+  String get nasEmptyMaterialsBody => '课程文件夹里的讲义、PDF 和笔记同步到本机后会出现在这里。';
+
+  @override
+  String get nasFilesUnavailable => '本机课程目录还不可用';
+
+  @override
+  String get nasOpenSync => '打开课程同步';
+
+  @override
+  String get nasServicesOptional =>
+      'NAS 服务是可选的：不连接也能浏览本机资料。连接后可以在这里手动触发作业扫描和日程同步。';
+
+  @override
+  String get nasEntryHint => '连接 NAS 后，资料、作业和日程会同步到本机';
+
+  @override
+  String nasEntryConnected(Object host, Object n) {
+    return '$host · 同步 $n 门课程';
+  }
+
+  @override
+  String get folderSyncSettingsGroup => '课程同步';
+
+  @override
+  String get studyConversationEmpty => '围绕指定资料持续提问，回答和整理结果都保留在此对话中。';
 }

@@ -1,6 +1,4 @@
-import 'dart:math' as math;
-
-import 'package:flutter/material.dart';
+part of 'study_canvas.dart';
 
 enum StudyDockEdge { top, right, bottom, left }
 
@@ -120,14 +118,14 @@ class _StudyEdgeDockState extends State<StudyEdgeDock> {
                     width: 30,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: const Color(0xffd9dadd),
+                      color: StudyChrome.of(context).surfaceStrong,
                       borderRadius: BorderRadius.circular(3),
                     ),
                   )
                 : Icon(
                     vertical ? Icons.drag_handle : Icons.more_vert,
                     size: 15,
-                    color: const Color(0xffa0a2a6),
+                    color: StudyChrome.of(context).inkFaint,
                   ),
           ),
         ),
@@ -144,6 +142,7 @@ class _StudyEdgeDockState extends State<StudyEdgeDock> {
     return Positioned.fill(
       child: LayoutBuilder(
         builder: (context, size) {
+          final chrome = StudyChrome.of(context);
           final centered = widget.centerHandle && !vertical;
           final extent = math.min(
             widget.maxLength ?? double.infinity,
@@ -190,14 +189,14 @@ class _StudyEdgeDockState extends State<StudyEdgeDock> {
                     fit: BoxFit.contain,
                     child: Material(
                       key: widget.surfaceKey,
-                      color: Colors.white,
+                      color: chrome.surface,
                       elevation: _drag == null ? 2 : 6,
-                      shadowColor: Colors.black.withValues(alpha: .18),
+                      shadowColor: chrome.shadow,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(
-                          widget.centerHandle ? 14 : 26,
+                          widget.centerHandle ? Corners.md : 26,
                         ),
-                        side: const BorderSide(color: Color(0xffeeeeef)),
+                        side: BorderSide(color: chrome.line),
                       ),
                       clipBehavior: Clip.antiAlias,
                       child: ConstrainedBox(

@@ -474,10 +474,11 @@ extension _StudyAgentUI on StudyCanvasState {
 }
 
 class _ConnectionPainter extends CustomPainter {
-  _ConnectionPainter(this.document, this.stage, Listenable repaint)
+  _ConnectionPainter(this.document, this.stage, Listenable repaint, this.chrome)
     : super(repaint: repaint);
   final StudyDocument document;
   final Rect stage;
+  final StudyChrome chrome;
   @override
   void paint(Canvas canvas, Size size) {
     final d = document, objects = {for (final c in document.cards) c.id: c};
@@ -511,22 +512,18 @@ class _ConnectionPainter extends CustomPainter {
       canvas.drawPath(
         path,
         Paint()
-          ..color = const Color(0xff9d91cb)
+          ..color = chrome.accent.withValues(alpha: .65)
           ..style = PaintingStyle.stroke
           ..strokeWidth = 2 / d.zoom,
       );
-      canvas.drawCircle(
-        end,
-        4 / d.zoom,
-        Paint()..color = const Color(0xff8170b8),
-      );
+      canvas.drawCircle(end, 4 / d.zoom, Paint()..color = chrome.accent);
       final label = TextPainter(
         text: TextSpan(
           text: link.label,
           style: TextStyle(
-            color: const Color(0xff61518a),
+            color: chrome.onAccentSoft,
             fontSize: 12 / d.zoom,
-            backgroundColor: const Color(0xfff6f3ff),
+            backgroundColor: chrome.accentSoft,
           ),
         ),
         textDirection: TextDirection.ltr,
@@ -571,10 +568,10 @@ class _KnowledgeBody extends StatelessWidget {
               child: switch (b.type) {
                 'heading' => SelectableText(
                   b.text,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 19,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xff25344a),
+                    color: StudyChrome.of(context).ink,
                   ),
                 ),
                 'list' || 'steps' => Column(
@@ -608,7 +605,7 @@ class _KnowledgeBody extends StatelessWidget {
                 'code' => Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(12),
-                  color: const Color(0xffedf0f6),
+                  color: StudyChrome.of(context).surfaceSoft,
                   child: SelectableText(
                     '${b.language}\n${b.text}',
                     style: const TextStyle(
