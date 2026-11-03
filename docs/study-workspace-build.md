@@ -23,7 +23,7 @@ Copy `lookd/bin/look-study-pdf` into the built application’s `Contents/MacOS` 
 
 ## Android stylus and folder access
 
-The Android build includes AndroidX motion prediction and Huawei's Pencil Engine API through their official Maven repositories. Device support is optional: predictions are transient and never saved; unsupported devices retain ordinary Flutter ink input. The system folder picker grants access only to the chosen sync tree. No private signing material or personal Syncthing configuration is included.
+The Android build includes AndroidX motion prediction and Huawei's Pencil Engine API through their official Maven repositories. Device support is optional: predictions are transient and never saved; unsupported devices retain ordinary Flutter ink input. The system folder picker grants access only to the chosen sync tree. No private signing material or personal sync credentials are included.
 
 Run the SAF publication recovery tests from `app/android` after the normal Flutter/Android build setup: `./gradlew :app:testDebugUnitTest --tests cn.lookstudio.look_studio.FolderDocumentPublicationTest`. These JVM tests inject rename and cleanup failures; they do not replace tests of the actual device's document provider or permission revocation.
 

@@ -37,7 +37,7 @@ func (s *Server) nasSnapshot(_ http.ResponseWriter, r *http.Request) (any, error
 	d["files"] = files
 	attachNASReports(d, files, b.Root)
 	if err != nil {
-		d["files_error"] = "本机课程目录不可用或扫描不完整，请检查 Syncthing"
+		d["files_error"] = "本机课程目录不可用或扫描不完整，请在课程同步里检查 WebDAV 连接"
 	}
 	deadlines, e := b.Deadlines()
 	d["deadlines"] = deadlines

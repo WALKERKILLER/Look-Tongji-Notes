@@ -13,7 +13,7 @@ Expose the user's existing NAS course downloader, lecture subscriber, deadline c
 
 ### Course workspace
 
-The course page presents recordings, shared course material, deadlines and homework together. Course identity uses an explicit mapping of local course code, Canvas course ID and iCourse course ID. Course mappings are explicit and editable; ambiguous matches are left for correction. Material can belong to a whole course without being assigned to a fictitious lecture. The bridge reads the configured Syncthing semester folder; existing source files remain the canonical copies.
+The course page presents recordings, shared course material, deadlines and homework together. Course identity uses an explicit mapping of local course code, Canvas course ID and iCourse course ID. Course mappings are explicit and editable; ambiguous matches are left for correction. Material can belong to a whole course without being assigned to a fictitious lecture. The bridge reads the configured local semester folder that course sync keeps up to date from the NAS over WebDAV; existing source files remain the canonical copies.
 
 The material list includes file type, source, last observed modification and availability. Supported files open through the authenticated local backend. HTML source is rendered as text or in a restricted sandbox; scripts cannot execute in the app origin. File access resolves real paths within configured semester/calendar roots, rejects symlinks escaping those roots and excludes hidden working directories and credentials. The bridge does not expose arbitrary host paths or an arbitrary shell interface.
 

@@ -2,12 +2,14 @@ package datasync
 
 import (
 	"context"
+	"encoding/xml"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -323,4 +325,90 @@ func (c *Client) Delete(ctx context.Context, p string) error {
 		return nil
 	}
 	return failed("DELETE", p, resp)
+}
+
+// RemoteFile is one member of a WebDAV collection.
+type RemoteFile struct {
+	Name  string
+	Size  int64
+	Dir   bool
+	MTime time.Time
+}
+
+type davMultistatus struct {
+	Responses []struct {
+		Href     string `xml:"href"`
+		Propstat []struct {
+			Status string `xml:"status"`
+			Prop   struct {
+				Length       string `xml:"getcontentlength"`
+				Modified     string `xml:"getlastmodified"`
+				ResourceType struct {
+					Collection *struct{} `xml:"collection"`
+				} `xml:"resourcetype"`
+			} `xml:"prop"`
+		} `xml:"propstat"`
+	} `xml:"response"`
+}
+
+// List returns the members of collection p, without p itself. A missing
+// collection is ErrNotFound, which callers read as "no devices yet".
+func (c *Client) List(ctx context.Context, p string) ([]RemoteFile, error) {
+	body := `<?xml version="1.0" encoding="utf-8"?><propfind xmlns="DAV:"><prop><resourcetype/><getcontentlength/><getlastmodified/></prop></propfind>`
+	resp, err := c.do(ctx, "PROPFIND", p, strings.NewReader(body), int64(len(body)),
+		map[string]string{"Depth": "1", "Content-Type": "application/xml; charset=utf-8"})
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode == http.StatusNotFound {
+		resp.Body.Close()
+		return nil, ErrNotFound
+	}
+	if resp.StatusCode != http.StatusMultiStatus && !ok(resp) {
+		return nil, failed("PROPFIND", "/"+p, resp)
+	}
+	defer resp.Body.Close()
+	var ms davMultistatus
+	if err := xml.NewDecoder(io.LimitReader(resp.Body, 8<<20)).Decode(&ms); err != nil {
+		return nil, fmt.Errorf("WebDAV 目录列表无法解析：%w", err)
+	}
+	self := ""
+	if resp.Request != nil && resp.Request.URL != nil {
+		self = strings.TrimSuffix(resp.Request.URL.EscapedPath(), "/")
+	}
+	seen := map[string]bool{}
+	out := make([]RemoteFile, 0, len(ms.Responses))
+	for _, r := range ms.Responses {
+		ref, err := url.Parse(strings.TrimSpace(r.Href))
+		if err != nil {
+			continue
+		}
+		if resp.Request != nil && resp.Request.URL != nil {
+			ref = resp.Request.URL.ResolveReference(ref)
+		}
+		clean := strings.TrimSuffix(ref.EscapedPath(), "/")
+		if clean == self {
+			continue // the collection itself
+		}
+		name, err := url.PathUnescape(clean[strings.LastIndex(clean, "/")+1:])
+		if err != nil || name == "" || seen[name] {
+			continue
+		}
+		seen[name] = true
+		f := RemoteFile{Name: name}
+		for _, ps := range r.Propstat {
+			if ps.Prop.ResourceType.Collection != nil {
+				f.Dir = true
+			}
+			if n, err := strconv.ParseInt(strings.TrimSpace(ps.Prop.Length), 10, 64); err == nil {
+				f.Size = n
+			}
+			if t, err := http.ParseTime(strings.TrimSpace(ps.Prop.Modified)); err == nil {
+				f.MTime = t
+			}
+		}
+		out = append(out, f)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
+	return out, nil
 }

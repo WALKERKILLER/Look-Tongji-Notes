@@ -194,7 +194,7 @@ func (s *Service) Status() Status {
 	if kind == "" {
 		kind = "webdav"
 	}
-	return Status{Kind: kind, LocalFolder: c.LocalFolder, CourseIDs: c.CourseIDs, Configured: c.URL != "" || c.Kind == "folder", URL: c.URL, User: c.User, HasPassword: s.pass != "", Folder: c.Folder,
+	return Status{Kind: kind, LocalFolder: c.LocalFolder, CourseIDs: c.CourseIDs, Configured: c.URL != "" || c.LocalFolder != "" || c.BridgeURL != "", URL: c.URL, User: c.User, HasPassword: s.pass != "", Folder: c.Folder,
 		Auto: c.Auto, Media: c.Media, Device: s.deviceName(), Files: len(c.Base), Running: s.running,
 		Progress: s.progress, Last: c.Last}
 }

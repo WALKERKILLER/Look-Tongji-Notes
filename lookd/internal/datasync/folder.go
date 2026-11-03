@@ -1,8 +1,9 @@
 package datasync
 
 // Folder transport contract: docs/specs/0023-course-folder-sync.md.
-// Each device owns its manifest; objects are immutable. Syncthing may deliver
-// them in either order, so an incomplete generation is never materialized.
+// Each device owns its manifest; objects are immutable. A WebDAV server may
+// deliver them in either order, so an incomplete generation is never
+// materialized.
 import (
 	"bytes"
 	"context"
@@ -55,6 +56,19 @@ type folderStorage struct {
 	remote string
 	token  string
 	hc     *http.Client
+	dav    *Client // WebDAV target: the same folder layout, on a NAS
+}
+
+// folderTarget names the remote a run wrote to, so a run against a different
+// NAS or folder never inherits the previous one's agreed state.
+func (c config) folderTarget() string {
+	if c.URL != "" {
+		return "webdav:" + c.URL + "|" + c.Folder
+	}
+	if c.BridgeURL != "" {
+		return "bridge:" + c.BridgeURL
+	}
+	return "dir:" + c.LocalFolder
 }
 
 func validFolderPath(p string) bool {
@@ -78,6 +92,13 @@ func (f *folderStorage) open(ctx context.Context, p string) (io.ReadCloser, erro
 	}
 	if f.root != nil {
 		return f.root.Open(filepath.FromSlash(p))
+	}
+	if f.dav != nil {
+		rc, _, err := f.dav.Get(ctx, p)
+		if errors.Is(err, ErrNotFound) {
+			return nil, os.ErrNotExist
+		}
+		return rc, err
 	}
 	req, e := http.NewRequestWithContext(ctx, "GET", f.remote+"/file?path="+url.QueryEscape(p), nil)
 	if e != nil {
@@ -128,6 +149,33 @@ func (f *folderStorage) put(ctx context.Context, p string, r io.Reader) error {
 		// retrying can turn a permission/provider failure into data loss.
 		return f.root.Rename(filepath.FromSlash(tmp), filepath.FromSlash(p))
 	}
+	if f.dav != nil {
+		if e := f.dav.MkdirAll(ctx, parent(p)); e != nil {
+			return e
+		}
+		size := int64(-1)
+		switch v := r.(type) {
+		case *bytes.Reader:
+			size = int64(v.Len())
+		case *bytes.Buffer:
+			size = int64(v.Len())
+		case *os.File:
+			if st, err := v.Stat(); err == nil {
+				if off, err := v.Seek(0, io.SeekCurrent); err == nil {
+					size = st.Size() - off
+				}
+			}
+		}
+		used := false
+		_, e := f.dav.Put(ctx, p, func() (io.ReadCloser, int64, error) {
+			if used {
+				return nil, 0, errors.New("同步写入无法重试，请稍后重试")
+			}
+			used = true
+			return io.NopCloser(r), size, nil
+		}, "")
+		return e
+	}
 	req, e := http.NewRequestWithContext(ctx, "PUT", f.remote+"/file?path="+url.QueryEscape(p), r)
 	if e != nil {
 		return e
@@ -162,6 +210,22 @@ func (f *folderStorage) devices(ctx context.Context) ([]string, error) {
 		names, e := d.Readdirnames(-1)
 		return names, e
 	}
+	if f.dav != nil {
+		list, e := f.dav.List(ctx, "devices")
+		if errors.Is(e, ErrNotFound) {
+			return nil, nil
+		}
+		if e != nil {
+			return nil, e
+		}
+		names := make([]string, 0, len(list))
+		for _, x := range list {
+			if !x.Dir {
+				names = append(names, x.Name)
+			}
+		}
+		return names, nil
+	}
 	req, e := http.NewRequestWithContext(ctx, "GET", f.remote+"/list?path=devices", nil)
 	if e != nil {
 		return nil, e
@@ -181,6 +245,24 @@ func (f *folderStorage) devices(ctx context.Context) ([]string, error) {
 }
 func (s *Service) folderStorage(c config) (*folderStorage, error) {
 	f := &folderStorage{hc: &http.Client{Timeout: 10 * time.Minute}}
+	if c.URL != "" {
+		pass := ""
+		if c.Pass != "" {
+			if s.Unseal == nil {
+				return nil, errors.New("缺少本机凭证解密器")
+			}
+			var e error
+			if pass, e = s.Unseal(c.Pass); e != nil {
+				return nil, e
+			}
+		}
+		dav, e := s.client(c.URL, c.Folder, c.User, pass)
+		if e != nil {
+			return nil, e
+		}
+		f.dav = dav
+		return f, nil
+	}
 	if c.BridgeURL != "" {
 		u, e := url.Parse(c.BridgeURL)
 		if e != nil || u.Scheme != "http" || u.Hostname() != "127.0.0.1" || u.Path != "" {
@@ -228,15 +310,61 @@ func (s *Service) configureFolder(ctx context.Context, in Settings) (Status, err
 		return Status{}, ErrBusy
 	}
 	defer s.runMu.Unlock()
-	if strings.TrimSpace(in.LocalFolder) == "" || len(in.CourseIDs) == 0 {
-		return Status{}, errors.New("请选择同步文件夹和至少一门课程")
+	if len(in.CourseIDs) == 0 {
+		return Status{}, errors.New("请至少选择一门课程")
 	}
 	for _, id := range in.CourseIDs {
 		if id == "" || strings.ContainsAny(id, "/\\\x00") {
 			return Status{}, errors.New("课程标识无效")
 		}
 	}
-	c := config{Kind: "folder", LocalFolder: in.LocalFolder, CourseIDs: in.CourseIDs, BridgeURL: in.BridgeURL, Auto: in.Auto, Media: in.Media}
+	c := config{Kind: "folder", CourseIDs: in.CourseIDs, BridgeURL: in.BridgeURL, Auto: in.Auto, Media: in.Media}
+	pass := ""
+	// The sync target is a WebDAV collection on the NAS. A local folder stays
+	// supported for the Android directory bridge and for tests.
+	if addr := strings.TrimSpace(in.URL); addr != "" {
+		norm, folder, err := normalize(addr, in.Folder)
+		if err != nil {
+			return Status{}, err
+		}
+		s.mu.Lock()
+		s.loadLocked()
+		pass = s.pass
+		s.mu.Unlock()
+		if in.Pass != nil {
+			pass = *in.Pass
+		}
+		c.URL, c.Folder, c.User = norm, folder, strings.TrimSpace(in.User)
+		root, err := s.client(norm, "", c.User, pass)
+		if err != nil {
+			return Status{}, err
+		}
+		if err := root.Check(ctx); err != nil {
+			return Status{}, err
+		}
+		if err := root.MkdirAll(ctx, folder); err != nil {
+			return Status{}, err
+		}
+		dir, err := s.client(norm, folder, c.User, pass)
+		if err != nil {
+			return Status{}, err
+		}
+		if err := dir.CheckWrite(ctx, "objects/write-check"); err != nil {
+			return Status{}, err
+		}
+		if pass != "" {
+			if s.Seal == nil {
+				return Status{}, errors.New("无法安全保存密码")
+			}
+			if c.Pass, err = s.Seal(pass); err != nil {
+				return Status{}, err
+			}
+		}
+	} else if strings.TrimSpace(in.LocalFolder) == "" {
+		return Status{}, errors.New("请填写 NAS 的 WebDAV 地址")
+	} else {
+		c.LocalFolder = in.LocalFolder
+	}
 	s.mu.Lock()
 	s.loadLocked()
 	c.DeviceID = s.cfg.DeviceID
@@ -275,7 +403,7 @@ func (s *Service) configureFolder(ctx context.Context, in Settings) (Status, err
 	}
 	s.mu.Lock()
 	s.cfg = c
-	s.pass = ""
+	s.pass = pass
 	s.saveLocked()
 	s.mu.Unlock()
 	s.publish("sync_changed", map[string]string{"what": "folder"})
@@ -891,7 +1019,7 @@ func (s *Service) syncFolder(ctx context.Context) (Result, error) {
 		return result, e
 	}
 	s.mu.Lock()
-	if s.cfg.Kind == "folder" && s.cfg.LocalFolder == c.LocalFolder {
+	if s.cfg.Kind == "folder" && s.cfg.folderTarget() == c.folderTarget() {
 		s.cfg.Base = map[string]Entry{}
 		for p, v := range next {
 			s.cfg.Base[p] = v.Entry
@@ -903,6 +1031,10 @@ func (s *Service) syncFolder(ctx context.Context) (Result, error) {
 
 // FolderPreview is read-only; configuration creates the versioned marker.
 func (s *Service) FolderPreview(ctx context.Context, in Settings) (map[string]any, error) {
+	s.mu.Lock()
+	s.loadLocked()
+	savedPass := s.pass
+	s.mu.Unlock()
 	dirs, err := s.folderDirs(in.CourseIDs)
 	if err != nil {
 		return nil, err
@@ -916,8 +1048,30 @@ func (s *Service) FolderPreview(ctx context.Context, in Settings) (map[string]an
 	if err != nil {
 		return nil, err
 	}
-	if in.LocalFolder != "" {
+	if in.LocalFolder != "" || strings.TrimSpace(in.URL) != "" {
 		cfg := config{LocalFolder: in.LocalFolder, BridgeURL: in.BridgeURL}
+		if addr := strings.TrimSpace(in.URL); addr != "" {
+			norm, folder, err := normalize(addr, in.Folder)
+			if err != nil {
+				return nil, err
+			}
+			cfg.URL, cfg.Folder, cfg.User = norm, folder, strings.TrimSpace(in.User)
+			if in.Pass != nil && *in.Pass != "" {
+				if s.Seal == nil {
+					return nil, errors.New("无法保护账号密码")
+				}
+				if cfg.Pass, err = s.Seal(*in.Pass); err != nil {
+					return nil, err
+				}
+			} else if savedPass != "" {
+				if s.Seal == nil {
+					return nil, errors.New("无法保护账号密码")
+				}
+				if cfg.Pass, err = s.Seal(savedPass); err != nil {
+					return nil, err
+				}
+			}
+		}
 		if in.BridgeURL != "" {
 			if s.Seal == nil {
 				return nil, errors.New("无法保护目录凭证")

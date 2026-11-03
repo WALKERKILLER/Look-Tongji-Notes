@@ -1,6 +1,6 @@
 # Optional NAS service adapter
 
-The NAS page connects an existing personal deployment to Studio. It does not install workers or configure Syncthing. It is disabled until the daemon has an explicit SSH host; browsing the rest of Studio does not require a NAS.
+The NAS page connects an existing personal deployment to Studio. It does not install workers or configure the WebDAV course sync. It is disabled until the daemon has an explicit SSH host; browsing the rest of Studio does not require a NAS.
 
 Set these environment variables when starting `lookd`:
 
