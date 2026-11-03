@@ -243,3 +243,72 @@ func TestFolderCanvasLatestSaveWinsWithoutBlockingConflict(t *testing.T) {
 		}
 	}
 }
+
+func webdavFolderService(t *testing.T, seal func(string) (string, error), unseal func(string) (string, error)) (*Service, string) {
+	t.Helper()
+	s, root := folderFixture(t)
+	s.Seal, s.Unseal = seal, unseal
+	return s, root
+}
+
+func TestFolderSyncOverWebDAV(t *testing.T) {
+	ctx := context.Background()
+	srv := davServer(t)
+	seal := func(s string) (string, error) { return "sealed:" + s, nil }
+	unseal := func(s string) (string, error) { return strings.TrimPrefix(s, "sealed:"), nil }
+	a, ar := webdavFolderService(t, seal, unseal)
+	b, br := webdavFolderService(t, seal, unseal)
+	writeFolderTest(t, ar, "courses/速成/course.json", `{"id":"local-pilot","title":"速成"}`)
+	writeFolderTest(t, ar, "courses/速成/note.md", "hello")
+	writeFolderTest(t, ar, "courses/别的课/course.json", `{"id":"other"}`)
+	pass := "secret"
+	for _, d := range []*Service{a, b} {
+		if _, e := d.Configure(ctx, Settings{
+			Kind: "folder", URL: srv.URL + "/dav/", User: "me", Pass: &pass,
+			Folder: "LookStudio", CourseIDs: []string{"local-pilot"}, Media: true,
+		}); e != nil {
+			t.Fatal(e)
+		}
+	}
+	st := a.Status()
+	if st.Kind != "folder" || st.URL == "" || !st.Configured || !st.HasPassword || st.Folder != "LookStudio" {
+		t.Fatalf("status %+v", st)
+	}
+	runFolderTest(t, a)
+	r := runFolderTest(t, b)
+	if r.Downloaded == 0 {
+		t.Fatalf("nothing downloaded: %+v", r)
+	}
+	if got, e := os.ReadFile(filepath.Join(br, "courses/速成/note.md")); e != nil || string(got) != "hello" {
+		t.Fatalf("note %q %v", got, e)
+	}
+	if _, e := os.Stat(filepath.Join(br, "courses/别的课")); !os.IsNotExist(e) {
+		t.Fatal("unselected course escaped")
+	}
+	// A second device edit must come back to the first over the same account.
+	writeFolderTest(t, br, "courses/速成/note.md", "from b")
+	runFolderTest(t, b)
+	runFolderTest(t, a)
+	if got, e := os.ReadFile(filepath.Join(ar, "courses/速成/note.md")); e != nil || string(got) != "from b" {
+		t.Fatalf("round trip %q %v", got, e)
+	}
+}
+
+func TestFolderSyncRejectsBadWebDAVAccount(t *testing.T) {
+	ctx := context.Background()
+	srv := davServer(t)
+	seal := func(s string) (string, error) { return "sealed:" + s, nil }
+	unseal := func(s string) (string, error) { return strings.TrimPrefix(s, "sealed:"), nil }
+	s, _ := webdavFolderService(t, seal, unseal)
+	bad := "wrong"
+	_, e := s.Configure(ctx, Settings{
+		Kind: "folder", URL: srv.URL + "/dav/", User: "me", Pass: &bad,
+		Folder: "LookStudio", CourseIDs: []string{"local-pilot"},
+	})
+	if e == nil || !strings.Contains(e.Error(), "账号或应用密码不正确") {
+		t.Fatalf("bad account accepted: %v", e)
+	}
+	if s.Status().Configured {
+		t.Fatal("failed configuration was saved")
+	}
+}

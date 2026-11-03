@@ -170,7 +170,7 @@ extension _StudyPenPalette on StudyCanvasState {
                           borderRadius: BorderRadius.circular(4),
                           border: Border.all(
                             color: color == 0xffffffff
-                                ? const Color(0xffd9dade)
+                                ? StudyChrome.of(context).line
                                 : Colors.transparent,
                           ),
                         ),
@@ -218,8 +218,8 @@ extension _StudyPenPalette on StudyCanvasState {
                           shape: BoxShape.circle,
                           border: Border.all(
                             color: _ink && (_penWidth - width).abs() < .05
-                                ? const Color(0xff0788ff)
-                                : const Color(0xffc5c8cd),
+                                ? StudyChrome.of(context).accent
+                                : StudyChrome.of(context).line,
                             width: 1.5,
                           ),
                         ),
@@ -229,7 +229,7 @@ extension _StudyPenPalette on StudyCanvasState {
                             child: Container(
                               width: 17,
                               height: math.min(9, width + 1),
-                              color: const Color(0xff25282d),
+                              color: StudyChrome.of(context).ink,
                             ),
                           ),
                         ),
@@ -237,10 +237,10 @@ extension _StudyPenPalette on StudyCanvasState {
                     ),
                     Text(
                       '${width.toInt()}',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 9,
                         height: 1.1,
-                        color: Color(0xff535862),
+                        color: StudyChrome.of(context).inkSoft,
                       ),
                     ),
                   ],
@@ -282,6 +282,7 @@ extension _StudyPenPalette on StudyCanvasState {
             unawaited(_saveBrushSettings());
           }
 
+          final chrome = StudyChrome.of(popup);
           final size = MediaQuery.sizeOf(popup),
               width = math.min(300.0, size.width - 24),
               height = math.min(
@@ -339,9 +340,9 @@ extension _StudyPenPalette on StudyCanvasState {
                   overlayShape: const RoundSliderOverlayShape(
                     overlayRadius: 12,
                   ),
-                  activeTrackColor: const Color(0xff0788ff),
-                  inactiveTrackColor: const Color(0xffebedf2),
-                  thumbColor: const Color(0xff0788ff),
+                  activeTrackColor: chrome.accent,
+                  inactiveTrackColor: chrome.surfaceStrong,
+                  thumbColor: chrome.accent,
                 ),
                 child: Slider(
                   value: value.clamp(min, max),
@@ -447,18 +448,23 @@ extension _StudyPenPalette on StudyCanvasState {
                             onChanged: (v) => change(() => _pressureEraser = v),
                           ),
                         ] else ...[
-                          const Text(
+                          Text(
                             '实时笔迹预览',
                             style: TextStyle(
                               fontSize: 10,
-                              color: Color(0xff737983),
+                              color: chrome.inkFaint,
                             ),
                           ),
                           SizedBox(
                             height: 42,
                             width: double.infinity,
                             child: CustomPaint(
-                              painter: _BrushPreview(_color, _penWidth, _brush),
+                              painter: _BrushPreview(
+                                _color,
+                                _penWidth,
+                                _brush,
+                                chrome,
+                              ),
                             ),
                           ),
                           const SizedBox(height: 16),

@@ -6,8 +6,11 @@ import 'package:provider/provider.dart';
 import '../../core/api.dart';
 import '../../core/app_state.dart';
 import '../../l10n/l10n.dart';
+import '../../theme/tokens.dart';
 import '../../widgets/look_markdown.dart';
+import '../../widgets/states.dart';
 import '../courses/course_page.dart';
+import '../settings/folder_sync_page.dart';
 
 List<Map<String, dynamic>> nasRows(dynamic v) => v is List
     ? v.whereType<Map>().map((m) => m.cast<String, dynamic>()).toList()
@@ -200,6 +203,7 @@ class _NasPageState extends State<NasPage> {
   };
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme, tt = Theme.of(context).textTheme;
     final files = nasRows(data?['files']);
     final courses = {
       ...files.map((f) => '${f['course']}'),
@@ -213,6 +217,8 @@ class _NasPageState extends State<NasPage> {
         ? context.watch<AppState>().courses
         : [];
     final linked = '${links[course] ?? ''}';
+    final online = data?['online'] == true;
+    final filesError = '${data?['files_error'] ?? ''}';
     return DefaultTabController(
       length: 4,
       initialIndex: widget.initialTab,
@@ -223,7 +229,7 @@ class _NasPageState extends State<NasPage> {
             IconButton(
               tooltip: l10n.nasRefresh,
               onPressed: busy ? null : () => load(refresh: true),
-              icon: const Icon(Icons.refresh),
+              icon: const Icon(Icons.refresh_rounded),
             ),
           ],
         ),
@@ -231,284 +237,435 @@ class _NasPageState extends State<NasPage> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             if (busy) const LinearProgressIndicator(),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    data?['online'] == true ? l10n.nasOnline : l10n.nasOffline,
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  Text(
-                    '${l10n.nasObserved}: ${dateLabel(data?['observed_at'])}',
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                  if (error != null || data?['error'] != null)
-                    Text(
-                      error ?? '${data!['error']}',
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.error,
-                      ),
-                    ),
-                  if (data?['files_error'] != null)
-                    Text('${data!['files_error']}'),
-                  if (data?['calendar_error'] != null)
-                    Text('${data!['calendar_error']}'),
-                  if (notice != null)
-                    Text(
-                      notice!,
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                    ),
-                  Wrap(
-                    spacing: 12,
-                    runSpacing: 8,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      DropdownButton<String>(
-                        value: courses.contains(course) ? course : '',
-                        items: [
-                          DropdownMenuItem(
-                            value: '',
-                            child: Text(l10n.nasAllCourses),
-                          ),
-                          ...courses.map(
-                            (c) => DropdownMenuItem(
-                              value: c,
-                              child: SizedBox(
-                                width: 235,
-                                child: Text(c, overflow: TextOverflow.ellipsis),
-                              ),
-                            ),
-                          ),
-                        ],
-                        onChanged: (v) => setState(() {
-                          course = v ?? '';
-                          selected = true;
-                        }),
-                      ),
-                      SizedBox(
-                        width: 220,
-                        child: TextField(
-                          decoration: InputDecoration(
-                            prefixIcon: const Icon(Icons.search),
-                            hintText: l10n.nasSearch,
-                          ),
-                          onChanged: (v) => setState(() => query = v),
-                        ),
-                      ),
-                      if (course.isNotEmpty)
-                        DropdownButton<String>(
-                          value: appCourses.any((c) => c.id == linked)
-                              ? linked
-                              : '',
-                          hint: Text(l10n.nasLinkCourse),
-                          items: [
-                            DropdownMenuItem(
-                              value: '',
-                              child: Text(l10n.nasUnlinked),
-                            ),
-                            ...appCourses.map(
-                              (c) => DropdownMenuItem(
-                                value: c.id,
-                                child: Text(c.title),
-                              ),
-                            ),
-                          ],
-                          onChanged: (v) => linkCourse(v ?? ''),
-                        ),
-                      if (linked.isNotEmpty)
-                        TextButton.icon(
-                          onPressed: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => CoursePage(courseId: linked),
-                            ),
-                          ),
-                          icon: const Icon(Icons.play_circle_outline),
-                          label: Text(l10n.nasOpenRecording),
-                        ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            TabBar(
-              isScrollable: true,
-              tabs: [
-                Tab(text: '${l10n.nasHomework} (${jobs.length})'),
-                Tab(text: '${l10n.nasDeadlines} (${deadlines.length})'),
-                Tab(text: l10n.nasMaterials),
-                Tab(text: l10n.nasServices),
-              ],
-            ),
             Expanded(
-              child: TabBarView(
-                children: [
-                  ListView(
-                    padding: const EdgeInsets.all(20),
-                    children: [
-                      Text(l10n.nasSeparateStates),
-                      ...jobs.map(
-                        (j) => Card(
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  '${j['name']}',
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .titleMedium,
-                                ),
-                                Text('${j['course']}'),
-                                Text(
-                                  '${stateName('${j['generation_state']}')} · ${j['submission_state'] == 'submitted' ? l10n.nasSubmitted : l10n.nasUnconfirmed}',
-                                ),
-                                if (j['due_at'] != null)
-                                  Text(
-                                    '${l10n.nasDue}: ${DateTime.tryParse('${j['due_at']}')?.toLocal() ?? j['due_at']}',
-                                  ),
-                                if (j['reason'] == 'execution_timeout')
-                                  Text(l10n.nasTimeout),
-                                if (j['reason'] == 'needs_attention')
-                                  Text(l10n.nasNeedsInput),
-                                Builder(
-                                  builder: (tabContext) => TextButton.icon(
-                                    icon: const Icon(Icons.folder_open),
-                                    label: Text(l10n.nasRelatedFiles),
-                                    onPressed: () {
-                                      setState(() {
-                                        course = '${j['course']}';
-                                        query = '';
-                                      });
-                                      DefaultTabController.of(tabContext)
-                                          .animateTo(2);
-                                    },
+              child: ContentWidth(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(
+                        Space.lg,
+                        Space.md,
+                        Space.lg,
+                        0,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                online
+                                    ? Icons.cloud_done_outlined
+                                    : Icons.cloud_off_outlined,
+                                size: 18,
+                                color: online ? cs.primary : cs.outline,
+                              ),
+                              const SizedBox(width: Space.sm),
+                              Text(
+                                online ? l10n.nasOnline : l10n.nasOffline,
+                                style: tt.titleSmall,
+                              ),
+                              const SizedBox(width: Space.sm),
+                              Expanded(
+                                child: Text(
+                                  '${l10n.nasObserved} ${dateLabel(data?['observed_at'])}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: tt.bodySmall?.copyWith(
+                                    color: cs.onSurfaceVariant,
                                   ),
                                 ),
-                                Wrap(
-                                  spacing: 8,
-                                  children: [
-                                    ...nasRows(j['reports']).map(
-                                      (f) => TextButton.icon(
-                                        onPressed: f['available'] == true
-                                            ? () => openFile(f)
-                                            : null,
-                                        icon: const Icon(
-                                          Icons.description_outlined,
-                                        ),
-                                        label: Text(
-                                          '${f['path']}'.split('/').last,
+                              ),
+                            ],
+                          ),
+                          if (notice != null)
+                            Padding(
+                              padding: const EdgeInsets.only(top: Space.xs),
+                              child: Text(
+                                notice!,
+                                style: tt.bodySmall?.copyWith(
+                                  color: cs.primary,
+                                ),
+                              ),
+                            ),
+                          const SizedBox(height: Space.md),
+                          Wrap(
+                            spacing: Space.sm,
+                            runSpacing: Space.sm,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              DropdownButton<String>(
+                                value: courses.contains(course) ? course : '',
+                                underline: const SizedBox.shrink(),
+                                items: [
+                                  DropdownMenuItem(
+                                    value: '',
+                                    child: Text(l10n.nasAllCourses),
+                                  ),
+                                  ...courses.map(
+                                    (c) => DropdownMenuItem(
+                                      value: c,
+                                      child: SizedBox(
+                                        width: 235,
+                                        child: Text(
+                                          c,
+                                          overflow: TextOverflow.ellipsis,
                                         ),
                                       ),
                                     ),
-                                    if ('${j['url'] ?? ''}'.startsWith(
-                                      'https://elearning.fudan.edu.cn/',
-                                    ))
-                                      TextButton(
-                                        onPressed: () => openPlainLink(
-                                          context,
-                                          '${j['url']}',
-                                        ),
-                                        child: Text(l10n.nasViewSource),
-                                      ),
-                                  ],
+                                  ),
+                                ],
+                                onChanged: (v) => setState(() {
+                                  course = v ?? '';
+                                  selected = true;
+                                }),
+                              ),
+                              SizedBox(
+                                width: 220,
+                                child: TextField(
+                                  decoration: InputDecoration(
+                                    isDense: true,
+                                    prefixIcon: const Icon(
+                                      Icons.search_rounded,
+                                      size: 18,
+                                    ),
+                                    hintText: l10n.nasSearch,
+                                    border: const OutlineInputBorder(),
+                                  ),
+                                  onChanged: (v) => setState(() => query = v),
                                 ),
-                                if (nasRows(j['reports']).isEmpty)
-                                  Text(l10n.nasNoReport),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  ListView(
-                    padding: const EdgeInsets.all(20),
-                    children: deadlines
-                        .map(
-                          (d) => Card(
-                            child: ListTile(
-                              leading: Icon(
-                                d['completed'] == 'true'
-                                    ? Icons.check_circle_outline
-                                    : Icons.event_outlined,
                               ),
-                              title: Text('${d['title']}'),
-                              subtitle: Text(
-                                '${dateLabel(d['due'])}\n${d['completed'] == 'true' ? l10n.nasDeadlineCompleted : l10n.nasUnconfirmed}',
-                              ),
-                              onTap:
-                                  '${d['url'] ?? ''}'.startsWith(
-                                    'https://elearning.fudan.edu.cn/',
-                                  )
-                                  ? () => openPlainLink(context, '${d['url']}')
-                                  : null,
-                            ),
-                          ),
-                        )
-                        .toList(),
-                  ),
-                  ListView.builder(
-                    padding: const EdgeInsets.all(20),
-                    itemCount: shownFiles.length,
-                    itemBuilder: (c, i) {
-                      final f = shownFiles[i];
-                      return ListTile(
-                        leading: const Icon(Icons.insert_drive_file_outlined),
-                        title: Text('${f['path']}'.split('/').last),
-                        subtitle: Text(
-                          '${f['path']}\n${f['modified']} · ${((f['size'] as num) / 1024).round()} KB',
-                        ),
-                        onTap: () => openFile(f),
-                      );
-                    },
-                  ),
-                  ListView(
-                    padding: const EdgeInsets.all(20),
-                    children: [
-                      Text(l10n.nasServicesHint),
-                      const SizedBox(height: 12),
-                      Wrap(
-                        spacing: 12,
-                        runSpacing: 8,
-                        children: [
-                          FilledButton.icon(
-                            onPressed: acting || data?['online'] != true
-                                ? null
-                                : () => run('homework'),
-                            icon: const Icon(Icons.play_arrow),
-                            label: Text(l10n.nasRunHomework),
-                          ),
-                          OutlinedButton.icon(
-                            onPressed: acting || data?['online'] != true
-                                ? null
-                                : () => run('calendar'),
-                            icon: const Icon(Icons.event_repeat),
-                            label: Text(l10n.nasRunCalendar),
+                              if (course.isNotEmpty)
+                                DropdownButton<String>(
+                                  value: appCourses.any((c) => c.id == linked)
+                                      ? linked
+                                      : '',
+                                  underline: const SizedBox.shrink(),
+                                  hint: Text(l10n.nasLinkCourse),
+                                  items: [
+                                    DropdownMenuItem(
+                                      value: '',
+                                      child: Text(l10n.nasUnlinked),
+                                    ),
+                                    ...appCourses.map(
+                                      (c) => DropdownMenuItem(
+                                        value: c.id,
+                                        child: Text(c.title),
+                                      ),
+                                    ),
+                                  ],
+                                  onChanged: (v) => linkCourse(v ?? ''),
+                                ),
+                              if (linked.isNotEmpty)
+                                TextButton.icon(
+                                  onPressed: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          CoursePage(courseId: linked),
+                                    ),
+                                  ),
+                                  icon: const Icon(
+                                    Icons.play_circle_outline,
+                                    size: 18,
+                                  ),
+                                  label: Text(l10n.nasOpenRecording),
+                                ),
+                            ],
                           ),
                         ],
                       ),
-                      ...nasRows(data?['services']).map((s) {
-                        final h = (s['health'] as Map?) ?? {};
-                        return Card(
-                          child: ListTile(
-                            title: Text(serviceName('${s['id']}')),
-                            subtitle: Text(
-                              '${l10n.nasServiceState}: ${s['active']} · ${s['result'] ?? ''}\n${l10n.nasLastRun}: ${dateLabel(h['finished'])}\n${l10n.nasScanResult}: ${h['jobs'] ?? '—'} / ${h['failures'] ?? '—'}\n${l10n.nasNextRun}: ${s['next_run'] ?? '—'}',
-                            ),
+                    ),
+                    TabBar(
+                      isScrollable: true,
+                      tabAlignment: TabAlignment.start,
+                      tabs: [
+                        Tab(text: '${l10n.nasHomework} (${jobs.length})'),
+                        Tab(text: '${l10n.nasDeadlines} (${deadlines.length})'),
+                        Tab(text: l10n.nasMaterials),
+                        Tab(text: l10n.nasServices),
+                      ],
+                    ),
+                    Expanded(
+                      child: TabBarView(
+                        children: [
+                          _tab(
+                            context,
+                            jobs.isEmpty,
+                            icon: Icons.assignment_outlined,
+                            title: l10n.nasEmptyHomework,
+                            body: l10n.nasEmptyHomeworkBody,
+                            online: online,
+                            children: [
+                              Padding(
+                                padding: const EdgeInsets.only(
+                                  bottom: Space.sm,
+                                ),
+                                child: Text(
+                                  l10n.nasSeparateStates,
+                                  style: tt.bodySmall?.copyWith(
+                                    color: cs.onSurfaceVariant,
+                                  ),
+                                ),
+                              ),
+                              ...jobs.map((j) => _jobCard(context, j)),
+                            ],
                           ),
-                        );
-                      }),
-                    ],
-                  ),
-                ],
+                          _tab(
+                            context,
+                            deadlines.isEmpty,
+                            icon: Icons.event_available_outlined,
+                            title: l10n.nasEmptyDeadlines,
+                            body: l10n.nasEmptyDeadlinesBody,
+                            online: online,
+                            children: deadlines
+                                .map(
+                                  (d) => Card(
+                                    margin: const EdgeInsets.only(
+                                      bottom: Space.sm,
+                                    ),
+                                    child: ListTile(
+                                      leading: Icon(
+                                        d['completed'] == 'true'
+                                            ? Icons.check_circle_outline
+                                            : Icons.event_outlined,
+                                      ),
+                                      title: Text('${d['title']}'),
+                                      subtitle: Text(
+                                        '${dateLabel(d['due'])}\n${d['completed'] == 'true' ? l10n.nasDeadlineCompleted : l10n.nasUnconfirmed}',
+                                      ),
+                                      onTap:
+                                          '${d['url'] ?? ''}'.startsWith(
+                                            'https://elearning.fudan.edu.cn/',
+                                          )
+                                          ? () => openPlainLink(
+                                              context,
+                                              '${d['url']}',
+                                            )
+                                          : null,
+                                    ),
+                                  ),
+                                )
+                                .toList(),
+                          ),
+                          _tab(
+                            context,
+                            shownFiles.isEmpty,
+                            icon: Icons.folder_open_outlined,
+                            title: filesError.isEmpty
+                                ? l10n.nasEmptyMaterials
+                                : l10n.nasFilesUnavailable,
+                            body: filesError.isEmpty
+                                ? l10n.nasEmptyMaterialsBody
+                                : filesError,
+                            action: TextButton.icon(
+                              onPressed: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const FolderSyncPage(),
+                                ),
+                              ),
+                              icon: const Icon(Icons.folder_copy_outlined),
+                              label: Text(l10n.nasOpenSync),
+                            ),
+                            online: online,
+                            children: [
+                              for (final f in shownFiles)
+                                Card(
+                                  margin: const EdgeInsets.only(
+                                    bottom: Space.xs,
+                                  ),
+                                  child: ListTile(
+                                    leading: Icon(
+                                      f['available'] == false
+                                          ? Icons.cloud_off_outlined
+                                          : Icons.insert_drive_file_outlined,
+                                    ),
+                                    title: Text('${f['path']}'.split('/').last),
+                                    subtitle: Text(
+                                      '${f['path']}\n${f['modified']} · ${((f['size'] as num) / 1024).round()} KB',
+                                    ),
+                                    onTap: () => openFile(f),
+                                  ),
+                                ),
+                            ],
+                          ),
+                          ListView(
+                            padding: const EdgeInsets.all(Space.lg),
+                            children: [
+                              Text(
+                                l10n.nasServicesOptional,
+                                style: tt.bodyMedium?.copyWith(
+                                  color: cs.onSurfaceVariant,
+                                ),
+                              ),
+                              const SizedBox(height: Space.md),
+                              Wrap(
+                                spacing: Space.sm,
+                                runSpacing: Space.sm,
+                                children: [
+                                  FilledButton.icon(
+                                    onPressed: acting || !online
+                                        ? null
+                                        : () => run('homework'),
+                                    icon: const Icon(Icons.play_arrow_rounded),
+                                    label: Text(l10n.nasRunHomework),
+                                  ),
+                                  OutlinedButton.icon(
+                                    onPressed: acting || !online
+                                        ? null
+                                        : () => run('calendar'),
+                                    icon: const Icon(
+                                      Icons.event_repeat_rounded,
+                                    ),
+                                    label: Text(l10n.nasRunCalendar),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: Space.md),
+                              ...nasRows(data?['services']).map((s) {
+                                final h = (s['health'] as Map?) ?? {};
+                                return Card(
+                                  margin: const EdgeInsets.only(
+                                    bottom: Space.sm,
+                                  ),
+                                  child: ListTile(
+                                    title: Text(serviceName('${s['id']}')),
+                                    subtitle: Text(
+                                      '${l10n.nasServiceState}: ${s['active']} · ${s['result'] ?? ''}\n${l10n.nasLastRun}: ${dateLabel(h['finished'])}\n${l10n.nasScanResult}: ${h['jobs'] ?? '—'} / ${h['failures'] ?? '—'}\n${l10n.nasNextRun}: ${s['next_run'] ?? '—'}',
+                                    ),
+                                  ),
+                                );
+                              }),
+                              if (error != null || data?['error'] != null)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: Space.sm),
+                                  child: Text(
+                                    error ?? '${data!['error']}',
+                                    style: tt.bodySmall?.copyWith(
+                                      color: cs.error,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// A tab body that explains itself when empty instead of rendering a blank
+  /// list, and never blocks on the optional NAS service.
+  Widget _tab(
+    BuildContext context,
+    bool empty, {
+    required IconData icon,
+    required String title,
+    required String body,
+    required bool online,
+    required List<Widget> children,
+    Widget? action,
+  }) {
+    final cs = Theme.of(context).colorScheme, tt = Theme.of(context).textTheme;
+    return ListView(
+      padding: const EdgeInsets.all(Space.lg),
+      children: [
+        if (empty)
+          Padding(
+            padding: const EdgeInsets.only(top: Space.xl),
+            child: Column(
+              children: [
+                Icon(icon, size: 40, color: cs.outline),
+                const SizedBox(height: Space.md),
+                Text(title, style: tt.titleMedium, textAlign: TextAlign.center),
+                const SizedBox(height: Space.xs),
+                Text(
+                  body,
+                  textAlign: TextAlign.center,
+                  style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+                ),
+                if (action != null) ...[
+                  const SizedBox(height: Space.md),
+                  action,
+                ],
+              ],
+            ),
+          )
+        else
+          ...children,
+      ],
+    );
+  }
+
+  Widget _jobCard(BuildContext context, Map<String, dynamic> j) {
+    final tt = Theme.of(context).textTheme;
+    return Card(
+      margin: const EdgeInsets.only(bottom: Space.sm),
+      child: Padding(
+        padding: const EdgeInsets.all(Space.lg),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('${j['name']}', style: tt.titleMedium),
+            Text(
+              '${j['course']}',
+              style: tt.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+            Text(
+              '${stateName('${j['generation_state']}')} · ${j['submission_state'] == 'submitted' ? l10n.nasSubmitted : l10n.nasUnconfirmed}',
+            ),
+            if (j['due_at'] != null)
+              Text(
+                '${l10n.nasDue}: ${DateTime.tryParse('${j['due_at']}')?.toLocal() ?? j['due_at']}',
+              ),
+            if (j['reason'] == 'execution_timeout') Text(l10n.nasTimeout),
+            if (j['reason'] == 'needs_attention') Text(l10n.nasNeedsInput),
+            Builder(
+              builder: (tabContext) => TextButton.icon(
+                icon: const Icon(Icons.folder_open_outlined),
+                label: Text(l10n.nasRelatedFiles),
+                onPressed: () {
+                  setState(() {
+                    course = '${j['course']}';
+                    query = '';
+                  });
+                  DefaultTabController.of(tabContext).animateTo(2);
+                },
+              ),
+            ),
+            Wrap(
+              spacing: Space.sm,
+              children: [
+                ...nasRows(j['reports']).map(
+                  (f) => TextButton.icon(
+                    onPressed: f['available'] == true
+                        ? () => openFile(f)
+                        : null,
+                    icon: const Icon(Icons.description_outlined, size: 18),
+                    label: Text('${f['path']}'.split('/').last),
+                  ),
+                ),
+                if ('${j['url'] ?? ''}'.startsWith(
+                  'https://elearning.fudan.edu.cn/',
+                ))
+                  TextButton(
+                    onPressed: () => openPlainLink(context, '${j['url']}'),
+                    child: Text(l10n.nasViewSource),
+                  ),
+              ],
+            ),
+            if (nasRows(j['reports']).isEmpty) Text(l10n.nasNoReport),
           ],
         ),
       ),

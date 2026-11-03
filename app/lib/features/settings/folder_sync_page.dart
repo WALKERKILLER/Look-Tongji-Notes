@@ -1,35 +1,37 @@
 import 'dart:async';
-import 'dart:io';
+import 'dart:convert';
 
-import 'package:file_selector/file_selector.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/api.dart';
 import '../../core/app_state.dart';
-import '../../core/android_bridge.dart';
+import '../../l10n/l10n.dart';
+import '../../theme/tokens.dart';
+import 'settings_common.dart';
 
-/// Course-scoped portable library; transport delivery is owned by Syncthing.
+/// Course-scoped portable library, carried by the NAS's WebDAV server.
+/// Contract: docs/specs/0023-course-folder-sync.md.
 class FolderSyncPage extends StatefulWidget {
-  const FolderSyncPage({super.key, this.api, this.chooseFolder});
+  const FolderSyncPage({super.key, this.api});
   final ApiCall? api;
-  final Future<Map<String, dynamic>?> Function()? chooseFolder;
   @override
   State<FolderSyncPage> createState() => _FolderSyncPageState();
 }
 
 class _FolderSyncPageState extends State<FolderSyncPage>
     with WidgetsBindingObserver {
-  Map<String, dynamic> _status = {},
-      _location = {},
-      _courses = {},
-      _preview = {};
+  Map<String, dynamic> _status = {}, _courses = {};
   final Set<String> _selected = {};
-  bool _busy = false, _media = true, _auto = true;
+  final _url = TextEditingController(),
+      _user = TextEditingController(),
+      _pass = TextEditingController(),
+      _folder = TextEditingController();
+  bool _busy = false, _media = true, _auto = true, _obscure = true;
   String? _error;
   Timer? _poll;
   ApiCall get _call => widget.api ?? context.read<AppState>().api.call;
+
   @override
   void initState() {
     super.initState();
@@ -42,6 +44,10 @@ class _FolderSyncPageState extends State<FolderSyncPage>
   void dispose() {
     _poll?.cancel();
     WidgetsBinding.instance.removeObserver(this);
+    _url.dispose();
+    _user.dispose();
+    _pass.dispose();
+    _folder.dispose();
     super.dispose();
   }
 
@@ -50,83 +56,64 @@ class _FolderSyncPageState extends State<FolderSyncPage>
     if (state == AppLifecycleState.resumed) unawaited(_run());
   }
 
+  Map<String, dynamic> _settings() => {
+    'kind': 'folder',
+    'url': _url.text.trim(),
+    'user': _user.text.trim(),
+    if (_pass.text.isNotEmpty) 'password': _pass.text,
+    'folder': _folder.text.trim(),
+    'course_ids': _selected.toList()..sort(),
+    'media': _media,
+    'auto': _auto,
+  };
+
   Future<void> _load() async {
     try {
       final s = Map<String, dynamic>.from(
         await _call('GET', '/api/sync') as Map,
       );
       if (!mounted) return;
+      // The page polls while it is open; rebuild only when the daemon actually
+      // reported something new so idle polling does not repaint the form.
+      if (_status.isNotEmpty && jsonEncode(s) == jsonEncode(_status)) return;
       setState(() {
         _status = s;
-        if (_location.isEmpty &&
-            s['kind'] == 'folder' &&
-            s['configured'] == true) {
-          _location = {'local_folder': s['local_folder']};
-          _selected.addAll((s['course_ids'] as List? ?? []).cast<String>());
+        if (_url.text.isEmpty && '${s['url'] ?? ''}'.isNotEmpty) {
+          _url.text = '${s['url']}';
+          _user.text = '${s['user'] ?? ''}';
+          _folder.text = '${s['folder'] ?? ''}';
           _media = s['media'] == true;
           _auto = s['auto'] == true;
+          if (s['kind'] == 'folder') {
+            _selected.addAll((s['course_ids'] as List? ?? []).cast<String>());
+          }
         }
       });
-      if (_courses.isEmpty) {
-        final p = Map<String, dynamic>.from(
-          await _call('POST', '/api/sync/folder/preview', {
-            'course_ids': _selected.toList(),
-            'media': _media,
-          }) as Map,
-        );
-        if (mounted)
-          setState(
-            () => _courses = Map<String, dynamic>.from(
-              p['courses'] as Map? ?? {},
-            ),
-          );
-      }
+      if (_courses.isEmpty && _selected.isNotEmpty) await _preview();
     } catch (e) {
       if (mounted) setState(() => _error = '$e');
     }
   }
 
-  Map<String, dynamic> _settings() => {
-    'kind': 'folder',
-    ..._location,
-    'course_ids': _selected.toList()..sort(),
-    'media': _media,
-    'auto': _auto,
-  };
-  Future<void> _pick() async {
+  Future<Map<String, dynamic>> _preview() async {
+    final p = Map<String, dynamic>.from(
+      await _call('POST', '/api/sync/folder/preview', _settings()) as Map,
+    );
+    if (mounted) {
+      setState(() {
+        _courses = Map<String, dynamic>.from(p['courses'] as Map? ?? {});
+      });
+    }
+    return p;
+  }
+
+  Future<void> _refreshCourses() async {
     setState(() {
       _busy = true;
       _error = null;
     });
     try {
-      Map<String, dynamic>? location;
-      if (widget.chooseFolder != null) {
-        location = await widget.chooseFolder!();
-      } else if (!kIsWeb && Platform.isAndroid) {
-        location = await AndroidBridge.pickSyncFolder();
-      } else if (!kIsWeb) {
-        final p = await getDirectoryPath(
-          confirmButtonText: '选择 LookStudioSync 文件夹',
-        );
-        if (p != null) location = {'local_folder': p};
-      } else {
-        throw StateError('请在桌面或安卓应用中选择同步目录');
-      }
-      if (location == null) return;
-      final p = Map<String, dynamic>.from(
-        await _call('POST', '/api/sync/folder/preview', {
-          'kind': 'folder',
-          ...location,
-          'course_ids': _selected.toList(),
-          'media': _media,
-        }) as Map,
-      );
-      if (mounted)
-        setState(() {
-          _location = location!;
-          _preview = p;
-          _courses = Map<String, dynamic>.from(p['courses'] as Map? ?? {});
-        });
+      await _preview();
     } catch (e) {
       if (mounted) setState(() => _error = '$e');
     } finally {
@@ -134,43 +121,50 @@ class _FolderSyncPageState extends State<FolderSyncPage>
     }
   }
 
+  /// A stored password is reused when the field is left empty, so only a first
+  /// connection has to type it.
+  bool get _ready =>
+      _url.text.trim().length > 8 &&
+      _user.text.trim().isNotEmpty &&
+      (_pass.text.isNotEmpty ||
+          (_status['has_password'] == true && _status['kind'] == 'folder')) &&
+      _selected.isNotEmpty;
+
   Future<void> _connect() async {
     setState(() {
       _busy = true;
       _error = null;
     });
     try {
-      if (!kIsWeb &&
-          Platform.isAndroid &&
-          !_location.containsKey('bridge_token')) {
-        final b = await AndroidBridge.syncFolderBridge();
-        if (b != null) _location = b;
-      }
-      final preview = Map<String, dynamic>.from(
-        await _call('POST', '/api/sync/folder/preview', _settings()) as Map,
-      );
+      final preview = await _preview();
       if (!mounted) return;
+      final mb = ((preview['bytes'] as num? ?? 0) / 1000000).toStringAsFixed(1);
+      final remoteMb = ((preview['incoming_bytes'] as num? ?? 0) / 1000000)
+          .toStringAsFixed(1);
       final ok = await showDialog<bool>(
         context: context,
         builder: (c) => AlertDialog(
-          title: const Text('接入同步资料库'),
+          title: Text(l10n.folderSyncConfirmTitle),
           content: Text(
-            '所选 ${_selected.length} 门课程；本机待扫描 ${preview['files']} 个文件，约 ${((preview['bytes'] as num? ?? 0) / 1000000).toStringAsFixed(1)} MB。\n\n远端已发布 ${preview['incoming_files'] ?? 0} 个文件，约 ${((preview['incoming_bytes'] as num? ?? 0) / 1000000).toStringAsFixed(1)} MB；传输完成后接收。\n\n合并已有内容，保留冲突副本。视频音频${_media ? '包含' : '不包含'}。学校登录和密钥留在本机。',
+            '${l10n.folderSyncSelected(_selected.length)}\n\n'
+            '${l10n.folderSyncPreview(preview['files'] ?? 0, mb, preview['incoming_files'] ?? 0, remoteMb)}\n\n'
+            '${l10n.folderSyncPrivacy(_media)}',
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(c, false),
-              child: const Text('取消'),
+              child: Text(l10n.commonCancel),
             ),
             FilledButton(
               onPressed: () => Navigator.pop(c, true),
-              child: const Text('接入并同步'),
+              child: Text(l10n.folderSyncConfirm),
             ),
           ],
         ),
       );
       if (ok != true) return;
       await _call('PUT', '/api/sync', _settings());
+      _pass.clear();
       await _run();
     } catch (e) {
       if (mounted) setState(() => _error = '$e');
@@ -181,9 +175,7 @@ class _FolderSyncPageState extends State<FolderSyncPage>
 
   Future<void> _run() async {
     try {
-      if (_status['kind'] == 'folder' || _location.isNotEmpty) {
-        await _call('POST', '/api/sync/run');
-      }
+      if (_status['kind'] == 'folder') await _call('POST', '/api/sync/run');
       await _load();
     } catch (e) {
       if (mounted) setState(() => _error = '$e');
@@ -197,18 +189,18 @@ class _FolderSyncPageState extends State<FolderSyncPage>
       await showDialog<void>(
         context: context,
         builder: (c) => AlertDialog(
-          title: const Text('同步冲突副本'),
+          title: Text(l10n.folderSyncConflicts),
           content: SizedBox(
             width: 620,
             child: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  if (rows.isEmpty) const Text('没有待处理的冲突'),
+                  if (rows.isEmpty) Text(l10n.folderSyncNoConflicts),
                   for (final row in rows)
                     ListTile(
                       title: Text('${row['path']}'),
-                      subtitle: Text('${row['bytes']} 字节'),
+                      subtitle: Text('${row['bytes']} B'),
                       onTap: () => _inspectConflict(
                         Map<String, dynamic>.from(row as Map),
                       ),
@@ -220,7 +212,7 @@ class _FolderSyncPageState extends State<FolderSyncPage>
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(c),
-              child: const Text('关闭'),
+              child: Text(l10n.commonClose),
             ),
           ],
         ),
@@ -238,25 +230,27 @@ class _FolderSyncPageState extends State<FolderSyncPage>
       final action = await showDialog<String>(
         context: context,
         builder: (c) => AlertDialog(
-          title: const Text('保留的另一版本'),
+          title: Text(l10n.folderSyncOtherCopy),
           content: SizedBox(
             width: 650,
             child: SingleChildScrollView(
-              child: SelectableText('${detail['body'] ?? '二进制文件，副本已完整保留。'}'),
+              child: SelectableText(
+                '${detail['body'] ?? l10n.folderSyncBinaryCopy}',
+              ),
             ),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(c),
-              child: const Text('稍后处理'),
+              child: Text(l10n.folderSyncLater),
             ),
             TextButton(
               onPressed: () => Navigator.pop(c, 'keep'),
-              child: const Text('保留当前版'),
+              child: Text(l10n.folderSyncKeepCurrent),
             ),
             FilledButton(
               onPressed: () => Navigator.pop(c, 'restore'),
-              child: const Text('使用此副本'),
+              child: Text(l10n.folderSyncUseThis),
             ),
           ],
         ),
@@ -274,96 +268,225 @@ class _FolderSyncPageState extends State<FolderSyncPage>
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
     final last = Map<String, dynamic>.from(_status['last'] as Map? ?? {});
     final running = _status['running'] == true;
-    return Scaffold(
-      appBar: AppBar(title: const Text('同步文件夹')),
-      body: ListView(
-        padding: const EdgeInsets.all(24),
-        children: [
-          const Text(
-            '连接 Syncthing / NAS 已同步到本机的 LookStudioSync 文件夹。每端保留本地工作库，保存后自动发布；设备之间的传输由同步工具完成。',
-          ),
-          const SizedBox(height: 16),
-          ListTile(
-            leading: const Icon(Icons.folder_shared_outlined),
-            title: Text('${_location['local_folder'] ?? '尚未选择同步文件夹'}'),
-            trailing: OutlinedButton(
-              onPressed: _busy ? null : _pick,
-              child: const Text('选择文件夹'),
+    final on = _status['configured'] == true && _status['kind'] == 'folder';
+    final host = Uri.tryParse(_url.text.trim())?.host ?? '';
+    return SettingsSubpage(
+      title: l10n.folderSyncTitle,
+      children: [
+        IntegrationHeader(
+          mark: Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              color: cs.primaryContainer,
+              borderRadius: BorderRadius.circular(Corners.lg),
+            ),
+            child: Icon(
+              Icons.folder_copy_outlined,
+              size: 30,
+              color: cs.onPrimaryContainer,
             ),
           ),
-          const Text('选择课程'),
-          for (final entry in _courses.entries)
-            CheckboxListTile(
-              title: Text('${entry.value}'),
-              value: _selected.contains(entry.key),
-              onChanged: _busy
-                  ? null
-                  : (v) => setState(() {
-                      if (v == true) {
-                        _selected.add(entry.key);
-                      } else {
-                        _selected.remove(entry.key);
-                      }
-                    }),
+          title: l10n.folderSyncTitle,
+          on: on,
+          status: on && host.isNotEmpty
+              ? l10n.webdavConnectedTo(host)
+              : l10n.commonNotSet,
+          body: l10n.folderSyncBody,
+        ),
+        SettingsGroup(
+          title: l10n.folderSyncAccount,
+          icon: Icons.dns_outlined,
+          children: [
+            const SizedBox(height: Space.xs),
+            TextField(
+              controller: _url,
+              keyboardType: TextInputType.url,
+              autocorrect: false,
+              onChanged: (_) => setState(() => _error = null),
+              decoration: InputDecoration(
+                labelText: l10n.webdavServer,
+                helperText: l10n.folderSyncAccountHint,
+                border: const OutlineInputBorder(),
+              ),
             ),
-          if (_courses.isEmpty)
-            const Padding(
-              padding: EdgeInsets.all(16),
-              child: Text('选择已有同步文件夹后，将列出其中的课程。'),
+            const SizedBox(height: Space.md),
+            TextField(
+              controller: _user,
+              autocorrect: false,
+              decoration: InputDecoration(
+                labelText: l10n.webdavAccount,
+                border: const OutlineInputBorder(),
+              ),
             ),
-          SwitchListTile(
-            title: const Text('包含视频和音频'),
-            subtitle: const Text('操作系统期末速成整课约433MB，保持原始画质'),
-            value: _media,
-            onChanged: _busy ? null : (v) => setState(() => _media = v),
-          ),
-          SwitchListTile(
-            title: const Text('自动检查与发布'),
-            subtitle: const Text('保存后自动发布；接收到文件后自动刷新'),
-            value: _auto,
-            onChanged: _busy ? null : (v) => setState(() => _auto = v),
-          ),
-          if (_preview.isNotEmpty) Text('已识别 ${_courses.length} 门可接入课程'),
-          if (_error != null)
-            Text(
+            const SizedBox(height: Space.md),
+            TextField(
+              controller: _pass,
+              obscureText: _obscure,
+              autocorrect: false,
+              enableSuggestions: false,
+              decoration: InputDecoration(
+                labelText: l10n.webdavAppPassword,
+                helperText: on && _status['has_password'] == true
+                    ? l10n.webdavKeepPassword
+                    : l10n.webdavPasswordSealed,
+                border: const OutlineInputBorder(),
+                suffixIcon: IconButton(
+                  tooltip: _obscure ? l10n.commonShow : l10n.commonHide,
+                  onPressed: () => setState(() => _obscure = !_obscure),
+                  icon: Icon(
+                    _obscure
+                        ? Icons.visibility_outlined
+                        : Icons.visibility_off_outlined,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: Space.md),
+            TextField(
+              controller: _folder,
+              autocorrect: false,
+              decoration: InputDecoration(
+                labelText: l10n.webdavFolder,
+                helperText: l10n.webdavFolderHelper,
+                border: const OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        SettingsGroup(
+          title: l10n.folderSyncCourses,
+          icon: Icons.menu_book_outlined,
+          children: [
+            if (_courses.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: Space.sm),
+                child: Text(
+                  l10n.folderSyncNoCourses,
+                  style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+                ),
+              ),
+            for (final entry in _courses.entries)
+              CheckboxListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text('${entry.value}'),
+                value: _selected.contains(entry.key),
+                onChanged: _busy
+                    ? null
+                    : (v) => setState(() {
+                        if (v == true) {
+                          _selected.add(entry.key);
+                        } else {
+                          _selected.remove(entry.key);
+                        }
+                      }),
+              ),
+            const SizedBox(height: Space.sm),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: OutlinedButton.icon(
+                onPressed: _busy || _url.text.trim().isEmpty
+                    ? null
+                    : _refreshCourses,
+                icon: const Icon(Icons.refresh_rounded),
+                label: Text(l10n.folderSyncRefresh),
+              ),
+            ),
+          ],
+        ),
+        SettingsGroup(
+          title: l10n.folderSyncOptions,
+          icon: Icons.tune_rounded,
+          children: [
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(l10n.webdavMedia),
+              subtitle: Text(l10n.webdavMediaHint),
+              value: _media,
+              onChanged: _busy ? null : (v) => setState(() => _media = v),
+            ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(l10n.commonAutoSync),
+              subtitle: Text(l10n.folderSyncAutoHint),
+              value: _auto,
+              onChanged: _busy ? null : (v) => setState(() => _auto = v),
+            ),
+          ],
+        ),
+        if (_error != null)
+          Padding(
+            padding: const EdgeInsets.only(top: Space.md),
+            child: Text(
               _error!,
-              style: TextStyle(color: Theme.of(context).colorScheme.error),
+              style: tt.bodyMedium?.copyWith(color: cs.error),
             ),
-          if (last['error'] != null && '${last['error']}'.isNotEmpty)
-            Text(
-              '${last['error']}',
-              style: TextStyle(color: Theme.of(context).colorScheme.error),
-            ),
-          if (running)
-            const LinearProgressIndicator()
-          else if (last['at'] != null)
-            Text(
-              '已写入同步文件夹：${last['uploaded'] ?? 0} 项；已接收：${last['downloaded'] ?? 0} 项。其他设备接收状态请查看 Syncthing。',
-            ),
-          const SizedBox(height: 16),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: [
-              FilledButton(
-                onPressed: _busy || _location.isEmpty || _selected.isEmpty
-                    ? null
-                    : _connect,
-                child: const Text('预览并接入'),
-              ),
-              OutlinedButton(
-                onPressed: _busy || running || _status['kind'] != 'folder'
-                    ? null
-                    : _run,
-                child: const Text('立即检查'),
-              ),
-              TextButton(onPressed: _conflicts, child: const Text('查看冲突')),
-            ],
           ),
-        ],
-      ),
+        if (last['error'] != null && '${last['error']}'.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: Space.md),
+            child: Text(
+              '${last['error']}',
+              style: tt.bodyMedium?.copyWith(color: cs.error),
+            ),
+          ),
+        if (running)
+          const Padding(
+            padding: EdgeInsets.only(top: Space.md),
+            child: LinearProgressIndicator(),
+          )
+        else if (last['at'] != null)
+          Padding(
+            padding: const EdgeInsets.only(top: Space.md),
+            child: Text(
+              l10n.folderSyncLastRun(
+                last['uploaded'] ?? 0,
+                last['downloaded'] ?? 0,
+                last['conflicts'] ?? 0,
+              ),
+              style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+            ),
+          ),
+        const SizedBox(height: Space.lg),
+        Wrap(
+          spacing: Space.sm,
+          runSpacing: Space.sm,
+          children: [
+            FilledButton.icon(
+              onPressed: _busy || !_ready ? null : _connect,
+              icon: _busy
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2.5),
+                    )
+                  : const Icon(Icons.cloud_done_outlined),
+              label: Text(l10n.folderSyncConnect),
+            ),
+            OutlinedButton.icon(
+              onPressed: _busy || running || !on ? null : _run,
+              icon: const Icon(Icons.sync_rounded),
+              label: Text(l10n.folderSyncCheck),
+            ),
+            TextButton.icon(
+              onPressed: _conflicts,
+              icon: const Icon(Icons.call_split_rounded),
+              label: Text(l10n.folderSyncConflicts),
+            ),
+          ],
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(Space.xs, Space.lg, Space.xs, 0),
+          child: Text(
+            l10n.webdavPrivacy,
+            style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+          ),
+        ),
+      ],
     );
   }
 }

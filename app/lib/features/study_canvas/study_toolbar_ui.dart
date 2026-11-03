@@ -17,23 +17,25 @@ extension _StudyToolbars on StudyCanvasState {
     Key? key,
     bool selected = false,
     bool compact = false,
-  }) => IconButton(
-    key: key,
-    tooltip: label,
-    onPressed: action,
-    isSelected: selected,
-    style: IconButton.styleFrom(
-      minimumSize: compact ? const Size(32, 32) : const Size(40, 40),
-      padding: EdgeInsets.all(compact ? 5 : 8),
-      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-      backgroundColor: Colors.transparent,
-      foregroundColor: selected
-          ? const Color(0xff0788ff)
-          : const Color(0xff25282d),
-      disabledForegroundColor: const Color(0xffc0c3c7),
-    ),
-    icon: Icon(icon, size: compact ? 20 : 22),
-  );
+  }) {
+    final c = StudyChrome.of(context);
+    return IconButton(
+      key: key,
+      tooltip: label,
+      onPressed: action,
+      isSelected: selected,
+      style: IconButton.styleFrom(
+        minimumSize: compact ? const Size(32, 32) : const Size(40, 40),
+        padding: EdgeInsets.all(compact ? 5 : 8),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        backgroundColor: Colors.transparent,
+        foregroundColor: selected ? c.accent : c.ink,
+        disabledForegroundColor: c.inkFaint,
+      ),
+      icon: Icon(icon, size: compact ? 20 : 22),
+    );
+  }
+
   Widget _divider(bool vertical, {bool compact = false}) => SizedBox(
     width: vertical ? 28 : (compact ? 8 : 16),
     height: vertical ? (compact ? 8 : 16) : 28,
@@ -41,7 +43,7 @@ extension _StudyToolbars on StudyCanvasState {
       child: Container(
         width: vertical ? 28 : 1,
         height: vertical ? 1 : 28,
-        color: const Color(0xffededf0),
+        color: StudyChrome.of(context).line,
       ),
     ),
   );
@@ -247,8 +249,8 @@ extension _StudyToolbars on StudyCanvasState {
                                   borderRadius: BorderRadius.circular(10),
                                   border: Border.all(
                                     color: _paperStyle == entry.key
-                                        ? const Color(0xff0788ff)
-                                        : const Color(0xffd9dade),
+                                        ? StudyChrome.of(context).accent
+                                        : StudyChrome.of(context).line,
                                     width: 1.5,
                                   ),
                                 ),

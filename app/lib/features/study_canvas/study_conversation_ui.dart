@@ -668,6 +668,7 @@ class _ConversationBodyState extends State<_ConversationBody> {
               ),
       );
     final sources = preview?['sources'] as List? ?? [];
+    final chrome = StudyChrome.of(context);
     return Listener(
       onPointerDown: (_) => owner._activeConversation = widget.card.id,
       child: Padding(
@@ -691,7 +692,7 @@ class _ConversationBodyState extends State<_ConversationBody> {
               builder: (_, __, ___) => Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: const Color(0xfff4f1ff),
+                  color: chrome.accentSoft,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Column(
@@ -803,11 +804,11 @@ class _ConversationBodyState extends State<_ConversationBody> {
               child: ListView(
                 children: [
                   if (turns.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 22),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 22),
                       child: Text(
-                        '围绕指定资料持续提问，回答和整理结果都保留在此对话中。',
-                        style: TextStyle(color: Color(0xff7c7c8b)),
+                        l10n.studyConversationEmpty,
+                        style: TextStyle(color: chrome.inkSoft),
                       ),
                     ),
                   for (final raw in turns) ...[

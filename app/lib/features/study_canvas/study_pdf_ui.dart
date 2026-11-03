@@ -98,6 +98,7 @@ class _PDFBodyState extends State<_PDFBody> {
                             card.textBoxes,
                             start,
                             end,
+                            StudyChrome.of(context).accentWash,
                           ),
                         ),
                       ),
@@ -192,9 +193,10 @@ class _PDFBodyState extends State<_PDFBody> {
 }
 
 class _PDFTextHighlight extends CustomPainter {
-  const _PDFTextHighlight(this.boxes, this.start, this.end);
+  const _PDFTextHighlight(this.boxes, this.start, this.end, this.color);
   final List<Map> boxes;
   final int? start, end;
+  final Color color;
   @override
   void paint(Canvas canvas, Size size) {
     if (start == null || end == null) return;
@@ -208,12 +210,15 @@ class _PDFTextHighlight extends CustomPainter {
             (b['w'] as num).toDouble() * size.width,
             (b['h'] as num).toDouble() * size.height,
           ),
-          Paint()..color = const Color(0x555b7fff),
+          Paint()..color = color,
         );
     }
   }
 
   @override
   bool shouldRepaint(covariant _PDFTextHighlight old) =>
-      old.start != start || old.end != end || old.boxes != boxes;
+      old.start != start ||
+      old.end != end ||
+      old.boxes != boxes ||
+      old.color != color;
 }

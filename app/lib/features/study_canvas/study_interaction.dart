@@ -429,8 +429,9 @@ class _InteractionFeedback extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final s = state, d = s.document!;
     Offset screen(Offset p) => p * d.zoom + d.camera;
+    final accent = state.chrome.accent;
     final line = Paint()
-      ..color = const Color(0xff6657d9)
+      ..color = accent
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.5;
     void dash(Path path) {
@@ -447,7 +448,7 @@ class _InteractionFeedback extends CustomPainter {
     final loop = s._erasing ? s._eraserLasso : s._lasso;
     if (loop.length > 1 && !(s._lassoRectangle && !s._erasing)) {
       final path = Path()..addPolygon(loop.map(screen).toList(), true);
-      canvas.drawPath(path, Paint()..color = const Color(0x126657d9));
+      canvas.drawPath(path, Paint()..color = state.chrome.accentWash);
       dash(path);
     } else {
       final r =
@@ -458,7 +459,11 @@ class _InteractionFeedback extends CustomPainter {
         final box = Rect.fromPoints(screen(r.topLeft), screen(r.bottomRight));
         dash(Path()..addRect(box));
         if (s._selectionReady) {
-          canvas.drawCircle(box.bottomRight, 7, Paint()..color = Colors.white);
+          canvas.drawCircle(
+            box.bottomRight,
+            7,
+            Paint()..color = state.chrome.paper,
+          );
           canvas.drawCircle(box.bottomRight, 7, line);
         }
       }
@@ -470,13 +475,13 @@ class _InteractionFeedback extends CustomPainter {
       canvas.drawCircle(
         cursor,
         s._cursorRadius,
-        Paint()..color = Colors.white.withValues(alpha: .24),
+        Paint()..color = state.chrome.paper.withValues(alpha: .24),
       );
       canvas.drawCircle(
         cursor,
         s._cursorRadius,
         Paint()
-          ..color = Colors.white
+          ..color = state.chrome.paper
           ..style = PaintingStyle.stroke
           ..strokeWidth = 3,
       );
@@ -484,12 +489,12 @@ class _InteractionFeedback extends CustomPainter {
         cursor,
         s._cursorRadius,
         Paint()
-          ..color = const Color(0xff455269)
+          ..color = state.chrome.inkSoft
           ..style = PaintingStyle.stroke
           ..strokeWidth = 1.3,
       );
       if (s._temporaryEraser)
-        canvas.drawCircle(cursor, 2, Paint()..color = const Color(0xff6657d9));
+        canvas.drawCircle(cursor, 2, Paint()..color = accent);
     }
   }
 

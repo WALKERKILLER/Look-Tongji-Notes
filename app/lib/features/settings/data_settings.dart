@@ -332,15 +332,15 @@ class _DataSettingsState extends State<DataSettings> {
           ],
         ),
         SettingsGroup(
-          title: '同步文件夹',
-          icon: Icons.folder_shared_outlined,
+          title: l10n.folderSyncSettingsGroup,
+          icon: Icons.folder_copy_outlined,
           children: [
             ListTile(
-              title: const Text('Syncthing / NAS 同步资料库'),
+              title: Text(l10n.folderSyncTitle),
               subtitle: Text(
                 _sync['kind'] == 'folder'
-                    ? '${_sync['local_folder']}'
-                    : '选择课程，在多台设备间同步学习成果',
+                    ? '${_sync['url'] ?? ''}'
+                    : l10n.folderSyncSubtitle,
               ),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => Navigator.of(context)
