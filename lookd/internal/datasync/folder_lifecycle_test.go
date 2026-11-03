@@ -272,3 +272,73 @@ func TestFolderDuplicateSessionWithoutRenameTombstoneIsRejected(t *testing.T) {
 		t.Fatal("partially installed ambiguous rename")
 	}
 }
+
+func TestFolderInvalidGlobalIndexCannotPublishSessionDeletion(t *testing.T) {
+	for _, broken := range []string{"null", "[]", `{"s1":null}`} {
+		t.Run(broken, func(t *testing.T) {
+			a, b, remote, old, body := folderChatFixture(t)
+			manifest := filepath.Join(remote, "devices", a.cfg.DeviceID+".json")
+			before, err := os.ReadFile(manifest)
+			if err != nil {
+				t.Fatal(err)
+			}
+			writeFolderTest(t, a.Roots.Data, "agent/sessions-meta.json", broken)
+			if _, err := a.Sync(context.Background()); err == nil {
+				t.Fatal("invalid index became an empty export")
+			}
+			after, err := os.ReadFile(manifest)
+			if err != nil || string(before) != string(after) {
+				t.Fatal("corrupt metadata changed published generation")
+			}
+			runFolderTest(t, b)
+			assertFolderBytes(t, b.Roots.Data, old, body)
+		})
+	}
+}
+
+func TestFolderRemovedCourseDoesNotPoisonLaterRounds(t *testing.T) {
+	remote := t.TempDir()
+	a, ar := folderFixture(t)
+	b, br := folderFixture(t)
+	writeFolderTest(t, ar, "courses/pilot/course.json", `{"id":"local-pilot"}`)
+	writeFolderTest(t, ar, "courses/pilot/note.md", "remove with course")
+	configureTest(t, a, remote)
+	configureTest(t, b, remote)
+	runFolderTest(t, a)
+	runFolderTest(t, b)
+	runFolderTest(t, a)
+	// Simulate upgrading a private baseline written before course ownership
+	// was recorded. A normal round must migrate it while the marker exists.
+	for _, dev := range []*Service{a, b} {
+		bases, err := filepath.Glob(filepath.Join(dev.Roots.Data, "folder-base-*.json"))
+		if err != nil || len(bases) != 1 {
+			t.Fatal(bases, err)
+		}
+		raw, err := os.ReadFile(bases[0])
+		if err != nil {
+			t.Fatal(err)
+		}
+		var old map[string]json.RawMessage
+		if err := json.Unmarshal(raw, &old); err != nil {
+			t.Fatal(err)
+		}
+		delete(old, "courses")
+		raw, _ = json.Marshal(old)
+		if err := os.WriteFile(bases[0], raw, 0600); err != nil {
+			t.Fatal(err)
+		}
+		runFolderTest(t, dev)
+	}
+	if err := os.RemoveAll(filepath.Join(ar, "courses/pilot")); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 3; i++ {
+		runFolderTest(t, a)
+		runFolderTest(t, b)
+	}
+	for _, root := range []string{ar, br} {
+		if _, err := os.Stat(filepath.Join(root, "courses/pilot/note.md")); !os.IsNotExist(err) {
+			t.Fatal("course content reappeared", err)
+		}
+	}
+}

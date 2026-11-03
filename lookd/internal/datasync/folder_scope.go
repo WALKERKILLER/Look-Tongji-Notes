@@ -75,7 +75,7 @@ func (s *Service) folderExtras(ctx context.Context, ids []string, tracked map[st
 				CourseID string `json:"course_id"`
 			} `json:"quiz"`
 		}
-		if err := readFolderJSON(abs, &v); err != nil {
+		if err := ReadFolderIndex(abs, &v); err != nil {
 			if trackedAbs[abs] {
 				return nil, err
 			}
@@ -87,17 +87,18 @@ func (s *Service) folderExtras(ctx context.Context, ids []string, tracked map[st
 			}
 		}
 	}
-	meta := map[string]map[string]any{}
 	metaPath := filepath.Join(s.Roots.Data, "agent", "sessions-meta.json")
-	if err := readFolderJSON(metaPath, &meta); err != nil {
+	meta, err := ReadFolderSessionMetadata(metaPath)
+	if err != nil {
 		if !errors.Is(err, os.ErrNotExist) {
 			return nil, err
 		}
+		meta = map[string]map[string]any{}
 		// Recover a first import interrupted before the server indexed it.
 		for _, course := range ids {
 			cached := filepath.Join(s.Roots.Data, "agent", "course-sessions", course+".json")
-			var entries map[string]map[string]any
-			if err := readFolderJSON(cached, &entries); err != nil {
+			entries, err := ReadFolderSessionMetadata(cached)
+			if err != nil {
 				if errors.Is(err, os.ErrNotExist) {
 					continue
 				}
@@ -237,7 +238,7 @@ func validateFolderDocument(p, staged string, dirs map[string]string) error {
 			CourseID string `json:"course_id"`
 		} `json:"quiz"`
 	}
-	if err := readFolderJSON(staged, &v); err != nil {
+	if err := ReadFolderIndex(staged, &v); err != nil {
 		return errors.New("同步索引文档格式无效或超过 32 MiB")
 	}
 	if name == "course.json" {

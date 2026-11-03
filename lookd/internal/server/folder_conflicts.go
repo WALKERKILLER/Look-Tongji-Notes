@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -42,7 +43,10 @@ func (s *Server) folderConflicts(_ http.ResponseWriter, r *http.Request) (any, e
 	if e != nil {
 		return nil, e
 	}
-	resolved := s.resolvedFolderConflicts()
+	resolved, e := s.resolvedFolderConflicts()
+	if e != nil {
+		return nil, e
+	}
 	out := []map[string]any{}
 	for id, p := range paths {
 		if resolved[id] {
@@ -57,16 +61,22 @@ func (s *Server) folderConflicts(_ http.ResponseWriter, r *http.Request) (any, e
 	}
 	return out, nil
 }
-func fileDigest(p string) string {
-	f, e := os.Open(p)
-	if e != nil {
-		return ""
+func fileDigest(p string) (string, error) {
+	f, err := os.Open(p)
+	if errors.Is(err, os.ErrNotExist) {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
 	}
 	defer f.Close()
 	h := sha256.New()
-	io.Copy(h, f)
-	return hex.EncodeToString(h.Sum(nil))
+	if _, err := io.Copy(h, f); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(h.Sum(nil)), nil
 }
+
 func (s *Server) folderConflict(_ http.ResponseWriter, r *http.Request) (any, error) {
 	paths, e := s.folderConflictPaths()
 	if e != nil {
@@ -131,7 +141,11 @@ func (s *Server) folderConflict(_ http.ResponseWriter, r *http.Request) (any, er
 		}
 		defer f.Close()
 		b, e := io.ReadAll(io.LimitReader(f, 1<<20))
-		return map[string]any{"body": string(b), "current_hash": fileDigest(target)}, e
+		if e != nil {
+			return nil, e
+		}
+		hash, e := fileDigest(target)
+		return map[string]any{"body": string(b), "current_hash": hash}, e
 	}
 	var in struct {
 		Action       string `json:"action"`
@@ -140,31 +154,77 @@ func (s *Server) folderConflict(_ http.ResponseWriter, r *http.Request) (any, er
 	if e := decode(r, &in); e != nil {
 		return nil, e
 	}
-	if in.ExpectedHash != fileDigest(target) {
-		return nil, apiError{409, "当前版本已改变，请重新查看"}
-	}
-	if in.Action == "keep" {
-		return ok(), s.markFolderConflict(r.PathValue("conflict"))
-	}
-	if in.Action != "restore" {
+	if in.Action != "keep" && in.Action != "restore" {
 		return nil, badRequest("无效的处理方式")
 	}
-	if st, e := os.Stat(target); e == nil && st.Mode().IsRegular() {
-		backup := filepath.Join(s.Lib.Root, datasync.ConflictDir, "manual-"+time.Now().Format("20060102-150405.000"), filepath.Join(parts[1:]...))
-		os.MkdirAll(filepath.Dir(backup), 0700)
-		if e = copyConflict(target, backup); e != nil {
-			return nil, e
+	// Serialize restore with local saves and received-file application. Check the
+	// expected revision and ownership inside the same lock as the replacement.
+	restored := false
+	e = s.Lib.ApplySyncFiles(func() error {
+		if err := r.Context().Err(); err != nil {
+			return err
+		}
+		if err := guardConflictTarget(targetRoot, target); err != nil {
+			return err
+		}
+		current, err := fileDigest(target)
+		if err != nil {
+			return err
+		}
+		if in.ExpectedHash != current {
+			return apiError{409, "当前版本已改变，请重新查看"}
+		}
+		if in.Action == "keep" {
+			return s.markFolderConflict(r.PathValue("conflict"))
+		}
+		folderCopy := parts[1] == "library" || parts[1] == "course-data" || strings.HasPrefix(parts[0], "folder-")
+		if folderCopy && (s.Data == nil || s.Data.Status().Kind != "folder") {
+			return badRequest("请先接入同步文件夹并选择此课程，再恢复副本")
+		}
+		if s.Data != nil && s.Data.Status().Kind == "folder" {
+			logical := filepath.ToSlash(filepath.Join(parts[1:]...))
+			if parts[1] != "library" && parts[1] != "course-data" {
+				logical = "library/" + filepath.ToSlash(relative)
+			}
+			if err := s.Data.ValidateFolderRestore(r.Context(), logical, p); err != nil {
+				return err
+			}
+		}
+		// Validate the acknowledgement index before replacing any working file.
+		if _, err := s.resolvedFolderConflicts(); err != nil {
+			return err
+		}
+		if current != "" {
+			backup := filepath.Join(s.Lib.Root, datasync.ConflictDir, "manual-"+time.Now().Format("20060102-150405.000000000"), filepath.Join(parts[1:]...))
+			if err := guardConflictTarget(s.Lib.Root, backup); err != nil {
+				return err
+			}
+			if err := copyConflict(target, backup); err != nil {
+				return err
+			}
+		}
+		if err := copyConflict(p, target); err != nil {
+			return err
+		}
+		restored = true
+		return s.markFolderConflict(r.PathValue("conflict"))
+	})
+	// The working file is installed even if recording its acknowledgement fails.
+	// Refresh it after releasing the library lock, including on client disconnect.
+	if restored {
+		refreshCtx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), 30*time.Second)
+		s.DataArrived(refreshCtx, true, dataChanged)
+		cancel()
+		if s.Data != nil {
+			s.Data.Soon(s.Ctx)
 		}
 	}
-	if e = copyConflict(p, target); e != nil {
+	if e != nil {
 		return nil, e
 	}
-	s.DataArrived(r.Context(), true, dataChanged)
-	if s.Data != nil {
-		s.Data.Soon(s.Ctx)
-	}
-	return ok(), s.markFolderConflict(r.PathValue("conflict"))
+	return ok(), nil
 }
+
 func copyConflict(src, dst string) error {
 	if src == dst {
 		return errors.New("路径相同")
@@ -183,7 +243,9 @@ func copyConflict(src, dst string) error {
 	}
 	defer os.Remove(w.Name())
 	_, e = io.Copy(w, r)
-	w.Close()
+	if closeErr := w.Close(); e == nil {
+		e = closeErr
+	}
 	if e != nil {
 		return e
 	}
@@ -219,29 +281,29 @@ func (s *Server) folderDraft(_ http.ResponseWriter, r *http.Request) (any, error
 	return ok(), nil
 }
 
-func (s *Server) resolvedFolderConflicts() map[string]bool {
+func (s *Server) resolvedFolderConflicts() (map[string]bool, error) {
 	out := map[string]bool{}
 	if s.Data == nil {
-		return out
+		return out, nil
 	}
-	b, e := os.ReadFile(filepath.Join(s.Data.Roots.Data, "folder-conflicts-resolved.json"))
-	if e == nil {
-		json.Unmarshal(b, &out)
+	err := datasync.ReadFolderIndex(filepath.Join(s.Data.Roots.Data, "folder-conflicts-resolved.json"), &out)
+	if errors.Is(err, os.ErrNotExist) {
+		return out, nil
 	}
-	return out
+	return out, err
 }
 func (s *Server) markFolderConflict(id string) error {
 	if s.Data == nil {
 		return nil
 	}
-	out := s.resolvedFolderConflicts()
-	out[id] = true
-	b, e := json.Marshal(out)
-	if e != nil {
-		return e
+	out, err := s.resolvedFolderConflicts()
+	if err != nil {
+		return err
 	}
-	return os.WriteFile(filepath.Join(s.Data.Roots.Data, "folder-conflicts-resolved.json"), b, 0600)
+	out[id] = true
+	return writeFolderIndex(filepath.Join(s.Data.Roots.Data, "folder-conflicts-resolved.json"), out)
 }
+
 func guardConflictTarget(root, p string) error {
 	rel, e := filepath.Rel(root, p)
 	if e != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {

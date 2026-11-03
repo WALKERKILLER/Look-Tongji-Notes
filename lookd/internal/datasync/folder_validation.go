@@ -2,6 +2,7 @@ package datasync
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/hex"
 	"encoding/json"
@@ -88,7 +89,7 @@ func (s *Service) validateFolderCourseDir(id, dir string, dirs map[string]string
 	var c struct {
 		ID string `json:"id"`
 	}
-	if err := readFolderJSON(filepath.Join(abs, "course.json"), &c); err != nil {
+	if err := ReadFolderIndex(filepath.Join(abs, "course.json"), &c); err != nil {
 		return fmt.Errorf("无法确认同步目标课程归属：%w", err)
 	}
 	if c.ID != id {
@@ -97,7 +98,8 @@ func (s *Service) validateFolderCourseDir(id, dir string, dirs map[string]string
 	return nil
 }
 
-func readFolderJSON(p string, v any) (err error) {
+// ReadFolderIndex reads a bounded JSON object, preserving missing-file errors.
+func ReadFolderIndex(p string, v any) (err error) {
 	defer func() {
 		if err != nil {
 			err = fmt.Errorf("读取同步索引 %s：%w", p, err)
@@ -114,6 +116,10 @@ func readFolderJSON(p string, v any) (err error) {
 	}
 	if int64(len(b)) > folderRecordLimit {
 		return errors.New("同步索引文档超过 32 MiB")
+	}
+	b = bytes.TrimSpace(b)
+	if len(b) == 0 || b[0] != '{' {
+		return errors.New("同步索引必须是 JSON 对象，不能是 null 或数组")
 	}
 	return json.Unmarshal(b, v)
 }
@@ -169,7 +175,7 @@ func (s *Service) validateFolderTargets(ctx context.Context, entries map[string]
 		return nil
 	}
 	current := folderSessionMeta{}
-	if err := readFolderJSON(filepath.Join(s.Roots.Data, "agent", "sessions-meta.json"), &current); err != nil && !errors.Is(err, os.ErrNotExist) {
+	if err := ReadFolderIndex(filepath.Join(s.Roots.Data, "agent", "sessions-meta.json"), &current); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return err
 	}
 	owners := map[string]string{}
@@ -184,7 +190,7 @@ func (s *Service) validateFolderTargets(ctx context.Context, entries map[string]
 		}
 		abs, _ := s.folderAbs(p)
 		var meta folderSessionMeta
-		if err := readFolderJSON(abs, &meta); err != nil {
+		if err := ReadFolderIndex(abs, &meta); err != nil {
 			if errors.Is(err, os.ErrNotExist) {
 				continue
 			}
@@ -228,7 +234,7 @@ func (s *Service) validateFolderTargets(ctx context.Context, entries map[string]
 		}
 		course := strings.Split(p, "/")[1]
 		var meta folderSessionMeta
-		if err := readFolderJSON(source(p, v), &meta); err != nil {
+		if err := ReadFolderIndex(source(p, v), &meta); err != nil {
 			return err
 		}
 		for id, m := range meta {
@@ -277,7 +283,7 @@ func (s *Service) validateFolderTargets(ctx context.Context, entries map[string]
 					CourseID string `json:"course_id"`
 				} `json:"quiz"`
 			}
-			if err := readFolderJSON(abs, &doc); err != nil {
+			if err := ReadFolderIndex(abs, &doc); err != nil {
 				return err
 			}
 			if doc.Quiz.CourseID != course {
@@ -323,4 +329,55 @@ func (s *Service) validateFolderTargets(ctx context.Context, entries map[string]
 		}
 	}
 	return nil
+}
+
+// ReadFolderSessionMetadata rejects missing/null entries instead of treating
+// a damaged ownership index as instructions to release sessions.
+func ReadFolderSessionMetadata(p string) (map[string]map[string]any, error) {
+	entries := map[string]map[string]any{}
+	if err := ReadFolderIndex(p, &entries); err != nil {
+		return nil, err
+	}
+	for id, v := range entries {
+		if id == "" || v == nil {
+			return nil, fmt.Errorf("会话索引条目无效：%s", p)
+		}
+	}
+	return entries, nil
+}
+
+// ValidateFolderRestore applies the same scope and ownership checks as an
+// automatic import. The caller holds its working-library write lock.
+func (s *Service) ValidateFolderRestore(ctx context.Context, p, source string) error {
+	dirs, err := s.folderDirs(s.Status().CourseIDs)
+	if err != nil {
+		return err
+	}
+	if !folderScoped(p, dirs) {
+		return errors.New("恢复目标不属于已选择的同步课程")
+	}
+	for id, dir := range dirs {
+		if err := s.validateFolderCourseDir(id, dir, dirs); err != nil {
+			return err
+		}
+	}
+	st, err := os.Stat(source)
+	if err != nil {
+		return err
+	}
+	if !st.Mode().IsRegular() {
+		return errors.New("冲突副本不是普通文件")
+	}
+	hash, err := hashFile(source)
+	if err != nil {
+		return err
+	}
+	entries := map[string]folderEntry{p: {Entry: Entry{Hash: hash, Size: st.Size()}}}
+	if err := validateFolderTransfer(entries, nil); err != nil {
+		return err
+	}
+	if err := validateFolderDocument(p, source, dirs); err != nil {
+		return err
+	}
+	return s.validateFolderTargets(ctx, entries, map[string]string{hash: source}, nil)
 }

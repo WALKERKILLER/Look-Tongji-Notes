@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"lookstudio/lookd/internal/datasync"
 	"lookstudio/lookd/internal/store"
@@ -116,11 +117,12 @@ func (s *Server) mergeFolderSessionMetadata() error {
 		wanted[id] = true
 	}
 	dest := filepath.Join(s.Data.Roots.Data, "agent", "sessions-meta.json")
-	meta := map[string]map[string]any{}
-	if b, e := os.ReadFile(dest); e == nil {
-		if e = json.Unmarshal(b, &meta); e != nil {
-			return e
+	meta, err := datasync.ReadFolderSessionMetadata(dest)
+	if err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
+			return err
 		}
+		meta = map[string]map[string]any{}
 	}
 	paths, _ := filepath.Glob(filepath.Join(s.Data.Roots.Data, "agent", "course-sessions", "*.json"))
 	for _, p := range paths {
@@ -128,13 +130,9 @@ func (s *Server) mergeFolderSessionMetadata() error {
 		if !wanted[course] {
 			continue
 		}
-		b, e := os.ReadFile(p)
-		if e != nil {
-			return e
-		}
-		var entries map[string]map[string]any
-		if e = json.Unmarshal(b, &entries); e != nil {
-			return e
+		entries, err := datasync.ReadFolderSessionMetadata(p)
+		if err != nil {
+			return err
 		}
 		for id, v := range entries {
 			// A cache must not undo a local reassignment or claim an ordinary chat.
@@ -146,12 +144,32 @@ func (s *Server) mergeFolderSessionMetadata() error {
 			}
 		}
 	}
-	b, e := json.Marshal(meta)
-	if e != nil {
-		return e
+	return writeFolderIndex(dest, meta)
+}
+
+// Replace private indexes atomically so a failed write cannot leave truncated JSON.
+func writeFolderIndex(dest string, value any) error {
+	b, err := json.Marshal(value)
+	if err != nil {
+		return err
 	}
-	if e = os.MkdirAll(filepath.Dir(dest), 0700); e != nil {
-		return e
+	if err := os.MkdirAll(filepath.Dir(dest), 0700); err != nil {
+		return err
 	}
-	return os.WriteFile(dest, b, 0600)
+	f, err := os.CreateTemp(filepath.Dir(dest), ".folder-index-*")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(f.Name())
+	_, err = f.Write(b)
+	if err == nil {
+		err = f.Sync()
+	}
+	if closeErr := f.Close(); err == nil {
+		err = closeErr
+	}
+	if err != nil {
+		return err
+	}
+	return os.Rename(f.Name(), dest)
 }

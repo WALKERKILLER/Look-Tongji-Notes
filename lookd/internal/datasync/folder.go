@@ -48,6 +48,7 @@ type folderManifest struct {
 type folderBase struct {
 	Library string                 `json:"library"`
 	Files   map[string]folderEntry `json:"files"`
+	Courses map[string]string      `json:"courses,omitempty"`
 }
 type folderStorage struct {
 	root   *os.Root
@@ -421,6 +422,28 @@ func (s *Service) syncFolder(ctx context.Context) (Result, error) {
 	if e != nil {
 		return result, e
 	}
+	basePath := filepath.Join(s.Roots.Data, "folder-base-"+marker.ID+".json")
+	base := folderBase{Library: marker.ID, Files: map[string]folderEntry{}}
+	if b, err := os.ReadFile(basePath); err == nil {
+		var saved *folderBase
+		if json.Unmarshal(b, &saved) != nil || saved == nil || saved.Library != marker.ID || saved.Files == nil {
+			return result, fmt.Errorf("本机同步记录损坏，请从备份恢复：%s", basePath)
+		}
+		base = *saved
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return result, fmt.Errorf("无法读取本机同步记录：%w", err)
+	}
+	// A missing course marker may be an intentional deletion only when this
+	// private baseline already recorded the directory's course ownership.
+	validateDir := func(id, dir string, dirs map[string]string) error {
+		err := s.validateFolderCourseDir(id, dir, dirs)
+		if errors.Is(err, os.ErrNotExist) && base.Courses[id] == dir {
+			if _, known := base.Files["library/"+dir+"/course.json"]; known {
+				return nil
+			}
+		}
+		return err
+	}
 	dirs, e := s.folderDirs(c.CourseIDs)
 	if e != nil {
 		return result, e
@@ -452,7 +475,7 @@ func (s *Service) syncFolder(ctx context.Context) (Result, error) {
 				if old := dirs[id]; old != "" && old != dir {
 					return result, errors.New("同一课程使用了不同目录，请先处理课程冲突")
 				}
-				if e := s.validateFolderCourseDir(id, dir, dirs); e != nil {
+				if e := validateDir(id, dir, dirs); e != nil {
 					return result, e
 				}
 				dirs[id] = dir
@@ -460,17 +483,7 @@ func (s *Service) syncFolder(ctx context.Context) (Result, error) {
 		}
 		manifests = append(manifests, m)
 	}
-	basePath := filepath.Join(s.Roots.Data, "folder-base-"+marker.ID+".json")
-	base := folderBase{Library: marker.ID, Files: map[string]folderEntry{}}
-	if b, err := os.ReadFile(basePath); err == nil {
-		var saved *folderBase
-		if json.Unmarshal(b, &saved) != nil || saved == nil || saved.Library != marker.ID || saved.Files == nil {
-			return result, fmt.Errorf("本机同步记录损坏，请从备份恢复：%s", basePath)
-		}
-		base = *saved
-	} else if !errors.Is(err, os.ErrNotExist) {
-		return result, fmt.Errorf("无法读取本机同步记录：%w", err)
-	}
+
 	combined := map[string]folderEntry{}
 	for _, m := range manifests {
 		for p, v := range m.Files {
@@ -705,7 +718,7 @@ func (s *Service) syncFolder(ctx context.Context) (Result, error) {
 			return err
 		}
 		for id, dir := range dirs {
-			if err := s.validateFolderCourseDir(id, dir, dirs); err != nil {
+			if err := validateDir(id, dir, dirs); err != nil {
 				return err
 			}
 		}
@@ -862,6 +875,12 @@ func (s *Service) syncFolder(ctx context.Context) (Result, error) {
 	// publishing their content in this device's selected-course manifest.
 	for p, v := range next {
 		base.Files[p] = v
+	}
+	if base.Courses == nil {
+		base.Courses = map[string]string{}
+	}
+	for id, dir := range dirs {
+		base.Courses[id] = dir
 	}
 	if err := checkReady(); err != nil {
 		result.Partial = changed
