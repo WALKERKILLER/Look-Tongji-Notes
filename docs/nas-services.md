@@ -25,7 +25,7 @@ generated_key: os-lab-1
 https://elearning.fudan.edu.cn/courses/123/assignments/456
 ```
 
-An optional Fudan eLearning assignment URL in the document supplies the course and assignment IDs. Keep deadline files below 64,000 bytes, the reader's input limit. Course material scans return an error when a directory or file cannot be read; any accompanying list is partial.
+An optional Fudan eLearning assignment URL in the document supplies the course and assignment IDs. Keep deadline files below 64,000 bytes, the reader's input limit. Course material scans return an error when a directory cannot be listed or an entry cannot be statted; any accompanying list may be partial. File content read errors are reported when opening or reading the material.
 
 The remote [probe](../lookd/internal/nasbridge/probe.py) reads `~/.local/share/course-homework-worker` on the SSH account and expects `health.json`, `calendar-health.json` and `queue.sqlite3`. It observes the user services `course-homework` and `course-calendar-nightly`, and the containers `icourse-subscriber` and `course-calendar-sync`. This is a deployment-specific adapter, not a generic NAS protocol. Deployments with a different schema need a separate adapter; missing files or services are reported as unavailable.
 

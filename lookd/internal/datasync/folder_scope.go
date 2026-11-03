@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -38,18 +39,36 @@ func (s *Service) folderAbs(p string) (string, bool) {
 	}
 	return "", false
 }
-func (s *Service) folderExtras(ctx context.Context, ids []string) ([]File, error) {
+
+// Export only selected courses. A malformed previously tracked file stops the
+// round; an unrelated malformed global file cannot become a deletion.
+func (s *Service) folderExtras(ctx context.Context, ids []string, tracked map[string]bool) ([]File, error) {
 	wanted := map[string]bool{}
 	for _, id := range ids {
 		wanted[id] = true
 	}
-	var out []File
-	add := func(p, abs string) {
-		if fi, e := os.Lstat(abs); e == nil && fi.Mode().IsRegular() {
-			out = append(out, File{Path: p, Abs: abs, Size: fi.Size(), ModTime: fi.ModTime()})
+	trackedAbs := map[string]bool{}
+	for p := range tracked {
+		if abs, ok := s.folderAbs(p); ok {
+			trackedAbs[abs] = true
 		}
 	}
-	quizzes, _ := filepath.Glob(filepath.Join(s.Roots.Library, "quizzes", "*.json"))
+	var out []File
+	add := func(p, abs string) error {
+		fi, err := os.Lstat(abs)
+		if err != nil {
+			return err
+		}
+		if !fi.Mode().IsRegular() {
+			return fmt.Errorf("同步文件不是普通文件：%s", abs)
+		}
+		out = append(out, File{Path: p, Abs: abs, Size: fi.Size(), ModTime: fi.ModTime()})
+		return nil
+	}
+	quizzes, err := filepath.Glob(filepath.Join(s.Roots.Library, "quizzes", "*.json"))
+	if err != nil {
+		return nil, err
+	}
 	for _, abs := range quizzes {
 		var v struct {
 			Quiz struct {
@@ -57,46 +76,119 @@ func (s *Service) folderExtras(ctx context.Context, ids []string) ([]File, error
 			} `json:"quiz"`
 		}
 		if err := readFolderJSON(abs, &v); err != nil {
-			return nil, err
+			if trackedAbs[abs] {
+				return nil, err
+			}
+			continue
 		}
 		if wanted[v.Quiz.CourseID] {
-			add("course-data/"+v.Quiz.CourseID+"/quizzes/"+filepath.Base(abs), abs)
+			if err := add("course-data/"+v.Quiz.CourseID+"/quizzes/"+filepath.Base(abs), abs); err != nil {
+				return nil, err
+			}
 		}
 	}
 	meta := map[string]map[string]any{}
-	if err := readFolderJSON(filepath.Join(s.Roots.Data, "agent", "sessions-meta.json"), &meta); err != nil && !os.IsNotExist(err) {
+	metaPath := filepath.Join(s.Roots.Data, "agent", "sessions-meta.json")
+	if err := readFolderJSON(metaPath, &meta); err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
+			return nil, err
+		}
+		// Recover a first import interrupted before the server indexed it.
+		for _, course := range ids {
+			cached := filepath.Join(s.Roots.Data, "agent", "course-sessions", course+".json")
+			var entries map[string]map[string]any
+			if err := readFolderJSON(cached, &entries); err != nil {
+				if errors.Is(err, os.ErrNotExist) {
+					continue
+				}
+				return nil, err
+			}
+			for id, v := range entries {
+				if v["course_id"] != course {
+					return nil, fmt.Errorf("会话索引归属无效：%s", cached)
+				}
+				if old, ok := meta[id]; ok && old["course_id"] != course {
+					return nil, fmt.Errorf("会话索引归属冲突：%s", cached)
+				}
+				meta[id] = v
+			}
+		}
+	}
+	// Parse each header once, independently of the number of selected courses.
+	headers, invalid, err := s.folderSessionHeaders(ctx)
+	if err != nil {
 		return nil, err
+	}
+	for abs, err := range invalid {
+		selected := trackedAbs[abs]
+		for id, m := range meta {
+			course, _ := m["course_id"].(string)
+			if wanted[course] && (filepath.Base(abs) == id+".jsonl" || strings.HasSuffix(filepath.Base(abs), "_"+id+".jsonl")) {
+				selected = true
+			}
+		}
+		if selected {
+			return nil, err
+		}
+	}
+	presentIDs := map[string]bool{}
+	for _, id := range headers {
+		presentIDs[id] = true
 	}
 	for _, course := range ids {
 		selected := map[string]map[string]any{}
 		for id, v := range meta {
-			if v["course_id"] == course {
+			if v["course_id"] == course && presentIDs[id] {
 				selected[id] = v
 			}
 		}
 		generated := filepath.Join(s.Roots.Data, "agent", "course-sessions", course+".json")
-		if len(selected) > 0 {
-			b, _ := json.Marshal(selected)
-			if e := writeFile(generated, time.Time{}, func(f *os.File) error { _, e := f.Write(b); return e }); e != nil {
-				return nil, e
-			}
-			add("course-data/"+course+"/metadata.json", generated)
-		}
+		// This is an export cache, not an independent source of ownership.
 		if len(selected) == 0 {
-			continue
-		}
-		sessions, _ := filepath.Glob(filepath.Join(s.Roots.Data, "agent", "sessions", "*.jsonl"))
-		for _, abs := range sessions {
-			id, err := folderSessionID(abs)
-			if err != nil {
+			if err := os.Remove(generated); err != nil && !errors.Is(err, os.ErrNotExist) {
 				return nil, err
 			}
-			if _, ok := selected[id]; ok {
-				add("course-data/"+course+"/assistant/"+filepath.Base(abs), abs)
+			continue
+		}
+		b, _ := json.Marshal(selected)
+		if err := writeFile(generated, time.Time{}, func(f *os.File) error { _, e := f.Write(b); return e }); err != nil {
+			return nil, err
+		}
+		if err := add("course-data/"+course+"/metadata.json", generated); err != nil {
+			return nil, err
+		}
+	}
+	for abs, id := range headers {
+		course, _ := meta[id]["course_id"].(string)
+		if wanted[course] {
+			if err := add("course-data/"+course+"/assistant/"+filepath.Base(abs), abs); err != nil {
+				return nil, err
 			}
 		}
 	}
 	return out, ctx.Err()
+}
+
+// Invalid, unrelated headers are retained on disk and only block a round when
+// a selected/tracked file or an incoming destination actually depends on them.
+func (s *Service) folderSessionHeaders(ctx context.Context) (map[string]string, map[string]error, error) {
+	paths, err := filepath.Glob(filepath.Join(s.Roots.Data, "agent", "sessions", "*.jsonl"))
+	if err != nil {
+		return nil, nil, err
+	}
+	headers, invalid := map[string]string{}, map[string]error{}
+	for _, p := range paths {
+		if err := ctx.Err(); err != nil {
+			return nil, nil, err
+		}
+		id, err := folderSessionID(p)
+		if err != nil {
+			invalid[p] = err
+		} else {
+			headers[p] = id
+		}
+	}
+	return headers, invalid, nil
 }
 
 func safeWorkingPath(abs, root string) error {

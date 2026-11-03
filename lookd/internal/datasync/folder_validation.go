@@ -2,6 +2,7 @@ package datasync
 
 import (
 	"bufio"
+	"context"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -79,7 +80,7 @@ func (s *Service) validateFolderCourseDir(id, dir string, dirs map[string]string
 	if err := safeWorkingPath(filepath.Join(abs, "course.json"), s.Roots.Library); err != nil {
 		return err
 	}
-	if _, err := os.Stat(abs); os.IsNotExist(err) {
+	if _, err := os.Stat(abs); errors.Is(err, os.ErrNotExist) {
 		return nil
 	} else if err != nil {
 		return err
@@ -96,7 +97,12 @@ func (s *Service) validateFolderCourseDir(id, dir string, dirs map[string]string
 	return nil
 }
 
-func readFolderJSON(p string, v any) error {
+func readFolderJSON(p string, v any) (err error) {
+	defer func() {
+		if err != nil {
+			err = fmt.Errorf("读取同步索引 %s：%w", p, err)
+		}
+	}()
 	f, err := os.Open(p)
 	if err != nil {
 		return err
@@ -112,7 +118,12 @@ func readFolderJSON(p string, v any) error {
 	return json.Unmarshal(b, v)
 }
 
-func folderSessionID(p string) (string, error) {
+func folderSessionID(p string) (id string, err error) {
+	defer func() {
+		if err != nil {
+			err = fmt.Errorf("读取助手会话 %s：%w", p, err)
+		}
+	}()
 	f, err := os.Open(p)
 	if err != nil {
 		return "", err
@@ -136,7 +147,7 @@ type folderSessionMeta map[string]struct {
 
 // Global quiz/session destinations and session IDs must retain their owner.
 // Run the full preflight inside ApplyFiles, before any file can be installed.
-func (s *Service) validateFolderTargets(entries map[string]folderEntry, staged map[string]string) error {
+func (s *Service) validateFolderTargets(ctx context.Context, entries map[string]folderEntry, staged map[string]string, released map[string]bool) error {
 	hasExtras := false
 	for p := range entries {
 		abs, ok := s.folderAbs(p)
@@ -158,52 +169,51 @@ func (s *Service) validateFolderTargets(entries map[string]folderEntry, staged m
 		return nil
 	}
 	current := folderSessionMeta{}
-	if err := readFolderJSON(filepath.Join(s.Roots.Data, "agent", "sessions-meta.json"), &current); err != nil && !os.IsNotExist(err) {
+	if err := readFolderJSON(filepath.Join(s.Roots.Data, "agent", "sessions-meta.json"), &current); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return err
 	}
 	owners := map[string]string{}
 	for id, m := range current {
 		owners[id] = m.CourseID
 	}
-	// Retain ownership even before the server has merged a previously received
-	// per-course metadata file into its global index.
-	paths, err := filepath.Glob(filepath.Join(s.Roots.Data, "agent", "course-sessions", "*.json"))
-	if err != nil {
-		return err
-	}
-	for _, p := range paths {
+	// The global index is authoritative. Selected import caches only supply
+	// missing IDs while a newly received session awaits server indexing.
+	for p, v := range entries {
+		if !strings.HasPrefix(p, "course-data/") || !strings.HasSuffix(p, "/metadata.json") || v.Deleted != 0 {
+			continue
+		}
+		abs, _ := s.folderAbs(p)
 		var meta folderSessionMeta
-		if err := readFolderJSON(p, &meta); err != nil {
+		if err := readFolderJSON(abs, &meta); err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				continue
+			}
 			return err
 		}
-		course := strings.TrimSuffix(filepath.Base(p), ".json")
+		course := strings.Split(p, "/")[1]
 		for id, m := range meta {
+			if _, ok := current[id]; ok {
+				continue
+			}
 			if m.CourseID != course {
-				return errors.New("本机会话索引归属无效")
+				return fmt.Errorf("本机会话索引归属无效：%s", abs)
 			}
 			if old, ok := owners[id]; ok && old != course {
-				return errors.New("本机会话索引归属冲突")
+				return fmt.Errorf("本机会话索引归属冲突：%s", abs)
 			}
 			owners[id] = course
 		}
 	}
-	sessionPaths := map[string]string{}
-	paths, err = filepath.Glob(filepath.Join(s.Roots.Data, "agent", "sessions", "*.jsonl"))
+	headers, _, err := s.folderSessionHeaders(ctx)
 	if err != nil {
 		return err
 	}
-	for _, p := range paths {
-		id, err := folderSessionID(p)
-		if err != nil {
-			return err
-		}
-		if old, ok := sessionPaths[id]; ok && old != p {
-			return errors.New("本机存在重复会话标识")
-		}
-		sessionPaths[id] = p
+	sessionPaths := map[string][]string{}
+	for p, id := range headers {
+		sessionPaths[id] = append(sessionPaths[id], p)
 		if _, ok := owners[id]; !ok {
 			owners[id] = ""
-		} // Unclassified chats are not transferable course history.
+		}
 	}
 	source := func(p string, v folderEntry) string {
 		if staged[v.Hash] != "" {
@@ -232,8 +242,12 @@ func (s *Service) validateFolderTargets(entries map[string]folderEntry, staged m
 		}
 	}
 	targets := map[string]string{}
+	incomingSessions := map[string]string{}
 	for p, v := range entries {
 		if !strings.HasPrefix(p, "course-data/") {
+			continue
+		}
+		if v.Deleted != 0 && released[p] {
 			continue
 		}
 		abs, ok := s.folderAbs(p)
@@ -254,7 +268,7 @@ func (s *Service) validateFolderTargets(entries map[string]folderEntry, staged m
 		}
 		_, err := os.Stat(abs)
 		exists := err == nil
-		if err != nil && !os.IsNotExist(err) {
+		if err != nil && !errors.Is(err, os.ErrNotExist) {
 			return err
 		}
 		if strings.Contains(p, "/quizzes/") && exists {
@@ -293,10 +307,20 @@ func (s *Service) validateFolderTargets(entries map[string]folderEntry, staged m
 		if owners[id] != course || (exists && localID != id) {
 			return errors.New("同步会话正文与课程归属不一致")
 		}
-		if old, ok := sessionPaths[id]; ok && old != abs {
-			return errors.New("同步会话标识已使用其他文件名")
+		if old, ok := incomingSessions[id]; ok && old != abs {
+			return fmt.Errorf("同步会话重复：%s 与 %s", old, abs)
 		}
-		sessionPaths[id] = abs
+		incomingSessions[id] = abs
+		for _, old := range sessionPaths[id] {
+			if old == abs {
+				continue
+			}
+			oldPath := "course-data/" + course + "/assistant/" + filepath.Base(old)
+			tombstone, ok := entries[oldPath]
+			if !ok || tombstone.Deleted == 0 {
+				return fmt.Errorf("同步会话标识已使用其他文件名：%s；改名需同时删除旧路径", old)
+			}
+		}
 	}
 	return nil
 }

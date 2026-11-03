@@ -210,7 +210,10 @@ func (s *Service) folderStorage(c config) (*folderStorage, error) {
 		return nil, errors.New("请选择本机普通目录，不支持符号链接")
 	}
 	for _, root := range []string{s.Roots.Library, s.Roots.Data} {
-		r, _ := filepath.EvalSymlinks(root)
+		r, err := filepath.EvalSymlinks(root)
+		if err != nil {
+			return nil, fmt.Errorf("工作目录不可用 %s：%w", root, err)
+		}
 		if real == r || strings.HasPrefix(real, r+string(os.PathSeparator)) || strings.HasPrefix(r, real+string(os.PathSeparator)) {
 			return nil, errors.New("同步目录必须与工作库和私有配置目录分开")
 		}
@@ -475,7 +478,15 @@ func (s *Service) syncFolder(ctx context.Context) (Result, error) {
 			delete(hashes, p)
 		}
 	}
-	extras, err := s.folderExtras(ctx, c.CourseIDs)
+	tracked := map[string]bool{}
+	for _, entries := range []map[string]folderEntry{base.Files, combined} {
+		for p, v := range entries {
+			if folderScoped(p, dirs) && v.Deleted == 0 {
+				tracked[p] = true
+			}
+		}
+	}
+	extras, err := s.folderExtras(ctx, c.CourseIDs, tracked)
 	if err != nil {
 		return result, err
 	}
@@ -506,6 +517,12 @@ func (s *Service) syncFolder(ctx context.Context) (Result, error) {
 	for p := range base.Files {
 		if folderScoped(p, dirs) && (c.Media || !IsMedia(p)) {
 			paths[p] = true
+		}
+	}
+	releasedSessions := map[string]bool{}
+	for p := range base.Files {
+		if strings.Contains(p, "/assistant/") && hashes[p] == "" {
+			releasedSessions[p] = true
 		}
 	}
 	for p := range paths {
@@ -641,7 +658,7 @@ func (s *Service) syncFolder(ctx context.Context) (Result, error) {
 
 	apply := func() error {
 		// Recheck ownership after staging and before the first working-file write.
-		if err := s.validateFolderTargets(combined, staged); err != nil {
+		if err := s.validateFolderTargets(ctx, combined, staged, releasedSessions); err != nil {
 			return err
 		}
 		for id, dir := range dirs {
@@ -651,6 +668,12 @@ func (s *Service) syncFolder(ctx context.Context) (Result, error) {
 		}
 		for _, p := range keys {
 			v := combined[p]
+			if v.Deleted != 0 && releasedSessions[p] {
+				// Leaving a logical course scope must not delete a session
+				// that is now owned by a different local course.
+				next[p] = v
+				continue
+			}
 			abs, ok := s.folderAbs(p)
 			if !ok {
 				return errors.New("同步文件超出资料库")

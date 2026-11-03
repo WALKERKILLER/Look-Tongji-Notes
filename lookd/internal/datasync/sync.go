@@ -138,6 +138,12 @@ func (s *Service) Sync(ctx context.Context) (Result, error) {
 		s.mu.Unlock()
 		return Result{}, ErrNotConfigured
 	}
+	for _, root := range []string{s.Roots.Library, s.Roots.Data} {
+		if err := checkScanRoot(root); err != nil {
+			s.mu.Unlock()
+			return Result{}, err
+		}
+	}
 	s.running = true
 	s.mu.Unlock()
 	s.publish("sync_progress", Progress{Step: "连接 WebDAV"})
@@ -163,7 +169,10 @@ func (s *Service) Sync(ctx context.Context) (Result, error) {
 	s.mu.Lock()
 	s.running, s.progress = false, nil
 	s.cfg.Last = &res
-	s.saveLocked()
+	// Do not recreate a private root that disappeared during the round.
+	if checkScanRoot(s.Roots.Data) == nil {
+		s.saveLocked()
+	}
 	s.mu.Unlock()
 	s.publish("sync_done", res)
 	return res, err

@@ -4,6 +4,7 @@
 package datasync
 
 import (
+	"fmt"
 	"io/fs"
 	"os"
 	"path"
@@ -114,14 +115,26 @@ func dataAllowed(rel string) bool {
 	return false
 }
 
+// Optional children may be absent; the configured root itself must exist.
+func checkScanRoot(root string) error {
+	st, err := os.Stat(root)
+	if err != nil {
+		return fmt.Errorf("工作目录不可用 %s：%w", root, err)
+	}
+	if !st.IsDir() {
+		return fmt.Errorf("工作目录不是目录：%s", root)
+	}
+	return nil
+}
+
 // ScanLibrary lists the library's files, sorted by path.
 func (r Roots) ScanLibrary(withMedia bool) ([]File, error) {
+	if err := checkScanRoot(r.Library); err != nil {
+		return nil, err
+	}
 	var out []File
 	err := filepath.WalkDir(r.Library, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
-			if p == r.Library && os.IsNotExist(err) {
-				return nil
-			}
 			return err
 		}
 		rel, err := filepath.Rel(r.Library, p)
@@ -151,6 +164,9 @@ func (r Roots) ScanLibrary(withMedia bool) ([]File, error) {
 
 // ScanData lists portable files; an unreadable subtree is not a deletion.
 func (r Roots) ScanData() ([]File, error) {
+	if err := checkScanRoot(r.Data); err != nil {
+		return nil, err
+	}
 	var out []File
 	add := func(rel string) error {
 		p := filepath.Join(r.Data, filepath.FromSlash(rel))

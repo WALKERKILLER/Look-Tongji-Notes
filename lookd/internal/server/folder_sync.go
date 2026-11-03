@@ -137,6 +137,10 @@ func (s *Server) mergeFolderSessionMetadata() error {
 			return e
 		}
 		for id, v := range entries {
+			// A cache must not undo a local reassignment or claim an ordinary chat.
+			if old, exists := meta[id]; exists && old["course_id"] != course {
+				continue
+			}
 			if v["course_id"] == course {
 				meta[id] = v
 			}
