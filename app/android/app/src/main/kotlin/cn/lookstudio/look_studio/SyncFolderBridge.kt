@@ -95,10 +95,25 @@ class SyncFolderBridge(private val context: Context, private val tree: Uri) {
                                 val buffer = ByteArray(65536); var left = length
                                 while (left > 0) { val n = input.read(buffer, 0, minOf(left, buffer.size.toLong()).toInt()); if (n < 0) throw java.io.EOFException(); dest.write(buffer,0,n);left-=n }
                             }
-                            children(parent)[name]?.let { DocumentsContract.deleteDocument(resolver, uri(it)) }
-                            if (DocumentsContract.renameDocument(resolver,temp,name) == null) throw java.io.IOException("文件发布失败")
-                            reply(output,200)
+                            publishFolderDocument(
+                                temporary = temp,
+                                previous = children(parent)[name]?.let { uri(it) },
+                                name = name,
+                                backupName = "$name.previous-${System.nanoTime()}",
+                                rename = { document, target ->
+                                    DocumentsContract.renameDocument(resolver, document, target)
+                                        ?: throw java.io.IOException("文件发布失败，已保留旧版本")
+                                },
+                                delete = { document ->
+                                    if (!DocumentsContract.deleteDocument(resolver, document)) {
+                                        throw java.io.IOException("旧版本清理失败")
+                                    }
+                                },
+                            )
                         } catch (e: Exception) { try { DocumentsContract.deleteDocument(resolver,temp) } catch (_:Exception) {}; throw e }
+                        // A disconnected client must not delete a published document:
+                        // providers may keep the temporary document's ID after rename.
+                        reply(output,200)
                     }
                     else -> reply(output,405)
                 }

@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"lookstudio/lookd/internal/datasync"
 	"lookstudio/lookd/internal/store"
 	"net/http"
@@ -16,9 +17,9 @@ type coursePortableState struct {
 	Activity []store.ActivityRow `json:"activity"`
 }
 
-func (s *Server) courseLectureIDs(ctx context.Context, ids []string) (map[string]bool, map[string]bool, error) {
+func (s *Server) courseLectureIDs(ctx context.Context, ids []string) (map[string]bool, map[string]string, error) {
 	courses := map[string]bool{}
-	lectures := map[string]bool{}
+	lectures := map[string]string{}
 	for _, id := range ids {
 		courses[id] = true
 		rows, e := s.St.Lectures(ctx, id)
@@ -26,7 +27,7 @@ func (s *Server) courseLectureIDs(ctx context.Context, ids []string) (map[string
 			return nil, nil, e
 		}
 		for _, l := range rows {
-			lectures[l.ID] = true
+			lectures[l.ID] = id
 		}
 	}
 	return courses, lectures, nil
@@ -41,13 +42,13 @@ func (s *Server) CourseState(ctx context.Context, ids []string) ([]byte, error) 
 		return nil, e
 	}
 	for id := range user.Playback {
-		if !lectures[id] {
+		if lectures[id] == "" {
 			delete(user.Playback, id)
 		}
 	}
 	bs := []store.Bookmark{}
 	for _, b := range user.Bookmarks {
-		if lectures[b.LectureID] {
+		if lectures[b.LectureID] != "" {
 			bs = append(bs, b)
 		}
 	}
@@ -74,29 +75,28 @@ func (s *Server) MergeCourseState(ctx context.Context, ids []string, b []byte) (
 		return false, e
 	}
 	for id := range st.User.Playback {
-		if !lectures[id] {
+		if lectures[id] == "" {
 			delete(st.User.Playback, id)
 		}
 	}
 	bs := []store.Bookmark{}
 	for _, v := range st.User.Bookmarks {
-		if lectures[v.LectureID] {
+		if lectures[v.LectureID] != "" {
 			bs = append(bs, v)
 		}
 	}
 	st.User.Bookmarks = bs
-	changed, e := s.St.MergeUserState(ctx, st.User)
-	if e != nil {
-		return false, e
-	}
+	activity := []store.ActivityRow{}
 	for _, v := range st.Activity {
-		if courses[v.CourseID] {
-			if e = s.St.PutActivity(ctx, v); e != nil {
-				return changed, e
-			}
+		if !courses[v.CourseID] {
+			continue
 		}
+		if v.LectureID != "" && lectures[v.LectureID] != v.CourseID {
+			return false, fmt.Errorf("同步学习记录的课次不属于对应课程：%s", v.LectureID)
+		}
+		activity = append(activity, v)
 	}
-	return changed, nil
+	return s.St.MergeLearningState(ctx, st.User, activity)
 }
 func (s *Server) folderPreview(_ http.ResponseWriter, r *http.Request) (any, error) {
 	var in datasync.Settings

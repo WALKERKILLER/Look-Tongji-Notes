@@ -25,6 +25,8 @@ Copy `lookd/bin/look-study-pdf` into the built application’s `Contents/MacOS` 
 
 The Android build includes AndroidX motion prediction and Huawei's Pencil Engine API through their official Maven repositories. Device support is optional: predictions are transient and never saved; unsupported devices retain ordinary Flutter ink input. The system folder picker grants access only to the chosen sync tree. No private signing material or personal Syncthing configuration is included.
 
+Run the SAF publication recovery tests from `app/android` after the normal Flutter/Android build setup: `./gradlew :app:testDebugUnitTest --tests cn.lookstudio.look_studio.FolderDocumentPublicationTest`. These JVM tests inject rename and cleanup failures; they do not replace tests of the actual device's document provider or permission revocation.
+
 ## Validation boundary
 
 Real PDF integration tests require an installed renderer. The ordinary Go suite explicitly skips them when required executables are absent; malformed PDFs, conversion failures and content assertions still fail when the renderer is present. The missing-component error and output/page limits have separate tests that do not require Poppler. A green ordinary suite without a renderer does not establish PDF conversion coverage.

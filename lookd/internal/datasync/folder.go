@@ -123,17 +123,9 @@ func (f *folderStorage) put(ctx context.Context, p string, r io.Reader) error {
 		if e != nil {
 			return e
 		}
-		// Windows Rename cannot replace an existing target. Only a device's own
-		// manifest is mutable; incomplete/missing manifests are retried by readers.
-		if e = f.root.Rename(filepath.FromSlash(tmp), filepath.FromSlash(p)); e != nil {
-			if _, se := f.root.Stat(filepath.FromSlash(p)); se == nil {
-				if re := f.root.Remove(filepath.FromSlash(p)); re != nil {
-					return re
-				}
-				e = f.root.Rename(filepath.FromSlash(tmp), filepath.FromSlash(p))
-			}
-		}
-		return e
+		// A rename failure must preserve the existing target. Removing it and
+		// retrying can turn a permission/provider failure into data loss.
+		return f.root.Rename(filepath.FromSlash(tmp), filepath.FromSlash(p))
 	}
 	req, e := http.NewRequestWithContext(ctx, "PUT", f.remote+"/file?path="+url.QueryEscape(p), r)
 	if e != nil {
