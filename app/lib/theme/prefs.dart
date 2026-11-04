@@ -59,6 +59,9 @@ class UiPrefs extends ChangeNotifier {
   double subtitleScale = 1.0;
   bool showSubtitles = true;
 
+  /// Outlines cut by topic rather than by the lecture's main stages.
+  bool outlineDetailed = false;
+
   void _read() {
     final raw = _sp.getString('ui');
     if (raw == null) return;
@@ -93,6 +96,7 @@ class UiPrefs extends ChangeNotifier {
     slideFollow = m['slideFollow'] ?? true;
     subtitleScale = (m['subtitleScale'] ?? 1.0).toDouble();
     showSubtitles = m['showSubtitles'] ?? true;
+    outlineDetailed = m['outlineDetailed'] ?? false;
   }
 
   Map<String, dynamic> _toJson() => {
@@ -119,6 +123,7 @@ class UiPrefs extends ChangeNotifier {
         'slideFollow': slideFollow,
         'subtitleScale': subtitleScale,
         'showSubtitles': showSubtitles,
+        'outlineDetailed': outlineDetailed,
       };
 
   /// The preferences as stored (the assistant reads its registry keys).

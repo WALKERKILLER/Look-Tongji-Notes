@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -58,6 +59,11 @@ func Open(root string, st *store.Store) (*Library, error) {
 		log.Printf("library: %v", err)
 	}
 	l.mirrorMu.Unlock()
+	if n, err := l.RepairTranscripts(context.Background()); err != nil {
+		log.Printf("library: repair transcripts: %v", err)
+	} else if n > 0 {
+		log.Printf("library: re-read %d transcripts with misplaced cue times", n)
+	}
 	return l, nil
 }
 
@@ -540,6 +546,23 @@ func (l *Library) Reindex(ctx context.Context) (int, error) {
 
 var srtTime = regexp.MustCompile(`(\d+):(\d+):(\d+)[,.](\d+)\s*-->\s*(\d+):(\d+):(\d+)[,.](\d+)`)
 
+// srtMs reads one SRT clock. Fields are decimal even with a leading zero
+// ("08" is eight); the fraction is in milliseconds whatever its width.
+func srtMs(h, mi, se, frac string) int64 {
+	n := func(s string) int64 {
+		v, _ := strconv.ParseInt(s, 10, 64)
+		return v
+	}
+	frac = (frac + "000")[:3]
+	return n(h)*3600000 + n(mi)*60000 + n(se)*1000 + n(frac)
+}
+
+// ParseSRT reads transcript.srt back into segments.
+//
+// It once parsed with fmt.Sscan, which takes a leading zero as octal: 08
+// and 09 read as 0, so cues in minutes 8 and 9, or at seconds 8 and 9, moved
+// back in time whenever the index was rebuilt from files.
+// [Library.RepairTranscripts] fixes lectures indexed that way.
 func ParseSRT(s string) []store.Segment {
 	var out []store.Segment
 	blocks := regexp.MustCompile(`\r?\n\r?\n`).Split(strings.TrimSpace(s), -1)
@@ -550,20 +573,37 @@ func ParseSRT(s string) []store.Segment {
 			if m == nil {
 				continue
 			}
-			ms := func(h, mi, se, f string) int64 {
-				var a, b2, c, d int64
-				fmt.Sscan(h, &a)
-				fmt.Sscan(mi, &b2)
-				fmt.Sscan(se, &c)
-				fmt.Sscan(f, &d)
-				return a*3600000 + b2*60000 + c*1000 + d
-			}
 			text := strings.TrimSpace(strings.Join(lines[i+1:], " "))
-			out = append(out, store.Segment{Idx: len(out), StartMs: ms(m[1], m[2], m[3], m[4]), EndMs: ms(m[5], m[6], m[7], m[8]), Text: text})
+			out = append(out, store.Segment{Idx: len(out), StartMs: srtMs(m[1], m[2], m[3], m[4]), EndMs: srtMs(m[5], m[6], m[7], m[8]), Text: text})
 			break
 		}
 	}
 	return out
+}
+
+// RepairTranscripts re-reads transcript.srt for lectures whose indexed
+// segments run backwards in time, the mark of the old octal parse, and
+// returns how many it repaired.
+func (l *Library) RepairTranscripts(ctx context.Context) (int, error) {
+	ids, err := l.Store.DisorderedTranscripts(ctx)
+	if err != nil || len(ids) == 0 {
+		return 0, err
+	}
+	n := 0
+	for _, id := range ids {
+		lec, err := l.Store.Lecture(ctx, id)
+		if err != nil || lec.Dir == "" {
+			continue
+		}
+		raw, err := os.ReadFile(filepath.Join(l.Abs(lec.Dir), "transcript.srt"))
+		if err != nil {
+			continue
+		}
+		if segs := ParseSRT(string(raw)); len(segs) > 0 && l.Store.ReplaceSegments(ctx, id, segs) == nil {
+			n++
+		}
+	}
+	return n, nil
 }
 
 func parseNote(p string) (store.Note, bool) {

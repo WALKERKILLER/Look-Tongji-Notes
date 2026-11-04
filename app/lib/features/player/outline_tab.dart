@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../core/app_state.dart';
 import '../../core/format.dart';
 import '../../core/models.dart';
+import '../../theme/prefs.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/states.dart';
 import 'lecture_player.dart';
@@ -55,11 +56,49 @@ class _OutlineTabState extends State<OutlineTab> with AutomaticKeepAliveClientMi
   }
 
   Future<void> _generate() async {
-    await widget.ctl.generateOutline();
+    await widget.ctl.generateOutline(detailed: context.read<UiPrefs>().outlineDetailed);
     if (!mounted) return;
     final e = widget.ctl.outlineError;
     if (e != null) showSnack(context, l10n.outlineFailed(e));
   }
+
+  /// Changes how finely outlines are cut; an existing outline is rewritten
+  /// at the new grain, and undo puts the previous one back.
+  Future<void> _setDetail(bool detailed) async {
+    final prefs = context.read<UiPrefs>();
+    final ctl = widget.ctl;
+    if (prefs.outlineDetailed == detailed) return;
+    prefs.update((p) => p.outlineDetailed = detailed);
+    if (ctl.chapters.isEmpty || ctl.outlineBusy) return;
+    final old = ctl.chapters;
+    await ctl.generateOutline(detailed: detailed);
+    if (!mounted) return;
+    final e = ctl.outlineError;
+    if (e != null) return showSnack(context, l10n.outlineFailed(e));
+    showSnack(context, l10n.outlineRedone(detailed ? l10n.outlineDetailed : l10n.outlineConcise), action: l10n.commonUndo, onAction: () async {
+      prefs.update((p) => p.outlineDetailed = !detailed);
+      await ctl.api.put('/api/lectures/${ctl.lectureId}/timeline', {
+        'chapters': [for (final c in old) c.j],
+      });
+      ctl.reloadTimeline();
+    });
+  }
+
+  /// 精简 | 详细: the grain of the next outline (and of this one, rewritten).
+  Widget _grain(bool detailed, {required bool enabled}) => Tooltip(
+        message: l10n.outlineDetailHint,
+        child: SegmentedButton<bool>(
+          key: const ValueKey('outline-detail'),
+          showSelectedIcon: false,
+          style: const ButtonStyle(visualDensity: VisualDensity.compact),
+          segments: [
+            ButtonSegment(value: false, label: Text(l10n.outlineConcise)),
+            ButtonSegment(value: true, label: Text(l10n.outlineDetailed)),
+          ],
+          selected: {detailed},
+          onSelectionChanged: enabled ? (s) => _setDetail(s.first) : null,
+        ),
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -67,6 +106,7 @@ class _OutlineTabState extends State<OutlineTab> with AutomaticKeepAliveClientMi
     final ctl = widget.ctl;
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
+    final detailed = context.watch<UiPrefs>().outlineDetailed;
 
     if (ctl.chapters.isEmpty) {
       if (ctl.outlineBusy) return const _Drafting();
@@ -89,7 +129,11 @@ class _OutlineTabState extends State<OutlineTab> with AutomaticKeepAliveClientMi
         icon: Icons.view_timeline_outlined,
         title: l10n.outlineTitle,
         body: ctl.outlineError == null ? l10n.outlineBody : l10n.outlineLastError(ctl.outlineError!),
-        action: FilledButton.icon(onPressed: _generate, icon: const Icon(Icons.auto_awesome_rounded), label: Text(ctl.outlineError == null ? l10n.outlineGenerate : l10n.commonRetry)),
+        action: Column(mainAxisSize: MainAxisSize.min, children: [
+          _grain(detailed, enabled: true),
+          const SizedBox(height: Space.lg),
+          FilledButton.icon(onPressed: _generate, icon: const Icon(Icons.auto_awesome_rounded), label: Text(ctl.outlineError == null ? l10n.outlineGenerate : l10n.commonRetry)),
+        ]),
       );
     }
 
@@ -99,8 +143,11 @@ class _OutlineTabState extends State<OutlineTab> with AutomaticKeepAliveClientMi
         padding: const EdgeInsets.fromLTRB(Space.lg, Space.sm, Space.xs, 0),
         child: Row(children: [
           Expanded(
-            child: Text(ctl.outlineBusy ? l10n.outlineRegenerating : l10n.outlineSummary(ctl.chapters.length, fmtClock(total)), style: tt.labelLarge?.copyWith(color: cs.onSurfaceVariant)),
+            child: Text(ctl.outlineBusy ? l10n.outlineRegenerating : l10n.outlineSummary(ctl.chapters.length, fmtClock(total)),
+                maxLines: 1, overflow: TextOverflow.ellipsis, style: tt.labelLarge?.copyWith(color: cs.onSurfaceVariant)),
           ),
+          const SizedBox(width: Space.sm),
+          _grain(detailed, enabled: !ctl.outlineBusy),
           MenuAnchor(
             menuChildren: [
               MenuItemButton(leadingIcon: const Icon(Icons.refresh_rounded), onPressed: ctl.outlineBusy ? null : _generate, child: Text(l10n.commonRegenerate)),

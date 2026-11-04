@@ -28,6 +28,7 @@ import 'theme/glass.dart';
 import 'theme/prefs.dart';
 import 'theme/tokens.dart';
 import 'widgets/glass_dock.dart';
+import 'widgets/glass_rail.dart';
 import 'widgets/organic_shapes.dart';
 import 'widgets/states.dart';
 import 'widgets/user_avatar.dart';
@@ -404,51 +405,34 @@ class _AppShellState extends State<AppShell> {
               Space.xs,
               Space.lg,
             ),
-            child: GlassSurface(
-              radius: Corners.xl,
-              child: NavigationRail(
-                backgroundColor: Colors.transparent,
-                selectedIndex: _index,
-                onDestinationSelected: _select,
-                leading: Padding(
-                  padding: const EdgeInsets.only(top: Space.sm, bottom: Space.xl),
-                  child: Column(
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: Space.lg),
-                        child: const _BrandMark(),
-                      ),
-                      if (!docked) _AssistantFab(compact: false),
-                    ],
-                  ),
-                ),
-                trailingAtBottom: true,
-                trailing: Padding(
-                  padding: const EdgeInsets.only(bottom: Space.lg),
-                  child: Column(
-                    children: [
-                      const NotificationBell(),
-                      const SizedBox(height: Space.md),
-                      Tooltip(
-                        message: l10n.shellProfileTooltip(userDisplayName(context)),
-                        child: InkWell(
-                          customBorder: const CircleBorder(),
-                          onTap: () => showProfileDialog(context),
-                          child: const UserAvatar(size: 40),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                destinations: [
-                  for (var i = 0; i < _dests.length; i++)
-                    NavigationRailDestination(
-                      icon: icon(i, false),
-                      selectedIcon: icon(i, true),
-                      label: Text(_dests[i].label),
+            child: GlassNavRail(
+              key: const ValueKey('shell-rail'),
+              selected: _index,
+              onSelected: _select,
+              brand: const _BrandMark(),
+              leading: docked ? null : const _AssistantFab(compact: false),
+              trailing: Column(
+                children: [
+                  const NotificationBell(),
+                  const SizedBox(height: Space.sm),
+                  Tooltip(
+                    message: l10n.shellProfileTooltip(userDisplayName(context)),
+                    child: InkWell(
+                      customBorder: const CircleBorder(),
+                      onTap: () => showProfileDialog(context),
+                      child: const UserAvatar(size: 40),
                     ),
+                  ),
                 ],
               ),
+              items: [
+                for (var i = 0; i < _dests.length; i++)
+                  GlassNavItem(
+                    icon: icon(i, false),
+                    selectedIcon: icon(i, true),
+                    label: _dests[i].label,
+                  ),
+              ],
             ),
           ),
           Expanded(

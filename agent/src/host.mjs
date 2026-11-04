@@ -463,15 +463,16 @@ route("GET", "/transcript-review/([^/]+)", async (_req,[id]) => transcriptReview
 route("POST", "/transcript-review/([^/]+)", async (_req,[id]) => transcriptReviewer.start(decodeURIComponent(id)));
 route("DELETE", "/transcript-review/([^/]+)", async (_req,[id]) => transcriptReviewer.cancel(decodeURIComponent(id)));
 
-// POST /timeline generates and saves a lecture outline (the player's button).
+// POST /timeline generates and saves a lecture outline (the player's button);
+// detail is "concise" (the default) or "detailed".
 route("POST", "/timeline", async (req, _m, res) => {
-	const { lecture_id } = await body(req);
+	const { lecture_id, detail } = await body(req);
 	if (!lecture_id) throw httpError(400, "缺少 lecture_id");
 	const ac = new AbortController();
 	res.on("close", () => {
 		if (!res.writableFinished) ac.abort();
 	});
-	return { chapters: await generateTimeline(pipeline, lecture_id, ac.signal) };
+	return { chapters: await generateTimeline(pipeline, lecture_id, ac.signal, detail === "detailed" ? "detailed" : "concise") };
 });
 
 function sessionTitle(s) {

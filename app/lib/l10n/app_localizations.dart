@@ -1672,6 +1672,30 @@ abstract class AppLocalizations {
   /// **'生成大纲'**
   String get outlineGenerate;
 
+  /// No description provided for @outlineConcise.
+  ///
+  /// In zh, this message translates to:
+  /// **'精简'**
+  String get outlineConcise;
+
+  /// No description provided for @outlineDetailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'详细'**
+  String get outlineDetailed;
+
+  /// No description provided for @outlineDetailHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'精简只分课堂的主要阶段，详细按知识点分章'**
+  String get outlineDetailHint;
+
+  /// No description provided for @outlineRedone.
+  ///
+  /// In zh, this message translates to:
+  /// **'已改为{mode}大纲'**
+  String outlineRedone(Object mode);
+
   /// No description provided for @outlineRegenerating.
   ///
   /// In zh, this message translates to:

@@ -36,10 +36,26 @@ function transcriptDigest(segs) {
 	return lines.join("\n");
 }
 
-function prompt(info, durMs, slideTimes) {
+/**
+ * How finely to cut a lecture of `mins` minutes: "concise" keeps the main
+ * stages only, "detailed" gives each topic its own chapter.
+ */
+export function timelinePlan(mins, detail = "concise") {
+	if (detail === "detailed") {
+		const lo = Math.max(4, Math.round(mins / 8));
+		return { lo, hi: Math.max(lo + 2, Math.min(24, Math.round(mins / 4))), minLen: 2, words: "10-28" };
+	}
+	const lo = Math.max(3, Math.round(mins / 20));
+	return { lo, hi: Math.max(lo + 1, Math.min(10, Math.round(mins / 9))), minLen: 6, words: "8-20" };
+}
+
+function prompt(info, durMs, slideTimes, detail) {
 	const mins = durMs / 60000;
-	const lo = Math.max(3, Math.round(mins / 12));
-	const hi = Math.max(lo + 2, Math.min(18, Math.round(mins / 5)));
+	const { lo, hi, minLen, words } = timelinePlan(mins, detail);
+	const grain =
+		detail === "detailed"
+			? "按知识点细分：每个独立的概念、推导、例题或讨论各成一段。"
+			: "只分课堂的主要阶段：同一主题下相邻的小节、例题和换页合并为一段，不要逐页或逐个知识点切分。";
 	return `你是大学课程助教，为课堂录像写“时间轴大纲”，帮助学生快速定位。
 
 课程：${info.course}
@@ -49,8 +65,8 @@ ${slideTimes ? `PPT 换页时间（可作为分段参考）：${slideTimes}\n` :
 输出要求：
 1. 每行一个时间段，格式严格为 \`MM:SS-MM:SS：阶段内容\`；超过 60 分钟继续累加分钟（如 75:20），不要写小时。
 2. 第一行从 00:00 开始；相邻时间段首尾相接；最后一段结束于 ${mmss(durMs)}。
-3. 按课堂实际阶段划分，共 ${lo}-${hi} 段，每段至少 2 分钟。
-4. 阶段内容用简体中文，8-24 字，写清这段讲的具体知识点或活动（例如“傅里叶变换的卷积定理推导”），不要写“老师讲解”“继续讲课”这类空话。
+3. ${grain}共 ${lo}-${hi} 段，每段至少 ${minLen} 分钟。
+4. 阶段内容用简体中文，${words} 字，写清这段讲的具体知识点或活动（例如“傅里叶变换的卷积定理推导”），不要写“老师讲解”“继续讲课”这类空话。
 5. 课前准备、点名、课间休息、布置作业等如实单独成段。
 6. 只输出大纲本身，不要标题、编号、解释或代码块。
 
@@ -58,10 +74,11 @@ ${slideTimes ? `PPT 换页时间（可作为分段参考）：${slideTimes}\n` :
 }
 
 /**
- * Generates and saves a lecture outline. Returns the saved chapters.
+ * Generates and saves a lecture outline, concise or detailed. Returns the
+ * saved chapters.
  * @param {import("./models.mjs").ModelPipeline} pipeline
  */
-export async function generateTimeline(pipeline, lectureId, signal) {
+export async function generateTimeline(pipeline, lectureId, signal, detail = "concise") {
 	const r = await get(`/api/lectures/${enc(lectureId)}`);
 	const segs = await get(`/api/lectures/${enc(lectureId)}/transcript`);
 	if (!segs.length) throw new Error("这节课还没有文字稿，先转写再生成大纲");
@@ -73,7 +90,7 @@ export async function generateTimeline(pipeline, lectureId, signal) {
 	} catch {}
 	const model = await pipeline.currentModel();
 	if (!model) throw new Error("还没有可用的模型。请在 设置 → 模型 中添加 API Key。");
-	const sys = prompt({ course: r.course.title, lecture: r.lecture.title, date: r.lecture.date }, durMs, slideTimes);
+	const sys = prompt({ course: r.course.title, lecture: r.lecture.title, date: r.lecture.date }, durMs, slideTimes, detail);
 	const body = transcriptDigest(segs);
 	const deadline = AbortSignal.timeout(180_000);
 	const sig = signal ? AbortSignal.any([signal, deadline]) : deadline;
