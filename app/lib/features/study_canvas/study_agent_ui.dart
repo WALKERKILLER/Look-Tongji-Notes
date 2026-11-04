@@ -89,62 +89,6 @@ extension _StudyAgentUI on StudyCanvasState {
     ];
   }
 
-  Future<void> _documentSelection(StudyCard card) async {
-    TextSelection selection = const TextSelection.collapsed(offset: 0);
-    final chosen = await showDialog<bool>(
-      context: context,
-      builder: (c) => AlertDialog(
-        title: Text('${card.title} · 原文选区'),
-        content: SizedBox(
-          width: 650,
-          height: 360,
-          child: SingleChildScrollView(
-            child: card.text.isEmpty
-                ? const Text('此页没有可提取文字。请使用区域选择，再通过支持图像的模型理解扫描件或公式。')
-                : SelectableText(
-                    card.text,
-                    onSelectionChanged: (s, cause) => selection = s,
-                  ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(c),
-            child: const Text('取消'),
-          ),
-          if (card.text.isEmpty)
-            FilledButton(
-              onPressed: () {
-                _update(() => _tool = StudyTool.region);
-                Navigator.pop(c, false);
-              },
-              child: const Text('选择视觉区域'),
-            )
-          else
-            FilledButton(
-              onPressed: () => Navigator.pop(c, true),
-              child: const Text('围绕所选文字问 AI'),
-            ),
-        ],
-      ),
-    );
-    if (!mounted || chosen != true) return;
-    if (selection.isCollapsed || selection.start < 0) {
-      _toast('请先在原文中拖选要提问的文字');
-      return;
-    }
-    _detail.clear();
-    _detail
-      ..objectId = card.id
-      ..start = selection.start
-      ..end = selection.end;
-    _selection
-      ..clear()
-      ..add(card.id);
-    _regionSelection = null;
-    await _openConversation();
-  }
-
   Future<void> _focusSource(StudyAnchor a) async {
     if (a.workspaceId.isNotEmpty && a.workspaceId != widget.ctl.lectureId) {
       _toast('此来源属于其他课次，请先打开对应课程');

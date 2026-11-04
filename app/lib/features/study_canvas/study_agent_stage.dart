@@ -1,37 +1,35 @@
 part of 'study_canvas.dart';
 
-// The agent on the canvas: the composer sits at the horizontal centre, the
-// conversation stacks directly above it like an ordinary chat, and the
-// material around it stays in view. Threads run from each bound card to the
-// composer; while the agent reads one, its thread flows and the card glows.
-// Conversations themselves are small nodes on the canvas (_ThreadNode).
-// Contract: docs/multimodal-canvas.md, spec 0021 (answers stay in the chat).
+// Conversations use a collapsible sidebar; only explicitly pinned answers
+// become canvas cards. Source bindings and sidecar histories remain independent.
+// Contract: docs/multimodal-canvas.md, spec 0021.
 
 /// The zoom capsule's offset from the corner and its approximate width.
 const studyZoomInset = Space.md;
 const studyZoomWidth = 172.0;
 
 extension _StudyStage on StudyCanvasState {
+  StudyEdgeDock _aiDock() => StudyEdgeDock(
+    key: const ValueKey('dock-ai'),
+    id: 'ai',
+    label: 'AI 入口',
+    showHandle: false,
+    dragIcon: Icons.auto_awesome_outlined,
+    surfaceKey: _aiDockKey,
+    placement: _aiPlacement,
+    onChanged: (p) => _moveDock('ai', p),
+    children: (_) => [
+      IconButton(
+        key: const ValueKey('study-ai-tab'),
+        tooltip: '打开 AI 对话',
+        onPressed: _ask,
+        icon: const Icon(Icons.auto_awesome_outlined),
+      ),
+    ],
+  );
+
   List<StudyCard> get _threads =>
       document?.cards.where((c) => c.type == 'conversation').toList() ?? [];
-
-  /// Clearance under the composer: any dock on the bottom edge, and the
-  /// zoom capsule when the composer would reach it.
-  double _stageBottom(double composerWidth) {
-    var dock = 0.0;
-    if (_penPlacement.edge == StudyDockEdge.bottom) dock = 42 * 1.15;
-    if (_toolPlacement.edge == StudyDockEdge.bottom ||
-        _modulePlacement.edge == StudyDockEdge.bottom) {
-      dock = math.max(dock, 52);
-    }
-    final zoom =
-        _viewport.width >= 600 &&
-        (_viewport.width - composerWidth) / 2 < studyZoomWidth + Space.lg;
-    return math.max(
-      Space.md + (dock > 0 ? dock + studyDockMargin * 2 : 0),
-      zoom ? studyZoomInset + 40 + Space.sm : 0,
-    );
-  }
 
   Widget _agentStage() {
     final threads = {for (final c in _threads) c.id: c};
@@ -80,14 +78,8 @@ extension _StudyStage on StudyCanvasState {
     );
   }
 
-  /// Conversations used to be 520×620 chat cards; they are nodes now, and
-  /// the newest one is on the stage when the canvas opens.
+  /// Retain conversation identities and histories without moving saved objects.
   void _adoptThreads(StudyDocument d) {
-    for (final c in d.cards.where((c) => c.type == 'conversation')) {
-      if (c.rect.height > 260) {
-        c.rect = Rect.fromLTWH(c.rect.left, c.rect.top, 300, 200);
-      }
-    }
     if (!d.cards.any((c) => c.id == _activeConversation)) {
       _activeConversation = d.cards
           .where((c) => c.type == 'conversation')
@@ -102,6 +94,7 @@ extension _StudyStage on StudyCanvasState {
     String? send,
     bool bind = true,
     bool pick = false,
+    bool allowImages = false,
     Offset? at,
   }) async {
     final d = document;
@@ -133,6 +126,7 @@ extension _StudyStage on StudyCanvasState {
     _initialConversations[card.id] = {
       'query': query,
       'visuals': visual,
+      'allow_images': allowImages,
       if (send != null && send.trim().isNotEmpty) 'send': send.trim(),
       if (pick) 'pick': true,
     };
@@ -154,12 +148,58 @@ extension _StudyStage on StudyCanvasState {
     );
     for (
       var i = 0;
-      i < 60 && document!.cards.any((c) => c.rect.inflate(16).overlaps(rect));
+      i < 60 &&
+          document!.cards.any(
+            (c) =>
+                c.type != 'conversation' && c.rect.inflate(16).overlaps(rect),
+          );
       i++
     ) {
       rect = rect.shift(Offset(0, size.height + 24));
     }
     return rect;
+  }
+
+  void _pinAnswer(Map turn) {
+    final d = document;
+    final answer = '${turn['answer'] ?? ''}'.trim();
+    if (d == null || answer.isEmpty || !d.editable(d.activeLayer)) return;
+    if (d.cards.length >= 2000) {
+      _toast('画布卡片已达上限');
+      return;
+    }
+    final anchors = [
+      for (final source in (turn['result'] as Map?)?['sources'] as List? ?? [])
+        StudyAnchor.fromJson(source as Map),
+    ];
+    final source = d.cards
+        .where((c) => anchors.any((a) => a.objectId == c.id))
+        .firstOrNull;
+    final rect = source == null
+        ? _freeSpot(const Size(400, 300))
+        : Rect.fromLTWH(source.rect.right + 24, source.rect.top, 400, 300);
+    d.checkpoint();
+    d.cards.add(
+      StudyCard(
+        id: studyId(),
+        type: 'text',
+        layer: d.activeLayer,
+        rect: rect,
+        title: '${turn['question'] ?? 'AI 解答'}'.characters.take(60).toString(),
+        text: answer,
+        sources: anchors,
+      ),
+    );
+    // Pinning is an explicit placement action; reveal the resulting card.
+    final view = _visibleWorld.deflate(64 / d.zoom);
+    if (!view.contains(rect.topLeft) || !view.contains(rect.bottomRight)) {
+      d.camera = _viewport.center(Offset.zero) - rect.center * d.zoom;
+      _cameraChanged();
+    }
+    d.changed();
+    _update(() => _stageOpen = false);
+    _composerFocus.unfocus();
+    _toast('已留在画布，可移动、编辑或撤销');
   }
 
   void _activateThread(String? id) {
@@ -395,10 +435,7 @@ class _StageViewState extends State<_StageView>
     vsync: this,
     duration: const Duration(milliseconds: 1400),
   );
-  final _composer = GlobalKey(),
-      _panel = GlobalKey(),
-      _header = GlobalKey(),
-      _stage = GlobalKey();
+  final _composer = GlobalKey(), _panel = GlobalKey(), _stage = GlobalKey();
   bool _hover = false;
   String? _focusSource;
   bool _looping = false;
@@ -425,11 +462,15 @@ class _StageViewState extends State<_StageView>
     _sync();
   }
 
-  List<GlobalKey> get _keys => [_composer, _panel, _header];
+  List<GlobalKey> get _keys => [_composer, _panel];
 
-  void _claim() => widget.active
-      ? owner._stageKeys.addAll(_keys)
-      : owner._stageKeys.removeAll(_keys);
+  void _claim() {
+    owner._stageKeys.removeAll(_keys);
+    // Offstage retains drafts and layout, but must not reserve canvas input.
+    if (widget.active && owner._stageOpen) {
+      owner._stageKeys.add(_panel);
+    }
+  }
 
   @override
   void didUpdateWidget(_StageView old) {
@@ -481,43 +522,28 @@ class _StageViewState extends State<_StageView>
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final size = MediaQuery.sizeOf(context);
+    _claim();
     final viewport = owner._viewport;
-    final width = math.min(
-      680.0,
-      viewport.width - (viewport.width < 600 ? Space.lg : Space.xxxl * 2),
-    );
-    final cited = widget.turns.isEmpty
-        ? const <String>{}
-        : {
-            for (final s
-                in ((widget.turns.last as Map)['result'] as Map?)?['sources']
-                        as List? ??
-                    const [])
-              if ((s as Map)['object_id'] != null) '${s['object_id']}',
-          };
-    final bound = {
+    final width = math.min(420.0, math.max(240.0, viewport.width - 16));
+    final open = owner._stageOpen;
+    final cited = <String>{
+      for (final s
+          in ((widget.turns.lastOrNull as Map?)?['result'] as Map?)?['sources']
+                  as List? ??
+              [])
+        if ((s as Map)['object_id'] != null) '${s['object_id']}',
+    };
+    final bound = <String>{
       for (final s in widget.sources.cast<Map>())
         if ((s['anchor'] as Map?)?['object_id'] != null)
           '${(s['anchor'] as Map)['object_id']}',
     };
-    // An empty stage is just the composer; its hints appear while typing.
-    final open =
-        owner._stageOpen &&
-        (widget.turns.isNotEmpty ||
-            (widget.active && owner._composerFocus.hasFocus));
-    final bottom = owner._stageBottom(width);
-    final topReserve = 52.0 + Space.xl * 2;
-    final panelMax = math.max(
-      160.0,
-      viewport.height - topReserve - bottom - 210,
-    );
     return Stack(
       key: _stage,
       children: [
-        Positioned.fill(
-          child: IgnorePointer(
-            child: RepaintBoundary(
+        if (open)
+          Positioned.fill(
+            child: IgnorePointer(
               child: CustomPaint(
                 painter: _FlowPainter(
                   owner: owner,
@@ -539,53 +565,35 @@ class _StageViewState extends State<_StageView>
               ),
             ),
           ),
-        ),
         Positioned(
-          left: 0,
-          right: 0,
-          bottom: bottom,
-          child: Center(
-            child: SizedBox(
-              width: width,
-              child: ValueListenableBuilder<bool>(
-                valueListenable: owner._gesturing,
-                // While a stroke or pan is under way the conversation steps
-                // back so the work beneath it stays visible.
-                builder: (context, gesturing, child) => AnimatedOpacity(
-                  opacity: gesturing ? .16 : 1,
-                  duration: Motion.short4,
-                  curve: Motion.standard,
-                  child: IgnorePointer(ignoring: gesturing, child: child),
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    if (widget.thread != null || owner._threads.isNotEmpty)
-                      _headerRow(context, open),
-                    AnimatedSize(
-                      duration: Motion.medium2,
-                      curve: Motion.emphasized,
-                      alignment: Alignment.bottomCenter,
-                      child: open
-                          ? ConstrainedBox(
-                              key: _panel,
-                              constraints: BoxConstraints(
-                                maxHeight: math.min(
-                                  panelMax,
-                                  size.height * .62,
-                                ),
-                              ),
-                              child: widget.turns.isEmpty
-                                  ? TextFieldTapRegion(child: _welcome(context))
-                                  : _conversation(context),
-                            )
-                          : const SizedBox(width: double.infinity),
+          left: owner._aiPlacement.edge == StudyDockEdge.left ? 8 : null,
+          right: owner._aiPlacement.edge == StudyDockEdge.left ? null : 8,
+          top: math.max(76, owner._topBarsBottom + 8),
+          bottom: 80,
+          width: width,
+          child: Offstage(
+            offstage: !open,
+            child: GlassSurface(
+              key: _panel,
+              radius: Corners.lg,
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _headerRow(context, open),
+                  Expanded(
+                    child: widget.turns.isEmpty
+                        ? SingleChildScrollView(child: _welcome(context))
+                        : _conversation(context),
+                  ),
+                  const SizedBox(height: 8),
+                  ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxHeight: math.max(100, viewport.height * .4),
                     ),
-                    const SizedBox(height: Space.sm),
-                    _composerPane(context),
-                  ],
-                ),
+                    child: SingleChildScrollView(child: _composerPane(context)),
+                  ),
+                ],
               ),
             ),
           ),
@@ -599,7 +607,6 @@ class _StageViewState extends State<_StageView>
     final cs = Theme.of(context).colorScheme;
     final threads = owner._threads;
     return Padding(
-      key: _header,
       padding: const EdgeInsets.only(bottom: Space.sm),
       child: Row(
         children: [
@@ -661,24 +668,15 @@ class _StageViewState extends State<_StageView>
             ),
           ),
           const Spacer(),
-          if (widget.turns.isNotEmpty)
-            GlassSurface(
-              radius: Corners.full,
-              shadow: false,
-              child: IconButton(
-                tooltip: open
-                    ? l10n.studyStageCollapse
-                    : l10n.studyStageExpand(widget.turns.length),
-                visualDensity: VisualDensity.compact,
-                onPressed: () =>
-                    owner._update(() => owner._stageOpen = !owner._stageOpen),
-                icon: AnimatedRotation(
-                  turns: open ? 0 : .5,
-                  duration: Motion.short4,
-                  child: const Icon(Icons.keyboard_arrow_down_rounded),
-                ),
-              ),
-            ),
+          IconButton(
+            key: const ValueKey('study-ai-close'),
+            tooltip: '收起 AI 对话',
+            onPressed: () {
+              owner._composerFocus.unfocus();
+              owner._update(() => owner._stageOpen = false);
+            },
+            icon: const Icon(Icons.chevron_right_rounded),
+          ),
         ],
       ),
     );
@@ -839,6 +837,16 @@ class _StageViewState extends State<_StageView>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   SelectionArea(child: LookMarkdown(answer)),
+                  if (raw['state'] == 'done')
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton.icon(
+                        key: ValueKey('study-pin-answer-${raw['id']}'),
+                        onPressed: () => owner._pinAnswer(raw),
+                        icon: const Icon(Icons.push_pin_outlined, size: 16),
+                        label: const Text('留在画布'),
+                      ),
+                    ),
                   if (sources.isNotEmpty) ...[
                     const SizedBox(height: Space.sm),
                     Wrap(

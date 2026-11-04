@@ -454,14 +454,23 @@ void main() {
       final key = await fixture.open(t, api);
       await selectInk(t);
       final before = key.currentState!.document!.cards.single.rect;
+      await t.tap(find.text('问 AI').last);
+      await t.pumpAndSettle();
+      expect(api.request, isNull);
+      await t.enterText(
+        find.byKey(const ValueKey('study-quick-question')),
+        '解释选区',
+      );
       await t.runAsync(() async {
-        await t.tap(find.text('问 AI').last);
-        for (var i = 0; i < 80 && api.selection == null; i++) {
+        await t.tap(find.byTooltip('发送问题'));
+        for (var i = 0; i < 80 && api.request == null; i++) {
           await t.pump();
           await Future<void>.delayed(const Duration(milliseconds: 10));
         }
       });
       await t.pumpAndSettle();
+      expect(api.request?['question'], '解释选区');
+      expect(api.request?['visuals'], isEmpty);
       expect(api.selection?['objects'], ['pdf-page']);
       expect(api.selection?['selection']['object_id'], 'pdf-page');
       expect(api.selection?['selection']['stroke_ids'], ['s']);

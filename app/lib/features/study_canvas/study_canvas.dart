@@ -23,6 +23,7 @@ import '../../theme/tokens.dart';
 import '../../widgets/look_markdown.dart';
 import '../../l10n/l10n.dart';
 import '../player/lecture_player.dart';
+import '../player/video_card_hold.dart';
 import '../practice/quiz.dart';
 import 'study_document.dart';
 import 'study_pdf_column.dart';
@@ -88,13 +89,11 @@ class StudyCanvasState extends State<StudyCanvas> with WidgetsBindingObserver {
   StudyDockPlacement _penPlacement = const StudyDockPlacement(
     StudyDockEdge.bottom,
   );
-  StudyDockPlacement _toolPlacement = const StudyDockPlacement(
-    StudyDockEdge.top,
+  StudyDockPlacement _aiPlacement = const StudyDockPlacement(
+    StudyDockEdge.right,
+    .34,
   );
-  StudyDockPlacement _modulePlacement = const StudyDockPlacement(
-    StudyDockEdge.top,
-    0,
-  );
+  final _aiDockKey = GlobalKey();
   bool _dockSmall = false;
   final _penItemKeys = <int, GlobalKey>{};
   final _eraserKey = GlobalKey();
@@ -111,6 +110,10 @@ class StudyCanvasState extends State<StudyCanvas> with WidgetsBindingObserver {
   bool _lassoRectangle = false;
   Timer? _pressureTimer;
   Timer? _shapeTimer;
+  Timer? _cardHoldTimer;
+  Offset? _cardHoldOrigin;
+  bool _heldCardNeedsCheckpoint = false;
+  final _videoSurfacePointers = <int>{};
   final _inputSurface = GlobalKey();
   StreamSubscription? _stylusEvents;
   Timer? _predictionExpiry;
@@ -127,6 +130,7 @@ class StudyCanvasState extends State<StudyCanvas> with WidgetsBindingObserver {
   List<StudyCard> _copiedCards = [];
   Rect? _copiedBounds;
 
+  final _topBarKey = GlobalKey();
   final _moduleKey = GlobalKey(), _toolbarKey = GlobalKey();
   final _conversationKeys = <String, GlobalKey<_ConversationBodyState>>{};
   final _initialConversations = <String, Map>{};
@@ -139,12 +143,15 @@ class StudyCanvasState extends State<StudyCanvas> with WidgetsBindingObserver {
   final _threadSummary = <String, Map>{};
   final _threadTick = ValueNotifier(0);
   final _stageKeys = <GlobalKey>{};
+  final _cardHeaderActions = <String, GlobalKey>{};
   final _composerFocus = FocusNode(debugLabel: 'study-composer');
   final _idleInput = TextEditingController();
 
   /// True while a stroke, pan or drag is under way; the stage steps back.
   final _gesturing = ValueNotifier(false);
-  bool _stageOpen = true;
+  bool _stageOpen = false;
+  bool _quickAsk = false, _quickSending = false, _quickImages = false;
+  final _quickInput = TextEditingController();
 
   /// The open 课次素材 tab, or null when the shelf is away.
   _ShelfTab? _shelfTab, _shelfShown;
@@ -152,7 +159,6 @@ class StudyCanvasState extends State<StudyCanvas> with WidgetsBindingObserver {
 
   /// Where a dragged shelf item would land, in canvas pixels.
   final _dropHint = ValueNotifier<Rect?>(null);
-  bool _moduleSmall = false, _toolbarSmall = false;
   String _status = l10n.studyOpening;
   bool _importing = false, _disposed = false;
   Timer? _saveTimer;
@@ -172,6 +178,8 @@ class StudyCanvasState extends State<StudyCanvas> with WidgetsBindingObserver {
   Rect? _regionSelection, _sourceHighlight;
   void _update(VoidCallback action) => setState(action);
   final _pointers = <int, Offset>{};
+  final _touchPointers = <int>{}, _stylusPointers = <int>{};
+  Timer? _palmCooldown;
   List<InkPoint> _points = [];
   final List<StudyStroke> _prefix = [];
   int _prefixEnd = 0;
@@ -185,7 +193,6 @@ class StudyCanvasState extends State<StudyCanvas> with WidgetsBindingObserver {
   Offset? _pinchWorld;
   int? _drawingPointer;
   int _pointBudget = 20000;
-  DateTime? _lastStylus;
   Size _viewport = const Size(1000, 700);
 
   @override
@@ -445,6 +452,8 @@ class StudyCanvasState extends State<StudyCanvas> with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    _cancelCardHold();
+    _palmCooldown?.cancel();
     unawaited(_titlebar(false));
     WidgetsBinding.instance.removeObserver(this);
     _syncCheck?.cancel();
@@ -460,6 +469,7 @@ class StudyCanvasState extends State<StudyCanvas> with WidgetsBindingObserver {
     _threadTick.dispose();
     _composerFocus.dispose();
     _idleInput.dispose();
+    _quickInput.dispose();
     _gesturing.dispose();
     _dropHint.dispose();
     document?.removeListener(_changed);
@@ -493,10 +503,12 @@ class StudyCanvasState extends State<StudyCanvas> with WidgetsBindingObserver {
   bool _overControls(Offset global) {
     for (final key in [
       _dockKey,
+      _aiDockKey,
       _zoomKey,
       _selectionMenuKey,
       _moduleKey,
       _toolbarKey,
+      _topBarKey,
       _shelfKey,
       ..._stageKeys,
     ]) {
@@ -509,23 +521,95 @@ class StudyCanvasState extends State<StudyCanvas> with WidgetsBindingObserver {
     return false;
   }
 
+  void _cancelCardHold() {
+    _cardHoldTimer?.cancel();
+    _cardHoldTimer = null;
+    _cardHoldOrigin = null;
+  }
+
+  void _holdMaterial(PointerDownEvent e, StudyCard card) {
+    final d = document!, tool = _tool;
+    if (!d.canTransformCard(card)) return;
+    _cardHoldOrigin = e.localPosition;
+    _cardHoldTimer = Timer(canvasCardHoldDelay, () {
+      _cancelCardHold();
+      if (!mounted ||
+          document != d ||
+          _tool != tool ||
+          _pointers.length != 1 ||
+          !_pointers.containsKey(e.pointer) ||
+          !d.cards.contains(card) ||
+          !d.canTransformCard(card))
+        return;
+      _panCamera = null;
+      _detail.clear();
+      _regionSelection = null;
+      _selectionReady = false;
+      _selectionBounds = null;
+      _selection
+        ..clear()
+        ..add(card.id);
+      _dragCard = card.id;
+      _resize = false;
+      _last = _world(_pointers[e.pointer]!);
+      _heldCardNeedsCheckpoint = true;
+      unawaited(HapticFeedback.selectionClick());
+      setState(() {});
+      _scene.value++;
+    });
+  }
+
   void _down(PointerDownEvent e) {
+    _trackStylusPresence(e);
+    if (e.kind == PointerDeviceKind.touch && _touchBlocked) return;
+    _cancelCardHold();
     _realStylus(e);
     if (_overControls(e.position)) return;
     final d = document!;
     final hitPoint = _world(e.localPosition);
     final hitCard = d.cards
-        .where((c) => d.visible(c.layer) && c.rect.contains(hitPoint))
+        .where(
+          (c) =>
+              c.type != 'conversation' &&
+              d.visible(c.layer) &&
+              c.rect.contains(hitPoint),
+        )
         .lastOrNull;
-    if (hitCard != null && _tool != StudyTool.hand) {
+    // Static material bodies are part of the pan surface. Keep their title
+    // actions and PDF paging controls interactive; ink still uses the pen.
+    final materialBody =
+        hitCard != null &&
+        const {'pdfdoc', 'pdf', 'image'}.contains(hitCard.type) &&
+        hitPoint.dy >= hitCard.rect.top + 36 &&
+        hitPoint.dy < hitCard.rect.bottom - (hitCard.type == 'pdfdoc' ? 36 : 0);
+    final passiveVideoBody =
+        hitCard != null &&
+        const {'lecture', 'video'}.contains(hitCard.type) &&
+        (_writing ||
+            _tool == StudyTool.hand ||
+            _videoSurfacePointers.contains(e.pointer)) &&
+        hitPoint.dy >= hitCard.rect.top + 36 &&
+        hitPoint.dy < hitCard.rect.bottom - 20;
+    if (hitCard != null &&
+        _tool != StudyTool.hand &&
+        e.buttons != kMiddleMouseButton) {
+      final actions =
+          _cardHeaderActions[hitCard.id]?.currentContext?.findRenderObject()
+              as RenderBox?;
       final headerAction =
-          hitPoint.dy < hitCard.rect.top + 36 &&
-          hitPoint.dx > hitCard.rect.right - 150;
-      final content =
-          hitPoint.dy >= hitCard.rect.top + 36 &&
-          hitPoint.dy < hitCard.rect.bottom - 20;
+          actions != null &&
+          actions.hasSize &&
+          actions.size.contains(actions.globalToLocal(e.position));
+      final resizeHandle =
+          e.kind == PointerDeviceKind.mouse &&
+          !hitCard.collapsed &&
+          (hitPoint - hitCard.rect.bottomRight).distance < 28 / d.zoom;
+      final content = hitPoint.dy >= hitCard.rect.top + 36 && !resizeHandle;
       if (headerAction ||
-          (content && (hitCard.type == 'conversation' || !_writing)))
+          (content &&
+              !materialBody &&
+              !passiveVideoBody &&
+              (hitCard.type == 'conversation' || !_writing)))
         return;
     }
     final stylus =
@@ -533,17 +617,15 @@ class StudyCanvasState extends State<StudyCanvas> with WidgetsBindingObserver {
         e.kind == PointerDeviceKind.invertedStylus;
     if (_erasing || _selectionDragging || _lasso.isNotEmpty) return;
     if (_drawingPointer != null && e.pointer != _drawingPointer) return;
-    if (e.kind == PointerDeviceKind.touch &&
-        _lastStylus != null &&
-        DateTime.now().difference(_lastStylus!).inMilliseconds < 1000)
-      return;
     if (stylus) {
-      _lastStylus = DateTime.now();
       _pointers.clear();
       _panCamera = null;
     }
     _pointers[e.pointer] = e.localPosition;
+    if (e.kind == PointerDeviceKind.touch) _touchPointers.add(e.pointer);
     if (_pointers.length == 2 && _drawingPointer == null) {
+      _dragCard = null;
+      _heldCardNeedsCheckpoint = false;
       final p = _pointers.values.toList();
       _marquee = null;
       _lasso.clear();
@@ -584,14 +666,19 @@ class StudyCanvasState extends State<StudyCanvas> with WidgetsBindingObserver {
       _scene.value++;
       return;
     }
-    if ((e.kind == PointerDeviceKind.touch &&
-            !(hitCard != null &&
-                !_writing &&
-                hitPoint.dy < hitCard.rect.top + 36)) ||
+    if (e.kind == PointerDeviceKind.touch ||
         _tool == StudyTool.hand ||
+        ((materialBody || passiveVideoBody) && _tool == StudyTool.select) ||
         e.buttons == kMiddleMouseButton) {
       _panCamera = d.camera;
       _start = e.localPosition;
+      final touchCard = e.kind == PointerDeviceKind.touch && hitCard != null;
+      if ((touchCard || materialBody || passiveVideoBody) &&
+          !stylus &&
+          e.buttons != kMiddleMouseButton &&
+          (e.kind == PointerDeviceKind.touch || _tool == StudyTool.select)) {
+        _holdMaterial(e, hitCard);
+      }
       return;
     }
     if (_tool == StudyTool.eraser ||
@@ -635,7 +722,10 @@ class StudyCanvasState extends State<StudyCanvas> with WidgetsBindingObserver {
       _live.value++;
       return;
     }
-    final hits = d.cards.where((a) => d.visible(a.layer) && a.rect.contains(p));
+    final hits = d.cards.where(
+      (a) =>
+          a.type != 'conversation' && d.visible(a.layer) && a.rect.contains(p),
+    );
     if (hits.isNotEmpty) {
       final c = hits.last;
       if (!_selection.contains(c.id)) {
@@ -644,7 +734,8 @@ class StudyCanvasState extends State<StudyCanvas> with WidgetsBindingObserver {
         _selection.clear();
         _selection.add(c.id);
       }
-      if (d.canTransformCard(c) &&
+      if (!stylus &&
+          d.canTransformCard(c) &&
           (p.dy < c.rect.top + 38 ||
               (!c.collapsed &&
                   (p - c.rect.bottomRight).distance < 28 / d.zoom))) {
@@ -674,12 +765,16 @@ class StudyCanvasState extends State<StudyCanvas> with WidgetsBindingObserver {
             .clamp(.05, 1)
       : .7;
   void _move(PointerMoveEvent e) {
+    _trackStylusPresence(e);
     if (_drawingPointer == e.pointer) _realStylus(e);
     final d = document!;
     if (!_pointers.containsKey(e.pointer)) return;
-    if (e.kind == PointerDeviceKind.stylus ||
-        e.kind == PointerDeviceKind.invertedStylus) {
-      _lastStylus = DateTime.now();
+    if (_cardHoldOrigin != null) {
+      if ((e.localPosition - _cardHoldOrigin!).distance <= 8) {
+        _pointers[e.pointer] = e.localPosition;
+        return;
+      }
+      _cancelCardHold();
     }
     _pointers[e.pointer] = e.localPosition;
     if (!_gesturing.value) _gesturing.value = true;
@@ -752,7 +847,7 @@ class StudyCanvasState extends State<StudyCanvas> with WidgetsBindingObserver {
     }
     if (_erasing) {
       _updateEraserCursor(e.localPosition);
-      if (!_temporaryEraser && _eraserMode == 'lasso') {
+      if (_eraserMode == 'lasso') {
         if (_eraserLasso.length < 1024 &&
             (_eraserLasso.last - p).distance > 3 / d.zoom)
           _eraserLasso.add(p);
@@ -779,24 +874,7 @@ class StudyCanvasState extends State<StudyCanvas> with WidgetsBindingObserver {
       return;
     }
     if (_dragCard != null) {
-      final c = d.cards.firstWhere((a) => a.id == _dragCard), old = c.rect;
-      final delta = p - _last!;
-      final next = _resize
-          ? Rect.fromLTWH(
-              old.left,
-              old.top,
-              math.max(
-                c.type == 'conversation' ? 240 : 280,
-                old.width + delta.dx,
-              ),
-              math.max(
-                c.type == 'conversation' ? 160 : 180,
-                old.height + delta.dy,
-              ),
-            )
-          : old.shift(delta);
-      d.transformCards(_resize ? {c.id} : _selection, old, next);
-      _last = p;
+      _moveHeldCard(p);
       return;
     }
     if (_marquee != null) {
@@ -809,9 +887,45 @@ class StudyCanvasState extends State<StudyCanvas> with WidgetsBindingObserver {
     }
   }
 
+  void _moveHeldCard(Offset p) {
+    final d = document!;
+    final c = d.cards.firstWhere((a) => a.id == _dragCard), old = c.rect;
+    final delta = p - _last!;
+    if (delta == Offset.zero) return;
+    if (_heldCardNeedsCheckpoint) {
+      d.checkpoint();
+      _heldCardNeedsCheckpoint = false;
+    }
+    final next = _resize
+        ? Rect.fromLTWH(
+            old.left,
+            old.top,
+            math.max(
+              c.type == 'conversation' ? 240 : 280,
+              old.width + delta.dx,
+            ),
+            math.max(
+              c.type == 'conversation' ? 160 : 180,
+              old.height + delta.dy,
+            ),
+          )
+        : old.shift(delta);
+    d.transformCards(_resize ? {c.id} : _selection, old, next);
+    _last = p;
+  }
+
+  Widget _videoInput(Widget child) => VideoCardHoldScope(
+    onSurfaceDown: (e) => _videoSurfacePointers.add(e.pointer),
+    onSurfaceEnd: (e) => _videoSurfacePointers.remove(e.pointer),
+    child: child,
+  );
+
   void _up(PointerEvent e) {
+    _trackStylusPresence(e);
     final d = document!;
     if (!_pointers.containsKey(e.pointer)) return;
+    _cancelCardHold();
+    _touchPointers.remove(e.pointer);
     if (_drawingPointer == e.pointer) {
       _clearPrediction();
       _lastRealStylusTime = null;
@@ -888,10 +1002,7 @@ class StudyCanvasState extends State<StudyCanvas> with WidgetsBindingObserver {
       _start = _pointers.values.single;
     }
     if (_pointers.isEmpty) {
-      if (_erasing &&
-          !_temporaryEraser &&
-          _eraserMode == 'lasso' &&
-          e is! PointerCancelEvent) {
+      if (_erasing && _eraserMode == 'lasso' && e is! PointerCancelEvent) {
         d.eraseLasso(_eraserLasso);
         _eraserLasso.clear();
       }
@@ -910,6 +1021,7 @@ class StudyCanvasState extends State<StudyCanvas> with WidgetsBindingObserver {
       _start = _last = null;
       _marquee = null;
       _dragCard = null;
+      _heldCardNeedsCheckpoint = false;
       _erasing = false;
       _pinchDistance = null;
       _scene.value++;
@@ -947,7 +1059,9 @@ class StudyCanvasState extends State<StudyCanvas> with WidgetsBindingObserver {
 
   void _fit() {
     final d = document!;
-    final cards = d.cards.where((a) => d.visible(a.layer));
+    final cards = d.cards.where(
+      (a) => a.type != 'conversation' && d.visible(a.layer),
+    );
     var r = cards.isEmpty
         ? const Rect.fromLTWH(0, 0, 880, 550)
         : cards.first.rect;
@@ -1165,7 +1279,32 @@ class StudyCanvasState extends State<StudyCanvas> with WidgetsBindingObserver {
   }
 
   Future<void> _ask() async {
-    await _openConversation();
+    if (_selectionReady &&
+        _selectionBounds != null &&
+        _tool == StudyTool.region) {
+      _update(() => _quickAsk = true);
+    } else {
+      await _openConversation();
+    }
+  }
+
+  Future<void> _sendQuickQuestion() async {
+    final text = _quickInput.text.trim();
+    if (text.isEmpty || _quickSending) return;
+    _update(() => _quickSending = true);
+    try {
+      await _startConversation(send: text, allowImages: _quickImages);
+      if (!mounted) return;
+      _quickInput.clear();
+      _update(() {
+        _quickAsk = false;
+        _tool = StudyTool.select;
+      });
+    } catch (e) {
+      if (mounted) _toast('无法发送选区问题：$e');
+    } finally {
+      if (mounted) _update(() => _quickSending = false);
+    }
   }
 
   /// The player's full side panel (outline, AI tools) as a dialog.
@@ -1299,23 +1438,13 @@ class StudyCanvasState extends State<StudyCanvas> with WidgetsBindingObserver {
 
   void _moveDock(String id, StudyDockPlacement next) {
     setState(() {
-      final old = switch (id) {
-        'tools' => _toolPlacement,
-        'modules' => _modulePlacement,
-        _ => _penPlacement,
-      };
-      bool occupied(StudyDockPlacement p) =>
-          p.edge == next.edge && (p.offset - next.offset).abs() < .25;
-      if (id != 'tools' && occupied(_toolPlacement)) _toolPlacement = old;
-      if (id != 'modules' && occupied(_modulePlacement)) _modulePlacement = old;
-      if (id != 'pens' && occupied(_penPlacement)) _penPlacement = old;
       switch (id) {
-        case 'tools':
-          _toolPlacement = next;
-        case 'modules':
-          _modulePlacement = next;
+        case 'ai':
+          _aiPlacement = next;
+          _stageOpen = true;
         default:
           _penPlacement = next;
+          _dockSmall = false;
       }
     });
     unawaited(_saveLayout());
@@ -1329,6 +1458,8 @@ class StudyCanvasState extends State<StudyCanvas> with WidgetsBindingObserver {
   );
 
   Widget _canvas(StudyDocument d) {
+    final cardIds = d.cards.map((c) => c.id).toSet();
+    _cardHeaderActions.removeWhere((id, _) => !cardIds.contains(id));
     final stage = _visibleWorld.inflate(
       math.max(_viewport.width, _viewport.height) / d.zoom,
     );
@@ -1340,9 +1471,7 @@ class StudyCanvasState extends State<StudyCanvas> with WidgetsBindingObserver {
           key: const ValueKey('study-input'),
           behavior: HitTestBehavior.translucent,
           onPointerHover: (e) {
-            if (e.kind == PointerDeviceKind.stylus ||
-                e.kind == PointerDeviceKind.invertedStylus)
-              _lastStylus = DateTime.now();
+            _trackStylusPresence(e);
             if (_tool == StudyTool.eraser ||
                 e.kind == PointerDeviceKind.invertedStylus)
               _updateEraserCursor(e.localPosition);
@@ -1439,10 +1568,10 @@ class StudyCanvasState extends State<StudyCanvas> with WidgetsBindingObserver {
                                 ),
                                 for (final c in d.cards.where(
                                   (a) =>
+                                      a.type != 'conversation' &&
                                       d.visible(a.layer) &&
                                       (a.type == 'lecture' ||
                                           a.type == 'video' ||
-                                          a.type == 'conversation' ||
                                           a.rect.overlaps(stage)),
                                 ))
                                   Positioned(
@@ -1496,7 +1625,12 @@ class StudyCanvasState extends State<StudyCanvas> with WidgetsBindingObserver {
                                                 .firstOrNull
                                                 ?.type,
                                           )
-                                      ? inkOnDark(_gestureColor, _tool == StudyTool.highlighter ? 'highlighter' : 'pen')
+                                      ? inkOnDark(
+                                          _gestureColor,
+                                          _tool == StudyTool.highlighter
+                                              ? 'highlighter'
+                                              : 'pen',
+                                        )
                                       : _gestureColor,
                                   width: () => _gestureWidth,
                                   brush: () => _gestureBrush,
@@ -1538,10 +1672,12 @@ class StudyCanvasState extends State<StudyCanvas> with WidgetsBindingObserver {
                   ),
                 _assetDropTarget(),
                 _dropOutline(),
+                _DockGroup(
+                  topInset: _topBarsBottom + 8,
+                  children: [_penDock(), if (!_stageOpen) _aiDock()],
+                ),
+                _fixedTopBars(),
                 _agentStage(),
-                _topToolbar(),
-                _moduleRail(),
-                _penDock(),
                 _selectionToolbar(),
                 _shelf(),
                 if (_viewport.width >= 600)
@@ -1589,7 +1725,10 @@ class StudyCanvasState extends State<StudyCanvas> with WidgetsBindingObserver {
                             tooltip: l10n.studyFit,
                             visualDensity: VisualDensity.compact,
                             onPressed: _fit,
-                            icon: const Icon(Icons.fit_screen_outlined, size: 18),
+                            icon: const Icon(
+                              Icons.fit_screen_outlined,
+                              size: 18,
+                            ),
                           ),
                         ],
                       ),
@@ -1617,20 +1756,17 @@ class StudyCanvasState extends State<StudyCanvas> with WidgetsBindingObserver {
         width: selected ? 2 : 1,
       ),
     );
-    Widget action(
-      String tooltip,
-      IconData icon,
-      VoidCallback? onPressed,
-    ) => IconButton(
-      tooltip: tooltip,
-      onPressed: onPressed,
-      iconSize: 16,
-      visualDensity: VisualDensity.compact,
-      constraints: const BoxConstraints.tightFor(width: 32, height: 32),
-      padding: EdgeInsets.zero,
-      color: cs.onSurfaceVariant,
-      icon: Icon(icon),
-    );
+    Widget action(String tooltip, IconData icon, VoidCallback? onPressed) =>
+        IconButton(
+          tooltip: tooltip,
+          onPressed: onPressed,
+          iconSize: 16,
+          visualDensity: VisualDensity.compact,
+          constraints: const BoxConstraints.tightFor(width: 32, height: 32),
+          padding: EdgeInsets.zero,
+          color: cs.onSurfaceVariant,
+          icon: Icon(icon),
+        );
     final pdfColumn = c.type == 'pdfdoc' && c.pdfColumn.isNotEmpty;
     // Rare actions live in one menu so the header never runs out of room.
     final more = <(String, IconData, VoidCallback?)>[
@@ -1661,12 +1797,6 @@ class StudyCanvasState extends State<StudyCanvas> with WidgetsBindingObserver {
           Icons.vertical_align_center_rounded,
           _importing ? null : () => _collapsePDFColumn(c.pdfColumn),
         ),
-      if (c.type == 'pdf' || c.type == 'pdfdoc')
-        (
-          l10n.studyCardSelectText,
-          Icons.text_snippet_outlined,
-          () => _documentSelection(c),
-        ),
       if (c.generated)
         (
           l10n.studyCardEditKnowledge,
@@ -1676,13 +1806,17 @@ class StudyCanvasState extends State<StudyCanvas> with WidgetsBindingObserver {
       if (c.type == 'text')
         (l10n.studyEditText, Icons.edit_outlined, () => _text(c)),
       if (c.type != 'lecture' && !pdfColumn)
-        (l10n.studyCardDelete, Icons.delete_outline_rounded, () {
-          d.checkpoint();
-          d.cards.removeWhere((v) => v.id == c.id);
-          d.connections.removeWhere((v) => v.from == c.id || v.to == c.id);
-          d.strokes.removeWhere((v) => v.anchor == c.id);
-          d.changed();
-        }),
+        (
+          l10n.studyCardDelete,
+          Icons.delete_outline_rounded,
+          () {
+            d.checkpoint();
+            d.cards.removeWhere((v) => v.id == c.id);
+            d.connections.removeWhere((v) => v.from == c.id || v.to == c.id);
+            d.strokes.removeWhere((v) => v.anchor == c.id);
+            d.changed();
+          },
+        ),
     ];
     return IgnorePointer(
       ignoring: _writing || _tool == StudyTool.hand || !d.editable(c.layer),
@@ -1744,7 +1878,11 @@ class StudyCanvasState extends State<StudyCanvas> with WidgetsBindingObserver {
                         waitDuration: const Duration(milliseconds: 600),
                         child: Text(
                           c.type == 'pdf' && c.pdfColumn.isNotEmpty
-                              ? l10n.studyCardPdfPage(c.title, c.page, c.pageCount)
+                              ? l10n.studyCardPdfPage(
+                                  c.title,
+                                  c.page,
+                                  c.pageCount,
+                                )
                               : c.title,
                           style: Theme.of(context).textTheme.labelLarge
                               ?.copyWith(color: chrome.ink),
@@ -1753,71 +1891,80 @@ class StudyCanvasState extends State<StudyCanvas> with WidgetsBindingObserver {
                         ),
                       ),
                     ),
-                    if (c.type == 'pdfdoc' &&
-                        (c.pdfColumn.isEmpty ||
-                            d.pdfPages(c.id).length < c.pageCount))
-                      action(
-                        c.pdfColumn.isEmpty ? '在画布展开为一列' : '继续展开整列',
-                        Icons.view_agenda_outlined,
-                        _importing ? null : () => _expandPDFColumn(c),
+                    Row(
+                      key: _cardHeaderActions.putIfAbsent(
+                        c.id,
+                        () => GlobalKey(),
                       ),
-                    if (c.type != 'conversation')
-                      Draggable<String>(
-                        data: c.id,
-                        feedback: Material(
-                          type: MaterialType.transparency,
-                          child: GlassSurface(
-                            depth: GlassDepth.float,
-                            radius: Corners.full,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: Space.md,
-                              vertical: Space.sm,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (c.type == 'pdfdoc' &&
+                            (c.pdfColumn.isEmpty ||
+                                d.pdfPages(c.id).length < c.pageCount))
+                          action(
+                            c.pdfColumn.isEmpty ? '在画布展开为一列' : '继续展开整列',
+                            Icons.view_agenda_outlined,
+                            _importing ? null : () => _expandPDFColumn(c),
+                          ),
+                        if (c.type != 'conversation')
+                          Draggable<String>(
+                            data: c.id,
+                            feedback: Material(
+                              type: MaterialType.transparency,
+                              child: GlassSurface(
+                                depth: GlassDepth.float,
+                                radius: Corners.full,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: Space.md,
+                                  vertical: Space.sm,
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.add_comment_outlined,
+                                      size: 16,
+                                      color: cs.primary,
+                                    ),
+                                    const SizedBox(width: Space.sm),
+                                    ConstrainedBox(
+                                      constraints: const BoxConstraints(
+                                        maxWidth: 220,
+                                      ),
+                                      child: Text(
+                                        c.title,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
                             ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.add_comment_outlined,
-                                  size: 16,
-                                  color: cs.primary,
-                                ),
-                                const SizedBox(width: Space.sm),
-                                ConstrainedBox(
-                                  constraints: const BoxConstraints(
-                                    maxWidth: 220,
-                                  ),
-                                  child: Text(
-                                    c.title,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ],
+                            child: action(
+                              l10n.studyCardAsk,
+                              Icons.add_comment_outlined,
+                              () => _chooseConversation(c),
                             ),
                           ),
-                        ),
-                        child: action(
-                          l10n.studyCardAsk,
-                          Icons.add_comment_outlined,
-                          () => _chooseConversation(c),
-                        ),
-                      ),
-                    if (more.isNotEmpty)
-                      MenuAnchor(
-                        menuChildren: [
-                          for (final (label, icon, run) in more)
-                            MenuItemButton(
-                              leadingIcon: Icon(icon, size: 18),
-                              onPressed: run,
-                              child: Text(label),
+                        if (more.isNotEmpty)
+                          MenuAnchor(
+                            menuChildren: [
+                              for (final (label, icon, run) in more)
+                                MenuItemButton(
+                                  leadingIcon: Icon(icon, size: 18),
+                                  onPressed: run,
+                                  child: Text(label),
+                                ),
+                            ],
+                            builder: (context, menu, _) => action(
+                              l10n.studyCardMore,
+                              Icons.more_horiz_rounded,
+                              () => menu.isOpen ? menu.close() : menu.open(),
                             ),
-                        ],
-                        builder: (context, menu, _) => action(
-                          l10n.studyCardMore,
-                          Icons.more_horiz_rounded,
-                          () => menu.isOpen ? menu.close() : menu.open(),
-                        ),
-                      ),
+                          ),
+                      ],
+                    ),
                     Icon(
                       Icons.drag_indicator_rounded,
                       size: 16,
@@ -1839,13 +1986,22 @@ class StudyCanvasState extends State<StudyCanvas> with WidgetsBindingObserver {
                     'conversation' => _ThreadNode(owner: this, card: c),
                     'lecture' => Column(
                       children: [
-                        Expanded(child: widget.video),
-                        SizedBox(
-                          height: 30,
-                          child: TextButton.icon(
-                            onPressed: () => _toggleShelf(_ShelfTab.transcript),
-                            icon: const Icon(Icons.subtitles_outlined, size: 16),
-                            label: Text(l10n.studyShelfFromVideo),
+                        Expanded(child: _videoInput(widget.video)),
+                        TextButton.icon(
+                          key: const ValueKey('study-video-shelf'),
+                          style: TextButton.styleFrom(
+                            minimumSize: const Size(0, 48),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 10,
+                            ),
+                          ),
+                          onPressed: () => _toggleShelf(_ShelfTab.transcript),
+                          icon: const Icon(Icons.subtitles_outlined, size: 16),
+                          label: Text(
+                            l10n.studyShelfFromVideo,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ],
@@ -1861,16 +2017,21 @@ class StudyCanvasState extends State<StudyCanvas> with WidgetsBindingObserver {
                       errorBuilder: (_, error, stack) =>
                           Center(child: Text(l10n.studyImageFailed)),
                     ),
-                    'video' => _LocalVideo(
-                      key: _localVideoKeys.putIfAbsent(
-                        c.id,
-                        () => GlobalKey<_LocalVideoState>(),
+                    'video' => _videoInput(
+                      _LocalVideo(
+                        key: _localVideoKeys.putIfAbsent(
+                          c.id,
+                          () => GlobalKey<_LocalVideoState>(),
+                        ),
+                        url: c.path.isEmpty
+                            ? widget.api.studyMediaUrl(
+                                widget.ctl.lectureId,
+                                c.id,
+                              )
+                            : widget.api.fileUrl(c.path),
+                        initialMs: _localVideoTimes[c.id] ?? 0,
+                        onPosition: (ms) => _localVideoTimes[c.id] = ms,
                       ),
-                      url: c.path.isEmpty
-                          ? widget.api.studyMediaUrl(widget.ctl.lectureId, c.id)
-                          : widget.api.fileUrl(c.path),
-                      initialMs: _localVideoTimes[c.id] ?? 0,
-                      onPosition: (ms) => _localVideoTimes[c.id] = ms,
                     ),
                     'note' ||
                     'explanation' ||
@@ -1989,14 +2150,55 @@ class _LocalVideoState extends State<_LocalVideo> {
 
   @override
   Widget build(BuildContext context) => _error == null
-      ? Video(controller: controller)
+      ? MaterialDesktopVideoControlsTheme(
+          normal: const MaterialDesktopVideoControlsThemeData(
+            modifyVolumeOnScroll: false,
+            playAndPauseOnTap: false,
+            toggleFullscreenOnDoublePress: false,
+            primaryButtonBar: [],
+            topButtonBar: [],
+            buttonBarHeight: 48,
+            seekBarContainerHeight: 36,
+            bottomButtonBarMargin: EdgeInsets.zero,
+          ),
+          fullscreen: const MaterialDesktopVideoControlsThemeData(),
+          child: MaterialVideoControlsTheme(
+            normal: const MaterialVideoControlsThemeData(
+              volumeGesture: false,
+              brightnessGesture: false,
+              seekGesture: false,
+              seekOnDoubleTap: false,
+              speedUpOnLongPress: false,
+              primaryButtonBar: [],
+              topButtonBar: [],
+              bottomButtonBar: [
+                MaterialPlayOrPauseButton(),
+                MaterialPositionIndicator(),
+                Spacer(),
+                MaterialFullscreenButton(),
+              ],
+              buttonBarHeight: 48,
+              seekBarContainerHeight: 36,
+              bottomButtonBarMargin: EdgeInsets.zero,
+            ),
+            fullscreen: const MaterialVideoControlsThemeData(),
+            child: VideoCardHoldRegion(
+              bottomControlsHeight: 84,
+              child: Video(controller: controller),
+            ),
+          ),
+        )
       : Center(child: Text(l10n.studyLocalVideoError(_error!)));
 }
 
 /// The paper colour as shown: in dark mode each paper keeps a trace of its
 /// hue over the scheme's low container surface.
-Color studyPaperTone(int color, ColorScheme cs) => cs.brightness == Brightness.dark
-    ? Color.alphaBlend(Color(color).withValues(alpha: color == 0xffffffff ? 0 : .06), cs.surfaceContainerLow)
+Color studyPaperTone(int color, ColorScheme cs) =>
+    cs.brightness == Brightness.dark
+    ? Color.alphaBlend(
+        Color(color).withValues(alpha: color == 0xffffffff ? 0 : .06),
+        cs.surfaceContainerLow,
+      )
     : Color(color);
 
 class _Paper extends CustomPainter {
@@ -2067,7 +2269,10 @@ class _InkScene extends CustomPainter {
     c.translate(-stage.left, -stage.top);
     final viewport = stage;
     final printed = dark
-        ? {for (final card in d.cards) if (studyOnPrintedPage(card.type)) card.id}
+        ? {
+            for (final card in d.cards)
+              if (studyOnPrintedPage(card.type)) card.id,
+          }
         : const <String>{};
     for (final stroke in [...d.strokes, ...live]) {
       if (d.strokeVisible(stroke) && stroke.bounds.overlaps(viewport))
