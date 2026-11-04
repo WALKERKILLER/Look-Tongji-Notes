@@ -446,6 +446,27 @@ func (s *Store) Segments(ctx context.Context, lectureID string, fromMs, toMs int
 	return out, rows.Err()
 }
 
+// DisorderedTranscripts lists lectures with a segment that ends before it
+// starts or starts over a second before the one preceding it.
+func (s *Store) DisorderedTranscripts(ctx context.Context) ([]string, error) {
+	rows, err := s.DB.QueryContext(ctx, `SELECT DISTINCT lecture_id FROM (
+ SELECT lecture_id, start_ms, end_ms, LAG(start_ms) OVER (PARTITION BY lecture_id ORDER BY idx) AS prev FROM segments)
+ WHERE end_ms + 1000 < start_ms OR start_ms + 1000 < prev`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		out = append(out, id)
+	}
+	return out, rows.Err()
+}
+
 // ---- search ----
 
 type Hit struct {

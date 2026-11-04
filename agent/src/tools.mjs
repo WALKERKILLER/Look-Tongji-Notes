@@ -625,10 +625,13 @@ export function createTools(conv, pluginGroups = {}, extra = {}) {
 			name: "generate_timeline",
 			label: "生成大纲",
 			description:
-				"Generate and save a lecture's outline from its transcript in one step (a separate model call reads the whole transcript, so you do not need to). Overwrites any existing outline.",
-			parameters: Type.Object({ lecture_id: Type.String() }),
-			execute: async (_id, { lecture_id }, signal) => {
-				const chs = await generateTimeline(conv.pipeline, lecture_id, signal);
+				"Generate and save a lecture's outline from its transcript in one step (a separate model call reads the whole transcript, so you do not need to). Overwrites any existing outline. detail: 'concise' (default; the main stages only) or 'detailed' (one chapter per topic); use 'detailed' only when the user asks for a finer outline.",
+			parameters: Type.Object({
+				lecture_id: Type.String(),
+				detail: Type.Optional(Type.Union([Type.Literal("concise"), Type.Literal("detailed")])),
+			}),
+			execute: async (_id, { lecture_id, detail }, signal) => {
+				const chs = await generateTimeline(conv.pipeline, lecture_id, signal, detail);
 				return text(chs.map((c) => `[${clock(c.start_ms)}]–[${clock(c.end_ms)}] ${c.title}`).join("\n"), { timeline: chs, lecture_id });
 			},
 		},

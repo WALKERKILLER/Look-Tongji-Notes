@@ -246,8 +246,9 @@ class LecturePlayer extends ChangeNotifier implements PlayerHandle {
   }
 
   /// Asks the assistant host to write the outline (one model call over the
-  /// whole transcript). Errors land in [outlineError].
-  Future<void> generateOutline() async {
+  /// whole transcript), by main stage or, when [detailed], by topic. Errors
+  /// land in [outlineError].
+  Future<void> generateOutline({bool detailed = false}) async {
     if (outlineBusy) return;
     outlineBusy = true;
     outlineError = null;
@@ -255,6 +256,7 @@ class LecturePlayer extends ChangeNotifier implements PlayerHandle {
     try {
       final r = (await api.post('/agent/timeline', {
         'lecture_id': lectureId,
+        'detail': detailed ? 'detailed' : 'concise',
       }, const Duration(minutes: 4)) as Map).cast<String, dynamic>();
       chapters = jsonList(r['chapters'])
           .map((e) => Chapter((e as Map).cast<String, dynamic>()))

@@ -587,6 +587,15 @@
     }
   },
   "outlineGenerate": "生成大纲",
+  "outlineConcise": "精简",
+  "outlineDetailed": "详细",
+  "outlineDetailHint": "精简只分课堂的主要阶段，详细按知识点分章",
+  "outlineRedone": "已改为{mode}大纲",
+  "@outlineRedone": {
+    "placeholders": {
+      "mode": {}
+    }
+  },
   "outlineRegenerating": "正在重新分章…",
   "outlineSummary": "{length} 章 · {value}",
   "@outlineSummary": {

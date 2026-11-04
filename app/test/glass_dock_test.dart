@@ -44,6 +44,37 @@ void main() {
     expect(t.takeException(), isNull);
   });
 
+  testWidgets('the lens is inset evenly so its corners follow the pill', (t) async {
+    await t.pumpWidget(dock(selected: 0));
+    await t.pumpAndSettle();
+    final lens = t.getRect(find.byKey(const ValueKey('dock-lens')));
+    final pill = t.getRect(find.byKey(const ValueKey('dock-bar')));
+    expect(lens.top - pill.top, GlassNavDock.inset);
+    expect(pill.bottom - lens.bottom, GlassNavDock.inset);
+    expect(lens.left - pill.left, GlassNavDock.inset);
+    expect(GlassNavDock.lensRadius, GlassNavDock.height / 2 - GlassNavDock.inset);
+  });
+
+  testWidgets('pressing and sliding along the dock selects where the finger lifts', (t) async {
+    final picked = <int>[];
+    await t.pumpWidget(dock(onSelected: picked.add));
+    await t.pumpAndSettle();
+    final g = await t.startGesture(t.getCenter(find.text('首页')));
+    await t.pump();
+    for (final label in ['课程', '日程', '下载']) {
+      await g.moveTo(t.getCenter(find.text(label)));
+      await t.pump();
+    }
+    // The lens follows the finger before anything is selected.
+    final lens = t.getRect(find.byKey(const ValueKey('dock-lens')));
+    expect(lens.center.dx, closeTo(t.getCenter(find.text('下载')).dx, 8));
+    expect(picked, isEmpty);
+    await g.up();
+    await t.pumpAndSettle();
+    expect(picked, [3]);
+    expect(t.takeException(), isNull);
+  });
+
   testWidgets('a minimized dock shows the current destination and expands on tap', (t) async {
     var expanded = false;
     await t.pumpWidget(dock(selected: 1, minimized: true, onExpand: () => expanded = true));

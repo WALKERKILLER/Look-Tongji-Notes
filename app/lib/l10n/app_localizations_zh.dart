@@ -926,6 +926,20 @@ class AppLocalizationsZh extends AppLocalizations {
   String get outlineGenerate => '生成大纲';
 
   @override
+  String get outlineConcise => '精简';
+
+  @override
+  String get outlineDetailed => '详细';
+
+  @override
+  String get outlineDetailHint => '精简只分课堂的主要阶段，详细按知识点分章';
+
+  @override
+  String outlineRedone(Object mode) {
+    return '已改为$mode大纲';
+  }
+
+  @override
   String get outlineRegenerating => '正在重新分章…';
 
   @override
