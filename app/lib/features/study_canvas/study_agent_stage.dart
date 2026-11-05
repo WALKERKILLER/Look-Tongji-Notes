@@ -190,16 +190,41 @@ extension _StudyStage on StudyCanvasState {
         sources: anchors,
       ),
     );
-    // Pinning is an explicit placement action; reveal the resulting card.
-    final view = _visibleWorld.deflate(64 / d.zoom);
-    if (!view.contains(rect.topLeft) || !view.contains(rect.bottomRight)) {
-      d.camera = _viewport.center(Offset.zero) - rect.center * d.zoom;
-      _cameraChanged();
-    }
     d.changed();
+    // Pinning is an explicit placement action; carry the view to the card.
+    _reveal(rect);
     _update(() => _stageOpen = false);
     _composerFocus.unfocus();
     _toast('已留在画布，可移动、编辑或撤销');
+  }
+
+  /// Brings [rect] into view at the current zoom when it is not already.
+  void _reveal(Rect rect) {
+    final d = document!;
+    final view = _visibleWorld.deflate(64 / d.zoom);
+    if (view.contains(rect.topLeft) && view.contains(rect.bottomRight)) return;
+    _flyTo(_viewport.center(Offset.zero) - rect.center * d.zoom, d.zoom);
+  }
+
+  /// The card an answer was pinned as, while it still holds the answer.
+  StudyCard? _pinnedCard(Map turn) {
+    final answer = '${turn['answer'] ?? ''}'.trim();
+    if (answer.isEmpty) return null;
+    return document?.cards
+        .where((c) => c.type == 'text' && c.text == answer)
+        .lastOrNull;
+  }
+
+  /// Selects a pinned card and carries the view to it.
+  void _revealCard(StudyCard card) {
+    _update(() {
+      _selection
+        ..clear()
+        ..add(card.id);
+      _stageOpen = false;
+    });
+    _scene.value++;
+    _reveal(card.rect);
   }
 
   void _activateThread(String? id) {
@@ -571,12 +596,14 @@ class _StageViewState extends State<_StageView>
           top: math.max(76, owner._topBarsBottom + 8),
           bottom: 80,
           width: width,
-          child: Offstage(
-            offstage: !open,
+          child: _SidebarMotion(
+            open: open,
+            fromStart: owner._aiPlacement.edge == StudyDockEdge.left,
             child: GlassSurface(
               key: _panel,
-              radius: Corners.lg,
-              padding: const EdgeInsets.all(12),
+              depth: GlassDepth.panel,
+              radius: _sidebarRadius,
+              padding: const EdgeInsets.all(_sidebarInset),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -586,7 +613,7 @@ class _StageViewState extends State<_StageView>
                         ? SingleChildScrollView(child: _welcome(context))
                         : _conversation(context),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: Space.sm),
                   ConstrainedBox(
                     constraints: BoxConstraints(
                       maxHeight: math.max(100, viewport.height * .4),
@@ -630,18 +657,18 @@ class _StageViewState extends State<_StageView>
                 child: Text(l10n.studyThreadNew),
               ),
             ],
-            builder: (context, menu, _) => GlassSurface(
+            builder: (context, menu, _) => _Well(
               radius: Corners.full,
-              shadow: false,
+              color: cs.onSurface.withValues(alpha: .06),
               child: InkWell(
                 customBorder: const StadiumBorder(),
                 onTap: () => menu.isOpen ? menu.close() : menu.open(),
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(
+                  padding: const EdgeInsetsDirectional.fromSTEB(
                     Space.md,
-                    Space.xs + 2,
                     Space.sm,
-                    Space.xs + 2,
+                    Space.sm,
+                    Space.sm,
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -675,7 +702,12 @@ class _StageViewState extends State<_StageView>
               owner._composerFocus.unfocus();
               owner._update(() => owner._stageOpen = false);
             },
-            icon: const Icon(Icons.chevron_right_rounded),
+            // Points the way the panel leaves.
+            icon: Icon(
+              owner._aiPlacement.edge == StudyDockEdge.left
+                  ? Icons.chevron_left_rounded
+                  : Icons.chevron_right_rounded,
+            ),
           ),
         ],
       ),
@@ -690,15 +722,10 @@ class _StageViewState extends State<_StageView>
       l10n.studyIdeaExplain,
       l10n.studyIdeaQuiz,
     ];
-    return GlassSurface(
-      depth: GlassDepth.panel,
-      radius: Corners.xl,
-      padding: const EdgeInsets.fromLTRB(
-        Space.xl,
-        Space.lg,
-        Space.xl,
-        Space.lg,
-      ),
+    return _Well(
+      radius: _innerRadius,
+      color: _wellOf(cs),
+      padding: const EdgeInsets.all(Space.lg),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -776,14 +803,12 @@ class _StageViewState extends State<_StageView>
               constraints: BoxConstraints(
                 maxWidth: owner._viewport.width < 600 ? 280 : 460,
               ),
-              child: GlassSurface(
-                depth: GlassDepth.panel,
-                radius: Corners.lg,
-                shadow: false,
-                tint: cs.primaryContainer,
+              child: _Well(
+                radius: _innerRadius,
+                color: cs.primaryContainer,
                 padding: const EdgeInsets.symmetric(
                   horizontal: Space.lg,
-                  vertical: Space.sm + 2,
+                  vertical: Space.md,
                 ),
                 child: SelectableText(
                   '${raw['question']}',
@@ -796,10 +821,9 @@ class _StageViewState extends State<_StageView>
           if (working)
             Align(
               alignment: AlignmentDirectional.centerStart,
-              child: GlassSurface(
-                depth: GlassDepth.panel,
+              child: _Well(
                 radius: Corners.full,
-                shadow: false,
+                color: _wellOf(cs),
                 padding: const EdgeInsets.symmetric(
                   horizontal: Space.md,
                   vertical: Space.sm,
@@ -824,14 +848,14 @@ class _StageViewState extends State<_StageView>
               ),
             )
           else if (answer.isNotEmpty)
-            GlassSurface(
-              depth: GlassDepth.panel,
-              radius: Corners.xl,
+            _Well(
+              radius: _innerRadius,
+              color: _wellOf(cs),
               padding: const EdgeInsets.fromLTRB(
                 Space.lg,
                 Space.md,
                 Space.lg,
-                Space.md,
+                Space.sm,
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -839,12 +863,12 @@ class _StageViewState extends State<_StageView>
                   SelectionArea(child: LookMarkdown(answer)),
                   if (raw['state'] == 'done')
                     Align(
-                      alignment: Alignment.centerRight,
-                      child: TextButton.icon(
+                      alignment: AlignmentDirectional.centerEnd,
+                      child: _PinButton(
                         key: ValueKey('study-pin-answer-${raw['id']}'),
-                        onPressed: () => owner._pinAnswer(raw),
-                        icon: const Icon(Icons.push_pin_outlined, size: 16),
-                        label: const Text('留在画布'),
+                        pinned: owner._pinnedCard(raw),
+                        onPin: () => owner._pinAnswer(raw),
+                        onShow: (card) => owner._revealCard(card),
                       ),
                     ),
                   if (sources.isNotEmpty) ...[
@@ -891,12 +915,10 @@ class _StageViewState extends State<_StageView>
               ),
             ),
           if (failed)
-            GlassSurface(
-              depth: GlassDepth.panel,
-              radius: Corners.lg,
-              shadow: false,
-              tint: cs.errorContainer,
-              padding: const EdgeInsets.fromLTRB(
+            _Well(
+              radius: _innerRadius,
+              color: cs.errorContainer,
+              padding: const EdgeInsetsDirectional.fromSTEB(
                 Space.lg,
                 Space.xs,
                 Space.xs,
@@ -947,17 +969,12 @@ class _StageViewState extends State<_StageView>
         setState(() => _hover = false);
         widget.onDrop(v.data);
       },
-      builder: (context, _, _) => GlassSurface(
+      builder: (context, _, _) => _Well(
         key: _composer,
-        depth: GlassDepth.float,
-        radius: Corners.xl,
-        selected: _hover,
-        padding: const EdgeInsets.fromLTRB(
-          Space.sm,
-          Space.sm,
-          Space.sm,
-          Space.sm,
-        ),
+        radius: _innerRadius,
+        color: _wellOf(cs, strong: true),
+        outline: _hover ? cs.primary : null,
+        padding: const EdgeInsets.all(Space.sm),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1472,4 +1489,172 @@ class _FlowPainter extends CustomPainter {
       o.focus != focus ||
       o.busy != busy ||
       o.scheme != scheme;
+}
+
+// The sidebar is the one glass pane; what sits inside it is tonal, with
+// corners concentric to the pane's (outer = inner + inset).
+const double _sidebarRadius = Corners.xl;
+const double _sidebarInset = Space.md;
+const double _innerRadius = _sidebarRadius - _sidebarInset;
+
+/// A reading surface inside the sidebar: lighter than the frost in light
+/// mode, raised from it in dark mode. [strong] is the composer's.
+Color _wellOf(ColorScheme cs, {bool strong = false}) =>
+    cs.brightness == Brightness.dark
+    ? cs.surfaceBright.withValues(alpha: strong ? .55 : .38)
+    : cs.surfaceContainerLowest.withValues(alpha: strong ? .94 : .78);
+
+/// A tonal surface inside a glass pane. Unlike [GlassSurface] it does not
+/// blur again, so nested content stays crisp and cheap.
+class _Well extends StatelessWidget {
+  const _Well({
+    super.key,
+    required this.radius,
+    required this.color,
+    required this.child,
+    this.padding = EdgeInsets.zero,
+    this.outline,
+  });
+  final double radius;
+  final Color color;
+  final Color? outline;
+  final EdgeInsetsGeometry padding;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final shape = RoundedSuperellipseBorder(
+      borderRadius: BorderRadius.circular(radius),
+      side: outline == null
+          ? BorderSide.none
+          : BorderSide(color: outline!, width: 1.5),
+    );
+    return AnimatedContainer(
+      duration: Motion.short3,
+      decoration: ShapeDecoration(shape: shape, color: color),
+      child: Material(
+        type: MaterialType.transparency,
+        shape: shape,
+        clipBehavior: Clip.antiAlias,
+        child: Padding(padding: padding, child: child),
+      ),
+    );
+  }
+}
+
+/// Slides the sidebar in from its edge and back out, keeping its state
+/// while hidden.
+class _SidebarMotion extends StatefulWidget {
+  const _SidebarMotion({
+    required this.open,
+    required this.fromStart,
+    required this.child,
+  });
+  final bool open, fromStart;
+  final Widget child;
+
+  @override
+  State<_SidebarMotion> createState() => _SidebarMotionState();
+}
+
+class _SidebarMotionState extends State<_SidebarMotion>
+    with SingleTickerProviderStateMixin {
+  late final _c = AnimationController(
+    vsync: this,
+    duration: Motion.medium2,
+    reverseDuration: Motion.short4,
+  )..addStatusListener((_) => setState(() {}));
+  bool _entered = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // A conversation opened straight onto the stage slides in as well.
+    if (_entered) return;
+    _entered = true;
+    if (!widget.open) return;
+    MediaQuery.disableAnimationsOf(context) ? _c.value = 1 : _c.forward();
+  }
+
+  @override
+  void didUpdateWidget(_SidebarMotion old) {
+    super.didUpdateWidget(old);
+    if (old.open == widget.open) return;
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _c.value = widget.open ? 1 : 0;
+    } else {
+      widget.open ? _c.forward() : _c.reverse();
+    }
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final curve = CurvedAnimation(
+      parent: _c,
+      curve: Motion.emphasizedDecelerate,
+      reverseCurve: Motion.emphasizedAccelerate,
+    );
+    // A short travel: the panel arrives from where the AI entry sat.
+    final from = Offset(widget.fromStart ? -.06 : .06, 0);
+    return Offstage(
+      offstage: _c.isDismissed,
+      child: IgnorePointer(
+        ignoring: !widget.open,
+        child: FadeTransition(
+          opacity: curve,
+          child: SlideTransition(
+            position: Tween(begin: from, end: Offset.zero).animate(curve),
+            child: widget.child,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 留在画布 on a finished answer; once pinned it turns into a way back to
+/// the card instead of offering a second copy.
+class _PinButton extends StatelessWidget {
+  const _PinButton({
+    super.key,
+    required this.pinned,
+    required this.onPin,
+    required this.onShow,
+  });
+  final StudyCard? pinned;
+  final VoidCallback onPin;
+  final ValueChanged<StudyCard> onShow;
+
+  @override
+  Widget build(BuildContext context) => AnimatedSwitcher(
+    duration: Motion.short4,
+    switchInCurve: Motion.emphasizedDecelerate,
+    switchOutCurve: Motion.emphasizedAccelerate,
+    transitionBuilder: (child, a) => FadeTransition(
+      opacity: a,
+      child: ScaleTransition(
+        scale: Tween(begin: .92, end: 1.0).animate(a),
+        child: child,
+      ),
+    ),
+    child: pinned == null
+        ? TextButton.icon(
+            key: const ValueKey('pin'),
+            onPressed: onPin,
+            icon: const Icon(Icons.push_pin_outlined, size: 18),
+            label: const Text('留在画布'),
+          )
+        : TextButton.icon(
+            key: const ValueKey('pinned'),
+            onPressed: () => onShow(pinned!),
+            icon: const Icon(Icons.check_rounded, size: 18),
+            label: const Text('已在画布 · 查看'),
+          ),
+  );
 }

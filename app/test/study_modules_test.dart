@@ -279,6 +279,14 @@ void main() {
       expect(find.byTooltip('发送'), findsNothing);
       await key.currentState!.flush();
       expect(StudyDocument.fromJson(api.doc).cards.last.text, pinned.text);
+      // The answer now leads back to its card instead of pinning a copy.
+      await t.tap(find.byKey(const ValueKey('study-ai-tab')));
+      await t.pumpAndSettle();
+      expect(find.text('留在画布'), findsNothing);
+      await t.tap(find.text('已在画布 · 查看'));
+      await t.pumpAndSettle();
+      expect(d.cards.where((c) => c.type == 'text'), hasLength(2));
+      expect(find.byTooltip('发送'), findsNothing);
       d.undo();
       await t.pumpAndSettle();
       expect(d.cards.any((c) => c.id == pinned.id), false);

@@ -66,23 +66,33 @@ class StudyEdgeDock extends StatefulWidget {
 }
 
 class _StudyEdgeDockState extends State<StudyEdgeDock>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   _DockGroupState? _group;
-  late final _snap =
-      AnimationController(
-          vsync: this,
-          duration: const Duration(milliseconds: 180),
-        )
-        ..addListener(() => _group?.relayout.value++)
-        ..addStatusListener((status) {
-          if (status != AnimationStatus.completed || _target == null) return;
-          final target = _target!;
-          setState(() {
-            _center = null;
-            _target = null;
-          });
-          widget.onChanged(target);
-        });
+  late final _snap = AnimationController(vsync: this, duration: Motion.medium1)
+    ..addListener(() => _group?.relayout.value++)
+    ..addStatusListener((status) {
+      if (status != AnimationStatus.completed || _target == null) return;
+      final target = _target!;
+      setState(() {
+        _center = null;
+        _target = null;
+      });
+      // Settled: a tick, and the dock opens out from the edge.
+      unawaited(HapticFeedback.selectionClick());
+      _bloom();
+      widget.onChanged(target);
+    });
+
+  /// Grows the dock in when it changes form: the ball under the finger on
+  /// pickup, the full dock from its edge once it has snapped.
+  late final _form = AnimationController(
+    vsync: this,
+    duration: Motion.medium2,
+    value: 1,
+  );
+  void _bloom() => MediaQuery.disableAnimationsOf(context)
+      ? _form.value = 1
+      : _form.forward(from: 0);
   Offset? _center;
   StudyDockPlacement? _target;
 
@@ -101,12 +111,15 @@ class _StudyEdgeDockState extends State<StudyEdgeDock>
   void dispose() {
     _group?.docks.remove(widget.id);
     _snap.dispose();
+    _form.dispose();
     super.dispose();
   }
 
   void _start(DragStartDetails e) {
     _snap.reset();
+    unawaited(HapticFeedback.lightImpact());
     _moveTo(e.globalPosition);
+    _bloom();
   }
 
   void _moveTo(Offset global) {
@@ -145,11 +158,13 @@ class _StudyEdgeDockState extends State<StudyEdgeDock>
   }
 
   void _cancel() {
+    final moved = _center != null;
     _snap.stop();
     setState(() {
       _center = null;
       _target = null;
     });
+    if (moved) _bloom();
     _group?.relayout.value++;
   }
 
@@ -234,6 +249,12 @@ class _StudyEdgeDockState extends State<StudyEdgeDock>
               if (widget.trailing != null) widget.trailing!,
             ],
           );
+          // Pickup scales from the finger; the docked form from its edge.
+          final grow = floating ? Alignment.center : widget.placement.alignment;
+          final form = CurvedAnimation(
+            parent: _form,
+            curve: Motion.emphasizedDecelerate,
+          );
           return Listener(
             onPointerCancel: (_) => _cancel(),
             child: GestureDetector(
@@ -243,64 +264,78 @@ class _StudyEdgeDockState extends State<StudyEdgeDock>
               onPanUpdate: (e) => _moveTo(e.globalPosition),
               onPanEnd: (_) => _end(),
               onPanCancel: _cancel,
-              child: SizedBox(
-                key: ValueKey('study-dock-${widget.id}'),
-                width: floating
-                    ? 52
-                    : (vertical ? widget.thickness * widget.scale : null),
-                height: floating
-                    ? 52
-                    : (vertical ? null : widget.thickness * widget.scale),
-                child: FittedBox(
-                  fit: BoxFit.contain,
-                  child: GlassSurface(
-                    key: widget.surfaceKey,
-                    selected: floating,
-                    radius: floating
-                        ? 26
-                        : (widget.centerHandle
-                              ? Corners.lg
-                              : widget.thickness / 2),
-                    child: floating
-                        ? SizedBox(
-                            width: 52,
-                            height: 52,
-                            child: Icon(
-                              widget.dragIcon,
-                              key: ValueKey('study-dock-floating-${widget.id}'),
-                            ),
-                          )
-                        : ConstrainedBox(
-                            constraints: BoxConstraints(
-                              maxWidth: vertical
-                                  ? widget.thickness
-                                  : extent / widget.scale,
-                              maxHeight: vertical
-                                  ? extent / widget.scale
-                                  : widget.thickness,
-                            ),
-                            child: centered && widget.showHandle
-                                ? Stack(
-                                    children: [
-                                      Padding(
-                                        padding: const EdgeInsets.only(top: 8),
-                                        child: strip,
-                                      ),
-                                      Positioned(
-                                        top: 0,
-                                        left: 0,
-                                        right: 0,
-                                        child: Center(
-                                          child: _handle(
-                                            vertical,
-                                            centered: true,
+              child: FadeTransition(
+                opacity: Tween(begin: .4, end: 1.0).animate(form),
+                child: ScaleTransition(
+                  scale: Tween(
+                    begin: floating ? .7 : .86,
+                    end: 1.0,
+                  ).animate(form),
+                  alignment: grow,
+                  child: SizedBox(
+                    key: ValueKey('study-dock-${widget.id}'),
+                    width: floating
+                        ? 52
+                        : (vertical ? widget.thickness * widget.scale : null),
+                    height: floating
+                        ? 52
+                        : (vertical ? null : widget.thickness * widget.scale),
+                    child: FittedBox(
+                      fit: BoxFit.contain,
+                      child: GlassSurface(
+                        key: widget.surfaceKey,
+                        selected: floating,
+                        radius: floating
+                            ? 26
+                            : (widget.centerHandle
+                                  ? Corners.lg
+                                  : widget.thickness / 2),
+                        child: floating
+                            ? SizedBox(
+                                width: 52,
+                                height: 52,
+                                child: Icon(
+                                  widget.dragIcon,
+                                  key: ValueKey(
+                                    'study-dock-floating-${widget.id}',
+                                  ),
+                                ),
+                              )
+                            : ConstrainedBox(
+                                constraints: BoxConstraints(
+                                  maxWidth: vertical
+                                      ? widget.thickness
+                                      : extent / widget.scale,
+                                  maxHeight: vertical
+                                      ? extent / widget.scale
+                                      : widget.thickness,
+                                ),
+                                child: centered && widget.showHandle
+                                    ? Stack(
+                                        children: [
+                                          Padding(
+                                            padding: const EdgeInsets.only(
+                                              top: 8,
+                                            ),
+                                            child: strip,
                                           ),
-                                        ),
-                                      ),
-                                    ],
-                                  )
-                                : strip,
-                          ),
+                                          Positioned(
+                                            top: 0,
+                                            left: 0,
+                                            right: 0,
+                                            child: Center(
+                                              child: _handle(
+                                                vertical,
+                                                centered: true,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      )
+                                    : strip,
+                              ),
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -390,7 +425,7 @@ class _DockGroupLayout extends MultiChildLayoutDelegate {
         rect = Rect.lerp(
           free,
           docked,
-          Curves.easeOutCubic.transform(state._snap.value),
+          Motion.emphasizedDecelerate.transform(state._snap.value),
         )!;
       } else {
         occupied.add(rect);

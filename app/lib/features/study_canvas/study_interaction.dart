@@ -550,3 +550,113 @@ class _InteractionFeedback extends CustomPainter {
   @override
   bool shouldRepaint(_InteractionFeedback old) => old.state != state;
 }
+
+/// A ring that fills under a finger resting on a card, so the hold that
+/// lifts the card reads as deliberate rather than as a stall. It stays
+/// hidden through the first moments, when most contacts become pans.
+class _HoldCue extends StatelessWidget {
+  const _HoldCue({required this.at});
+  final ValueListenable<Offset?> at;
+
+  static const double _size = 44;
+
+  @override
+  Widget build(BuildContext context) => ValueListenableBuilder<Offset?>(
+    valueListenable: at,
+    builder: (context, p, _) => p == null
+        ? const SizedBox.shrink()
+        : Positioned(
+            left: p.dx - _size / 2,
+            top: p.dy - _size / 2,
+            width: _size,
+            height: _size,
+            child: IgnorePointer(
+              // A new hold starts a new fill.
+              child: _HoldRing(key: ValueKey(p)),
+            ),
+          ),
+  );
+}
+
+class _HoldRing extends StatefulWidget {
+  const _HoldRing({super.key});
+  @override
+  State<_HoldRing> createState() => _HoldRingState();
+}
+
+class _HoldRingState extends State<_HoldRing>
+    with SingleTickerProviderStateMixin {
+  // Silent for the first quarter of the hold.
+  static const _quiet = .25;
+  late final _fill = AnimationController(
+    vsync: this,
+    duration: canvasCardHoldDelay,
+  )..forward();
+
+  @override
+  void dispose() {
+    _fill.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (MediaQuery.disableAnimationsOf(context)) return const SizedBox();
+    final cs = Theme.of(context).colorScheme;
+    return AnimatedBuilder(
+      animation: _fill,
+      builder: (context, _) {
+        final t = ((_fill.value - _quiet) / (1 - _quiet)).clamp(0.0, 1.0);
+        return Opacity(
+          opacity: Motion.emphasizedDecelerate.transform(
+            (t * 4).clamp(0.0, 1.0),
+          ),
+          child: CustomPaint(
+            painter: _RingPainter(
+              Motion.emphasized.transform(t),
+              cs.primary,
+              cs.surface,
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _RingPainter extends CustomPainter {
+  _RingPainter(this.t, this.ink, this.halo);
+  final double t;
+  final Color ink, halo;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final r = size.shortestSide / 2 - 3;
+    final c = size.center(Offset.zero);
+    // A soft disc keeps the ring legible over any material.
+    canvas.drawCircle(c, r + 2, Paint()..color = halo.withValues(alpha: .55));
+    canvas.drawCircle(
+      c,
+      r,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 3
+        ..color = ink.withValues(alpha: .18),
+    );
+    canvas.drawArc(
+      Rect.fromCircle(center: c, radius: r),
+      -math.pi / 2,
+      2 * math.pi * t,
+      false,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 3
+        ..strokeCap = StrokeCap.round
+        ..color = ink,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_RingPainter o) =>
+      o.t != t || o.ink != ink || o.halo != halo;
+}

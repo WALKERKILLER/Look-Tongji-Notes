@@ -69,7 +69,8 @@ class StudyCanvas extends StatefulWidget {
   State<StudyCanvas> createState() => StudyCanvasState();
 }
 
-class StudyCanvasState extends State<StudyCanvas> with WidgetsBindingObserver {
+class StudyCanvasState extends State<StudyCanvas>
+    with WidgetsBindingObserver, TickerProviderStateMixin {
   /// Theme-derived chrome colours for the whole workspace.
   StudyChrome get chrome => StudyChrome.of(context);
 
@@ -99,6 +100,14 @@ class StudyCanvasState extends State<StudyCanvas> with WidgetsBindingObserver {
   final _eraserKey = GlobalKey();
   final _eraserLasso = <Offset>[], _lasso = <Offset>[];
   final _camera = ValueNotifier(0), _cursor = ValueNotifier(0);
+
+  /// Carries the view to a new place instead of cutting to it; see [_flyTo].
+  late final _fly = AnimationController(vsync: this, duration: Motion.long2)
+    ..addListener(() => _flyStep?.call());
+  void Function()? _flyStep;
+
+  /// Where a finger rests on a card while the hold to move it runs.
+  final _holdCue = ValueNotifier<Offset?>(null);
   final _selectionMenuKey = GlobalKey();
   Rect? _stageRect, _selectionBounds;
   Offset? _eraserCursor, _pressureOrigin, _pressureStart;
@@ -464,6 +473,8 @@ class StudyCanvasState extends State<StudyCanvas> with WidgetsBindingObserver {
     _shapeTimer?.cancel();
     _predictionExpiry?.cancel();
     unawaited(_stylusEvents?.cancel());
+    _fly.dispose();
+    _holdCue.dispose();
     _camera.dispose();
     _cursor.dispose();
     _threadTick.dispose();
@@ -525,12 +536,42 @@ class StudyCanvasState extends State<StudyCanvas> with WidgetsBindingObserver {
     _cardHoldTimer?.cancel();
     _cardHoldTimer = null;
     _cardHoldOrigin = null;
+    _holdCue.value = null;
+  }
+
+  /// Moves the view to [camera] at [zoom] along one eased path. The point
+  /// at the centre of the window travels in a straight line while the zoom
+  /// changes geometrically, so the way there stays readable. Any touch,
+  /// wheel or zoom stops it where it is.
+  void _flyTo(Offset camera, double zoom) {
+    final d = document!;
+    _fly.stop();
+    if (MediaQuery.disableAnimationsOf(context) ||
+        ((d.camera - camera).distance < 1 && (d.zoom - zoom).abs() < .001)) {
+      d
+        ..zoom = zoom
+        ..camera = camera;
+      _cameraChanged();
+      return;
+    }
+    final centre = _viewport.center(Offset.zero);
+    final z0 = d.zoom, from = (centre - d.camera) / z0;
+    final to = (centre - camera) / zoom;
+    _flyStep = () {
+      if (document != d) return _fly.stop();
+      final t = Motion.emphasized.transform(_fly.value);
+      d.zoom = z0 * math.pow(zoom / z0, t);
+      d.camera = centre - Offset.lerp(from, to, t)! * d.zoom;
+      _cameraChanged();
+    };
+    _fly.forward(from: 0);
   }
 
   void _holdMaterial(PointerDownEvent e, StudyCard card) {
     final d = document!, tool = _tool;
     if (!d.canTransformCard(card)) return;
     _cardHoldOrigin = e.localPosition;
+    _holdCue.value = e.localPosition;
     _cardHoldTimer = Timer(canvasCardHoldDelay, () {
       _cancelCardHold();
       if (!mounted ||
@@ -565,6 +606,7 @@ class StudyCanvasState extends State<StudyCanvas> with WidgetsBindingObserver {
     _cancelCardHold();
     _realStylus(e);
     if (_overControls(e.position)) return;
+    _fly.stop();
     final d = document!;
     final hitPoint = _world(e.localPosition);
     final hitCard = d.cards
@@ -1035,6 +1077,7 @@ class StudyCanvasState extends State<StudyCanvas> with WidgetsBindingObserver {
         _overControls(e.position))
       return;
     GestureBinding.instance.pointerSignalResolver.register(e, (_) {
+      _fly.stop();
       final d = document!;
       if (HardwareKeyboard.instance.isMetaPressed ||
           HardwareKeyboard.instance.isControlPressed) {
@@ -1049,6 +1092,7 @@ class StudyCanvasState extends State<StudyCanvas> with WidgetsBindingObserver {
   }
 
   void _zoomBy(double factor) {
+    _fly.stop();
     final d = document!,
         center = _viewport.center(Offset.zero),
         p = _world(_viewport.center(Offset.zero));
@@ -1068,14 +1112,14 @@ class StudyCanvasState extends State<StudyCanvas> with WidgetsBindingObserver {
     for (final c in cards) {
       r = r.expandToInclude(c.rect);
     }
-    d.zoom = math
+    final zoom = math
         .min(
           (_viewport.width - 100) / r.width,
           (_viewport.height - 100) / r.height,
         )
-        .clamp(.05, 1.5);
-    d.camera = _viewport.center(Offset.zero) - r.center * d.zoom;
-    _cameraChanged();
+        .clamp(.05, 1.5)
+        .toDouble();
+    _flyTo(_viewport.center(Offset.zero) - r.center * zoom, zoom);
   }
 
   void _toast(String s) {
@@ -1486,6 +1530,7 @@ class StudyCanvasState extends State<StudyCanvas> with WidgetsBindingObserver {
                 _erasing ||
                 _overControls(e.position))
               return;
+            _fly.stop();
             _pinchZoom = d.zoom;
             _pinchWorld = _world(e.localPosition);
             _panCamera = d.camera;
@@ -1672,6 +1717,7 @@ class StudyCanvasState extends State<StudyCanvas> with WidgetsBindingObserver {
                   ),
                 _assetDropTarget(),
                 _dropOutline(),
+                _HoldCue(at: _holdCue),
                 _DockGroup(
                   topInset: _topBarsBottom + 8,
                   children: [_penDock(), if (!_stageOpen) _aiDock()],

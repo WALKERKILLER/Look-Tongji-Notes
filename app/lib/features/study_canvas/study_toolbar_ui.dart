@@ -58,46 +58,67 @@ extension _StudyToolbars on StudyCanvasState {
   }) =>
       _action(label, icon, action, key: key, selected: selected, compact: true);
 
-  double get _topBarsInset => Platform.isMacOS ? 28 : 8;
+  /// Height of the top controls; macOS leaves room for the window buttons.
+  static const double _topBarHeight = 36;
+  double get _topBarsInset => Platform.isMacOS ? 28 : Space.sm;
   bool get _stackTopBars => _viewport.width < 900;
-  double get _topBarsBottom => _topBarsInset + (_stackTopBars ? 80 : 36);
+  double get _topBarsBottom =>
+      _topBarsInset +
+      (_stackTopBars ? 2 * _topBarHeight + Space.sm : _topBarHeight);
 
-  Widget _topButtons(String id, List<Widget> actions, {Key? key}) => SizedBox(
-    key: key,
-    height: 36,
-    child: Row(
-      key: ValueKey('study-top-$id'),
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        for (var i = 0; i < actions.length; i++) ...[
-          if (i > 0) SizedBox(width: _viewport.width < 360 ? 0 : 6),
-          GlassSurface(
-            radius: Corners.full,
-            child: SizedBox(
-              width: 36,
-              height: 36,
-              child: Center(child: actions[i]),
-            ),
-          ),
-        ],
-      ],
-    ),
-  );
+  /// Related buttons share one glass capsule, as iOS 26 toolbars group
+  /// them; a lone action keeps its own circle. Fewer panes also means fewer
+  /// backdrop blurs over a playing video.
+  Widget _topButtons(String id, List<List<Widget>> groups, {Key? key}) =>
+      SizedBox(
+        key: key,
+        height: _topBarHeight,
+        child: Row(
+          key: ValueKey('study-top-$id'),
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (var g = 0; g < groups.length; g++) ...[
+              if (g > 0)
+                SizedBox(width: _viewport.width < 360 ? Space.xs : Space.sm),
+              GlassSurface(
+                radius: Corners.full,
+                padding: EdgeInsets.symmetric(
+                  horizontal: groups[g].length > 1 ? Space.xxs : 0,
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    for (final a in groups[g])
+                      SizedBox.square(
+                        dimension: _topBarHeight,
+                        child: Center(child: a),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
+      );
 
   Widget _fixedTopBars() {
-    final navigation = _topButtons(
-      'navigation',
-      _navigationActions(),
-      key: _moduleKey,
-    );
-    final actions = _topButtons('actions', _canvasActions());
+    // 返回 stands alone; the rest of each side is one group.
+    final nav = _navigationActions(), act = _canvasActions();
+    final navigation = _topButtons('navigation', [
+      nav.take(1).toList(),
+      nav.skip(1).toList(),
+    ], key: _moduleKey);
+    final actions = _topButtons('actions', [
+      act.take(act.length - 1).toList(),
+      [act.last],
+    ]);
     final tools = GlassSurface(
       key: _toolbarKey,
       radius: Corners.full,
-      padding: const EdgeInsets.symmetric(horizontal: 4),
+      padding: const EdgeInsets.symmetric(horizontal: Space.xs),
       child: SizedBox(
         key: const ValueKey('study-top-tools'),
-        height: 36,
+        height: _topBarHeight,
         child: SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           child: Row(
@@ -109,24 +130,24 @@ extension _StudyToolbars on StudyCanvasState {
     );
     return Positioned(
       top: _topBarsInset,
-      left: 8,
-      right: 8,
+      left: Space.sm,
+      right: Space.sm,
       child: SizedBox(
         key: _topBarKey,
         child: _stackTopBars
             ? Column(
                 children: [
                   Row(children: [navigation, const Spacer(), actions]),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: Space.sm),
                   Align(alignment: Alignment.topCenter, child: tools),
                 ],
               )
             : Row(
                 children: [
                   navigation,
-                  const SizedBox(width: 16),
+                  const SizedBox(width: Space.lg),
                   Expanded(child: Center(child: tools)),
-                  const SizedBox(width: 16),
+                  const SizedBox(width: Space.lg),
                   actions,
                 ],
               ),

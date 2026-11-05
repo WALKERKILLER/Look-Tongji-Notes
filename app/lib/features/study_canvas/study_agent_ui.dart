@@ -170,13 +170,14 @@ extension _StudyAgentUI on StudyCanvasState {
         r.height * _sourceBounds(card).height,
       );
     }
-    d.zoom = math
+    final zoom = math
         .min(
           (_viewport.width - 100) / math.max(100, target.width),
           (_viewport.height - 100) / math.max(100, target.height),
         )
-        .clamp(.05, 2);
-    d.camera = _viewport.center(Offset.zero) - target.center * d.zoom;
+        .clamp(.05, 2)
+        .toDouble();
+    _flyTo(_viewport.center(Offset.zero) - target.center * zoom, zoom);
     _selection
       ..clear()
       ..addAll(card == null ? <String>[] : [card.id]);
