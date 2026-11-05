@@ -1,6 +1,39 @@
 part of 'study_canvas.dart';
 
 extension _StudyStylus on StudyCanvasState {
+  bool get _touchBlocked =>
+      _stylusPointers.isNotEmpty || (_palmCooldown?.isActive ?? false);
+
+  void _trackStylusPresence(PointerEvent e) {
+    if (e.kind != PointerDeviceKind.stylus &&
+        e.kind != PointerDeviceKind.invertedStylus)
+      return;
+    if (e is PointerDownEvent) _stylusPointers.add(e.pointer);
+    if (e is PointerUpEvent || e is PointerCancelEvent) {
+      _stylusPointers.remove(e.pointer);
+    }
+    // Active contact is authoritative even when the pen stops reporting moves.
+    // Lift/cancel restarts the grace period for a palm still resting nearby.
+    _palmCooldown?.cancel();
+    _palmCooldown = Timer(const Duration(seconds: 1), () {});
+    if (_touchPointers.isEmpty) return;
+    // A palm that touched first cannot resume navigation when the pen lifts.
+    // Only a fresh down after the grace period may start another gesture.
+    for (final pointer in _touchPointers) {
+      _pointers.remove(pointer);
+    }
+    _touchPointers.clear();
+    _cancelCardHold();
+    _panCamera = null;
+    _pinchDistance = _pinchZoom = null;
+    _pinchWorld = null;
+    _dragCard = null;
+    _heldCardNeedsCheckpoint = false;
+    _resize = false;
+    _start = _last = null;
+    if (_pointers.isEmpty) _gesturing.value = false;
+  }
+
   Future<void> _startStylus() async {
     if (defaultTargetPlatform != TargetPlatform.android) return;
     // Probe first: EventChannel reports a missing native plugin globally.

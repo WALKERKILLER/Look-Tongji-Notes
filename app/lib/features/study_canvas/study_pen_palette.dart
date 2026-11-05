@@ -60,8 +60,10 @@ extension _StudyPenPalette on StudyCanvasState {
     ),
   );
 
-  Widget _penDock() => StudyEdgeDock(
+  StudyEdgeDock _penDock() => StudyEdgeDock(
+    key: const ValueKey('dock-pens'),
     id: 'pens',
+    dragIcon: Icons.draw_outlined,
     label: '笔盒',
     scale: 1.15,
     surfaceKey: _dockKey,

@@ -43,7 +43,10 @@ extension _StudyShelf on StudyCanvasState {
     final shown = tab ?? _shelfShown;
     if (shown == null) return const SizedBox.shrink();
     final side = _shelfSide;
-    final top = Space.xxxl + Space.xl + studyDockMargin;
+    final top = math.max(
+      Space.xxxl + Space.xl + studyDockMargin,
+      _topBarsBottom + 8,
+    );
     return AnimatedPositioned(
       duration: Motion.medium2,
       curve: Motion.emphasized,

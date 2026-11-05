@@ -102,7 +102,6 @@ extension _StudyModules on StudyCanvasState {
     try {
       final data = jsonDecode(raw) as Map;
       _update(() {
-        _moduleSmall = data['modules_small'] == true;
         _paperStyle =
             const {'blank', 'ruled', 'dots', 'grid'}.contains(data['paper'])
             ? '${data['paper']}'
@@ -110,17 +109,9 @@ extension _StudyModules on StudyCanvasState {
         _paperColor = _paperColors.containsKey(data['paper_color'])
             ? data['paper_color'] as int
             : 0xffffffff;
-        _toolbarSmall = data['tools_small'] == true;
         _dockSmall = data['pens_small'] == true;
-        _toolPlacement = StudyDockPlacement.parse(
-          data['tools'],
-          _toolPlacement,
-        );
-        _modulePlacement = StudyDockPlacement.parse(
-          data['modules'],
-          _modulePlacement,
-        );
         _penPlacement = StudyDockPlacement.parse(data['pens'], _penPlacement);
+        _aiPlacement = StudyDockPlacement.parse(data['ai'], _aiPlacement);
       });
     } catch (_) {
       /* Layout preferences are independent of the course document. */
@@ -134,11 +125,8 @@ extension _StudyModules on StudyCanvasState {
       jsonEncode({
         'paper': _paperStyle,
         'paper_color': _paperColor,
-        'tools': _toolPlacement.json(),
-        'modules': _modulePlacement.json(),
         'pens': _penPlacement.json(),
-        'modules_small': _moduleSmall,
-        'tools_small': _toolbarSmall,
+        'ai': _aiPlacement.json(),
         'pens_small': _dockSmall,
       }),
     );
@@ -373,6 +361,7 @@ class _ConversationBodyState extends State<_ConversationBody> {
         owner._initialConversations.remove(widget.card.id);
         if (!mounted) return;
         if (initial['send'] is String) {
+          data!['allow_images'] = initial['allow_images'] == true;
           input.text = initial['send'] as String;
           await start();
         } else if (initial['pick'] == true) {
@@ -413,7 +402,8 @@ class _ConversationBodyState extends State<_ConversationBody> {
         data!['revision'] = out['revision'];
       } catch (e) {
         ok = false;
-        if (mounted) setState(() => error = l10n.studyConversationSaveFailed('$e'));
+        if (mounted)
+          setState(() => error = l10n.studyConversationSaveFailed('$e'));
       }
     });
     await saving;
@@ -655,7 +645,8 @@ class _ConversationBodyState extends State<_ConversationBody> {
       onEditVideo: editVideo,
       onPickSources: ready ? pickSources : load,
       onInspectSources: preview == null ? null : inspectSources,
-      allowImages: ready && (visuals.isNotEmpty || data!['allow_images'] == true)
+      allowImages:
+          ready && (visuals.isNotEmpty || data!['allow_images'] == true)
           ? data!['allow_images'] == true
           : null,
       onAllowImages: (v) {

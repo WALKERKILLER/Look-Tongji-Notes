@@ -29,9 +29,7 @@ extension _StudyToolbars on StudyCanvasState {
         minimumSize: compact ? const Size(32, 32) : const Size(40, 40),
         padding: EdgeInsets.all(compact ? 5 : 8),
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        backgroundColor: selected
-            ? cs.secondaryContainer
-            : Colors.transparent,
+        backgroundColor: selected ? cs.secondaryContainer : Colors.transparent,
         foregroundColor: selected ? cs.onSecondaryContainer : cs.onSurface,
         disabledForegroundColor: cs.onSurface.withValues(alpha: .38),
       ),
@@ -51,181 +49,252 @@ extension _StudyToolbars on StudyCanvasState {
     ),
   );
 
-  Widget _moduleRail() {
-    final narrow =
-        _viewport.width < 900 &&
-        _modulePlacement.edge == StudyDockEdge.top &&
-        _toolPlacement.edge == StudyDockEdge.top;
-    final placement = narrow
-        ? const StudyDockPlacement(StudyDockEdge.left, .2)
-        : _modulePlacement;
-    return StudyEdgeDock(
-      id: 'modules',
-      label: '导航栏',
-      surfaceKey: _moduleKey,
-      placement: placement,
-      maxLength: 330,
-      startInset: Platform.isMacOS && !narrow ? 80 : 0,
-      onChanged: (p) => _moveDock('modules', p),
-      children: (vertical) => [
-        _action('返回', Icons.arrow_back, widget.onBack),
-        _action(
-          l10n.studyExitCanvas,
-          Icons.smart_display_outlined,
-          widget.onClassic,
-          key: const ValueKey('study-exit-canvas'),
-        ),
-        _action('页面与材料', Icons.view_sidebar_outlined, _pageIndex),
-        _action(
-          l10n.studyShelf,
-          Icons.inventory_2_outlined,
-          () => _toggleShelf(),
-          key: const ValueKey('study-open-shelf'),
-          selected: _shelfTab != null,
-        ),
-        PopupMenuButton<String>(
-          tooltip: '添加模块',
-          icon: const Icon(Icons.grid_view_outlined, size: 22),
-          onSelected: (v) {
-            switch (v) {
-              case 'video':
-                _videoModules();
-              case 'file':
-                _import();
-              case 'course':
-                _courseMaterials();
-              case 'note':
-                _text();
-              case 'chat':
-                _openConversation(newConversation: true, bind: false);
-            }
-          },
-          itemBuilder: (_) => const [
-            PopupMenuItem(value: 'video', child: Text('视频')),
-            PopupMenuItem(value: 'file', child: Text('文件')),
-            PopupMenuItem(value: 'course', child: Text('课程资料')),
-            PopupMenuItem(value: 'note', child: Text('笔记')),
-            PopupMenuItem(value: 'chat', child: Text('AI 对话')),
+  Widget _topAction(
+    String label,
+    IconData icon,
+    VoidCallback? action, {
+    Key? key,
+    bool selected = false,
+  }) =>
+      _action(label, icon, action, key: key, selected: selected, compact: true);
+
+  /// Height of the top controls; macOS leaves room for the window buttons.
+  static const double _topBarHeight = 36;
+  double get _topBarsInset => Platform.isMacOS ? 28 : Space.sm;
+  bool get _stackTopBars => _viewport.width < 900;
+  double get _topBarsBottom =>
+      _topBarsInset +
+      (_stackTopBars ? 2 * _topBarHeight + Space.sm : _topBarHeight);
+
+  /// Related buttons share one glass capsule, as iOS 26 toolbars group
+  /// them; a lone action keeps its own circle. Fewer panes also means fewer
+  /// backdrop blurs over a playing video.
+  Widget _topButtons(String id, List<List<Widget>> groups, {Key? key}) =>
+      SizedBox(
+        key: key,
+        height: _topBarHeight,
+        child: Row(
+          key: ValueKey('study-top-$id'),
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (var g = 0; g < groups.length; g++) ...[
+              if (g > 0)
+                SizedBox(width: _viewport.width < 360 ? Space.xs : Space.sm),
+              GlassSurface(
+                radius: Corners.full,
+                padding: EdgeInsets.symmetric(
+                  horizontal: groups[g].length > 1 ? Space.xxs : 0,
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    for (final a in groups[g])
+                      SizedBox.square(
+                        dimension: _topBarHeight,
+                        child: Center(child: a),
+                      ),
+                  ],
+                ),
+              ),
+            ],
           ],
         ),
-        _action('手写 / 浏览', Icons.draw_outlined, () {
-          if (_ink)
-            _chooseTool(StudyTool.select);
-          else
-            _pickPen(_presetIndex);
-        }, selected: _ink),
-      ],
+      );
+
+  Widget _fixedTopBars() {
+    // 返回 stands alone; the rest of each side is one group.
+    final nav = _navigationActions(), act = _canvasActions();
+    final navigation = _topButtons('navigation', [
+      nav.take(1).toList(),
+      nav.skip(1).toList(),
+    ], key: _moduleKey);
+    final actions = _topButtons('actions', [
+      act.take(act.length - 1).toList(),
+      [act.last],
+    ]);
+    final tools = GlassSurface(
+      key: _toolbarKey,
+      radius: Corners.full,
+      padding: const EdgeInsets.symmetric(horizontal: Space.xs),
+      child: SizedBox(
+        key: const ValueKey('study-top-tools'),
+        height: _topBarHeight,
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: _toolbarActions(),
+          ),
+        ),
+      ),
+    );
+    return Positioned(
+      top: _topBarsInset,
+      left: Space.sm,
+      right: Space.sm,
+      child: SizedBox(
+        key: _topBarKey,
+        child: _stackTopBars
+            ? Column(
+                children: [
+                  Row(children: [navigation, const Spacer(), actions]),
+                  const SizedBox(height: Space.sm),
+                  Align(alignment: Alignment.topCenter, child: tools),
+                ],
+              )
+            : Row(
+                children: [
+                  navigation,
+                  const SizedBox(width: Space.lg),
+                  Expanded(child: Center(child: tools)),
+                  const SizedBox(width: Space.lg),
+                  actions,
+                ],
+              ),
+      ),
     );
   }
 
-  Widget _topToolbar() {
+  List<Widget> _navigationActions() => [
+    _topAction('返回', Icons.arrow_back, widget.onBack),
+    _topAction('页面与材料', Icons.view_sidebar_outlined, _pageIndex),
+    _topAction(
+      l10n.studyShelf,
+      Icons.inventory_2_outlined,
+      () => _toggleShelf(),
+      key: const ValueKey('study-open-shelf'),
+      selected: _shelfTab != null,
+    ),
+    _topAction('手写 / 浏览', Icons.draw_outlined, () {
+      if (_ink)
+        _chooseTool(StudyTool.select);
+      else
+        _pickPen(_presetIndex);
+    }, selected: _ink),
+  ];
+
+  List<Widget> _toolbarActions() {
     final d = document!;
-    final reserve =
-        _viewport.width >= 900 && _modulePlacement.edge == _toolPlacement.edge
-        ? (Platform.isMacOS ? 640.0 : 480.0)
-        : 160.0;
-    return StudyEdgeDock(
-      id: 'tools',
-      label: '工具栏',
-      surfaceKey: _toolbarKey,
-      placement: _toolPlacement,
-      maxLength: _toolPlacement.vertical
-          ? null
-          : math.max(200, _viewport.width - reserve),
-      onChanged: (p) => _moveDock('tools', p),
-      trailing: _action(
-        _toolbarSmall ? '展开工具栏' : '收起工具栏',
-        _toolbarSmall ? Icons.more_horiz : Icons.unfold_less,
-        () {
-          _update(() => _toolbarSmall = !_toolbarSmall);
-          unawaited(_saveLayout());
-        },
+    return [
+      _topAction(l10n.commonUndo, Icons.undo, d.canUndo ? d.undo : null),
+      _topAction(l10n.studyRedo, Icons.redo, d.canRedo ? d.redo : null),
+      _divider(false, compact: true),
+      _topAction(
+        '箭头：选择对象 / 拖动空白或资料页面移动画布',
+        Icons.near_me_outlined,
+        () => _chooseTool(StudyTool.select),
+        key: const ValueKey('study-tool-select'),
+        selected: _tool == StudyTool.select,
       ),
-      children: (vertical) => [
-        if (!_toolbarSmall) ...[
-          _action(l10n.commonUndo, Icons.undo, d.canUndo ? d.undo : null),
-          _action(l10n.studyRedo, Icons.redo, d.canRedo ? d.redo : null),
-          _divider(vertical),
-          _action(
-            '箭头：选择对象 / 拖动空白移动画布',
-            Icons.near_me_outlined,
-            () => _chooseTool(StudyTool.select),
-            key: const ValueKey('study-tool-select'),
-            selected: _tool == StudyTool.select,
-          ),
-          _action(
-            l10n.studyHandTool,
-            Icons.pan_tool_outlined,
-            () => _chooseTool(StudyTool.hand),
-            key: const ValueKey('study-tool-hand'),
-            selected: _tool == StudyTool.hand,
-          ),
-          _action(
-            '套索 / 框选',
-            Icons.gesture,
-            () => _chooseTool(StudyTool.region),
-            key: const ValueKey('study-tool-region'),
-            selected: _tool == StudyTool.region,
-          ),
-          _divider(vertical),
-          _action('插入文字笔记', Icons.text_fields, () => _text()),
-          _action('插入图片、PDF 或文件', Icons.image_outlined, () => _import()),
-          _action('课程资料', Icons.folder_open_outlined, _courseMaterials),
-          _divider(vertical),
-          _action(l10n.studyLayers, Icons.layers_outlined, _layers),
-          _action('纸张背景', Icons.wallpaper_outlined, _paperSettings),
-          _action('问 AI', Icons.auto_awesome_outlined, _ask),
-        ],
-        if (_remotePending) ...[
-          TextButton(
-            onPressed: () => _resolveRemote(true),
-            child: const Text('保留本机'),
-          ),
-          TextButton(
-            onPressed: () => _resolveRemote(false),
-            child: const Text('采用另一端'),
-          ),
-        ],
-        _action(
-          _status,
-          _saveError != null ? Icons.error_outline : Icons.cloud_done_outlined,
-          () => flush(),
+      _topAction(
+        l10n.studyHandTool,
+        Icons.pan_tool_outlined,
+        () => _chooseTool(StudyTool.hand),
+        key: const ValueKey('study-tool-hand'),
+        selected: _tool == StudyTool.hand,
+      ),
+      _topAction(
+        '套索 / 框选',
+        Icons.gesture,
+        () => _chooseTool(StudyTool.region),
+        key: const ValueKey('study-tool-region'),
+        selected: _tool == StudyTool.region,
+      ),
+      _divider(false, compact: true),
+      _topAction('插入文字笔记', Icons.text_fields, () => _text()),
+      _topAction('插入图片、PDF 或文件', Icons.image_outlined, () => _import()),
+      _topAction('课程资料', Icons.folder_open_outlined, _courseMaterials),
+      _divider(false, compact: true),
+      _topAction(l10n.studyLayers, Icons.layers_outlined, _layers),
+      _topAction('纸张背景', Icons.wallpaper_outlined, _paperSettings),
+      if (_remotePending) ...[
+        TextButton(
+          onPressed: () => _resolveRemote(true),
+          child: const Text('保留本机'),
         ),
-        PopupMenuButton<String>(
-          tooltip: widget.ctl.lecture?.shortTitle ?? '画布菜单',
-          icon: const Icon(Icons.more_horiz, size: 22),
-          onSelected: (v) {
-            switch (v) {
-              case 'classic':
-                widget.onClassic();
-              case 'links':
-                _connectionSettings();
-              case 'export':
-                exportRecovery();
-              case 'fit':
-                _fit();
-              case 'brush':
-                _advancedPenSettings();
-              case 'paper':
-                _paperSettings();
-            }
-          },
-          itemBuilder: (_) => [
-            PopupMenuItem(
-              enabled: false,
-              child: Text(widget.ctl.lecture?.shortTitle ?? '学习画布'),
-            ),
-            const PopupMenuItem(value: 'fit', child: Text('显示全部材料')),
-            const PopupMenuItem(value: 'brush', child: Text('画笔与橡皮设置')),
-            const PopupMenuItem(value: 'links', child: Text('管理知识关联')),
-            const PopupMenuItem(value: 'export', child: Text('导出画布副本')),
-            const PopupMenuDivider(),
-            PopupMenuItem(value: 'classic', child: Text(l10n.studyExitCanvas)),
-          ],
+        TextButton(
+          onPressed: () => _resolveRemote(false),
+          child: const Text('采用另一端'),
         ),
       ],
-    );
+    ];
   }
+
+  List<Widget> _canvasActions() => [
+    PopupMenuButton<String>(
+      tooltip: '添加模块',
+      padding: EdgeInsets.zero,
+      style: IconButton.styleFrom(
+        minimumSize: const Size(32, 32),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      ),
+      icon: const Icon(Icons.add, size: 20),
+      onSelected: (v) {
+        switch (v) {
+          case 'video':
+            _videoModules();
+          case 'file':
+            _import();
+          case 'course':
+            _courseMaterials();
+          case 'note':
+            _text();
+          case 'chat':
+            _openConversation(newConversation: true, bind: false);
+        }
+      },
+      itemBuilder: (_) => const [
+        PopupMenuItem(value: 'video', child: Text('视频')),
+        PopupMenuItem(value: 'file', child: Text('文件')),
+        PopupMenuItem(value: 'course', child: Text('课程资料')),
+        PopupMenuItem(value: 'note', child: Text('笔记')),
+        PopupMenuItem(value: 'chat', child: Text('AI 对话')),
+      ],
+    ),
+    _topAction('显示全部卡片', Icons.open_in_full, _fit),
+    _topAction(
+      _status,
+      _saveError != null ? Icons.error_outline : Icons.cloud_done_outlined,
+      () => flush(),
+    ),
+    PopupMenuButton<String>(
+      tooltip: widget.ctl.lecture?.shortTitle ?? '画布菜单',
+      padding: EdgeInsets.zero,
+      style: IconButton.styleFrom(
+        minimumSize: const Size(32, 32),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      ),
+      icon: const Icon(Icons.more_horiz, size: 20),
+      onSelected: (v) {
+        switch (v) {
+          case 'classic':
+            widget.onClassic();
+          case 'links':
+            _connectionSettings();
+          case 'export':
+            exportRecovery();
+          case 'fit':
+            _fit();
+          case 'brush':
+            _advancedPenSettings();
+          case 'paper':
+            _paperSettings();
+        }
+      },
+      itemBuilder: (_) => [
+        PopupMenuItem(
+          enabled: false,
+          child: Text(widget.ctl.lecture?.shortTitle ?? '学习画布'),
+        ),
+        const PopupMenuItem(value: 'fit', child: Text('显示全部材料')),
+        const PopupMenuItem(value: 'brush', child: Text('画笔与橡皮设置')),
+        const PopupMenuItem(value: 'links', child: Text('管理知识关联')),
+        const PopupMenuItem(value: 'export', child: Text('导出画布副本')),
+        const PopupMenuDivider(),
+        PopupMenuItem(value: 'classic', child: Text(l10n.studyExitCanvas)),
+      ],
+    ),
+  ];
 
   Future<void> _paperSettings() async {
     await showDialog<void>(

@@ -7,7 +7,8 @@ import '../lib/features/study_canvas/study_document.dart';
 import 'study_canvas_ui_test.dart' as fixture;
 
 class AnswerApi extends fixture.FixtureApi {
-  AnswerApi(super.doc);
+  AnswerApi(super.doc, {this.sources = const []});
+  final List<Map<String, dynamic>> sources;
   @override
   Future<dynamic> canvasRun(String id) async => {
     'id': id,
@@ -26,7 +27,7 @@ class AnswerApi extends fixture.FixtureApi {
         'source_ids': [],
       },
     ],
-    'sources': [],
+    'sources': sources,
     'editable_ids': [],
     'trace': [],
   };
@@ -37,7 +38,12 @@ class ShelfPlayer extends fixture.FixturePlayer {
   @override
   final segments = [
     for (final (i, t) in ['缓存命中更快', '未命中要访问主存', '局部性原理'].indexed)
-      Segment({'idx': i, 'start_ms': i * 4000, 'end_ms': i * 4000 + 3500, 'text': t}),
+      Segment({
+        'idx': i,
+        'start_ms': i * 4000,
+        'end_ms': i * 4000 + 3500,
+        'text': t,
+      }),
   ];
   @override
   final chapters = [
@@ -57,10 +63,19 @@ void main() {
     final blocks = studyBlocksFromMarkdown(
       '# 缓存\n命中率高。\n\n- 时间局部性\n- 空间局部性\n\n1. 查标签\n2. 比较\n\n```c\nint x;\n```',
     );
-    expect(blocks.map((b) => b.type), ['heading', 'paragraph', 'list', 'steps', 'code']);
+    expect(blocks.map((b) => b.type), [
+      'heading',
+      'paragraph',
+      'list',
+      'steps',
+      'code',
+    ]);
     expect(blocks[2].items, ['时间局部性', '空间局部性']);
     expect(blocks[4].language, 'c');
-    expect(studyBlocksFromMarkdown(List.filled(40, '段落').join('\n\n')).length, 32);
+    expect(
+      studyBlocksFromMarkdown(List.filled(40, '段落').join('\n\n')).length,
+      32,
+    );
   });
 
   testWidgets('subtitles drag from the shelf onto the canvas as cited cards', (
@@ -173,6 +188,8 @@ void main() {
         }
       }
       final reopened = await fixture.open(t, api);
+      expect(find.byTooltip('发送'), findsNothing);
+      await t.tap(find.byKey(const ValueKey('study-ai-tab')));
       await t.pumpAndSettle();
       expect(find.text('预览并应用画布操作'), findsNothing);
       expect(find.text('历史画布操作已停用，回答仍保留在对话中。'), findsOneWidget);
@@ -189,8 +206,13 @@ void main() {
         ),
         findsOneWidget,
       );
-      // The newest conversation is on stage; its node-mate opens from 「继续」.
-      await t.tap(find.text('继续'));
+      // History is available in the sidebar without visible conversation cards.
+      final threads = reopened.currentState!.document!.cards
+          .where((c) => c.type == 'conversation')
+          .toList();
+      await t.tap(find.text(threads.last.title));
+      await t.pumpAndSettle();
+      await t.tap(find.widgetWithText(MenuItemButton, threads.first.title));
       await t.pumpAndSettle();
       expect(
         t
@@ -202,12 +224,86 @@ void main() {
       await t.pumpAndSettle();
     },
   );
+  testWidgets(
+    'sidebar preserves drafts, yields canvas input and pins only on request',
+    (t) async {
+      final doc = StudyDocument()
+        ..camera = Offset.zero
+        ..zoom = 1
+        ..cards.add(
+          StudyCard(
+            id: 'text',
+            type: 'text',
+            layer: 'main',
+            rect: const Rect.fromLTWH(100, 150, 300, 200),
+            text: '课程原文',
+          ),
+        );
+      final api = AnswerApi(
+        doc.json(),
+        sources: [
+          {'kind': 'text', 'object_id': 'text', 'quote': '课程原文'},
+        ],
+      );
+      final key = await fixture.open(t, api);
+      await t.tap(find.byKey(const ValueKey('study-ai-tab')));
+      await t.pumpAndSettle();
+      await t.enterText(find.byType(TextField).last, '保留这份草稿');
+      await t.tap(find.byKey(const ValueKey('study-ai-close')));
+      await t.pumpAndSettle();
+      expect(find.byTooltip('发送'), findsNothing);
+      final camera = key.currentState!.document!.camera;
+      await t.dragFrom(const Offset(1300, 600), const Offset(-100, 40));
+      await t.pumpAndSettle();
+      expect(
+        key.currentState!.document!.camera,
+        isNot(camera),
+        reason: 'An offstage sidebar must not intercept canvas gestures',
+      );
+      await t.tap(find.byKey(const ValueKey('study-ai-tab')));
+      await t.pumpAndSettle();
+      expect(
+        t.widget<TextField>(find.byType(TextField).last).controller!.text,
+        '保留这份草稿',
+      );
+      await t.tap(find.byTooltip('发送'));
+      await t.pumpAndSettle();
+      final d = key.currentState!.document!;
+      expect(d.cards.where((c) => c.type == 'text'), hasLength(1));
+      await t.tap(find.text('留在画布'));
+      await t.pumpAndSettle();
+      final pinned = d.cards.last;
+      expect(pinned.type, 'text');
+      expect(pinned.text, 'Model transport fixture answer');
+      expect(pinned.sources.single.objectId, 'text');
+      expect(find.byTooltip('发送'), findsNothing);
+      await key.currentState!.flush();
+      expect(StudyDocument.fromJson(api.doc).cards.last.text, pinned.text);
+      // The answer now leads back to its card instead of pinning a copy.
+      await t.tap(find.byKey(const ValueKey('study-ai-tab')));
+      await t.pumpAndSettle();
+      expect(find.text('留在画布'), findsNothing);
+      await t.tap(find.text('已在画布 · 查看'));
+      await t.pumpAndSettle();
+      expect(d.cards.where((c) => c.type == 'text'), hasLength(2));
+      expect(find.byTooltip('发送'), findsNothing);
+      d.undo();
+      await t.pumpAndSettle();
+      expect(d.cards.any((c) => c.id == pinned.id), false);
+      expect(api.conversations.values.single['turns'], hasLength(1));
+      await t.pumpWidget(const SizedBox());
+      await t.pumpAndSettle();
+    },
+  );
+
   testWidgets('the agent stage fits a phone in dark mode', (t) async {
     final api = AnswerApi(StudyDocument().json());
     await fixture.open(t, api, brightness: Brightness.dark);
     t.view.physicalSize = const Size(400, 800);
     await t.pumpAndSettle();
     expect(t.takeException(), isNull);
+    await t.tap(find.byKey(const ValueKey('study-ai-tab')));
+    await t.pumpAndSettle();
     final send = t.getRect(find.byTooltip('发送'));
     expect(send.right, lessThanOrEqualTo(400));
     expect(send.bottom, lessThanOrEqualTo(800));
@@ -216,10 +312,7 @@ void main() {
     await t.pumpAndSettle();
     expect(t.takeException(), isNull);
     expect(
-      find.textContaining(
-        'Model transport fixture answer',
-        findRichText: true,
-      ),
+      find.textContaining('Model transport fixture answer', findRichText: true),
       findsOneWidget,
     );
     await t.pumpWidget(const SizedBox());

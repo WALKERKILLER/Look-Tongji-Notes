@@ -11,6 +11,7 @@ import '../../theme/tokens.dart';
 import '../../widgets/loading.dart';
 import 'lecture_player.dart';
 import 'seek_bar.dart';
+import 'video_card_hold.dart';
 import '../../l10n/l10n.dart';
 
 const kSpeeds = [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0, 2.5, 3.0];
@@ -129,6 +130,7 @@ class PlayerViewState extends State<PlayerView> {
   @override
   Widget build(BuildContext context) {
     final prefs = context.watch<UiPrefs>();
+    final cardHold = VideoCardHoldScope.maybeOf(context);
     final mobile = Theme.of(context).platform == TargetPlatform.android || Theme.of(context).platform == TargetPlatform.iOS;
     return ListenableBuilder(
       listenable: ctl,
@@ -140,76 +142,80 @@ class PlayerViewState extends State<PlayerView> {
           child: Stack(fit: StackFit.expand, children: [
             const ColoredBox(color: Colors.black),
             Video(controller: ctl.video, controls: NoVideoControls, fill: Colors.black, wakelock: true),
-            // Gestures
-            GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: () {
-                if (mobile) {
-                  setState(() => _controls = !_controls);
-                  if (_controls) _bump();
-                } else {
-                  ctl.player.playOrPause();
-                  _bump();
-                }
-              },
-              onDoubleTapDown: mobile
-                  ? (d) {
-                      final w = context.size?.width ?? 1;
-                      final x = d.localPosition.dx / w;
-                      if (x < 0.35) {
-                        seekBy(-prefs.seekStepSec);
-                      } else if (x > 0.65) {
-                        seekBy(prefs.seekStepSec);
-                      } else {
-                        ctl.player.playOrPause();
-                      }
-                    }
-                  : null,
-              onDoubleTap: mobile ? () {} : widget.onFullscreen,
-              onLongPressStart: (_) {
-                HapticFeedback.lightImpact();
-                ctl.startBoost();
-              },
-              onLongPressEnd: (_) => ctl.endBoost(),
-              onPanStart: mobile
-                  ? (d) {
-                      _horizontal = true;
-                      _dragSeekMs = null;
-                      _dragVol = null;
-                      _dragStartMs = ctl.positionMs;
-                    }
-                  : null,
-              onPanUpdate: mobile
-                  ? (d) {
-                      final size = context.size ?? const Size(1, 1);
-                      if (_dragSeekMs == null && _dragVol == null) {
-                        _horizontal = d.delta.dx.abs() >= d.delta.dy.abs();
-                        if (_horizontal) {
-                          _dragSeekMs = _dragStartMs.toDouble();
+            // Picture gestures sit below the playback controls.
+            VideoCardHoldRegion(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () {
+                  if (mobile) {
+                    setState(() => _controls = !_controls);
+                    if (_controls) _bump();
+                  } else {
+                    ctl.player.playOrPause();
+                    _bump();
+                  }
+                },
+                onDoubleTapDown: mobile
+                    ? (d) {
+                        final w = context.size?.width ?? 1;
+                        final x = d.localPosition.dx / w;
+                        if (x < 0.35) {
+                          seekBy(-prefs.seekStepSec);
+                        } else if (x > 0.65) {
+                          seekBy(prefs.seekStepSec);
                         } else {
-                          _dragVol = ctl.volume;
+                          ctl.player.playOrPause();
                         }
                       }
-                      setState(() {
-                        if (_horizontal) {
-                          final span = (ctl.duration.inMilliseconds).clamp(60000, 600000).toDouble();
-                          _dragSeekMs = (_dragSeekMs! + d.delta.dx / size.width * span).clamp(0, ctl.duration.inMilliseconds.toDouble());
-                        } else {
-                          _dragVol = (_dragVol! - d.delta.dy / size.height * 150).clamp(0, 100);
-                          ctl.setVolume(_dragVol!);
-                        }
-                      });
-                    }
-                  : null,
-              onPanEnd: mobile
-                  ? (_) {
-                      if (_dragSeekMs != null) ctl.seekTo(_dragSeekMs!.round());
-                      setState(() {
+                    : null,
+                onDoubleTap: mobile ? () {} : widget.onFullscreen,
+                onLongPressStart: cardHold == null
+                    ? (_) {
+                        HapticFeedback.lightImpact();
+                        ctl.startBoost();
+                      }
+                    : null,
+                onLongPressEnd: cardHold == null ? (_) => ctl.endBoost() : null,
+                onPanStart: mobile && cardHold == null
+                    ? (d) {
+                        _horizontal = true;
                         _dragSeekMs = null;
                         _dragVol = null;
-                      });
-                    }
-                  : null,
+                        _dragStartMs = ctl.positionMs;
+                      }
+                    : null,
+                onPanUpdate: mobile && cardHold == null
+                    ? (d) {
+                        final size = context.size ?? const Size(1, 1);
+                        if (_dragSeekMs == null && _dragVol == null) {
+                          _horizontal = d.delta.dx.abs() >= d.delta.dy.abs();
+                          if (_horizontal) {
+                            _dragSeekMs = _dragStartMs.toDouble();
+                          } else {
+                            _dragVol = ctl.volume;
+                          }
+                        }
+                        setState(() {
+                          if (_horizontal) {
+                            final span = (ctl.duration.inMilliseconds).clamp(60000, 600000).toDouble();
+                            _dragSeekMs = (_dragSeekMs! + d.delta.dx / size.width * span).clamp(0, ctl.duration.inMilliseconds.toDouble());
+                          } else {
+                            _dragVol = (_dragVol! - d.delta.dy / size.height * 150).clamp(0, 100);
+                            ctl.setVolume(_dragVol!);
+                          }
+                        });
+                      }
+                    : null,
+                onPanEnd: mobile && cardHold == null
+                    ? (_) {
+                        if (_dragSeekMs != null) ctl.seekTo(_dragSeekMs!.round());
+                        setState(() {
+                          _dragSeekMs = null;
+                          _dragVol = null;
+                        });
+                      }
+                    : null,
+              ),
             ),
             // Picture-in-picture second view
             if (ctl.pipVideo != null) _PipWindow(controller: ctl.pipVideo!, label: ctl.sources[ctl.pipIdx!].label, onClose: () => ctl.setPip(null)),
