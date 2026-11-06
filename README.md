@@ -2,6 +2,9 @@
   <strong>English</strong> | <a href="README_ZH.md"><strong>中文</strong></a>
 </p>
 
+> [!IMPORTANT]
+> **This repository is no longer updated.** Development has moved to **[Coursive](https://github.com/WALKERKILLER/Coursive)**. The skills, code and releases here stay available for reference; please open new issues and pull requests in Coursive.
+
 <p align="center">
   <a href="#"><img src="images/logo.svg"></a>
 </p>
