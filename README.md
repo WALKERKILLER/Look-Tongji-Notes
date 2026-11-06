@@ -2,6 +2,11 @@
 
 # Look Studio
 
+> [!IMPORTANT]
+> **This branch is no longer updated.** Development has moved to **[Coursive](https://github.com/WALKERKILLER/Coursive)**. The code and releases here stay available for reference; please open new issues and pull requests in Coursive.
+>
+> **本分支已停止更新。** 开发已迁移至 **[Coursive](https://github.com/WALKERKILLER/Coursive)**。这里的代码和已发布版本保留，仅供参考。新的 Issue 和 Pull Request 请提交到 Coursive。
+
 > 🚧 开发中 / Work in progress — UI, APIs and data layout may change without notice.
 
 Desktop client for Tongji's lecture-recording platform (look.tongji.edu.cn), built on the [Look-Tongji-Notes](https://github.com/WALKERKILLER/Look-Tongji-Notes) skill: browse and download lectures, transcribe them, and write notes with an embedded assistant.
