@@ -3,6 +3,8 @@
 
 # Look-Tongji-Notes
 
+**This repository is frozen.** Development continues in [Coursive](https://github.com/WALKERKILLER/Coursive); do not start new work, pull requests or releases here unless the maintainer asks for a fix.
+
 ## Purpose
 Root of the Look Tongji Notes skill repository. Provides a multi-agent skill + CLI for processing lectures from Tongji Look (`look.tongji.edu.cn`): IAM SSO login, course listing, lecture transcription (SRT/TXT via BcutASR), slide snapshot download, supplementary material import, timeline outline generation, Markdown study-note writing, and static course knowledge-base site generation via the vendored `llm-wiki` library. Packaged as both a standalone CLI and an installable skill for Claude Code, Codex CLI, Cursor, Gemini CLI, OpenClaw, OpenCode, Hermes Agent, and GitHub Copilot.
 

@@ -2,6 +2,9 @@
   <a href="README.md"><strong>English</strong></a> | <strong>中文</strong>
 </p>
 
+> [!IMPORTANT]
+> **本仓库已停止更新。** 开发已迁移至 **[Coursive](https://github.com/WALKERKILLER/Coursive)**。这里的技能、代码和已发布版本保留，仅供参考。新的 Issue 和 Pull Request 请提交到 Coursive。
+
 <p align="center">
   <a href="#"><img src="images/logo.svg"></a>
 </p>
